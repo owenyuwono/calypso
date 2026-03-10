@@ -41,9 +41,6 @@ func _ready() -> void:
 	_decorate_field()
 	_add_zone_lighting()
 
-	# Apply toon shading to all environment meshes
-	_apply_toon_to_environment()
-
 	# Bake navmesh after environment is ready
 	var nav_region := $NavigationRegion3D
 	nav_region.bake_finished.connect(_on_navmesh_baked)
