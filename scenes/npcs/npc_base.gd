@@ -241,7 +241,8 @@ func _process_combat(delta: float) -> bool:
 			if _anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_do_combat_attack()
-		elif not _anim_player:
+		else:
+			# Fallback countdown when attack animation isn't playing
 			_hit_time -= delta
 			if _hit_time <= 0.0:
 				_pending_hit = false
