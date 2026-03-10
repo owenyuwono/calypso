@@ -32,6 +32,10 @@ signal item_looted(entity_id: String, item_id: String, count: int)
 signal item_purchased(buyer_id: String, item_id: String, cost: int)
 signal item_sold(seller_id: String, item_id: String, revenue: int)
 
+# Skills
+signal skill_used(entity_id: String, skill_id: String)
+signal skill_learned(entity_id: String, skill_id: String, new_level: int)
+
 # LLM events
 signal llm_request_sent(npc_id: String)
 signal llm_response_received(npc_id: String, response: Dictionary)
