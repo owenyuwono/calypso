@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/game_world/game_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="7_shop"]
 [ext_resource type="Script" path="res://scenes/main.gd" id="8_main"]
 [ext_resource type="PackedScene" path="res://scenes/ui/chat_input.tscn" id="9_chat"]
+[ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="10_minimap"]
+[ext_resource type="PackedScene" path="res://scenes/ui/chat_log.tscn" id="11_chatlog"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -35,5 +37,9 @@ target_path = NodePath("../Player")
 [node name="ShopPanel" parent="UILayer" instance=ExtResource("7_shop")]
 
 [node name="ChatInput" parent="UILayer" instance=ExtResource("9_chat")]
+
+[node name="ChatLog" parent="UILayer" instance=ExtResource("11_chatlog")]
+
+[node name="Minimap" parent="UILayer" instance=ExtResource("10_minimap")]
 
 [node name="NPCDebugPanel" parent="UILayer" instance=ExtResource("3_debug")]
