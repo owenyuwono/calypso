@@ -8,17 +8,11 @@ const ANIM_WHITELIST: PackedStringArray = [
 
 static var _scene_cache: Dictionary = {}
 static var _toon_shader: Shader = null
-static var _toon_cutout_shader: Shader = null
 
 static func _get_toon_shader() -> Shader:
 	if _toon_shader == null:
 		_toon_shader = load("res://assets/shaders/toon.gdshader") as Shader
 	return _toon_shader
-
-static func _get_toon_cutout_shader() -> Shader:
-	if _toon_cutout_shader == null:
-		_toon_cutout_shader = load("res://assets/shaders/toon_cutout.gdshader") as Shader
-	return _toon_cutout_shader
 
 static func load_model(path: String) -> PackedScene:
 	if _scene_cache.has(path):
@@ -177,20 +171,69 @@ static func apply_toon_to_model(root: Node) -> void:
 				toon_mat = create_toon_material_color(Color.WHITE)
 			mesh.set_surface_override_material(i, toon_mat)
 
-static func apply_toon_to_csg(node: Node) -> void:
-	if node is CSGPrimitive3D:
-		var csg := node as CSGPrimitive3D
-		if csg.material and csg.material is StandardMaterial3D:
-			var source := csg.material as StandardMaterial3D
-			csg.material = create_toon_material_color(source.albedo_color)
-	if node is MeshInstance3D:
-		var mesh := node as MeshInstance3D
-		if mesh.mesh:
-			var surf_count := mesh.mesh.get_surface_count()
-			for i in surf_count:
-				var override_mat := mesh.get_surface_override_material(i)
-				var orig_mat := override_mat if override_mat else mesh.mesh.surface_get_material(i)
-				if orig_mat and orig_mat is StandardMaterial3D:
-					mesh.set_surface_override_material(i, create_toon_material(orig_mat as StandardMaterial3D))
-	for child in node.get_children():
-		apply_toon_to_csg(child)
+# --- Consolidated Utility Functions ---
+
+## Spawn a floating damage number above a target entity.
+## caller is needed because static functions can't call get_tree().
+static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1)) -> void:
+	var target_node = WorldState.get_entity(target_id)
+	if not target_node:
+		return
+	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
+	if not dmg_scene:
+		return
+	var dmg := dmg_scene.instantiate()
+	caller.get_tree().current_scene.add_child(dmg)
+	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
+	dmg.setup(damage, color)
+
+## Flash-hit the target entity (calls its flash_hit() method if available).
+static func flash_target(target_id: String) -> void:
+	var target_node = WorldState.get_entity(target_id)
+	if not target_node or not is_instance_valid(target_node):
+		return
+	if target_node.has_method("flash_hit"):
+		target_node.flash_hit()
+
+## Create a fallback mesh (capsule or box) when a 3D model fails to load.
+## Returns {"model": Node3D, "mesh_instances": Array[MeshInstance3D], "overlay": StandardMaterial3D}.
+static func create_fallback_mesh(parent: Node3D, color: Color, use_box: bool = false) -> Dictionary:
+	var model := Node3D.new()
+	parent.add_child(model)
+	var mesh_inst := MeshInstance3D.new()
+	if use_box:
+		var box := BoxMesh.new()
+		box.size = Vector3(0.8, 0.8, 0.8)
+		mesh_inst.mesh = box
+		mesh_inst.position.y = 0.4
+	else:
+		var capsule := CapsuleMesh.new()
+		capsule.radius = 0.3
+		capsule.height = 1.2
+		mesh_inst.mesh = capsule
+		mesh_inst.position.y = 0.6
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mesh_inst.mesh.surface_set_material(0, mat)
+	model.add_child(mesh_inst)
+	var meshes: Array[MeshInstance3D] = [mesh_inst]
+	var overlay := create_overlay_material()
+	apply_overlay(meshes, overlay)
+	apply_toon_to_model(model)
+	return {"model": model, "mesh_instances": meshes, "overlay": overlay}
+
+## Create and attach an HP bar above an entity.
+static func create_hp_bar(parent: Node3D, y_offset: float = 1.8) -> Node:
+	var hp_bar_scene := load_model("res://scenes/ui/hp_bar_3d.tscn")
+	if not hp_bar_scene:
+		return null
+	var hp_bar := hp_bar_scene.instantiate()
+	hp_bar.position.y = y_offset
+	parent.add_child(hp_bar)
+	return hp_bar
+
+## Face a model toward a direction vector.
+static func face_direction(model: Node3D, dir: Vector3) -> void:
+	if model and dir.length_squared() > 0.01:
+		model.rotation.y = atan2(dir.x, dir.z)
+

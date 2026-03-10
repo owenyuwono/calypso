@@ -56,22 +56,10 @@ func _setup_model() -> void:
 		_anim_player.play("Idle")
 
 func _create_fallback_mesh() -> void:
-	_model = Node3D.new()
-	add_child(_model)
-	var mesh_inst := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.3
-	capsule.height = 1.2
-	mesh_inst.mesh = capsule
-	mesh_inst.position.y = 0.6
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = npc_color
-	mesh_inst.mesh.surface_set_material(0, mat)
-	_model.add_child(mesh_inst)
-	_mesh_instances = [mesh_inst]
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	var result := ModelHelper.create_fallback_mesh(self, npc_color)
+	_model = result.model
+	_mesh_instances = result.mesh_instances
+	_overlay_material = result.overlay
 
 func get_shop_items() -> Array:
 	return Array(shop_items)

@@ -2,7 +2,7 @@ extends CharacterBody3D
 ## Player controller with point-and-click movement, click-to-attack/interact, and death/respawn.
 ## Uses KayKit Knight 3D model with animations.
 
-const SPEED: float = 6.0
+const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const INTERACT_RANGE: float = 4.0
 const HOVER_RAY_LENGTH: float = 100.0
@@ -36,6 +36,8 @@ var _attack_timer: float = 0.0
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _pending_hit: bool = false
+var _hit_time: float = 0.0
 
 # 3D Model
 var _model: Node3D
@@ -99,27 +101,15 @@ func _setup_model() -> void:
 		_play_anim("Idle")
 
 func _create_fallback_mesh() -> void:
-	_model = Node3D.new()
-	add_child(_model)
-	var mesh_inst := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.3
-	capsule.height = 1.2
-	mesh_inst.mesh = capsule
-	mesh_inst.position.y = 0.6
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.4, 0.7)
-	mesh_inst.mesh.surface_set_material(0, mat)
-	_model.add_child(mesh_inst)
-	_mesh_instances = [mesh_inst]
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	var result := ModelHelper.create_fallback_mesh(self, Color(0.2, 0.4, 0.7))
+	_model = result.model
+	_mesh_instances = result.mesh_instances
+	_overlay_material = result.overlay
 
-func _play_anim(anim_name: String) -> void:
+func _play_anim(anim_name: String, force: bool = false) -> void:
 	if not _anim_player:
 		return
-	if _current_anim == anim_name and _anim_player.is_playing():
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -199,10 +189,7 @@ func _show_bubble(text: String) -> void:
 		_dialogue_bubble.show_dialogue(text)
 
 func _setup_hp_bar() -> void:
-	var hp_bar_scene := preload("res://scenes/ui/hp_bar_3d.tscn")
-	_hp_bar = hp_bar_scene.instantiate()
-	add_child(_hp_bar)
-	_hp_bar.position = Vector3(0, 1.8, 0)
+	_hp_bar = ModelHelper.create_hp_bar(self)
 	_hp_bar.visible = false
 
 func _physics_process(delta: float) -> void:
@@ -275,8 +262,7 @@ func _process(delta: float) -> void:
 		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
 func _face_direction(dir: Vector3) -> void:
-	if _model and dir.length() > 0.1:
-		_model.rotation.y = atan2(dir.x, dir.z)
+	ModelHelper.face_direction(_model, dir)
 
 func _process_combat(delta: float) -> bool:
 	var target_node := WorldState.get_entity(_attack_target)
@@ -311,12 +297,21 @@ func _process_combat(delta: float) -> bool:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
-	var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
-	_attack_timer += delta
-	if _attack_timer >= attack_speed:
-		_attack_timer = 0.0
-		_play_anim("1H_Melee_Attack_Chop")
-		get_tree().create_timer(0.3).timeout.connect(_perform_attack)
+	# Check animation position for hit event before starting new attacks
+	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+		if _anim_player.current_animation_position >= _hit_time:
+			_pending_hit = false
+			_perform_attack()
+
+	# Only accumulate attack cooldown after the pending hit has landed
+	if not _pending_hit:
+		var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
+		_attack_timer += delta
+		if _attack_timer >= attack_speed:
+			_attack_timer = 0.0
+			_play_anim("1H_Melee_Attack_Chop", true)
+			_pending_hit = true
+			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _perform_attack() -> void:
@@ -330,6 +325,7 @@ func _perform_attack() -> void:
 func _cancel_attack() -> void:
 	_attack_target = ""
 	_attack_timer = 0.0
+	_pending_hit = false
 	_last_nav_target_pos = Vector3.INF
 	_ring_target_id = ""
 	_hover_ring.visible = false
@@ -350,7 +346,10 @@ func _on_arrived() -> void:
 	var etype: String = data.get("type", "")
 	var target_node := WorldState.get_entity(_interact_target)
 
-	if etype == "shop_npc":
+	if etype == "loot_drop":
+		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
+			target_node.pickup("player")
+	elif etype == "shop_npc":
 		_open_shop(_interact_target)
 	elif etype == "npc":
 		if target_node and is_instance_valid(target_node):
@@ -400,12 +399,13 @@ func _process_hover() -> void:
 			var max_hp: int = data.get("max_hp", 0)
 			display_name += " (HP: %d/%d)" % [hp, max_hp]
 			_cursor_manager.set_cursor("attack")
-			_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+		elif entity_type == "loot_drop":
+			display_name += " [Loot]"
+			_cursor_manager.set_cursor("move")
 		elif entity_type == "shop_npc" or entity_type == "npc":
 			if entity_type == "shop_npc":
 				display_name += " [Shop]"
 			_cursor_manager.set_cursor("talk")
-			_hover_ring_material.albedo_color = Color(0.3, 0.5, 1.0, 0.6)
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name
@@ -450,6 +450,19 @@ func _handle_left_click() -> void:
 			if target_node:
 				_hover_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
 				_hover_ring.visible = true
+			return
+
+		if etype == "loot_drop":
+			# Click loot: walk to + pick up on arrival
+			_cancel_attack()
+			_interact_target = _hovered_entity_id
+			var target_node := WorldState.get_entity(_hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				var dist := global_position.distance_to(target_node.global_position)
+				if dist <= INTERACT_RANGE:
+					_on_arrived()
+					return
+				_navigate_to(target_node.global_position)
 			return
 
 		if etype == "shop_npc" or etype == "npc":
@@ -609,22 +622,16 @@ func flash_hit() -> void:
 		return
 	ModelHelper.flash_hit(_overlay_material, self)
 
+func _get_hit_delay(anim_name: String) -> float:
+	if _anim_player and _anim_player.has_animation(anim_name):
+		return _anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
+
 func _spawn_damage_number(target_id: String, damage: int) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node:
-		return
-	var dmg_scene := preload("res://scenes/ui/damage_number.tscn")
-	var dmg := dmg_scene.instantiate()
-	get_tree().current_scene.add_child(dmg)
-	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
-	dmg.setup(damage)
+	ModelHelper.spawn_damage_number(self, target_id, damage)
 
 func _flash_target(target_id: String) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node or not is_instance_valid(target_node):
-		return
-	if target_node.has_method("flash_hit"):
-		target_node.flash_hit()
+	ModelHelper.flash_target(target_id)
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	var marker := MeshInstance3D.new()

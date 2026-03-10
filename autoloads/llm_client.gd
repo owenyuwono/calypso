@@ -114,7 +114,5 @@ func _finish_request(pool_entry: Dictionary, req_id: String, response: Dictionar
 
 	if error.is_empty():
 		request_completed.emit(req_id, response)
-		GameEvents.llm_response_received.emit(req_id, response)
 	else:
 		request_failed.emit(req_id, error)
-		GameEvents.llm_request_failed.emit(req_id, error)

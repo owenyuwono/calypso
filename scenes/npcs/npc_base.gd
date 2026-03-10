@@ -37,13 +37,15 @@ var combat_target: String = ""
 var _attack_timer: float = 0.0
 var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _pending_hit: bool = false
+var _hit_time: float = 0.0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var dialogue_bubble: Node3D = $DialogueBubble
 @onready var name_label: Label3D = $NameLabel
 
-const MOVE_SPEED: float = 3.0
+const MOVE_SPEED: float = 3.6
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
 
@@ -106,35 +108,22 @@ func _setup_model() -> void:
 		_play_anim("Idle")
 
 func _create_fallback_mesh() -> void:
-	_model = Node3D.new()
-	add_child(_model)
-	var mesh_inst := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.3
-	capsule.height = 1.2
-	mesh_inst.mesh = capsule
-	mesh_inst.position.y = 0.6
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = npc_color
-	mesh_inst.mesh.surface_set_material(0, mat)
-	_model.add_child(mesh_inst)
-	_mesh_instances = [mesh_inst]
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	var result := ModelHelper.create_fallback_mesh(self, npc_color)
+	_model = result.model
+	_mesh_instances = result.mesh_instances
+	_overlay_material = result.overlay
 
-func _play_anim(anim_name: String) -> void:
+func _play_anim(anim_name: String, force: bool = false) -> void:
 	if not _anim_player:
 		return
-	if _current_anim == anim_name and _anim_player.is_playing():
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
 func _face_direction(dir: Vector3) -> void:
-	if _model and dir.length() > 0.1:
-		_model.rotation.y = atan2(dir.x, dir.z)
+	ModelHelper.face_direction(_model, dir)
 
 func _register_with_world() -> void:
 	WorldState.register_entity(npc_id, self, {
@@ -153,10 +142,7 @@ func _register_with_world() -> void:
 	})
 
 func _setup_hp_bar() -> void:
-	var hp_bar_scene := preload("res://scenes/ui/hp_bar_3d.tscn")
-	_hp_bar = hp_bar_scene.instantiate()
-	add_child(_hp_bar)
-	_hp_bar.position = Vector3(0, 1.8, 0)
+	_hp_bar = ModelHelper.create_hp_bar(self)
 	_hp_bar.visible = false
 
 func _physics_process(delta: float) -> void:
@@ -254,12 +240,21 @@ func _process_combat(delta: float) -> bool:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
-	var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
-	_attack_timer += delta
-	if _attack_timer >= attack_speed:
-		_attack_timer = 0.0
-		_play_anim("1H_Melee_Attack_Chop")
-		get_tree().create_timer(0.3).timeout.connect(_do_combat_attack)
+	# Check animation position for hit event before starting new attacks
+	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+		if _anim_player.current_animation_position >= _hit_time:
+			_pending_hit = false
+			_do_combat_attack()
+
+	# Only accumulate attack cooldown after the pending hit has landed
+	if not _pending_hit:
+		var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
+		_attack_timer += delta
+		if _attack_timer >= attack_speed:
+			_attack_timer = 0.0
+			_play_anim("1H_Melee_Attack_Chop", true)
+			_pending_hit = true
+			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _do_combat_attack() -> void:
@@ -295,7 +290,6 @@ func change_state(new_state: String) -> void:
 		var tint: Color = STATE_COLORS.get(new_state, Color(0, 0, 0, 0))
 		ModelHelper.set_state_tint(_overlay_material, tint)
 
-	GameEvents.npc_state_changed.emit(npc_id, old_state, new_state)
 
 func _on_any_npc_spoke(speaker_id: String, dialogue: String, _target_id: String) -> void:
 	if speaker_id == npc_id and dialogue_bubble:
@@ -320,10 +314,8 @@ func navigate_to_entity(target_id: String) -> void:
 		GameEvents.npc_action_completed.emit(npc_id, "move_to", false)
 
 func set_goal(new_goal: String) -> void:
-	var old_goal := current_goal
 	current_goal = new_goal
 	WorldState.set_entity_data(npc_id, "goal", new_goal)
-	GameEvents.npc_goal_changed.emit(npc_id, old_goal, new_goal)
 
 func enter_combat(target_id: String) -> void:
 	combat_target = target_id
@@ -352,11 +344,13 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		if memory_node:
 			memory_node.add_observation("Killed %s in combat" % combat_target)
 		combat_target = ""
+		_pending_hit = false
 		change_state(STATE_IDLE)
 
 func _die() -> void:
 	change_state(STATE_DEAD)
 	combat_target = ""
+	_pending_hit = false
 	velocity = Vector3.ZERO
 
 	# Lose 10% gold
@@ -389,7 +383,8 @@ func _respawn() -> void:
 
 	# Visual: restore materials and play idle
 	ModelHelper.restore_materials(_mesh_instances)
-	ModelHelper.clear_overlay(_overlay_material)
+	if _overlay_material:
+		ModelHelper.clear_overlay(_overlay_material)
 	_play_anim("Idle")
 
 	if _hp_bar:
@@ -417,22 +412,16 @@ func flash_hit() -> void:
 		return
 	ModelHelper.flash_hit(_overlay_material, self)
 
+func _get_hit_delay(anim_name: String) -> float:
+	if _anim_player and _anim_player.has_animation(anim_name):
+		return _anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
+
 func _spawn_damage_number(target_id: String, damage: int) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node:
-		return
-	var dmg_scene := preload("res://scenes/ui/damage_number.tscn")
-	var dmg := dmg_scene.instantiate()
-	get_tree().current_scene.add_child(dmg)
-	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
-	dmg.setup(damage)
+	ModelHelper.spawn_damage_number(self, target_id, damage)
 
 func _flash_target(target_id: String) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node or not is_instance_valid(target_node):
-		return
-	if target_node.has_method("flash_hit"):
-		target_node.flash_hit()
+	ModelHelper.flash_target(target_id)
 
 # --- Hover Highlight ---
 
