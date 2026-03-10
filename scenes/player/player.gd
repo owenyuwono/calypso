@@ -12,10 +12,16 @@ const MODEL_SCALE: float = 0.7
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
+var _cursor_manager: RefCounted
+var _hover_ring: MeshInstance3D
+var _hover_ring_material: StandardMaterial3D
+
 var _hovered_entity_id: String = ""
+var _ring_target_id: String = ""
 var _tooltip_label: Label
 var _tooltip_panel: PanelContainer
 var _hover_timer: float = 0.0
@@ -63,6 +69,8 @@ func _ready() -> void:
 	stats["equipment"] = {"weapon": "", "armor": ""}
 	WorldState.register_entity("player", self, stats)
 
+	_cursor_manager = CursorManager.new()
+	_setup_hover_ring()
 	_setup_tooltip()
 	_setup_hp_bar()
 	_setup_dialogue_bubble()
@@ -150,6 +158,29 @@ func _setup_dialogue_bubble() -> void:
 	add_child(_dialogue_bubble)
 	_dialogue_bubble.position = Vector3(0, 2.2, 0)
 
+func _setup_hover_ring() -> void:
+	_hover_ring = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.4
+	torus.outer_radius = 0.6
+	_hover_ring.mesh = torus
+	_hover_ring.top_level = true
+
+	_hover_ring_material = StandardMaterial3D.new()
+	_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+	_hover_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_hover_ring_material.no_depth_test = true
+	_hover_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_hover_ring.material_override = _hover_ring_material
+
+	_hover_ring.visible = false
+	add_child(_hover_ring)
+
+	# Looping pulse tween
+	var tween := get_tree().create_tween().set_loops()
+	tween.tween_property(_hover_ring, "scale", Vector3(1.15, 1.0, 1.15), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_hover_ring, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
 func show_chat(text: String) -> void:
 	_show_bubble(text)
 	# If there's a pending NPC conversation, send the message to them
@@ -225,6 +256,16 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if _is_dead:
 		return
+
+	# Track ring to locked target every frame
+	if _hover_ring.visible and _ring_target_id != "":
+		var entity := WorldState.get_entity(_ring_target_id)
+		if entity and is_instance_valid(entity) and WorldState.is_alive(_ring_target_id):
+			_hover_ring.global_position = entity.global_position + Vector3(0, 0.05, 0)
+		else:
+			_hover_ring.visible = false
+			_ring_target_id = ""
+
 	_hover_timer -= delta
 	if _hover_timer <= 0.0:
 		_hover_timer = 0.1
@@ -290,6 +331,8 @@ func _cancel_attack() -> void:
 	_attack_target = ""
 	_attack_timer = 0.0
 	_last_nav_target_pos = Vector3.INF
+	_ring_target_id = ""
+	_hover_ring.visible = false
 
 func _stop_navigation() -> void:
 	_is_navigating = false
@@ -347,7 +390,7 @@ func _process_hover() -> void:
 				new_node.highlight()
 		_hovered_entity_id = new_entity_id
 
-	# Update tooltip
+	# Update tooltip, cursor, and hover ring
 	if _hovered_entity_id != "":
 		var data := WorldState.get_entity_data(_hovered_entity_id)
 		var display_name: String = data.get("name", _hovered_entity_id)
@@ -356,13 +399,21 @@ func _process_hover() -> void:
 			var hp: int = data.get("hp", 0)
 			var max_hp: int = data.get("max_hp", 0)
 			display_name += " (HP: %d/%d)" % [hp, max_hp]
-		elif entity_type == "shop_npc":
-			display_name += " [Shop]"
+			_cursor_manager.set_cursor("attack")
+			_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+		elif entity_type == "shop_npc" or entity_type == "npc":
+			if entity_type == "shop_npc":
+				display_name += " [Shop]"
+			_cursor_manager.set_cursor("talk")
+			_hover_ring_material.albedo_color = Color(0.3, 0.5, 1.0, 0.6)
+		else:
+			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name
 		_tooltip_panel.visible = true
 		_tooltip_panel.position = mouse_pos + TOOLTIP_OFFSET
 	else:
 		_tooltip_panel.visible = false
+		_cursor_manager.set_cursor("default")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
@@ -388,11 +439,17 @@ func _handle_left_click() -> void:
 		var etype: String = data.get("type", "")
 
 		if etype == "monster" and WorldState.is_alive(_hovered_entity_id):
-			# Click monster: walk to + auto-attack
+			# Click monster: walk to + auto-attack, lock ring on target
 			_interact_target = ""
 			_attack_target = _hovered_entity_id
 			_attack_timer = 0.0
 			_is_navigating = false
+			_ring_target_id = _hovered_entity_id
+			_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+			var target_node := WorldState.get_entity(_ring_target_id)
+			if target_node:
+				_hover_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
+				_hover_ring.visible = true
 			return
 
 		if etype == "shop_npc" or etype == "npc":
@@ -409,11 +466,13 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
-	# Click on ground: move there
+	# Click on ground: move there, cancel target lock
 	var ground_pos := _raycast_ground()
 	if ground_pos != Vector3.INF:
 		_cancel_attack()
 		_interact_target = ""
+		_ring_target_id = ""
+		_hover_ring.visible = false
 		_spawn_click_marker(ground_pos)
 		_navigate_to(ground_pos)
 
@@ -481,6 +540,9 @@ func _is_ui_open() -> bool:
 # --- Death / Respawn ---
 
 func _on_entity_died(entity_id: String, _killer_id: String) -> void:
+	if entity_id == _ring_target_id:
+		_ring_target_id = ""
+		_hover_ring.visible = false
 	if entity_id != "player":
 		return
 	_die()
@@ -490,6 +552,9 @@ func _die() -> void:
 	_cancel_attack()
 	_stop_navigation()
 	velocity = Vector3.ZERO
+	_ring_target_id = ""
+	_hover_ring.visible = false
+	_cursor_manager.reset()
 
 	# Lose 10% gold
 	var gold := WorldState.get_gold("player")
