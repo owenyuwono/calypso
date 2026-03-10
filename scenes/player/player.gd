@@ -61,6 +61,10 @@ var _dialogue_bubble: Node3D
 var _pending_talk_target_id: String = ""
 var _pending_talk_target_node: Node3D
 
+func _exit_tree() -> void:
+	if _cursor_manager:
+		_cursor_manager.cleanup()
+
 func _ready() -> void:
 	_setup_model()
 

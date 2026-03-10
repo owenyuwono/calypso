@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scenes/monsters/monster_spawner.gd" id="4_spawner"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
-parsed_geometry_type = 2
+parsed_geometry_type = 0
 agent_radius = 0.5
 agent_height = 2.0
 

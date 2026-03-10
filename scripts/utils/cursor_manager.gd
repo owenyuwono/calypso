@@ -24,6 +24,11 @@ func reset() -> void:
 	_current_type = ""
 	set_cursor("default")
 
+func cleanup() -> void:
+	Input.set_custom_mouse_cursor(null)
+	_cursors.clear()
+	_current_type = ""
+
 # --- Drawing helpers ---
 
 func _set_pixel_safe(img: Image, x: int, y: int, color: Color) -> void:
