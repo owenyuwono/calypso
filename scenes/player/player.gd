@@ -52,6 +52,7 @@ var _hp_bar: Node3D
 # UI references (set by main scene setup)
 var shop_panel: Control
 var inventory_panel: Control
+var status_panel: Control
 var chat_input: Control
 
 # Dialogue bubble above head
@@ -556,6 +557,8 @@ func _is_ui_open() -> bool:
 	if shop_panel and shop_panel.has_method("is_open") and shop_panel.is_open():
 		return true
 	if inventory_panel and inventory_panel.has_method("is_open") and inventory_panel.is_open():
+		return true
+	if status_panel and status_panel.has_method("is_open") and status_panel.is_open():
 		return true
 	if chat_input and chat_input.is_open():
 		return true
