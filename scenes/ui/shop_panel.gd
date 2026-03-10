@@ -2,12 +2,13 @@ extends Control
 ## Shop UI panel for buying and selling items.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 var _panel: PanelContainer
 var _shop_list: VBoxContainer
 var _player_list: VBoxContainer
 var _gold_label: Label
-var _title_label: Label
+var _drag_handle: PanelContainer
 var _is_open: bool = false
 var _current_shop_id: String = ""
 var _current_shop_items: Array = []
@@ -37,34 +38,22 @@ func _build_ui() -> void:
 	style.content_margin_bottom = 12
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
-	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 
 	var main_vbox := VBoxContainer.new()
 	_panel.add_child(main_vbox)
 
-	# Title + Gold row
-	var top_row := HBoxContainer.new()
-	main_vbox.add_child(top_row)
-
-	_title_label = Label.new()
-	_title_label.text = "Shop"
-	_title_label.add_theme_font_size_override("font_size", 18)
-	_title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(_title_label)
-
+	# Gold label (will be reparented into drag handle as extra_right)
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 16)
 	_gold_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	top_row.add_child(_gold_label)
+	main_vbox.add_child(_gold_label)
 
-	# Close hint
-	var close_hint := Label.new()
-	close_hint.text = "(Escape to close)"
-	close_hint.add_theme_font_size_override("font_size", 12)
-	close_hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	close_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_vbox.add_child(close_hint)
+	# Draggable title bar with gold label on the right
+	_drag_handle = DragHandle.new()
+	_drag_handle.setup(_panel, "Shop", _gold_label)
+	_drag_handle.close_pressed.connect(close_shop)
+	main_vbox.add_child(_drag_handle)
+	main_vbox.move_child(_drag_handle, 0)
 
 	# Two columns
 	var columns := HBoxContainer.new()
@@ -122,10 +111,19 @@ func open_shop(shop_id: String) -> void:
 	_current_shop_id = shop_id
 	var shop_data := WorldState.get_entity_data(shop_id)
 	_current_shop_items = shop_data.get("shop_items", [])
-	_title_label.text = shop_data.get("name", "Shop")
+	_drag_handle.set_title(shop_data.get("name", "Shop"))
 	_is_open = true
 	visible = true
+	_center_panel()
 	_refresh()
+
+func _center_panel() -> void:
+	_panel.anchor_left = 0.0
+	_panel.anchor_top = 0.0
+	_panel.anchor_right = 0.0
+	_panel.anchor_bottom = 0.0
+	var vp_size := get_viewport_rect().size
+	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func close_shop() -> void:
 	_is_open = false

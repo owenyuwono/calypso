@@ -2,6 +2,7 @@ extends Control
 ## Player inventory panel toggled with Tab.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 var _panel: PanelContainer
 var _item_list: VBoxContainer
@@ -16,7 +17,6 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.anchors_preset = Control.PRESET_CENTER
 	_panel.custom_minimum_size = Vector2(300, 400)
 
 	var style := StyleBoxFlat.new()
@@ -37,19 +37,14 @@ func _build_ui() -> void:
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
 
-	# Center the panel
-	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-
 	var vbox := VBoxContainer.new()
 	_panel.add_child(vbox)
 
-	# Title
-	var title := Label.new()
-	title.text = "Inventory (Tab to close)"
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
+	# Draggable title bar
+	var drag_handle := DragHandle.new()
+	drag_handle.setup(_panel, "Inventory")
+	drag_handle.close_pressed.connect(_toggle)
+	vbox.add_child(drag_handle)
 
 	# Equipment section
 	_equipment_label = Label.new()
@@ -85,7 +80,16 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
+		_center_panel()
 		_refresh()
+
+func _center_panel() -> void:
+	_panel.anchor_left = 0.0
+	_panel.anchor_top = 0.0
+	_panel.anchor_right = 0.0
+	_panel.anchor_bottom = 0.0
+	var vp_size := get_viewport_rect().size
+	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func _refresh() -> void:
 	if not _is_open:
