@@ -3,6 +3,7 @@ extends Node
 
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
 # Entity registry: id -> Node3D reference
 var entities: Dictionary = {}
@@ -194,6 +195,18 @@ func deal_damage(attacker_id: String, target_id: String) -> int:
 		GameEvents.entity_died.emit(target_id, attacker_id)
 	return damage
 
+func deal_damage_amount(attacker_id: String, target_id: String, amount: int) -> int:
+	var def := get_effective_def(target_id)
+	var damage := maxi(1, amount - def)
+	var target_data := get_entity_data(target_id)
+	var hp: int = target_data.get("hp", 0)
+	hp = maxi(0, hp - damage)
+	set_entity_data(target_id, "hp", hp)
+	GameEvents.entity_damaged.emit(target_id, attacker_id, damage, hp)
+	if hp <= 0:
+		GameEvents.entity_died.emit(target_id, attacker_id)
+	return damage
+
 func heal_entity(entity_id: String, amount: int) -> int:
 	var data := get_entity_data(entity_id)
 	var hp: int = data.get("hp", 0)
@@ -284,8 +297,55 @@ func grant_xp(entity_id: String, amount: int) -> void:
 		set_entity_data(entity_id, "hp", cur_max_hp)  # Full heal on level up
 		set_entity_data(entity_id, "atk", get_stat(entity_id, "atk", 10) + LevelData.ATK_PER_LEVEL)
 		set_entity_data(entity_id, "def", get_stat(entity_id, "def", 5) + LevelData.DEF_PER_LEVEL)
+		set_entity_data(entity_id, "skill_points", get_entity_data(entity_id).get("skill_points", 0) + LevelData.SKILL_POINTS_PER_LEVEL)
 		GameEvents.level_up.emit(entity_id, level)
 		xp_needed = LevelData.xp_to_next_level(level)
 
 func is_alive(entity_id: String) -> bool:
 	return get_entity_data(entity_id).get("hp", 0) > 0
+
+# --- Skills ---
+
+func learn_skill(entity_id: String, skill_id: String) -> bool:
+	var data := get_entity_data(entity_id)
+	var sp: int = data.get("skill_points", 0)
+	if sp <= 0:
+		return false
+	var skill := SkillDatabase.get_skill(skill_id)
+	if skill.is_empty():
+		return false
+	var player_level: int = data.get("level", 1)
+	if player_level < skill.get("required_level", 1):
+		return false
+	var skills: Dictionary = data.get("skills", {})
+	var current_level: int = skills.get(skill_id, 0)
+	if current_level >= skill.get("max_level", 5):
+		return false
+	skills[skill_id] = current_level + 1
+	set_entity_data(entity_id, "skills", skills)
+	set_entity_data(entity_id, "skill_points", sp - 1)
+	GameEvents.skill_learned.emit(entity_id, skill_id, current_level + 1)
+	return true
+
+func get_skill_level(entity_id: String, skill_id: String) -> int:
+	var data := get_entity_data(entity_id)
+	var skills: Dictionary = data.get("skills", {})
+	return skills.get(skill_id, 0)
+
+func get_skill_points(entity_id: String) -> int:
+	return get_entity_data(entity_id).get("skill_points", 0)
+
+func set_hotbar_slot(entity_id: String, slot: int, skill_id: String) -> void:
+	var data := get_entity_data(entity_id)
+	var hotbar: Array = data.get("hotbar", ["", "", "", "", ""])
+	if slot < 0 or slot >= hotbar.size():
+		return
+	# Remove skill from other slots first
+	for i in range(hotbar.size()):
+		if hotbar[i] == skill_id:
+			hotbar[i] = ""
+	hotbar[slot] = skill_id
+	set_entity_data(entity_id, "hotbar", hotbar)
+
+func get_hotbar(entity_id: String) -> Array:
+	return get_entity_data(entity_id).get("hotbar", ["", "", "", "", ""])

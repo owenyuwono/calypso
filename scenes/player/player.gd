@@ -11,6 +11,7 @@ const MODEL_SCALE: float = 0.7
 
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 
@@ -38,6 +39,11 @@ var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
 var _pending_hit: bool = false
 var _hit_time: float = 0.0
+var _pending_skill_hit: bool = false
+var _pending_skill_damage: int = 0
+var _pending_skill_id: String = ""
+var _pending_skill_anim: String = ""
+var _skill_hit_time: float = 0.0
 
 # 3D Model
 var _model: Node3D
@@ -54,6 +60,8 @@ var shop_panel: Control
 var inventory_panel: Control
 var status_panel: Control
 var chat_input: Control
+var skill_hotbar: Control
+var skill_panel: Control
 
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
@@ -74,6 +82,9 @@ func _ready() -> void:
 	stats["name"] = "Player"
 	stats["inventory"] = {}
 	stats["equipment"] = {"weapon": "", "armor": ""}
+	stats["skill_points"] = 0
+	stats["skills"] = {}
+	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
 
 	_cursor_manager = CursorManager.new()
@@ -302,6 +313,13 @@ func _process_combat(delta: float) -> bool:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
+	# Check animation position for skill hit
+	if _pending_skill_hit and _anim_player:
+		if _anim_player.current_animation == _pending_skill_anim:
+			if _anim_player.current_animation_position >= _skill_hit_time:
+				_pending_skill_hit = false
+				_execute_skill_hit()
+
 	# Check animation position for hit event before starting new attacks
 	if _pending_hit:
 		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
@@ -316,7 +334,7 @@ func _process_combat(delta: float) -> bool:
 				_perform_attack()
 
 	# Only accumulate attack cooldown after the pending hit has landed
-	if not _pending_hit:
+	if not _pending_hit and not _pending_skill_hit:
 		var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
 		_attack_timer += delta
 		if _attack_timer >= attack_speed:
@@ -338,6 +356,10 @@ func _cancel_attack() -> void:
 	_attack_target = ""
 	_attack_timer = 0.0
 	_pending_hit = false
+	_pending_skill_hit = false
+	_pending_skill_damage = 0
+	_pending_skill_id = ""
+	_pending_skill_anim = ""
 	_last_nav_target_pos = Vector3.INF
 	_ring_target_id = ""
 	_hover_ring.visible = false
@@ -430,6 +452,13 @@ func _process_hover() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
+
+	if not _is_ui_open():
+		for i in range(5):
+			if event.is_action_pressed("hotbar_%d" % (i + 1)):
+				_try_use_hotbar_slot(i)
+				get_viewport().set_input_as_handled()
+				return
 
 	if event.is_action_pressed("chat_submit"):
 		if chat_input and not chat_input.is_open() and not _is_ui_open():
@@ -562,6 +591,8 @@ func _is_ui_open() -> bool:
 		return true
 	if chat_input and chat_input.is_open():
 		return true
+	if skill_panel and skill_panel.has_method("is_open") and skill_panel.is_open():
+		return true
 	return false
 
 # --- Death / Respawn ---
@@ -646,6 +677,63 @@ func _spawn_damage_number(target_id: String, damage: int) -> void:
 
 func _flash_target(target_id: String) -> void:
 	ModelHelper.flash_target(target_id)
+
+func _try_use_hotbar_slot(slot: int) -> void:
+	var hotbar: Array = WorldState.get_hotbar("player")
+	if slot < 0 or slot >= hotbar.size():
+		return
+	var skill_id: String = hotbar[slot]
+	if skill_id.is_empty():
+		return
+	if skill_hotbar and skill_hotbar.has_method("is_on_cooldown") and skill_hotbar.is_on_cooldown(skill_id):
+		return
+	_use_skill(skill_id)
+
+func _use_skill(skill_id: String) -> void:
+	var skill := SkillDatabase.get_skill(skill_id)
+	if skill.is_empty():
+		return
+	var skill_level: int = WorldState.get_skill_level("player", skill_id)
+	if skill_level <= 0:
+		return
+	var skill_type: String = skill.get("type", "")
+	if skill_type == "melee_attack":
+		if _attack_target.is_empty():
+			return
+		var target_node := WorldState.get_entity(_attack_target)
+		if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
+			return
+		var dist := global_position.distance_to(target_node.global_position)
+		var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
+		if dist > attack_range:
+			return
+		var multiplier := SkillDatabase.get_effective_multiplier(skill_id, skill_level)
+		var raw_damage := floori(WorldState.get_effective_atk("player") * multiplier)
+		var anim_name: String = skill.get("animation", "1H_Melee_Attack_Chop")
+		_pending_skill_hit = true
+		_pending_skill_damage = raw_damage
+		_pending_skill_id = skill_id
+		_pending_skill_anim = anim_name
+		_play_anim(anim_name, true)
+		_skill_hit_time = _get_hit_delay(anim_name)
+		_attack_timer = 0.0
+		_pending_hit = false
+		# Start cooldown
+		var cooldown := SkillDatabase.get_effective_cooldown(skill_id, skill_level)
+		if skill_hotbar and skill_hotbar.has_method("start_cooldown"):
+			skill_hotbar.start_cooldown(skill_id, cooldown)
+
+func _execute_skill_hit() -> void:
+	if _attack_target.is_empty():
+		return
+	if not WorldState.is_alive(_attack_target):
+		return
+	var actual_damage := WorldState.deal_damage_amount("player", _attack_target, _pending_skill_damage)
+	_spawn_damage_number(_attack_target, actual_damage)
+	_flash_target(_attack_target)
+	GameEvents.skill_used.emit("player", _pending_skill_id)
+	_pending_skill_damage = 0
+	_pending_skill_id = ""
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	var marker := MeshInstance3D.new()

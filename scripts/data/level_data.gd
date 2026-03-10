@@ -9,6 +9,7 @@ static func xp_to_next_level(current_level: int) -> int:
 	return current_level * 100
 
 ## Stat gains on level up.
+const SKILL_POINTS_PER_LEVEL: int = 1
 const HP_PER_LEVEL: int = 10
 const ATK_PER_LEVEL: int = 2
 const DEF_PER_LEVEL: int = 1
