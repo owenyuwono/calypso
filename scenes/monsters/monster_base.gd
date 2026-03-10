@@ -344,7 +344,8 @@ func _process_attacking(delta: float) -> void:
 			if _anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_perform_attack()
-		elif not _anim_player:
+		else:
+			# Fallback countdown for monsters without attack animation (e.g. slime)
 			_hit_time -= delta
 			if _hit_time <= 0.0:
 				_pending_hit = false
