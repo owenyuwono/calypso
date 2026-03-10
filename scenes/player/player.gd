@@ -91,22 +91,10 @@ func _setup_model() -> void:
 		_play_anim("Idle")
 
 func _create_fallback_mesh() -> void:
-	_model = Node3D.new()
-	add_child(_model)
-	var mesh_inst := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.3
-	capsule.height = 1.2
-	mesh_inst.mesh = capsule
-	mesh_inst.position.y = 0.6
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.4, 0.7)
-	mesh_inst.mesh.surface_set_material(0, mat)
-	_model.add_child(mesh_inst)
-	_mesh_instances = [mesh_inst]
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	var result := ModelHelper.create_fallback_mesh(self, Color(0.2, 0.4, 0.7))
+	_model = result.model
+	_mesh_instances = result.mesh_instances
+	_overlay_material = result.overlay
 
 func _play_anim(anim_name: String) -> void:
 	if not _anim_player:
@@ -168,10 +156,7 @@ func _show_bubble(text: String) -> void:
 		_dialogue_bubble.show_dialogue(text)
 
 func _setup_hp_bar() -> void:
-	var hp_bar_scene := preload("res://scenes/ui/hp_bar_3d.tscn")
-	_hp_bar = hp_bar_scene.instantiate()
-	add_child(_hp_bar)
-	_hp_bar.position = Vector3(0, 1.8, 0)
+	_hp_bar = ModelHelper.create_hp_bar(self)
 	_hp_bar.visible = false
 
 func _physics_process(delta: float) -> void:
@@ -234,8 +219,7 @@ func _process(delta: float) -> void:
 		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
 func _face_direction(dir: Vector3) -> void:
-	if _model and dir.length() > 0.1:
-		_model.rotation.y = atan2(dir.x, dir.z)
+	ModelHelper.face_direction(_model, dir)
 
 func _process_combat(delta: float) -> bool:
 	var target_node := WorldState.get_entity(_attack_target)
@@ -545,21 +529,10 @@ func flash_hit() -> void:
 	ModelHelper.flash_hit(_overlay_material, self)
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node:
-		return
-	var dmg_scene := preload("res://scenes/ui/damage_number.tscn")
-	var dmg := dmg_scene.instantiate()
-	get_tree().current_scene.add_child(dmg)
-	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
-	dmg.setup(damage)
+	ModelHelper.spawn_damage_number(self, target_id, damage)
 
 func _flash_target(target_id: String) -> void:
-	var target_node := WorldState.get_entity(target_id)
-	if not target_node or not is_instance_valid(target_node):
-		return
-	if target_node.has_method("flash_hit"):
-		target_node.flash_hit()
+	ModelHelper.flash_target(target_id)
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	var marker := MeshInstance3D.new()

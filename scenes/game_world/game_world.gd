@@ -7,7 +7,6 @@ const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
 const TREE_DIR := "res://assets/models/environment/nature/trees/fir/"
 const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 
 # Terrain noise (shared for height queries)
@@ -19,7 +18,6 @@ var _terrain_height_scale_field: float = 0.5
 var _model_cache: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _color_mat_cache: Dictionary = {}
-var _tree_mat_names_printed := false
 var _deco_noise: FastNoiseLite          # density modulation noise
 var _spawned_positions: Array = []       # Vector2 tracking for min-spacing checks
 var _path_lines: Array = []              # [{start: Vector2, end: Vector2, buffer: float}]
@@ -61,7 +59,6 @@ func _ready() -> void:
 func _on_navmesh_baked() -> void:
 	var nav_mesh: NavigationMesh = $NavigationRegion3D.navigation_mesh
 	var poly_count: int = nav_mesh.get_polygon_count()
-	print("[NavMesh] Bake finished — %d polygons" % poly_count)
 	if poly_count == 0:
 		push_warning("[NavMesh] WARNING: Navmesh is EMPTY!")
 	_setup_adventurer_npcs()
@@ -257,39 +254,27 @@ func _apply_tree_materials(instance: Node3D, leaf_color: Color, use_misc_bark: b
 	var bark_mat := _create_bark_material(use_misc_bark)
 	var leaf_mat := _create_leaf_material(leaf_color)
 	_apply_tree_materials_recursive(instance, bark_mat, leaf_mat)
-	_tree_mat_names_printed = true
 
 func _apply_tree_materials_recursive(node: Node, bark_mat: Material, leaf_mat: Material) -> void:
 	if node is MeshInstance3D:
 		var mesh_inst := node as MeshInstance3D
 		var surface_count := mesh_inst.get_surface_override_material_count()
-		var has_leaf_match := false
+		var found_leaf := false
 
-		# First pass: check if any material name contains "leaf"
+		# Single pass: assign by material name
 		for i in surface_count:
 			var orig_mat := mesh_inst.mesh.surface_get_material(i)
 			var mat_name := orig_mat.resource_name.to_lower() if orig_mat else ""
-			if not _tree_mat_names_printed:
-				print("[Tree] Surface %d material name: '%s'" % [i, mat_name])
 			if "leaf" in mat_name or "leaves" in mat_name:
-				has_leaf_match = true
-				break
-
-		# Second pass: apply materials
-		for i in surface_count:
-			var orig_mat := mesh_inst.mesh.surface_get_material(i)
-			var mat_name := orig_mat.resource_name.to_lower() if orig_mat else ""
-			if has_leaf_match:
-				if "leaf" in mat_name or "leaves" in mat_name:
-					mesh_inst.set_surface_override_material(i, leaf_mat)
-				else:
-					mesh_inst.set_surface_override_material(i, bark_mat)
+				mesh_inst.set_surface_override_material(i, leaf_mat)
+				found_leaf = true
 			else:
-				# Fallback: if 2+ surfaces, last surface is leaves
-				if surface_count >= 2 and i == surface_count - 1:
-					mesh_inst.set_surface_override_material(i, leaf_mat)
-				else:
-					mesh_inst.set_surface_override_material(i, bark_mat)
+				mesh_inst.set_surface_override_material(i, bark_mat)
+
+		# Fallback: no leaf names found, 2+ surfaces -> last surface is leaves
+		if not found_leaf and surface_count >= 2:
+			mesh_inst.set_surface_override_material(surface_count - 1, leaf_mat)
+
 	for child in node.get_children():
 		_apply_tree_materials_recursive(child, bark_mat, leaf_mat)
 
@@ -472,7 +457,6 @@ func _build_dungeon_walls() -> void:
 		elif aabb.size.z > 0.1:
 			wall_width = aabb.size.z
 		temp.queue_free()
-	print("[Dungeon] Wall tile width: %.2f" % wall_width)
 
 	# Outer walls — x:115→165, z:-20→30
 	# North wall: z=-20, x from 115 to 165

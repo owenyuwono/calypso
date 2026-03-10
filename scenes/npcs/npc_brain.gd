@@ -62,7 +62,6 @@ func _request_llm_decision() -> void:
 	var schema := ActionSchema.get_schema()
 	var req_id: String = npc.npc_id
 	LLMClient.send_chat(req_id, messages, schema)
-	GameEvents.llm_request_sent.emit(npc.npc_id)
 
 func _on_llm_response(req_id: String, response: Dictionary) -> void:
 	if req_id != npc.npc_id:
@@ -157,7 +156,6 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 
 		var schema := ActionSchema.get_schema()
 		LLMClient.send_chat(npc.npc_id, messages, schema)
-		GameEvents.llm_request_sent.emit(npc.npc_id)
 	else:
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % speaker_id
 		executor.execute("talk_to", speaker_id, greeting)
