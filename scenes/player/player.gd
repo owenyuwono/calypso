@@ -376,6 +376,7 @@ func _handle_left_click() -> void:
 	if ground_pos != Vector3.INF:
 		_cancel_attack()
 		_interact_target = ""
+		_spawn_click_marker(ground_pos)
 		_navigate_to(ground_pos)
 
 func _raycast_ground() -> Vector3:
@@ -509,3 +510,27 @@ func _flash_target(target_id: String) -> void:
 		return
 	if target_node.has_method("flash_hit"):
 		target_node.flash_hit()
+
+func _spawn_click_marker(pos: Vector3) -> void:
+	var marker := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.3
+	torus.outer_radius = 0.5
+	marker.mesh = torus
+	marker.rotation.x = 0.0  # Torus is already flat by default
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.3, 1.0, 0.4, 0.7)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = true
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	marker.material_override = mat
+
+	marker.position = Vector3(pos.x, pos.y + 0.05, pos.z)
+	get_tree().current_scene.add_child(marker)
+
+	var tween := get_tree().create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.6)
+	tween.tween_property(marker, "scale", Vector3(0.3, 0.3, 0.3), 0.6)
+	tween.chain().tween_callback(marker.queue_free)

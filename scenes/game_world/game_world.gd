@@ -400,8 +400,6 @@ func _spawn_dungeon_decorations() -> void:
 	# Chest
 	_spawn_dungeon_model("chest.glb", Vector3(65, 0, 45), PI)
 
-	# Stairs at entrance
-	_spawn_dungeon_model("stairs.gltf.glb", Vector3(40, 0, 32), PI / 2.0)
 
 	# Red ferns near entrance for transition feel
 	var dark_green := Color(0.08, 0.18, 0.06)

@@ -48,13 +48,3 @@ outline_modulate = Color(0, 0, 0, 1)
 
 [node name="DialogueBubble" parent="." instance=ExtResource("5_bubble")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
-
-[node name="InteractionPrompt" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
-visible = false
-billboard = 1
-font_size = 32
-outline_size = 8
-text = "Press E to talk"
-modulate = Color(1, 1, 1, 1)
-outline_modulate = Color(0, 0, 0, 1)

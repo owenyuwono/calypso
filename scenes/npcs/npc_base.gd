@@ -37,13 +37,11 @@ var combat_target: String = ""
 var _attack_timer: float = 0.0
 var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
-var _interaction_prompt_timer: float = 0.0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var dialogue_bubble: Node3D = $DialogueBubble
 @onready var name_label: Label3D = $NameLabel
-@onready var interaction_prompt: Label3D = $InteractionPrompt
 
 const MOVE_SPEED: float = 3.0
 const ARRIVAL_THRESHOLD: float = 1.0
@@ -126,7 +124,9 @@ func _create_fallback_mesh() -> void:
 	ModelHelper.apply_toon_to_model(_model)
 
 func _play_anim(anim_name: String) -> void:
-	if not _anim_player or _current_anim == anim_name:
+	if not _anim_player:
+		return
+	if _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -179,10 +179,6 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
 	move_and_slide()
-	_interaction_prompt_timer -= delta
-	if _interaction_prompt_timer <= 0.0:
-		_interaction_prompt_timer = 0.5
-		_update_interaction_prompt()
 
 	# Update animation based on movement
 	if current_state == STATE_COMBAT:
@@ -334,18 +330,6 @@ func enter_combat(target_id: String) -> void:
 	_attack_timer = 0.0
 	_last_nav_target_pos = Vector3.INF
 	change_state(STATE_COMBAT)
-
-func _update_interaction_prompt() -> void:
-	if not interaction_prompt:
-		return
-	var player_node = WorldState.get_entity("player")
-	if not player_node or not is_instance_valid(player_node):
-		interaction_prompt.visible = false
-		return
-	var dist := global_position.distance_to(player_node.global_position)
-	var in_range := dist <= 4.0
-	var is_available := current_state in [STATE_IDLE, STATE_MOVING]
-	interaction_prompt.visible = in_range and is_available
 
 func _update_hp_bar() -> void:
 	if not _hp_bar:

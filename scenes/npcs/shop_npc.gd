@@ -16,7 +16,6 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 @export var shop_items: PackedStringArray = []
 
 @onready var name_label: Label3D = $NameLabel
-@onready var interaction_prompt: Label3D = $InteractionPrompt
 
 # 3D Model
 var _model: Node3D
@@ -73,19 +72,6 @@ func _create_fallback_mesh() -> void:
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
 	ModelHelper.apply_toon_to_model(_model)
-
-func _process(_delta: float) -> void:
-	_update_interaction_prompt()
-
-func _update_interaction_prompt() -> void:
-	if not interaction_prompt:
-		return
-	var player := WorldState.get_entity("player")
-	if not player or not is_instance_valid(player):
-		interaction_prompt.visible = false
-		return
-	var dist := global_position.distance_to(player.global_position)
-	interaction_prompt.visible = dist <= 4.0
 
 func get_shop_items() -> Array:
 	return Array(shop_items)
