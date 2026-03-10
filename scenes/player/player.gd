@@ -2,7 +2,7 @@ extends CharacterBody3D
 ## Player controller with point-and-click movement, click-to-attack/interact, and death/respawn.
 ## Uses KayKit Knight 3D model with animations.
 
-const SPEED: float = 6.0
+const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const INTERACT_RANGE: float = 4.0
 const HOVER_RAY_LENGTH: float = 100.0
@@ -30,6 +30,8 @@ var _attack_timer: float = 0.0
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _pending_hit: bool = false
+var _hit_time: float = 0.0
 
 # 3D Model
 var _model: Node3D
@@ -96,10 +98,10 @@ func _create_fallback_mesh() -> void:
 	_mesh_instances = result.mesh_instances
 	_overlay_material = result.overlay
 
-func _play_anim(anim_name: String) -> void:
+func _play_anim(anim_name: String, force: bool = false) -> void:
 	if not _anim_player:
 		return
-	if _current_anim == anim_name and _anim_player.is_playing():
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -254,12 +256,21 @@ func _process_combat(delta: float) -> bool:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
-	var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
-	_attack_timer += delta
-	if _attack_timer >= attack_speed:
-		_attack_timer = 0.0
-		_play_anim("1H_Melee_Attack_Chop")
-		get_tree().create_timer(0.3).timeout.connect(_perform_attack)
+	# Check animation position for hit event before starting new attacks
+	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+		if _anim_player.current_animation_position >= _hit_time:
+			_pending_hit = false
+			_perform_attack()
+
+	# Only accumulate attack cooldown after the pending hit has landed
+	if not _pending_hit:
+		var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
+		_attack_timer += delta
+		if _attack_timer >= attack_speed:
+			_attack_timer = 0.0
+			_play_anim("1H_Melee_Attack_Chop", true)
+			_pending_hit = true
+			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _perform_attack() -> void:
@@ -273,6 +284,7 @@ func _perform_attack() -> void:
 func _cancel_attack() -> void:
 	_attack_target = ""
 	_attack_timer = 0.0
+	_pending_hit = false
 	_last_nav_target_pos = Vector3.INF
 
 func _stop_navigation() -> void:
@@ -291,7 +303,10 @@ func _on_arrived() -> void:
 	var etype: String = data.get("type", "")
 	var target_node := WorldState.get_entity(_interact_target)
 
-	if etype == "shop_npc":
+	if etype == "loot_drop":
+		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
+			target_node.pickup("player")
+	elif etype == "shop_npc":
 		_open_shop(_interact_target)
 	elif etype == "npc":
 		if target_node and is_instance_valid(target_node):
@@ -340,6 +355,8 @@ func _process_hover() -> void:
 			var hp: int = data.get("hp", 0)
 			var max_hp: int = data.get("max_hp", 0)
 			display_name += " (HP: %d/%d)" % [hp, max_hp]
+		elif entity_type == "loot_drop":
+			display_name += " [Loot]"
 		elif entity_type == "shop_npc":
 			display_name += " [Shop]"
 		_tooltip_label.text = display_name
@@ -377,6 +394,19 @@ func _handle_left_click() -> void:
 			_attack_target = _hovered_entity_id
 			_attack_timer = 0.0
 			_is_navigating = false
+			return
+
+		if etype == "loot_drop":
+			# Click loot: walk to + pick up on arrival
+			_cancel_attack()
+			_interact_target = _hovered_entity_id
+			var target_node := WorldState.get_entity(_hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				var dist := global_position.distance_to(target_node.global_position)
+				if dist <= INTERACT_RANGE:
+					_on_arrived()
+					return
+				_navigate_to(target_node.global_position)
 			return
 
 		if etype == "shop_npc" or etype == "npc":
@@ -527,6 +557,11 @@ func flash_hit() -> void:
 	if not _overlay_material:
 		return
 	ModelHelper.flash_hit(_overlay_material, self)
+
+func _get_hit_delay(anim_name: String) -> float:
+	if _anim_player and _anim_player.has_animation(anim_name):
+		return _anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
 	ModelHelper.spawn_damage_number(self, target_id, damage)

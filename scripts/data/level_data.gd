@@ -19,7 +19,7 @@ const BASE_PLAYER_STATS: Dictionary = {
 	"atk": 10, "def": 5,
 	"level": 1, "xp": 0,
 	"gold": 100,
-	"attack_speed": 1.0, "attack_range": 2.0,
+	"attack_speed": 0.8, "attack_range": 2.0,
 }
 
 const BASE_ADVENTURER_STATS: Dictionary = {
@@ -27,5 +27,5 @@ const BASE_ADVENTURER_STATS: Dictionary = {
 	"atk": 10, "def": 5,
 	"level": 1, "xp": 0,
 	"gold": 80,
-	"attack_speed": 1.0, "attack_range": 2.0,
+	"attack_speed": 0.8, "attack_range": 2.0,
 }
