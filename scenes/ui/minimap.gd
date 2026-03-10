@@ -11,9 +11,9 @@ const COLOR_BG := Color(0.1, 0.1, 0.15, 0.85)
 const COLOR_BORDER := Color(0.4, 0.35, 0.2)
 
 # Zone rectangles in world XZ (Rect2 uses x,y = world x,z)
-const ZONE_TOWN := Rect2(-20, -20, 55, 55)
-const ZONE_FIELD := Rect2(22, 18, 16, 20)
-const ZONE_DUNGEON := Rect2(40, 20, 30, 30)
+const ZONE_TOWN := Rect2(-35, -35, 70, 70)
+const ZONE_FIELD := Rect2(35, -35, 80, 80)
+const ZONE_DUNGEON := Rect2(115, -20, 50, 50)
 
 const COLOR_ZONE_TOWN := Color(0.2, 0.3, 0.2, 0.15)
 const COLOR_ZONE_FIELD := Color(0.3, 0.3, 0.15, 0.15)

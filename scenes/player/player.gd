@@ -314,9 +314,15 @@ func _process_combat(delta: float) -> bool:
 	_face_direction(to_target)
 
 	# Check animation position for skill hit
-	if _pending_skill_hit and _anim_player:
-		if _anim_player.current_animation == _pending_skill_anim:
+	if _pending_skill_hit:
+		if _anim_player and _anim_player.current_animation == _pending_skill_anim:
 			if _anim_player.current_animation_position >= _skill_hit_time:
+				_pending_skill_hit = false
+				_execute_skill_hit()
+		else:
+			# Fallback countdown when skill animation isn't playing
+			_skill_hit_time -= delta
+			if _skill_hit_time <= 0.0:
 				_pending_skill_hit = false
 				_execute_skill_hit()
 
