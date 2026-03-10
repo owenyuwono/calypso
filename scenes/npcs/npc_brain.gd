@@ -192,7 +192,7 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory),
 		]
 
-		var req_id := "chat_" + npc.npc_id
+		var req_id: String = "chat_" + npc.npc_id
 		LLMClient.send_chat(req_id, messages)
 	else:
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
@@ -223,7 +223,7 @@ func initiate_social_chat(target_id: String) -> bool:
 			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory),
 		]
 
-		var req_id := "chat_" + npc.npc_id
+		var req_id: String = "chat_" + npc.npc_id
 		LLMClient.send_chat(req_id, messages)
 		return true
 	else:
