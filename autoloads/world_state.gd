@@ -6,6 +6,8 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 # Entity registry: id -> Node3D reference
 var entities: Dictionary = {}
+# Reverse lookup: Node3D -> entity id
+var _node_to_id: Dictionary = {}
 # Location markers: id -> Vector3 position
 var location_markers: Dictionary = {}
 # Entity metadata: id -> Dictionary with type, stats, inventory, etc.
@@ -15,9 +17,13 @@ var entity_data: Dictionary = {}
 
 func register_entity(id: String, node: Node3D, data: Dictionary = {}) -> void:
 	entities[id] = node
+	_node_to_id[node] = id
 	entity_data[id] = data
 
 func unregister_entity(id: String) -> void:
+	var node = entities.get(id)
+	if node:
+		_node_to_id.erase(node)
 	entities.erase(id)
 	entity_data.erase(id)
 
@@ -28,10 +34,7 @@ func get_entity_data(id: String) -> Dictionary:
 	return entity_data.get(id, {})
 
 func get_entity_id_for_node(node: Node3D) -> String:
-	for id in entities:
-		if entities[id] == node:
-			return id
-	return ""
+	return _node_to_id.get(node, "")
 
 func set_entity_data(id: String, key: String, value: Variant) -> void:
 	if entity_data.has(id):
@@ -55,11 +58,13 @@ func get_all_locations() -> Dictionary:
 
 func get_nearby_entities(pos: Vector3, radius: float) -> Array:
 	var result: Array = []
+	var radius_sq := radius * radius
 	for id in entities:
 		var node: Node3D = entities[id]
 		if node and is_instance_valid(node):
-			if node.global_position.distance_to(pos) <= radius:
-				result.append({"id": id, "node": node, "distance": node.global_position.distance_to(pos)})
+			var dist_sq := node.global_position.distance_squared_to(pos)
+			if dist_sq <= radius_sq:
+				result.append({"id": id, "node": node, "distance": sqrt(dist_sq)})
 	result.sort_custom(func(a, b): return a.distance < b.distance)
 	return result
 
@@ -194,7 +199,10 @@ func heal_entity(entity_id: String, amount: int) -> int:
 	var hp: int = data.get("hp", 0)
 	var max_hp: int = data.get("max_hp", 1)
 	var healed := mini(amount, max_hp - hp)
-	set_entity_data(entity_id, "hp", hp + healed)
+	var new_hp := hp + healed
+	set_entity_data(entity_id, "hp", new_hp)
+	if healed > 0:
+		GameEvents.entity_healed.emit(entity_id, healed, new_hp)
 	return healed
 
 # --- Gold ---

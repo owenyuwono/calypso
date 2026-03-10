@@ -18,6 +18,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 var _hovered_entity_id: String = ""
 var _tooltip_label: Label
 var _tooltip_panel: PanelContainer
+var _hover_timer: float = 0.0
 
 # Navigation
 var _is_navigating: bool = false
@@ -28,6 +29,7 @@ var _attack_target: String = ""
 var _attack_timer: float = 0.0
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
+var _last_nav_target_pos: Vector3 = Vector3.INF
 
 # 3D Model
 var _model: Node3D
@@ -58,6 +60,7 @@ func _ready() -> void:
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
+	GameEvents.entity_healed.connect(_on_entity_healed)
 
 func _setup_model() -> void:
 	var result := ModelHelper.instantiate_model("res://assets/models/characters/Knight.glb", MODEL_SCALE)
@@ -73,6 +76,7 @@ func _setup_model() -> void:
 	_mesh_instances = ModelHelper.find_mesh_instances(_model)
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 	if _anim_player:
 		_play_anim("Idle")
@@ -93,9 +97,12 @@ func _create_fallback_mesh() -> void:
 	_mesh_instances = [mesh_inst]
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 func _play_anim(anim_name: String) -> void:
-	if not _anim_player or _current_anim == anim_name:
+	if not _anim_player:
+		return
+	if _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -183,12 +190,16 @@ func _physics_process(delta: float) -> void:
 		else:
 			_play_anim("Idle")
 
-	_update_hp_bar()
-
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _is_dead:
 		return
-	_process_hover()
+	_hover_timer -= delta
+	if _hover_timer <= 0.0:
+		_hover_timer = 0.1
+		_process_hover()
+	elif _tooltip_panel.visible:
+		# Keep tooltip following mouse between raycast ticks
+		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
 func _face_direction(dir: Vector3) -> void:
 	if _model and dir.length() > 0.1:
@@ -204,8 +215,11 @@ func _process_combat(delta: float) -> bool:
 	var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
 
 	if dist > attack_range:
-		# Navigate toward target
-		nav_agent.target_position = target_node.global_position
+		# Navigate toward target — only update nav if target moved significantly
+		var target_pos := target_node.global_position
+		if _last_nav_target_pos.distance_to(target_pos) > 1.0:
+			_last_nav_target_pos = target_pos
+			nav_agent.target_position = target_pos
 		if not nav_agent.is_navigation_finished():
 			var next_pos := nav_agent.get_next_path_position()
 			var dir := (next_pos - global_position)
@@ -243,6 +257,7 @@ func _perform_attack() -> void:
 func _cancel_attack() -> void:
 	_attack_target = ""
 	_attack_timer = 0.0
+	_last_nav_target_pos = Vector3.INF
 
 func _stop_navigation() -> void:
 	_is_navigating = false
@@ -452,10 +467,16 @@ func _respawn() -> void:
 	_play_anim("Idle")
 
 	GameEvents.entity_respawned.emit("player")
+	_update_hp_bar()
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
+		_update_hp_bar()
+
+func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
+	if entity_id == "player":
+		_update_hp_bar()
 
 func _update_hp_bar() -> void:
 	if not _hp_bar:

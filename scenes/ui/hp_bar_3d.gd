@@ -5,6 +5,7 @@ var _viewport: SubViewport
 var _sprite: Sprite3D
 var _bar_bg: ColorRect
 var _bar_fill: ColorRect
+var _prev_ratio: float = -1.0
 
 const BAR_WIDTH: int = 80
 const BAR_HEIGHT: int = 8
@@ -14,7 +15,7 @@ func _ready() -> void:
 	_viewport.transparent_bg = true
 	_viewport.size = Vector2i(BAR_WIDTH + 4, BAR_HEIGHT + 4)
 	_viewport.gui_disable_input = true
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_viewport)
 
 	# Background
@@ -44,6 +45,9 @@ func update_bar(current: int, maximum: int) -> void:
 	if maximum <= 0:
 		return
 	var ratio := clampf(float(current) / float(maximum), 0.0, 1.0)
+	if absf(ratio - _prev_ratio) < 0.001:
+		return
+	_prev_ratio = ratio
 	_bar_fill.size.x = BAR_WIDTH * ratio
 
 	# Color: green -> yellow -> red
@@ -53,3 +57,6 @@ func update_bar(current: int, maximum: int) -> void:
 		_bar_fill.color = Color(0.9, 0.8, 0.1)
 	else:
 		_bar_fill.color = Color(0.9, 0.1, 0.1)
+
+	# Trigger re-render only when values change
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

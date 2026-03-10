@@ -34,10 +34,11 @@ func _setup_style() -> void:
 	_label.add_theme_font_size_override("font_size", 16)
 
 func _process(delta: float) -> void:
-	if _showing:
-		_display_timer += delta
-		if _display_timer >= _display_duration:
-			hide_bubble()
+	if not _showing:
+		return
+	_display_timer += delta
+	if _display_timer >= _display_duration:
+		hide_bubble()
 
 func show_dialogue(text: String, duration: float = -1.0) -> void:
 	_label.text = text
@@ -45,6 +46,7 @@ func show_dialogue(text: String, duration: float = -1.0) -> void:
 	_display_timer = 0.0
 	_showing = true
 	visible = true
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_update_viewport_size()
 
 func _calc_duration(text: String) -> float:
@@ -77,5 +79,6 @@ func _update_viewport_size() -> void:
 	_viewport.size = Vector2i(bubble_width, bubble_height)
 
 	# Wait one frame for viewport to re-render, then assign texture.
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	await get_tree().process_frame
 	_sprite.texture = _viewport.get_texture()

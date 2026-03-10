@@ -12,7 +12,17 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 
 func _ready() -> void:
 	_build_ui()
+	# Event-driven updates instead of _process polling
+	GameEvents.entity_damaged.connect(_on_entity_damaged)
+	GameEvents.entity_healed.connect(_on_entity_healed)
+	GameEvents.xp_gained.connect(_on_player_event.bind(""))
 	GameEvents.level_up.connect(_on_level_up)
+	GameEvents.entity_died.connect(_on_entity_died)
+	GameEvents.entity_respawned.connect(_on_player_event.bind(""))
+	GameEvents.item_purchased.connect(_on_economy_event)
+	GameEvents.item_sold.connect(_on_economy_event)
+	# Initial refresh
+	_refresh_all()
 
 func _build_ui() -> void:
 	# Main container at top-left
@@ -117,7 +127,7 @@ func _build_ui() -> void:
 	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	xp_row.add_child(_xp_label)
 
-func _process(_delta: float) -> void:
+func _refresh_all() -> void:
 	var data := WorldState.get_entity_data("player")
 	if data.is_empty():
 		return
@@ -140,9 +150,30 @@ func _process(_delta: float) -> void:
 	_level_label.text = "Lv. %d" % level
 	_gold_label.text = "Gold: %d" % gold
 
+func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
+	if target_id == "player":
+		_refresh_all()
+
+func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
+	if entity_id == "player":
+		_refresh_all()
+
+func _on_player_event(entity_id: String, _arg: Variant, _extra: Variant = null) -> void:
+	if entity_id == "player":
+		_refresh_all()
+
+func _on_entity_died(entity_id: String, killer_id: String) -> void:
+	if entity_id == "player" or killer_id == "player":
+		_refresh_all()
+
+func _on_economy_event(entity_id: String, _item_id: String, _amount: int) -> void:
+	if entity_id == "player":
+		_refresh_all()
+
 func _on_level_up(entity_id: String, new_level: int) -> void:
 	if entity_id != "player":
 		return
+	_refresh_all()
 	# Spawn a floating "LEVEL UP!" text
 	var label := Label.new()
 	label.text = "LEVEL UP!"

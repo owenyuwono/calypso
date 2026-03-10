@@ -7,11 +7,13 @@ const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
 const TREE_DIR := "res://assets/models/environment/nature/trees/fir/"
 const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 
 # Model cache to avoid reloading
 var _model_cache: Dictionary = {}
 var _texture_cache: Dictionary = {}
+var _color_mat_cache: Dictionary = {}
 var _tree_mat_names_printed := false
 
 func _load_texture(path: String) -> Texture2D:
@@ -38,6 +40,9 @@ func _ready() -> void:
 	_spawn_field_decorations()
 	_decorate_field()
 	_add_zone_lighting()
+
+	# Apply toon shading to all environment meshes
+	_apply_toon_to_environment()
 
 	# Bake navmesh after environment is ready
 	var nav_region := $NavigationRegion3D
@@ -115,9 +120,17 @@ func _spawn_model(path: String, pos: Vector3, rot_y: float = 0.0, scale_val: flo
 	target_parent.add_child(instance)
 	return instance
 
-func _apply_color_to_model(instance: Node3D, color: Color) -> void:
+func _get_or_create_color_mat(color: Color) -> StandardMaterial3D:
+	var key := color.to_html()
+	if _color_mat_cache.has(key):
+		return _color_mat_cache[key]
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
+	_color_mat_cache[key] = mat
+	return mat
+
+func _apply_color_to_model(instance: Node3D, color: Color) -> void:
+	var mat := _get_or_create_color_mat(color)
 	_apply_material_recursive(instance, mat)
 
 func _apply_material_recursive(node: Node, mat: Material) -> void:
@@ -208,14 +221,9 @@ func _spawn_tree(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: 
 func _spawn_dungeon_model(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	return _spawn_model(DUNGEON_DIR + filename, pos, rot_y, scale_val)
 
-func _add_torch_light(parent: Node3D, offset: Vector3 = Vector3(0, 1.5, 0)) -> void:
-	var light := OmniLight3D.new()
-	light.position = offset
-	light.omni_range = 4.0
-	light.light_energy = 0.5
-	light.light_color = Color(1.0, 0.7, 0.3)
-	light.shadow_enabled = false
-	parent.add_child(light)
+func _add_torch_light(_parent: Node3D, _offset: Vector3 = Vector3(0, 1.5, 0)) -> void:
+	# OmniLights removed for performance — ambient light provides adequate illumination.
+	pass
 
 # =============================================================================
 # Dungeon Zone
@@ -318,30 +326,17 @@ func _get_node_aabb(node: Node3D) -> AABB:
 	return result
 
 func _tile_dungeon_floor() -> void:
-	# Tile the dungeon area (40→70, 20→50) with KayKit floor models
-	# Measure floor tile size
-	var floor_scene := _load_model(DUNGEON_DIR + "floor_tile_large.gltf.glb")
-	var tile_size := 2.0  # fallback
-	if floor_scene:
-		var temp := floor_scene.instantiate() as Node3D
-		var aabb := _get_node_aabb(temp)
-		tile_size = max(aabb.size.x, aabb.size.z)
-		if tile_size < 0.1:
-			tile_size = 2.0
-		temp.queue_free()
-	print("[Dungeon] Floor tile size: %.2f" % tile_size)
-
-	var floor_files: Array[String] = ["floor_tile_large.gltf.glb", "floor_dirt_large.gltf.glb"]
-	var idx := 0
-	var x := 40.0
-	while x < 70.0:
-		var z := 20.0
-		while z < 50.0:
-			var file: String = floor_files[idx % 2]
-			_spawn_dungeon_model(file, Vector3(x + tile_size * 0.5, 0.01, z + tile_size * 0.5))
-			idx += 1
-			z += tile_size
-		x += tile_size
+	# Single plane replaces ~150 individual floor tile models for draw call reduction
+	var floor_mesh := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(30, 30)  # covers dungeon area 40→70 x 20→50
+	floor_mesh.mesh = plane
+	floor_mesh.position = Vector3(55, 0.02, 35)  # center of dungeon area
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.22, 0.18, 0.15)
+	mat.roughness = 1.0
+	floor_mesh.set_surface_override_material(0, mat)
+	$NavigationRegion3D.add_child(floor_mesh)
 
 func _spawn_dungeon_decorations() -> void:
 	# Torches along walls with lights
@@ -478,31 +473,15 @@ func _decorate_town() -> void:
 	_spawn_foliage("SM_BushChina02.FBX", Vector3(8, 0, 5), dark_green, 1.5)
 	_spawn_foliage("SM_Bush1.FBX", Vector3(6, 0, -10), green, 2.5)
 
-	# Flowers near well
+	# Flowers near well (reduced from 3 to 2)
 	_spawn_foliage("SM_Flower_Daisies1.FBX", Vector3(4.5, 0, -1), flower_white, 0.0)
 	_spawn_foliage("SM_FlowerBush01.FBX", Vector3(2, 0, -2.5), flower_pink, 0.5)
-	_spawn_foliage("SM_FlowerBush02.FBX", Vector3(4, 0, 0.5), flower_yellow, 1.0)
 
-	# Flowers along shop fronts
+	# One flower per shop front (reduced from 4 to 2)
 	_spawn_foliage("SM_Flower_TulipsRed.FBX", Vector3(-6, 0, -3), flower_pink, 0.0)
-	_spawn_foliage("SM_Flower_TulipsPink.FBX", Vector3(-10, 0, -3.5), flower_pink, 0.5)
 	_spawn_foliage("SM_Flower_TulipsYellow.FBX", Vector3(6, 0, -4), flower_yellow, 0.0)
-	_spawn_foliage("SM_Flower_TulipsOrange.FBX", Vector3(10, 0, -4.5), flower_orange, 0.3)
 
-	# Sunflowers near fences
-	_spawn_foliage("SM_Flower_Sunflower1.FBX", Vector3(11.5, 0, -2), flower_yellow, 0.0)
-	_spawn_foliage("SM_Flower_Sunflower2.FBX", Vector3(11.5, 0, 5), flower_yellow, 0.5)
-
-	# Grass patches scattered on town ground
-	var grass_color := Color(0.25, 0.5, 0.18)
-	var grass_positions := [
-		Vector3(-7, 0, 3), Vector3(5, 0, 4), Vector3(-2, 0, -7),
-		Vector3(9, 0, 2), Vector3(-8, 0, -6), Vector3(0, 0, 6),
-		Vector3(-13, 0, 1), Vector3(7, 0, -8),
-	]
-	for i in grass_positions.size():
-		var grass_file := "SM_Grass1.FBX" if i % 2 == 0 else "SM_Grass2.FBX"
-		_spawn_foliage(grass_file, grass_positions[i], grass_color, randf() * TAU)
+	# Grass patches removed for draw call reduction
 
 	# Shop props — barrels and crates outside weapon shop
 	_spawn_dungeon_model("barrel_large.gltf.glb", Vector3(-5.5, 0, -3))
@@ -584,19 +563,17 @@ func _spawn_field_decorations() -> void:
 	if fallen2:
 		_apply_tree_materials(fallen2, muted_leaf, true)
 
-	# Improved rock clusters
+	# Rock clusters (reduced from 6 to 4)
 	_create_rock_cluster(Vector3(20, 0, 20))
 	_create_rock_cluster(Vector3(38, 0, 22))
 	_create_rock_cluster(Vector3(30, 0, 35))
-	_create_rock_cluster(Vector3(25, 0, 32))
 	_create_rock_cluster(Vector3(34, 0, 28))
-	_create_rock_cluster(Vector3(42, 0, 36))
 
 func _create_rock_cluster(center: Vector3) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(center.x * 100 + center.z * 10)
-	var rock_count := rng.randi_range(3, 4)
-	for i in rock_count:
+	var rock_mat := _get_or_create_color_mat(Color(0.4, 0.38, 0.36))
+	for i in 2:
 		var offset := Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.8, 0.8))
 		var radius := rng.randf_range(0.3, 0.7)
 		var pos := center + offset
@@ -613,10 +590,7 @@ func _create_rock_cluster(center: Vector3) -> void:
 		mesh_inst.mesh = sphere
 		mesh_inst.rotation.y = rng.randf() * TAU
 		mesh_inst.rotation.x = rng.randf_range(-0.2, 0.2)
-		var gray := rng.randf_range(0.33, 0.45)
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(gray, gray * 0.95, gray * 0.9)
-		mesh_inst.set_surface_override_material(0, mat)
+		mesh_inst.set_surface_override_material(0, rock_mat)
 		rock.add_child(mesh_inst)
 
 		var col := CollisionShape3D.new()
@@ -633,57 +607,35 @@ func _decorate_field() -> void:
 	var flower_yellow := Color(0.9, 0.85, 0.3)
 	var flower_orange := Color(0.9, 0.6, 0.2)
 
-	# Grass scattered across field
+	# Grass scattered across field (reduced from 15 to 5)
 	var grass_positions := [
-		Vector3(19, 0, 15), Vector3(22, 0, 22), Vector3(25, 0, 18),
-		Vector3(28, 0, 25), Vector3(30, 0, 30), Vector3(33, 0, 20),
-		Vector3(35, 0, 32), Vector3(37, 0, 38), Vector3(24, 0, 35),
-		Vector3(40, 0, 28), Vector3(27, 0, 40), Vector3(20, 0, 30),
-		Vector3(32, 0, 22), Vector3(38, 0, 34), Vector3(23, 0, 26),
+		Vector3(22, 0, 22), Vector3(28, 0, 25), Vector3(33, 0, 20),
+		Vector3(35, 0, 32), Vector3(24, 0, 35),
 	]
 	for i in grass_positions.size():
 		var grass_file := "SM_Grass1.FBX" if i % 2 == 0 else "SM_Grass2.FBX"
 		_spawn_foliage(grass_file, grass_positions[i], grass_color, float(i) * 1.3)
 
-	# Ferns near trees
+	# Ferns near trees (reduced from 10 to 4)
 	var fern_data := [
 		["SM_Fern1.FBX", Vector3(19, 0, 13)],
-		["SM_Fern2.FBX", Vector3(21, 0, 15)],
-		["SM_Fern3.FBX", Vector3(25, 0, 21)],
-		["SM_Fern1.FBX", Vector3(27, 0, 23)],
-		["SM_Fern2.FBX", Vector3(29, 0, 39)],
+		["SM_Fern2.FBX", Vector3(25, 0, 21)],
 		["SM_Fern3.FBX", Vector3(37, 0, 24)],
 		["SM_Fern1.FBX", Vector3(34, 0, 34)],
-		["SM_Fern2.FBX", Vector3(36, 0, 36)],
-		["SM_Fern3.FBX", Vector3(23, 0, 19)],
-		["SM_Fern1.FBX", Vector3(31, 0, 41)],
 	]
 	for data in fern_data:
 		_spawn_foliage(data[0], data[1], fern_color, randf() * TAU)
 
-	# Bushes in clusters
+	# Bushes in clusters (reduced from 6 to 3)
 	_spawn_foliage("SM_Bush1.FBX", Vector3(21, 0, 17), green, 0.0)
 	_spawn_foliage("SM_Bush2.FBX", Vector3(26, 0, 25), green, 1.2)
 	_spawn_foliage("SM_Bush3.FBX", Vector3(33, 0, 33), dark_green, 0.5)
-	_spawn_foliage("SM_BushLeafy01.FBX", Vector3(36, 0, 22), green, 2.0)
-	_spawn_foliage("SM_BushLeafy02.FBX", Vector3(29, 0, 36), green, 0.8)
-	_spawn_foliage("SM_Bush1.FBX", Vector3(40, 0, 32), dark_green, 1.5)
 
-	# Flowers in small groups near field edges
+	# Flowers (reduced from 5 to 2)
 	_spawn_foliage("SM_Flower_DaffodilsYellow.FBX", Vector3(18, 0, 18), flower_yellow, 0.0)
-	_spawn_foliage("SM_Flower_DaffodilsOrange.FBX", Vector3(20, 0, 25), flower_orange, 0.5)
-	_spawn_foliage("SM_Flower_DaffodilsPink.FBX", Vector3(35, 0, 38), Color(0.85, 0.4, 0.55), 1.0)
 	_spawn_foliage("SM_Flower_Sunflower1.FBX", Vector3(24, 0, 15), flower_yellow, 0.0)
-	_spawn_foliage("SM_Flower_Sunflower3.FBX", Vector3(38, 0, 30), flower_yellow, 1.5)
 
-	# Field-dungeon transition
-	var transition_stump := _spawn_model(TREE_DIR + "SM_FirStump1.FBX", Vector3(40, 0, 28), 0.0, 0.25)
-	if transition_stump:
-		_apply_tree_materials(transition_stump, Color(0.15, 0.35, 0.1), true)
-	_spawn_foliage("SM_Fern2.FBX", Vector3(39, 0, 26), Color(0.12, 0.25, 0.08), 0.5)
-	_spawn_foliage("SM_Marshtail01.FBX", Vector3(38, 0, 28), Color(0.2, 0.35, 0.15), 0.0)
-	_spawn_foliage("SM_Marshtail02.FBX", Vector3(39, 0, 30), Color(0.18, 0.3, 0.12), 1.0)
-	_spawn_foliage("SM_Marshtail03.FBX", Vector3(41, 0, 26), Color(0.2, 0.3, 0.15), 2.0)
+	# Field-dungeon transition removed for draw call reduction
 
 	# Torches flanking dungeon path entrance
 	var dt1 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(41, 0, 29))
@@ -698,16 +650,6 @@ func _decorate_field() -> void:
 # =============================================================================
 
 func _add_zone_lighting() -> void:
-	# Warm ambient lights near shops
-	_add_area_light(Vector3(-8, 2, -3), Color(1.0, 0.9, 0.7), 0.3, 8.0)
-	_add_area_light(Vector3(8, 2, -4), Color(1.0, 0.9, 0.7), 0.3, 8.0)
-
-func _add_area_light(pos: Vector3, color: Color, energy: float, light_range: float) -> void:
-	var light := OmniLight3D.new()
-	light.position = pos
-	light.light_color = color
-	light.light_energy = energy
-	light.omni_range = light_range
-	light.shadow_enabled = false
-	add_child(light)
+	# OmniLights removed for performance — ambient light provides adequate illumination.
+	pass
 

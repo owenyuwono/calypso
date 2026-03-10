@@ -36,6 +36,8 @@ var _nav_wait_frames: int = 0
 var combat_target: String = ""
 var _attack_timer: float = 0.0
 var _respawn_timer: float = 0.0
+var _last_nav_target_pos: Vector3 = Vector3.INF
+var _interaction_prompt_timer: float = 0.0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
@@ -82,6 +84,7 @@ func _ready() -> void:
 	GameEvents.npc_spoke.connect(_on_any_npc_spoke)
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
+	GameEvents.entity_healed.connect(_on_entity_healed)
 
 	_setup_hp_bar()
 
@@ -99,6 +102,7 @@ func _setup_model() -> void:
 	_mesh_instances = ModelHelper.find_mesh_instances(_model)
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 	if _anim_player:
 		_play_anim("Idle")
@@ -119,6 +123,7 @@ func _create_fallback_mesh() -> void:
 	_mesh_instances = [mesh_inst]
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 func _play_anim(anim_name: String) -> void:
 	if not _anim_player or _current_anim == anim_name:
@@ -174,8 +179,10 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
 	move_and_slide()
-	_update_interaction_prompt()
-	_update_hp_bar()
+	_interaction_prompt_timer -= delta
+	if _interaction_prompt_timer <= 0.0:
+		_interaction_prompt_timer = 0.5
+		_update_interaction_prompt()
 
 	# Update animation based on movement
 	if current_state == STATE_COMBAT:
@@ -227,8 +234,11 @@ func _process_combat(delta: float) -> bool:
 	var attack_range: float = WorldState.get_entity_data(npc_id).get("attack_range", 2.0)
 
 	if dist > attack_range * 1.5:
-		# Chase target
-		nav_agent.target_position = target_node.global_position
+		# Chase target — only update nav if target moved significantly
+		var target_pos := target_node.global_position
+		if _last_nav_target_pos.distance_to(target_pos) > 1.0:
+			_last_nav_target_pos = target_pos
+			nav_agent.target_position = target_pos
 		if not nav_agent.is_navigation_finished():
 			var next_pos := nav_agent.get_next_path_position()
 			var dir := (next_pos - global_position)
@@ -322,6 +332,7 @@ func set_goal(new_goal: String) -> void:
 func enter_combat(target_id: String) -> void:
 	combat_target = target_id
 	_attack_timer = 0.0
+	_last_nav_target_pos = Vector3.INF
 	change_state(STATE_COMBAT)
 
 func _update_interaction_prompt() -> void:
@@ -402,6 +413,7 @@ func _respawn() -> void:
 
 	change_state(STATE_IDLE)
 	GameEvents.entity_respawned.emit(npc_id)
+	_update_hp_bar()
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
@@ -410,6 +422,11 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
+		_update_hp_bar()
+
+func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
+	if entity_id == npc_id:
+		_update_hp_bar()
 
 func flash_hit() -> void:
 	if not _overlay_material:

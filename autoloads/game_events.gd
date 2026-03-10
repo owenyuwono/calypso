@@ -19,6 +19,7 @@ signal object_used(object_id: String, by_entity_id: String)
 
 # Combat
 signal entity_damaged(target_id: String, attacker_id: String, damage: int, remaining_hp: int)
+signal entity_healed(entity_id: String, amount: int, current_hp: int)
 signal entity_died(entity_id: String, killer_id: String)
 signal entity_respawned(entity_id: String)
 

@@ -24,6 +24,8 @@ var _respawn_timer: float = 0.0
 var _death_tween: Tween
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
+var _aggro_check_timer: float = 0.0
+var _last_nav_target_pos: Vector3 = Vector3.INF
 
 # Cached stats
 var _aggro_range: float = 6.0
@@ -82,12 +84,15 @@ func _ready() -> void:
 	})
 
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+	_aggro_check_timer = randf() * 0.3  # Stagger initial timer
 
 	# Create HP bar
 	_setup_hp_bar()
 
-	# Connect death signal
+	# Connect signals
 	GameEvents.entity_died.connect(_on_entity_died)
+	GameEvents.entity_damaged.connect(_on_entity_damaged)
+	GameEvents.entity_healed.connect(_on_entity_healed)
 
 func _setup_model(stats: Dictionary) -> void:
 	var model_scene_path: String = stats.get("model_scene", "")
@@ -114,6 +119,7 @@ func _setup_model(stats: Dictionary) -> void:
 	_mesh_instances = ModelHelper.find_mesh_instances(_model)
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 	# Apply color tint overlay for recolored monsters (goblin, dark_mage)
 	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
@@ -145,6 +151,7 @@ func _create_slime_mesh(stats: Dictionary) -> void:
 	_mesh_instances = [mesh_inst]
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 	# Wobble animation via tween
 	var tween := create_tween().set_loops()
@@ -166,6 +173,7 @@ func _create_fallback_mesh(stats: Dictionary) -> void:
 	_mesh_instances = [mesh_inst]
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+	ModelHelper.apply_toon_to_model(_model)
 
 func _play_anim(anim_name: String) -> void:
 	if not _anim_player or _current_anim == anim_name:
@@ -191,6 +199,9 @@ func _physics_process(delta: float) -> void:
 			_respawn()
 		return
 
+	# Tick aggro check timer
+	_aggro_check_timer -= delta
+
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
@@ -205,11 +216,10 @@ func _physics_process(delta: float) -> void:
 		"attacking":
 			_process_attacking(delta)
 
-	if state != "idle":
-		move_and_slide()
-	else:
+	if state == "idle" and is_on_floor():
 		velocity.x = 0.0
 		velocity.z = 0.0
+	else:
 		move_and_slide()
 
 	# Update animation
@@ -222,15 +232,15 @@ func _physics_process(delta: float) -> void:
 	else:
 		_play_anim("Idle")
 
-	_update_hp_bar()
-
 func _process_idle(delta: float) -> void:
 	_wander_timer -= delta
 	if _wander_timer <= 0.0:
 		_start_wander()
 
-	# Check for aggro
-	_check_aggro()
+	# Throttled aggro check (every 0.3s)
+	if _aggro_check_timer <= 0.0:
+		_aggro_check_timer = 0.3
+		_check_aggro()
 
 func _start_wander() -> void:
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
@@ -269,8 +279,10 @@ func _process_wander_movement() -> bool:
 		velocity.z = dir.z * MOVE_SPEED
 		_face_direction(dir)
 
-	# Still check aggro while wandering
-	_check_aggro()
+	# Throttled aggro check while wandering
+	if _aggro_check_timer <= 0.0:
+		_aggro_check_timer = 0.3
+		_check_aggro()
 	return true
 
 func _check_aggro() -> void:
@@ -305,8 +317,11 @@ func _process_aggro(delta: float) -> bool:
 		velocity.z = 0.0
 		return false
 
-	# Chase target
-	nav_agent.target_position = target_node.global_position
+	# Chase target — only update nav if target moved significantly
+	var target_pos := target_node.global_position
+	if _last_nav_target_pos.distance_to(target_pos) > 1.0:
+		_last_nav_target_pos = target_pos
+		nav_agent.target_position = target_pos
 	if not nav_agent.is_navigation_finished():
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position)
@@ -354,8 +369,17 @@ func _drop_aggro() -> void:
 	aggro_target = ""
 	state = "idle"
 	_wander_timer = randf_range(1.0, 3.0)
+	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area
 	nav_agent.target_position = spawn_point
+
+func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
+	if target_id == monster_id:
+		_update_hp_bar()
+
+func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
+	if entity_id == monster_id:
+		_update_hp_bar()
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:
@@ -445,6 +469,7 @@ func _respawn() -> void:
 	})
 
 	GameEvents.entity_respawned.emit(monster_id)
+	_update_hp_bar()
 
 func _update_hp_bar() -> void:
 	if not _hp_bar or state == "dead":
