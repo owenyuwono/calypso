@@ -258,8 +258,8 @@ func _process_combat(delta: float) -> bool:
 	_attack_timer += delta
 	if _attack_timer >= attack_speed:
 		_attack_timer = 0.0
-		_do_combat_attack()
 		_play_anim("1H_Melee_Attack_Chop")
+		get_tree().create_timer(0.3).timeout.connect(_do_combat_attack)
 	return false
 
 func _do_combat_attack() -> void:

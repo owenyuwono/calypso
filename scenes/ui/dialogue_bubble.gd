@@ -10,7 +10,7 @@ var _display_timer: float = 0.0
 var _display_duration: float = 4.0
 var _showing: bool = false
 
-const MAX_WIDTH := 300
+const MAX_WIDTH := 600
 const PIXEL_SIZE := 0.01
 
 func _ready() -> void:
@@ -31,7 +31,7 @@ func _setup_style() -> void:
 	_panel.add_theme_stylebox_override("panel", style)
 
 	_label.add_theme_color_override("font_color", Color.WHITE)
-	_label.add_theme_font_size_override("font_size", 16)
+	_label.add_theme_font_size_override("font_size", 32)
 
 func _process(delta: float) -> void:
 	if not _showing:

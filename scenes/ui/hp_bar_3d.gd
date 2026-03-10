@@ -7,8 +7,8 @@ var _bar_bg: ColorRect
 var _bar_fill: ColorRect
 var _prev_ratio: float = -1.0
 
-const BAR_WIDTH: int = 80
-const BAR_HEIGHT: int = 8
+const BAR_WIDTH: int = 120
+const BAR_HEIGHT: int = 16
 
 func _ready() -> void:
 	_viewport = SubViewport.new()

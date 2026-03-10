@@ -44,6 +44,14 @@ var _hp_bar: Node3D
 # UI references (set by main scene setup)
 var shop_panel: Control
 var inventory_panel: Control
+var chat_input: Control
+
+# Dialogue bubble above head
+var _dialogue_bubble: Node3D
+
+# Pending NPC conversation (set when player clicks NPC, cleared after chat sent)
+var _pending_talk_target_id: String = ""
+var _pending_talk_target_node: Node3D
 
 func _ready() -> void:
 	_setup_model()
@@ -57,6 +65,7 @@ func _ready() -> void:
 
 	_setup_tooltip()
 	_setup_hp_bar()
+	_setup_dialogue_bubble()
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
@@ -134,6 +143,29 @@ func _setup_tooltip() -> void:
 	_tooltip_panel.add_child(_tooltip_label)
 
 	canvas_layer.add_child(_tooltip_panel)
+
+func _setup_dialogue_bubble() -> void:
+	var bubble_scene := preload("res://scenes/ui/dialogue_bubble.tscn")
+	_dialogue_bubble = bubble_scene.instantiate()
+	add_child(_dialogue_bubble)
+	_dialogue_bubble.position = Vector3(0, 2.2, 0)
+
+func show_chat(text: String) -> void:
+	_show_bubble(text)
+	# If there's a pending NPC conversation, send the message to them
+	if not _pending_talk_target_id.is_empty() and _pending_talk_target_node and is_instance_valid(_pending_talk_target_node):
+		var npc_id := _pending_talk_target_id
+		var npc_node := _pending_talk_target_node
+		_pending_talk_target_id = ""
+		_pending_talk_target_node = null
+		_send_message_to_npc(text, npc_id, npc_node)
+		return
+	_pending_talk_target_id = ""
+	_pending_talk_target_node = null
+
+func _show_bubble(text: String) -> void:
+	if _dialogue_bubble:
+		_dialogue_bubble.show_dialogue(text)
 
 func _setup_hp_bar() -> void:
 	var hp_bar_scene := preload("res://scenes/ui/hp_bar_3d.tscn")
@@ -242,8 +274,8 @@ func _process_combat(delta: float) -> bool:
 	_attack_timer += delta
 	if _attack_timer >= attack_speed:
 		_attack_timer = 0.0
-		_perform_attack()
 		_play_anim("1H_Melee_Attack_Chop")
+		get_tree().create_timer(0.3).timeout.connect(_perform_attack)
 	return false
 
 func _perform_attack() -> void:
@@ -336,6 +368,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
 
+	if event.is_action_pressed("chat_submit"):
+		if chat_input and not chat_input.is_open() and not _is_ui_open():
+			chat_input.open()
+			get_viewport().set_input_as_handled()
+			return
+
 	if event.is_action_pressed("interact"):
 		_interact_with_nearest()
 
@@ -412,10 +450,20 @@ func _interact_with_nearest() -> void:
 			return
 
 func _talk_to_npc(target_npc_id: String, target_node: Node3D) -> void:
-	GameEvents.npc_spoke.emit("player", "Hello there!", target_npc_id)
-	var brain: Node = target_node.get_node_or_null("NPCBrain")
+	# Open chat input so player can type what they want to say
+	if chat_input and not chat_input.is_open():
+		_pending_talk_target_id = target_npc_id
+		_pending_talk_target_node = target_node
+		chat_input.open()
+		return
+	# Fallback if no chat input available
+	_send_message_to_npc("Hello there!", target_npc_id, target_node)
+
+func _send_message_to_npc(text: String, npc_id: String, npc_node: Node3D) -> void:
+	GameEvents.npc_spoke.emit("player", text, npc_id)
+	var brain: Node = npc_node.get_node_or_null("NPCBrain")
 	if brain and brain.has_method("request_reactive_response"):
-		brain.request_reactive_response("player", "Hello there!")
+		brain.request_reactive_response("player", text)
 
 func _open_shop(shop_id: String) -> void:
 	if shop_panel and shop_panel.has_method("open_shop"):
@@ -425,6 +473,8 @@ func _is_ui_open() -> bool:
 	if shop_panel and shop_panel.has_method("is_open") and shop_panel.is_open():
 		return true
 	if inventory_panel and inventory_panel.has_method("is_open") and inventory_panel.is_open():
+		return true
+	if chat_input and chat_input.is_open():
 		return true
 	return false
 

@@ -352,8 +352,8 @@ func _process_attacking(delta: float) -> void:
 	_attack_timer += delta
 	if _attack_timer >= _attack_speed:
 		_attack_timer = 0.0
-		_perform_attack()
 		_play_anim("1H_Melee_Attack_Chop")
+		get_tree().create_timer(0.3).timeout.connect(_perform_attack)
 
 func _perform_attack() -> void:
 	if not WorldState.is_alive(aggro_target):
@@ -490,7 +490,7 @@ func _spawn_damage_number(target_id: String, damage: int) -> void:
 	var dmg := dmg_scene.instantiate()
 	get_tree().current_scene.add_child(dmg)
 	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
-	dmg.setup(damage)
+	dmg.setup(damage, Color(1, 0.2, 0.2))
 
 func _flash_target(target_id: String) -> void:
 	var target_node := WorldState.get_entity(target_id)

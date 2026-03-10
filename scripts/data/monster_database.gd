@@ -10,8 +10,8 @@ const MONSTERS: Dictionary = {
 		"aggro_range": 6.0, "attack_range": 2.0, "attack_speed": 1.5,
 		"color": Color(0.2, 0.8, 0.2),
 		"wander_radius": 5.0,
-		"model_scene": "SLIME_PROCEDURAL",
-		"model_scale": 1.0,
+		"model_scene": "res://assets/models/characters/Slime.glb",
+		"model_scale": 0.7,
 	},
 	"wolf": {
 		"name": "Wolf",
