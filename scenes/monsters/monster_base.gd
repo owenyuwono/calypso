@@ -10,7 +10,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 @export var monster_id: String = ""
 
 const GRAVITY: float = 9.8
-const MOVE_SPEED: float = 2.5
+const MOVE_SPEED: float = 3.0
 const WANDER_INTERVAL_MIN: float = 3.0
 const WANDER_INTERVAL_MAX: float = 5.0
 
@@ -26,6 +26,8 @@ var _nav_started: bool = false
 var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _pending_hit: bool = false
+var _hit_time: float = 0.0
 
 # Cached stats
 var _aggro_range: float = 6.0
@@ -175,8 +177,10 @@ func _create_fallback_mesh(stats: Dictionary) -> void:
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
 	ModelHelper.apply_toon_to_model(_model)
 
-func _play_anim(anim_name: String) -> void:
-	if not _anim_player or _current_anim == anim_name:
+func _play_anim(anim_name: String, force: bool = false) -> void:
+	if not _anim_player:
+		return
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -349,25 +353,39 @@ func _process_attacking(delta: float) -> void:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
-	_attack_timer += delta
-	if _attack_timer >= _attack_speed:
-		_attack_timer = 0.0
-		_play_anim("1H_Melee_Attack_Chop")
-		get_tree().create_timer(0.3).timeout.connect(_perform_attack)
+	# Check animation position for hit event before starting new attacks
+	if _pending_hit:
+		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if _anim_player.current_animation_position >= _hit_time:
+				_pending_hit = false
+				_perform_attack()
+		elif not _anim_player:
+			_hit_time -= delta
+			if _hit_time <= 0.0:
+				_pending_hit = false
+				_perform_attack()
+
+	# Only accumulate attack cooldown after the pending hit has landed
+	if not _pending_hit:
+		_attack_timer += delta
+		if _attack_timer >= _attack_speed:
+			_attack_timer = 0.0
+			_play_anim("1H_Melee_Attack_Chop", true)
+			_pending_hit = true
+			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
 
 func _perform_attack() -> void:
 	if not WorldState.is_alive(aggro_target):
 		_drop_aggro()
 		return
 	var damage := WorldState.deal_damage(monster_id, aggro_target)
-	# Spawn damage number
 	_spawn_damage_number(aggro_target, damage)
-	# Flash red on the target
 	_flash_target(aggro_target)
 
 func _drop_aggro() -> void:
 	aggro_target = ""
 	state = "idle"
+	_pending_hit = false
 	_wander_timer = randf_range(1.0, 3.0)
 	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area
@@ -393,18 +411,21 @@ func _die(killer_id: String) -> void:
 	collision_shape.disabled = true
 	velocity = Vector3.ZERO
 
-	# Drop loot
+	# Spawn physical loot drops
 	var stats := MonsterDatabase.get_monster(monster_type)
 	var gold: int = stats.get("gold", 0)
-	WorldState.add_gold(killer_id, gold)
+	var drop_index := 0
+	if gold > 0:
+		_spawn_loot_drop(global_position, "", 0, gold, drop_index)
+		drop_index += 1
 
 	var drops: Array = stats.get("drops", [])
 	for drop in drops:
 		if randf() <= drop.get("chance", 0.0):
 			var item_id: String = drop.get("item", "")
 			if not item_id.is_empty():
-				WorldState.add_to_inventory(killer_id, item_id)
-				GameEvents.item_looted.emit(killer_id, item_id, 1)
+				_spawn_loot_drop(global_position, item_id, 1, 0, drop_index)
+				drop_index += 1
 
 	# Grant XP
 	var xp: int = stats.get("xp", 0)
@@ -513,3 +534,26 @@ func flash_hit() -> void:
 	if not _overlay_material:
 		return
 	ModelHelper.flash_hit(_overlay_material, self)
+
+func _get_hit_delay(anim_name: String) -> float:
+	if _anim_player and _anim_player.has_animation(anim_name):
+		return _anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
+
+func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
+	var loot_scene := preload("res://scenes/objects/loot_drop.gd")
+	var loot := StaticBody3D.new()
+	loot.set_script(loot_scene)
+	loot.item_id = item_id
+	loot.item_count = item_count
+	loot.gold_amount = gold
+	# Scatter so multiple drops don't stack
+	var offset := Vector3(
+		randf_range(-0.8, 0.8),
+		0,
+		randf_range(-0.8, 0.8)
+	)
+	if index > 0:
+		offset += Vector3(float(index) * 0.5, 0, 0)
+	loot.position = origin + offset
+	get_tree().current_scene.call_deferred("add_child", loot)

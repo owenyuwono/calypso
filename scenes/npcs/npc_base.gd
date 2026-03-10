@@ -37,13 +37,15 @@ var combat_target: String = ""
 var _attack_timer: float = 0.0
 var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _pending_hit: bool = false
+var _hit_time: float = 0.0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var dialogue_bubble: Node3D = $DialogueBubble
 @onready var name_label: Label3D = $NameLabel
 
-const MOVE_SPEED: float = 3.0
+const MOVE_SPEED: float = 3.6
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
 
@@ -123,10 +125,10 @@ func _create_fallback_mesh() -> void:
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
 	ModelHelper.apply_toon_to_model(_model)
 
-func _play_anim(anim_name: String) -> void:
+func _play_anim(anim_name: String, force: bool = false) -> void:
 	if not _anim_player:
 		return
-	if _current_anim == anim_name and _anim_player.is_playing():
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name)
@@ -254,12 +256,21 @@ func _process_combat(delta: float) -> bool:
 	var to_target := (target_node.global_position - global_position).normalized()
 	_face_direction(to_target)
 
-	var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
-	_attack_timer += delta
-	if _attack_timer >= attack_speed:
-		_attack_timer = 0.0
-		_play_anim("1H_Melee_Attack_Chop")
-		get_tree().create_timer(0.3).timeout.connect(_do_combat_attack)
+	# Check animation position for hit event before starting new attacks
+	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+		if _anim_player.current_animation_position >= _hit_time:
+			_pending_hit = false
+			_do_combat_attack()
+
+	# Only accumulate attack cooldown after the pending hit has landed
+	if not _pending_hit:
+		var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
+		_attack_timer += delta
+		if _attack_timer >= attack_speed:
+			_attack_timer = 0.0
+			_play_anim("1H_Melee_Attack_Chop", true)
+			_pending_hit = true
+			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _do_combat_attack() -> void:
@@ -352,11 +363,13 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		if memory_node:
 			memory_node.add_observation("Killed %s in combat" % combat_target)
 		combat_target = ""
+		_pending_hit = false
 		change_state(STATE_IDLE)
 
 func _die() -> void:
 	change_state(STATE_DEAD)
 	combat_target = ""
+	_pending_hit = false
 	velocity = Vector3.ZERO
 
 	# Lose 10% gold
@@ -416,6 +429,11 @@ func flash_hit() -> void:
 	if not _overlay_material:
 		return
 	ModelHelper.flash_hit(_overlay_material, self)
+
+func _get_hit_delay(anim_name: String) -> float:
+	if _anim_player and _anim_player.has_animation(anim_name):
+		return _anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
 	var target_node := WorldState.get_entity(target_id)
