@@ -4,6 +4,7 @@ extends CharacterBody3D
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+const LevelData = preload("res://scripts/data/level_data.gd")
 
 @export var npc_id: String = ""
 @export var npc_name: String = ""
@@ -126,20 +127,15 @@ func _face_direction(dir: Vector3) -> void:
 	ModelHelper.face_direction(_model, dir)
 
 func _register_with_world() -> void:
-	WorldState.register_entity(npc_id, self, {
-		"type": "npc",
-		"name": npc_name,
-		"personality": personality,
-		"state": STATE_IDLE,
-		"goal": current_goal,
-		"inventory": {},
-		"equipment": {"weapon": "", "armor": ""},
-		"hp": 50, "max_hp": 50,
-		"atk": 10, "def": 5,
-		"level": 1, "xp": 0,
-		"gold": 80,
-		"attack_speed": 1.0, "attack_range": 2.0,
-	})
+	var stats := LevelData.BASE_ADVENTURER_STATS.duplicate()
+	stats["type"] = "npc"
+	stats["name"] = npc_name
+	stats["personality"] = personality
+	stats["state"] = STATE_IDLE
+	stats["goal"] = current_goal
+	stats["inventory"] = {}
+	stats["equipment"] = {"weapon": "", "armor": ""}
+	WorldState.register_entity(npc_id, self, stats)
 
 func _setup_hp_bar() -> void:
 	_hp_bar = ModelHelper.create_hp_bar(self)
@@ -195,9 +191,8 @@ func _process_movement() -> bool:
 	var next_pos: Vector3 = nav_agent.get_next_path_position()
 	var dir: Vector3 = (next_pos - global_position)
 	dir.y = 0.0
-	dir = dir.normalized()
-
-	if dir.length() > 0.1:
+	if dir.length_squared() > 0.01:
+		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
 		_face_direction(dir)
@@ -225,8 +220,8 @@ func _process_combat(delta: float) -> bool:
 			var next_pos := nav_agent.get_next_path_position()
 			var dir := (next_pos - global_position)
 			dir.y = 0.0
-			dir = dir.normalized()
-			if dir.length() > 0.1:
+			if dir.length_squared() > 0.01:
+				dir = dir.normalized()
 				velocity.x = dir.x * MOVE_SPEED * 1.1
 				velocity.z = dir.z * MOVE_SPEED * 1.1
 				_face_direction(dir)
@@ -241,10 +236,16 @@ func _process_combat(delta: float) -> bool:
 	_face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
-	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
-		if _anim_player.current_animation_position >= _hit_time:
-			_pending_hit = false
-			_do_combat_attack()
+	if _pending_hit:
+		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if _anim_player.current_animation_position >= _hit_time:
+				_pending_hit = false
+				_do_combat_attack()
+		elif not _anim_player:
+			_hit_time -= delta
+			if _hit_time <= 0.0:
+				_pending_hit = false
+				_do_combat_attack()
 
 	# Only accumulate attack cooldown after the pending hit has landed
 	if not _pending_hit:

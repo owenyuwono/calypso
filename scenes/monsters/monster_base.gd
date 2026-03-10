@@ -52,6 +52,7 @@ func _ready() -> void:
 	var stats := MonsterDatabase.get_monster(monster_type)
 	if stats.is_empty():
 		push_warning("MonsterBase: Unknown monster type '%s'" % monster_type)
+		queue_free()
 		return
 
 	if monster_id.is_empty():
@@ -262,8 +263,8 @@ func _process_wander_movement() -> bool:
 	var next_pos := nav_agent.get_next_path_position()
 	var dir := (next_pos - global_position)
 	dir.y = 0.0
-	dir = dir.normalized()
-	if dir.length() > 0.1:
+	if dir.length_squared() > 0.01:
+		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
 		_face_direction(dir)
@@ -315,8 +316,8 @@ func _process_aggro(delta: float) -> bool:
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position)
 		dir.y = 0.0
-		dir = dir.normalized()
-		if dir.length() > 0.1:
+		if dir.length_squared() > 0.01:
+			dir = dir.normalized()
 			velocity.x = dir.x * MOVE_SPEED * 1.2
 			velocity.z = dir.z * MOVE_SPEED * 1.2
 			_face_direction(dir)

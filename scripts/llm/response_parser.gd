@@ -1,7 +1,7 @@
 extends RefCounted
 ## Parses and validates LLM JSON responses into action dictionaries.
 
-const VALID_ACTIONS: Array = ["move_to", "attack", "use_item", "buy_item", "sell_item", "talk_to", "wait"]
+const ActionSchema = preload("res://scripts/llm/action_schema.gd")
 
 static func parse(ollama_response: Dictionary) -> Dictionary:
 	var result := _empty_result()
@@ -43,7 +43,7 @@ static func validate(data: Dictionary) -> Dictionary:
 		result["action_data"] = {}
 
 	# Validate action
-	if result.action not in VALID_ACTIONS:
+	if result.action not in ActionSchema.VALID_ACTIONS:
 		result.error = "Invalid action: '%s'" % result.action
 		result.action = "wait"
 		return result

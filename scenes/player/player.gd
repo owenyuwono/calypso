@@ -302,10 +302,16 @@ func _process_combat(delta: float) -> bool:
 	_face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
-	if _pending_hit and _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
-		if _anim_player.current_animation_position >= _hit_time:
-			_pending_hit = false
-			_perform_attack()
+	if _pending_hit:
+		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if _anim_player.current_animation_position >= _hit_time:
+				_pending_hit = false
+				_perform_attack()
+		elif not _anim_player:
+			_hit_time -= delta
+			if _hit_time <= 0.0:
+				_pending_hit = false
+				_perform_attack()
 
 	# Only accumulate attack cooldown after the pending hit has landed
 	if not _pending_hit:

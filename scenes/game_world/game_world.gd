@@ -8,14 +8,13 @@ const TREE_DIR := "res://assets/models/environment/nature/trees/fir/"
 const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 # Terrain noise (shared for height queries)
 var _terrain_noise: FastNoiseLite
 var _terrain_height_scale_town: float = 0.3
 var _terrain_height_scale_field: float = 0.5
 
-# Model cache to avoid reloading
-var _model_cache: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _color_mat_cache: Dictionary = {}
 var _deco_noise: FastNoiseLite          # density modulation noise
@@ -48,7 +47,6 @@ func _ready() -> void:
 	_decorate_town_biomes()
 	_place_town_props()
 	_decorate_field_biomes()
-	_add_zone_lighting()
 
 	# Bake navmesh after environment is ready
 	var nav_region := $NavigationRegion3D
@@ -181,18 +179,8 @@ func _setup_adventurer_npcs() -> void:
 # Asset Loading Infrastructure
 # =============================================================================
 
-func _load_model(path: String) -> PackedScene:
-	if _model_cache.has(path):
-		return _model_cache[path]
-	var scene := load(path) as PackedScene
-	if scene:
-		_model_cache[path] = scene
-	else:
-		push_warning("Failed to load model: " + path)
-	return scene
-
 func _spawn_model(path: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0, parent: Node = null) -> Node3D:
-	var scene := _load_model(path)
+	var scene := ModelHelper.load_model(path)
 	if not scene:
 		return null
 	var instance: Node3D = scene.instantiate()
@@ -302,10 +290,6 @@ func _spawn_tree(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: 
 
 func _spawn_dungeon_model(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	return _spawn_model(DUNGEON_DIR + filename, pos, rot_y, scale_val)
-
-func _add_torch_light(_parent: Node3D, _offset: Vector3 = Vector3(0, 1.5, 0)) -> void:
-	# OmniLights removed for performance — ambient light provides adequate illumination.
-	pass
 
 # =============================================================================
 # Biome Decoration Infrastructure
@@ -447,7 +431,7 @@ func _build_dungeon_walls() -> void:
 	var walls_parent := $NavigationRegion3D/DungeonWalls
 
 	# Measure wall tile width from model AABB
-	var wall_scene := _load_model(DUNGEON_DIR + "wall.gltf.glb")
+	var wall_scene := ModelHelper.load_model(DUNGEON_DIR + "wall.gltf.glb")
 	var wall_width := 2.0  # default fallback
 	if wall_scene:
 		var temp := wall_scene.instantiate() as Node3D
@@ -575,9 +559,7 @@ func _spawn_dungeon_decorations() -> void:
 		elif pos.x < 116:  # West wall
 			rot = -PI / 2.0
 
-		var torch := _spawn_dungeon_model("torch_mounted.gltf.glb", pos, rot)
-		if torch:
-			_add_torch_light(torch)
+		_spawn_dungeon_model("torch_mounted.gltf.glb", pos, rot)
 
 	# Decorated pillars at room corners
 	_spawn_dungeon_model("pillar_decorated.gltf.glb", Vector3(118, 0, -17))
@@ -742,18 +724,10 @@ func _place_town_props() -> void:
 	_spawn_foliage("SM_BushLeafy02.FBX", Vector3(5.5, 0, -6), green, 1.0)
 
 	# Torches at shop fronts
-	var torch1 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-6.5, 0, -3))
-	if torch1:
-		_add_torch_light(torch1)
-	var torch2 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-9.5, 0, -3))
-	if torch2:
-		_add_torch_light(torch2)
-	var torch3 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(6.5, 0, -4))
-	if torch3:
-		_add_torch_light(torch3)
-	var torch4 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(9.5, 0, -4))
-	if torch4:
-		_add_torch_light(torch4)
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-6.5, 0, -3))
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-9.5, 0, -3))
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(6.5, 0, -4))
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(9.5, 0, -4))
 
 	# Bushes along fence line (x=30 border)
 	_spawn_foliage("SM_BushChina01.FBX", Vector3(29, 0, -15), dark_green, 0.0)
@@ -761,12 +735,8 @@ func _place_town_props() -> void:
 	_spawn_foliage("SM_BushChina03.FBX", Vector3(29, 0, 12), dark_green, 2.0)
 
 	# Torches at field entrance gateposts (x≈30)
-	var gate_torch1 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 4))
-	if gate_torch1:
-		_add_torch_light(gate_torch1)
-	var gate_torch2 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 8))
-	if gate_torch2:
-		_add_torch_light(gate_torch2)
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 4))
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 8))
 
 	# Flowers near well
 	_spawn_foliage("SM_Flower_Daisies1.FBX", Vector3(4.5, 0, -1), flower_white, 0.0)
@@ -906,18 +876,6 @@ func _decorate_field_biomes() -> void:
 	print("[Field] Biome scatter placed %d objects" % total)
 
 	# Manual: torches flanking dungeon entrance
-	var dt1 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 2))
-	if dt1:
-		_add_torch_light(dt1)
-	var dt2 := _spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 8))
-	if dt2:
-		_add_torch_light(dt2)
-
-# =============================================================================
-# Lighting
-# =============================================================================
-
-func _add_zone_lighting() -> void:
-	# OmniLights removed for performance — ambient light provides adequate illumination.
-	pass
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 2))
+	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 8))
 

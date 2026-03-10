@@ -21,6 +21,7 @@ func _ready() -> void:
 	GameEvents.entity_respawned.connect(_on_player_event.bind(""))
 	GameEvents.item_purchased.connect(_on_economy_event)
 	GameEvents.item_sold.connect(_on_economy_event)
+	GameEvents.item_looted.connect(_on_economy_event)
 	# Initial refresh
 	_refresh_all()
 

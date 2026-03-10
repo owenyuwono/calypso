@@ -97,6 +97,7 @@ func _process(delta: float) -> void:
 func pickup(entity_id: String) -> void:
 	if gold_amount > 0:
 		WorldState.add_gold(entity_id, gold_amount)
+		GameEvents.item_looted.emit(entity_id, "gold", gold_amount)
 	if not item_id.is_empty():
 		WorldState.add_to_inventory(entity_id, item_id, item_count)
 		GameEvents.item_looted.emit(entity_id, item_id, item_count)
