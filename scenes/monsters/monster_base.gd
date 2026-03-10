@@ -1,0 +1,490 @@
+extends CharacterBody3D
+## Monster entity with aggro AI, auto-attack, death, and loot.
+## Dynamically loads 3D models based on monster type from MonsterDatabase.
+
+const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+
+@export var monster_type: String = "slime"
+@export var monster_id: String = ""
+
+const GRAVITY: float = 9.8
+const MOVE_SPEED: float = 2.5
+const WANDER_INTERVAL_MIN: float = 3.0
+const WANDER_INTERVAL_MAX: float = 5.0
+
+# States
+var state: String = "idle"  # idle, wandering, aggro, attacking, dead
+var spawn_point: Vector3
+var aggro_target: String = ""
+var _attack_timer: float = 0.0
+var _wander_timer: float = 0.0
+var _respawn_timer: float = 0.0
+var _death_tween: Tween
+var _nav_started: bool = false
+var _nav_wait_frames: int = 0
+
+# Cached stats
+var _aggro_range: float = 6.0
+var _attack_range: float = 2.0
+var _attack_speed: float = 1.5
+var _wander_radius: float = 5.0
+
+@onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
+@onready var collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var name_label: Label3D = $NameLabel
+
+# 3D Model
+var _model: Node3D
+var _mesh_instances: Array[MeshInstance3D] = []
+var _overlay_material: StandardMaterial3D
+var _anim_player: AnimationPlayer
+var _current_anim: String = ""
+var _hp_bar: Node3D
+
+func _ready() -> void:
+	spawn_point = global_position
+	var stats := MonsterDatabase.get_monster(monster_type)
+	if stats.is_empty():
+		push_warning("MonsterBase: Unknown monster type '%s'" % monster_type)
+		return
+
+	if monster_id.is_empty():
+		monster_id = "%s_%d" % [monster_type, get_instance_id()]
+
+	_aggro_range = stats.get("aggro_range", 6.0)
+	_attack_range = stats.get("attack_range", 2.0)
+	_attack_speed = stats.get("attack_speed", 1.5)
+	_wander_radius = stats.get("wander_radius", 5.0)
+
+	# Setup 3D model
+	_setup_model(stats)
+
+	if name_label:
+		name_label.text = stats.get("name", monster_type)
+
+	nav_agent.target_desired_distance = 1.0
+	nav_agent.path_desired_distance = 1.0
+
+	# Register with WorldState
+	WorldState.register_entity(monster_id, self, {
+		"type": "monster",
+		"name": stats.get("name", monster_type),
+		"monster_type": monster_type,
+		"hp": stats.get("hp", 0),
+		"max_hp": stats.get("hp", 0),
+		"atk": stats.get("atk", 0),
+		"def": stats.get("def", 0),
+		"level": 1,
+		"attack_speed": _attack_speed,
+		"attack_range": _attack_range,
+	})
+
+	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+
+	# Create HP bar
+	_setup_hp_bar()
+
+	# Connect death signal
+	GameEvents.entity_died.connect(_on_entity_died)
+
+func _setup_model(stats: Dictionary) -> void:
+	var model_scene_path: String = stats.get("model_scene", "")
+	var scale_val: float = stats.get("model_scale", 0.7)
+
+	if model_scene_path.is_empty():
+		# No model defined — create colored mesh fallback
+		_create_fallback_mesh(stats)
+		return
+
+	if model_scene_path == "SLIME_PROCEDURAL":
+		_create_slime_mesh(stats)
+		return
+
+	var result := ModelHelper.instantiate_model(model_scene_path, scale_val)
+	if result.model == null:
+		_create_fallback_mesh(stats)
+		return
+
+	_model = result.model
+	add_child(_model)
+	_anim_player = result.anim_player
+
+	_mesh_instances = ModelHelper.find_mesh_instances(_model)
+	_overlay_material = ModelHelper.create_overlay_material()
+	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+
+	# Apply color tint overlay for recolored monsters (goblin, dark_mage)
+	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
+	if tint_color.a > 0:
+		_overlay_material.albedo_color = tint_color
+
+	if _anim_player:
+		_play_anim("Idle")
+
+func _create_slime_mesh(stats: Dictionary) -> void:
+	_model = Node3D.new()
+	add_child(_model)
+
+	var mesh_inst := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.5
+	sphere.height = 0.8
+	mesh_inst.mesh = sphere
+	mesh_inst.position.y = 0.4
+
+	var slime_color: Color = stats.get("color", Color(0.2, 0.8, 0.2))
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = slime_color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color.a = 0.8
+	mesh_inst.set_surface_override_material(0, mat)
+
+	_model.add_child(mesh_inst)
+	_mesh_instances = [mesh_inst]
+	_overlay_material = ModelHelper.create_overlay_material()
+	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+
+	# Wobble animation via tween
+	var tween := create_tween().set_loops()
+	tween.tween_property(_model, "scale", Vector3(1.1, 0.9, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_model, "scale", Vector3(0.9, 1.1, 0.9), 0.5).set_trans(Tween.TRANS_SINE)
+
+func _create_fallback_mesh(stats: Dictionary) -> void:
+	_model = Node3D.new()
+	add_child(_model)
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.8, 0.8, 0.8)
+	mesh_inst.mesh = box
+	mesh_inst.position.y = 0.4
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = stats.get("color", Color.WHITE)
+	mesh_inst.mesh.surface_set_material(0, mat)
+	_model.add_child(mesh_inst)
+	_mesh_instances = [mesh_inst]
+	_overlay_material = ModelHelper.create_overlay_material()
+	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
+
+func _play_anim(anim_name: String) -> void:
+	if not _anim_player or _current_anim == anim_name:
+		return
+	if _anim_player.has_animation(anim_name):
+		_anim_player.play(anim_name)
+		_current_anim = anim_name
+
+func _face_direction(dir: Vector3) -> void:
+	if _model and dir.length() > 0.1:
+		_model.rotation.y = atan2(dir.x, dir.z)
+
+func _setup_hp_bar() -> void:
+	var hp_bar_scene := preload("res://scenes/ui/hp_bar_3d.tscn")
+	_hp_bar = hp_bar_scene.instantiate()
+	add_child(_hp_bar)
+	_hp_bar.position = Vector3(0, 2.0, 0)
+
+func _physics_process(delta: float) -> void:
+	if state == "dead":
+		_respawn_timer -= delta
+		if _respawn_timer <= 0.0:
+			_respawn()
+		return
+
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
+
+	var is_moving := false
+	match state:
+		"idle":
+			_process_idle(delta)
+		"wandering":
+			is_moving = _process_wander_movement()
+		"aggro":
+			is_moving = _process_aggro(delta)
+		"attacking":
+			_process_attacking(delta)
+
+	if state != "idle":
+		move_and_slide()
+	else:
+		velocity.x = 0.0
+		velocity.z = 0.0
+		move_and_slide()
+
+	# Update animation
+	if state == "attacking":
+		pass  # Attack handles its own anims
+	elif state == "dead":
+		pass
+	elif is_moving:
+		_play_anim("Walking_A")
+	else:
+		_play_anim("Idle")
+
+	_update_hp_bar()
+
+func _process_idle(delta: float) -> void:
+	_wander_timer -= delta
+	if _wander_timer <= 0.0:
+		_start_wander()
+
+	# Check for aggro
+	_check_aggro()
+
+func _start_wander() -> void:
+	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+	var offset := Vector3(
+		randf_range(-_wander_radius, _wander_radius),
+		0,
+		randf_range(-_wander_radius, _wander_radius)
+	)
+	var target_pos := spawn_point + offset
+	state = "wandering"
+	_nav_started = false
+	_nav_wait_frames = 0
+	nav_agent.target_position = target_pos
+
+func _process_wander_movement() -> bool:
+	if not _nav_started:
+		if not nav_agent.is_navigation_finished():
+			_nav_started = true
+		else:
+			_nav_wait_frames += 1
+			if _nav_wait_frames > 30:
+				state = "idle"
+			return false
+
+	if nav_agent.is_navigation_finished():
+		state = "idle"
+		_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+		return false
+
+	var next_pos := nav_agent.get_next_path_position()
+	var dir := (next_pos - global_position)
+	dir.y = 0.0
+	dir = dir.normalized()
+	if dir.length() > 0.1:
+		velocity.x = dir.x * MOVE_SPEED
+		velocity.z = dir.z * MOVE_SPEED
+		_face_direction(dir)
+
+	# Still check aggro while wandering
+	_check_aggro()
+	return true
+
+func _check_aggro() -> void:
+	var nearby := WorldState.get_nearby_entities(global_position, _aggro_range)
+	for entry in nearby:
+		if entry.id == monster_id:
+			continue
+		var data := WorldState.get_entity_data(entry.id)
+		var etype: String = data.get("type", "")
+		if etype in ["player", "npc"] and WorldState.is_alive(entry.id):
+			aggro_target = entry.id
+			state = "aggro"
+			return
+
+func _process_aggro(delta: float) -> bool:
+	var target_node := WorldState.get_entity(aggro_target)
+	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(aggro_target):
+		_drop_aggro()
+		return false
+
+	var dist := global_position.distance_to(target_node.global_position)
+
+	# Lost interest if too far from spawn
+	if global_position.distance_to(spawn_point) > _aggro_range * 3.0:
+		_drop_aggro()
+		return false
+
+	if dist <= _attack_range:
+		state = "attacking"
+		_attack_timer = 0.0
+		velocity.x = 0.0
+		velocity.z = 0.0
+		return false
+
+	# Chase target
+	nav_agent.target_position = target_node.global_position
+	if not nav_agent.is_navigation_finished():
+		var next_pos := nav_agent.get_next_path_position()
+		var dir := (next_pos - global_position)
+		dir.y = 0.0
+		dir = dir.normalized()
+		if dir.length() > 0.1:
+			velocity.x = dir.x * MOVE_SPEED * 1.2
+			velocity.z = dir.z * MOVE_SPEED * 1.2
+			_face_direction(dir)
+			return true
+	return false
+
+func _process_attacking(delta: float) -> void:
+	var target_node := WorldState.get_entity(aggro_target)
+	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(aggro_target):
+		_drop_aggro()
+		return
+
+	var dist := global_position.distance_to(target_node.global_position)
+	if dist > _attack_range * 1.5:
+		state = "aggro"
+		return
+
+	# Face the target
+	var to_target := (target_node.global_position - global_position).normalized()
+	_face_direction(to_target)
+
+	_attack_timer += delta
+	if _attack_timer >= _attack_speed:
+		_attack_timer = 0.0
+		_perform_attack()
+		_play_anim("1H_Melee_Attack_Chop")
+
+func _perform_attack() -> void:
+	if not WorldState.is_alive(aggro_target):
+		_drop_aggro()
+		return
+	var damage := WorldState.deal_damage(monster_id, aggro_target)
+	# Spawn damage number
+	_spawn_damage_number(aggro_target, damage)
+	# Flash red on the target
+	_flash_target(aggro_target)
+
+func _drop_aggro() -> void:
+	aggro_target = ""
+	state = "idle"
+	_wander_timer = randf_range(1.0, 3.0)
+	# Return to spawn area
+	nav_agent.target_position = spawn_point
+
+func _on_entity_died(entity_id: String, killer_id: String) -> void:
+	if entity_id == monster_id:
+		_die(killer_id)
+	elif entity_id == aggro_target:
+		_drop_aggro()
+
+func _die(killer_id: String) -> void:
+	state = "dead"
+	aggro_target = ""
+	collision_shape.disabled = true
+	velocity = Vector3.ZERO
+
+	# Drop loot
+	var stats := MonsterDatabase.get_monster(monster_type)
+	var gold: int = stats.get("gold", 0)
+	WorldState.add_gold(killer_id, gold)
+
+	var drops: Array = stats.get("drops", [])
+	for drop in drops:
+		if randf() <= drop.get("chance", 0.0):
+			var item_id: String = drop.get("item", "")
+			if not item_id.is_empty():
+				WorldState.add_to_inventory(killer_id, item_id)
+				GameEvents.item_looted.emit(killer_id, item_id, 1)
+
+	# Grant XP
+	var xp: int = stats.get("xp", 0)
+	WorldState.grant_xp(killer_id, xp)
+
+	# Death visual: animation + fade
+	_play_anim("Death_A")
+	if _death_tween:
+		_death_tween.kill()
+	_death_tween = ModelHelper.fade_out(_mesh_instances, self)
+
+	if _hp_bar:
+		_hp_bar.visible = false
+	if name_label:
+		name_label.visible = false
+
+	# Start respawn timer
+	_respawn_timer = randf_range(30.0, 60.0)
+
+	# Unregister temporarily
+	WorldState.unregister_entity(monster_id)
+
+func _respawn() -> void:
+	var stats := MonsterDatabase.get_monster(monster_type)
+	if stats.is_empty():
+		push_warning("MonsterBase: Cannot respawn, unknown type '%s'" % monster_type)
+		return
+	state = "idle"
+	_current_anim = ""
+	global_position = spawn_point
+	collision_shape.disabled = false
+
+	# Restore model visuals
+	if _model:
+		_model.scale = Vector3.ONE * stats.get("model_scale", 0.7)
+	ModelHelper.restore_materials(_mesh_instances)
+	if _overlay_material:
+		# Restore tint if applicable
+		var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
+		_overlay_material.albedo_color = tint_color
+
+	if _hp_bar:
+		_hp_bar.visible = true
+	if name_label:
+		name_label.visible = true
+
+	_play_anim("Idle")
+	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+
+	# Re-register
+	WorldState.register_entity(monster_id, self, {
+		"type": "monster",
+		"name": stats.get("name", monster_type),
+		"monster_type": monster_type,
+		"hp": stats.get("hp", 0),
+		"max_hp": stats.get("hp", 0),
+		"atk": stats.get("atk", 0),
+		"def": stats.get("def", 0),
+		"level": 1,
+		"attack_speed": _attack_speed,
+		"attack_range": _attack_range,
+	})
+
+	GameEvents.entity_respawned.emit(monster_id)
+
+func _update_hp_bar() -> void:
+	if not _hp_bar or state == "dead":
+		return
+	var data := WorldState.get_entity_data(monster_id)
+	var hp: int = data.get("hp", 0)
+	var max_hp: int = data.get("max_hp", 1)
+	if _hp_bar.has_method("update_bar"):
+		_hp_bar.update_bar(hp, max_hp)
+	# Only show HP bar if damaged
+	_hp_bar.visible = hp < max_hp
+
+func _spawn_damage_number(target_id: String, damage: int) -> void:
+	var target_node := WorldState.get_entity(target_id)
+	if not target_node:
+		return
+	var dmg_scene := preload("res://scenes/ui/damage_number.tscn")
+	var dmg := dmg_scene.instantiate()
+	get_tree().current_scene.add_child(dmg)
+	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0)
+	dmg.setup(damage)
+
+func _flash_target(target_id: String) -> void:
+	var target_node := WorldState.get_entity(target_id)
+	if not target_node or not is_instance_valid(target_node):
+		return
+	if target_node.has_method("flash_hit"):
+		target_node.flash_hit()
+
+# --- Hover Highlight ---
+
+func highlight() -> void:
+	if _overlay_material:
+		ModelHelper.set_highlight(_overlay_material, true)
+
+func unhighlight() -> void:
+	if _overlay_material:
+		ModelHelper.set_highlight(_overlay_material, false)
+
+func flash_hit() -> void:
+	if not _overlay_material:
+		return
+	ModelHelper.flash_hit(_overlay_material, self)

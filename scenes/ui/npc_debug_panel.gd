@@ -1,5 +1,7 @@
 extends Control
-## Debug panel showing NPC internal state.
+## Debug panel showing adventurer NPC state, stats, and combat info.
+
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 @onready var content_label: RichTextLabel = $Panel/MarginContainer/VBoxContainer/Content
 @onready var title_label: Label = $Panel/MarginContainer/VBoxContainer/Title
@@ -26,7 +28,22 @@ func _input(event: InputEvent) -> void:
 func _refresh() -> void:
 	var text := ""
 
-	# Find all NPCs
+	# Player stats
+	var pdata := WorldState.get_entity_data("player")
+	if not pdata.is_empty():
+		text += "[b]Player[/b]\n"
+		text += "  Lv.%d  HP: %d/%d  ATK: %d  DEF: %d\n" % [
+			pdata.get("level", 1), pdata.get("hp", 0), pdata.get("max_hp", 0),
+			WorldState.get_effective_atk("player"), WorldState.get_effective_def("player")]
+		text += "  Gold: %d  XP: %d\n" % [pdata.get("gold", 0), pdata.get("xp", 0)]
+		var equip: Dictionary = pdata.get("equipment", {})
+		var w: String = equip.get("weapon", "")
+		var a: String = equip.get("armor", "")
+		text += "  Equip: %s / %s\n\n" % [
+			ItemDatabase.get_item_name(w) if not w.is_empty() else "-",
+			ItemDatabase.get_item_name(a) if not a.is_empty() else "-"]
+
+	# NPC adventurers
 	for entity_id in WorldState.entities:
 		var data := WorldState.get_entity_data(entity_id)
 		if data.get("type", "") != "npc":
@@ -39,25 +56,42 @@ func _refresh() -> void:
 		var npc_name: String = data.get("name", entity_id)
 		var state: String = data.get("state", "unknown")
 		var goal: String = data.get("goal", "none")
-		var inventory: Array = data.get("inventory", [])
+		var hp: int = data.get("hp", 0)
+		var max_hp: int = data.get("max_hp", 0)
+		var level: int = data.get("level", 1)
+		var gold: int = data.get("gold", 0)
 
 		var thought: String = node.last_thought if "last_thought" in node else ""
 		var action: String = node.current_action if "current_action" in node else ""
 		var target: String = node.current_target if "current_target" in node else ""
 
-		var pos := node.global_position
 		text += "[b]%s[/b] [color=#888](%s)[/color]\n" % [npc_name, entity_id]
-		text += "  State: [color=%s]%s[/color]\n" % [_state_color(state), state.to_upper()]
-		text += "  Pos: (%.1f, %.1f, %.1f)\n" % [pos.x, pos.y, pos.z]
+		text += "  State: [color=%s]%s[/color]" % [_state_color(state), state.to_upper()]
+
+		# Show combat target if in combat
+		if state == "combat" and "combat_target" in node and not node.combat_target.is_empty():
+			text += " vs %s" % node.combat_target
+		text += "\n"
+
+		text += "  Lv.%d  HP: %d/%d  ATK: %d  DEF: %d  Gold: %d\n" % [
+			level, hp, max_hp,
+			WorldState.get_effective_atk(entity_id), WorldState.get_effective_def(entity_id), gold]
+
 		text += "  Goal: %s\n" % goal
 		if not action.is_empty():
-			text += "  Action: %s → %s\n" % [action, target]
+			text += "  Action: %s -> %s\n" % [action, target]
 		if not thought.is_empty():
 			text += "  Thought: [i]%s[/i]\n" % thought
-		if not inventory.is_empty():
-			text += "  Inventory: %s\n" % ", ".join(inventory)
 
-		# Show memory observations
+		# Inventory summary
+		var inv: Dictionary = WorldState.get_inventory(entity_id)
+		if not inv.is_empty():
+			var items: Array = []
+			for item_id in inv:
+				items.append("%s x%d" % [ItemDatabase.get_item_name(item_id), inv[item_id]])
+			text += "  Items: %s\n" % ", ".join(items)
+
+		# Recent memory
 		var memory_node = node.get_node_or_null("NPCMemory")
 		if memory_node:
 			var obs: Array = memory_node.get_recent_observations(3)
@@ -68,7 +102,7 @@ func _refresh() -> void:
 
 		text += "\n"
 
-	# Show LLM status
+	# LLM status
 	text += "[b]LLM Status[/b]\n"
 	text += "  Active requests: %d / %d\n" % [LLMClient.get_active_request_count(), LLMClient.MAX_CONCURRENT_REQUESTS]
 
@@ -82,4 +116,6 @@ func _state_color(state: String) -> String:
 		"talking": return "#66ff66"
 		"interacting": return "#ff9933"
 		"failed": return "#ff4444"
+		"combat": return "#ff6600"
+		"dead": return "#880000"
 	return "#ffffff"

@@ -1,11 +1,14 @@
 extends Node
-## Global entity registry, spatial queries, inventory, and perception system.
+## Global entity registry, spatial queries, combat stats, inventory, and progression.
+
+const LevelData = preload("res://scripts/data/level_data.gd")
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 # Entity registry: id -> Node3D reference
 var entities: Dictionary = {}
 # Location markers: id -> Vector3 position
 var location_markers: Dictionary = {}
-# Entity metadata: id -> Dictionary with type, inventory, etc.
+# Entity metadata: id -> Dictionary with type, stats, inventory, etc.
 var entity_data: Dictionary = {}
 
 # --- Entity Registry ---
@@ -66,51 +69,215 @@ func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
 		return {}
 	var nearby := get_nearby_entities(npc_node.global_position, radius)
 	var npcs: Array = []
+	var monsters: Array = []
 	var items: Array = []
 	var objects: Array = []
 	var locations: Array = []
+	var shop_npcs: Array = []
 	for entry in nearby:
 		if entry.id == npc_id:
 			continue
 		var data := get_entity_data(entry.id)
 		var entity_type: String = data.get("type", "unknown")
 		match entity_type:
-			"npc":
-				npcs.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "state": data.get("state", "idle")})
+			"npc", "player":
+				var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1), "state": data.get("state", "idle")}
+				info["name"] = data.get("name", entry.id)
+				info["level"] = data.get("level", 1)
+				info["hp"] = data.get("hp", 0)
+				info["max_hp"] = data.get("max_hp", 0)
+				npcs.append(info)
+			"monster":
+				var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1)}
+				info["name"] = data.get("name", entry.id)
+				info["hp"] = data.get("hp", 0)
+				info["max_hp"] = data.get("max_hp", 0)
+				info["level"] = data.get("level", 1)
+				monsters.append(info)
 			"item":
 				items.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
 			"object":
 				objects.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
+			"shop_npc":
+				shop_npcs.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id), "shop_type": data.get("shop_type", "")})
 	for loc_id in location_markers:
 		var dist := npc_node.global_position.distance_to(location_markers[loc_id])
 		if dist <= radius:
 			locations.append({"id": loc_id, "distance": snapped(dist, 0.1)})
 	return {
 		"npcs": npcs,
+		"monsters": monsters,
 		"items": items,
 		"objects": objects,
 		"locations": locations,
+		"shop_npcs": shop_npcs,
 	}
 
-# --- Inventory ---
+# --- Count-Based Inventory ---
+# Inventory is now Dictionary: {item_type_id: count}
 
-func get_inventory(entity_id: String) -> Array:
+func get_inventory(entity_id: String) -> Dictionary:
 	var data := get_entity_data(entity_id)
-	return data.get("inventory", [])
+	return data.get("inventory", {})
 
-func add_to_inventory(entity_id: String, item_id: String) -> void:
+func add_to_inventory(entity_id: String, item_id: String, count: int = 1) -> void:
 	if not entity_data.has(entity_id):
 		return
 	if not entity_data[entity_id].has("inventory"):
-		entity_data[entity_id]["inventory"] = []
-	entity_data[entity_id]["inventory"].append(item_id)
+		entity_data[entity_id]["inventory"] = {}
+	var inv: Dictionary = entity_data[entity_id]["inventory"]
+	inv[item_id] = inv.get(item_id, 0) + count
 
-func remove_from_inventory(entity_id: String, item_id: String) -> bool:
+func remove_from_inventory(entity_id: String, item_id: String, count: int = 1) -> bool:
 	if not entity_data.has(entity_id):
 		return false
-	var inv: Array = entity_data[entity_id].get("inventory", [])
-	var idx := inv.find(item_id)
-	if idx >= 0:
-		inv.remove_at(idx)
-		return true
-	return false
+	var inv: Dictionary = entity_data[entity_id].get("inventory", {})
+	var current: int = inv.get(item_id, 0)
+	if current < count:
+		return false
+	current -= count
+	if current <= 0:
+		inv.erase(item_id)
+	else:
+		inv[item_id] = current
+	return true
+
+func has_item(entity_id: String, item_id: String, count: int = 1) -> bool:
+	var inv := get_inventory(entity_id)
+	return inv.get(item_id, 0) >= count
+
+func get_item_count(entity_id: String, item_id: String) -> int:
+	var inv := get_inventory(entity_id)
+	return inv.get(item_id, 0)
+
+# --- Combat Stats ---
+
+func get_stat(entity_id: String, stat: String, default: int = 0) -> int:
+	var data := get_entity_data(entity_id)
+	return data.get(stat, default)
+
+func get_effective_atk(entity_id: String) -> int:
+	var data := get_entity_data(entity_id)
+	var base_atk: int = data.get("atk", 0)
+	var equipment: Dictionary = data.get("equipment", {})
+	var weapon_id: String = equipment.get("weapon", "")
+	if not weapon_id.is_empty():
+		var item := ItemDatabase.get_item(weapon_id)
+		base_atk += item.get("atk_bonus", 0)
+	return base_atk
+
+func get_effective_def(entity_id: String) -> int:
+	var data := get_entity_data(entity_id)
+	var base_def: int = data.get("def", 0)
+	var equipment: Dictionary = data.get("equipment", {})
+	var armor_id: String = equipment.get("armor", "")
+	if not armor_id.is_empty():
+		var item := ItemDatabase.get_item(armor_id)
+		base_def += item.get("def_bonus", 0)
+	return base_def
+
+func deal_damage(attacker_id: String, target_id: String) -> int:
+	var atk := get_effective_atk(attacker_id)
+	var def := get_effective_def(target_id)
+	var damage := maxi(1, atk - def)
+	var target_data := get_entity_data(target_id)
+	var hp: int = target_data.get("hp", 0)
+	hp = maxi(0, hp - damage)
+	set_entity_data(target_id, "hp", hp)
+	GameEvents.entity_damaged.emit(target_id, attacker_id, damage, hp)
+	if hp <= 0:
+		GameEvents.entity_died.emit(target_id, attacker_id)
+	return damage
+
+func heal_entity(entity_id: String, amount: int) -> int:
+	var data := get_entity_data(entity_id)
+	var hp: int = data.get("hp", 0)
+	var max_hp: int = data.get("max_hp", 1)
+	var healed := mini(amount, max_hp - hp)
+	set_entity_data(entity_id, "hp", hp + healed)
+	return healed
+
+# --- Gold ---
+
+func get_gold(entity_id: String) -> int:
+	return get_entity_data(entity_id).get("gold", 0)
+
+func add_gold(entity_id: String, amount: int) -> void:
+	var current := get_gold(entity_id)
+	set_entity_data(entity_id, "gold", current + amount)
+
+func remove_gold(entity_id: String, amount: int) -> bool:
+	var current := get_gold(entity_id)
+	if current < amount:
+		return false
+	set_entity_data(entity_id, "gold", current - amount)
+	return true
+
+# --- Equipment ---
+
+func equip_item(entity_id: String, item_id: String) -> bool:
+	var item := ItemDatabase.get_item(item_id)
+	if item.is_empty():
+		return false
+	if not has_item(entity_id, item_id):
+		return false
+
+	var slot: String = ""
+	match item.get("type", ""):
+		"weapon": slot = "weapon"
+		"armor": slot = "armor"
+		_: return false
+
+	var data := get_entity_data(entity_id)
+	if not data.has("equipment"):
+		data["equipment"] = {"weapon": "", "armor": ""}
+
+	# Unequip current item in that slot
+	var current: String = data["equipment"].get(slot, "")
+	if not current.is_empty():
+		add_to_inventory(entity_id, current)
+
+	# Equip new item
+	remove_from_inventory(entity_id, item_id)
+	data["equipment"][slot] = item_id
+	return true
+
+func unequip_item(entity_id: String, slot: String) -> bool:
+	var data := get_entity_data(entity_id)
+	var equipment: Dictionary = data.get("equipment", {})
+	var item_id: String = equipment.get(slot, "")
+	if item_id.is_empty():
+		return false
+	equipment[slot] = ""
+	add_to_inventory(entity_id, item_id)
+	return true
+
+# --- Progression ---
+
+func grant_xp(entity_id: String, amount: int) -> void:
+	var data := get_entity_data(entity_id)
+	var level: int = data.get("level", 1)
+	if level >= LevelData.MAX_LEVEL:
+		return
+	var xp: int = data.get("xp", 0) + amount
+	set_entity_data(entity_id, "xp", xp)
+	GameEvents.xp_gained.emit(entity_id, amount)
+
+	# Check for level up
+	var xp_needed := LevelData.xp_to_next_level(level)
+	while xp >= xp_needed and level < LevelData.MAX_LEVEL:
+		xp -= xp_needed
+		level += 1
+		set_entity_data(entity_id, "xp", xp)
+		set_entity_data(entity_id, "level", level)
+		# Apply stat gains (re-read current values each iteration for multi-level)
+		var cur_max_hp: int = get_stat(entity_id, "max_hp", 50) + LevelData.HP_PER_LEVEL
+		set_entity_data(entity_id, "max_hp", cur_max_hp)
+		set_entity_data(entity_id, "hp", cur_max_hp)  # Full heal on level up
+		set_entity_data(entity_id, "atk", get_stat(entity_id, "atk", 10) + LevelData.ATK_PER_LEVEL)
+		set_entity_data(entity_id, "def", get_stat(entity_id, "def", 5) + LevelData.DEF_PER_LEVEL)
+		GameEvents.level_up.emit(entity_id, level)
+		xp_needed = LevelData.xp_to_next_level(level)
+
+func is_alive(entity_id: String) -> bool:
+	return get_entity_data(entity_id).get("hp", 0) > 0

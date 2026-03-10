@@ -1,9 +1,8 @@
 extends Node
-## NPC brain — LLM decision loop with fallback to hardcoded test actions.
+## NPC brain — LLM decision loop for adventurer NPCs with combat awareness.
 
 const NPC_DECISION_INTERVAL: float = 5.0
 
-# Preload LLM helper scripts
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 const ResponseParser = preload("res://scripts/llm/response_parser.gd")
 const ActionSchema = preload("res://scripts/llm/action_schema.gd")
@@ -14,7 +13,8 @@ var executor: Node  # NPCActionExecutor
 var _decision_timer: float = 0.0
 var _enabled: bool = true
 var _waiting_for_llm: bool = false
-var _use_llm: bool = true  # Set false to use test actions only
+var _use_llm: bool = true
+var _responding_to: String = ""  # Guard against infinite talk_to recursion
 
 # Test action queue (fallback when LLM unavailable)
 var _test_actions: Array = []
@@ -32,6 +32,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not _enabled or _waiting_for_llm:
+		return
+	# Don't make decisions while in combat, dead, or already acting
+	if npc.current_state in ["combat", "dead"]:
 		return
 	if npc.current_state != "idle":
 		return
@@ -65,6 +68,7 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 	if req_id != npc.npc_id:
 		return
 	_waiting_for_llm = false
+	_responding_to = ""
 
 	var parsed := ResponseParser.parse(response)
 
@@ -75,24 +79,24 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 		return
 
 	npc.last_thought = parsed.thinking
-	memory.add_observation("Thinking: %s → %s %s" % [parsed.thinking, parsed.action, parsed.target])
+	memory.add_observation("Thinking: %s -> %s %s" % [parsed.thinking, parsed.action, parsed.target])
 
 	# Update goal if requested
 	if not parsed.goal_update.is_empty():
 		npc.set_goal(parsed.goal_update)
 		memory.add_goal(parsed.goal_update)
 
-	executor.execute(parsed.action, parsed.target, parsed.dialogue)
+	executor.execute(parsed.action, parsed.target, parsed.dialogue, parsed.get("action_data", {}))
 
 func _on_llm_failed(req_id: String, error: String) -> void:
 	if req_id != npc.npc_id:
 		return
 	_waiting_for_llm = false
+	_responding_to = ""
 
 	push_warning("NPC %s: LLM request failed: %s" % [npc.npc_id, error])
 	memory.add_observation("Couldn't think clearly (LLM error: %s)" % error)
 
-	# Fallback to test action
 	npc.change_state("idle")
 	if not _test_actions.is_empty():
 		_use_test_action()
@@ -124,19 +128,26 @@ func set_use_llm(enabled: bool) -> void:
 	_use_llm = enabled
 
 ## Reactive conversation — triggered when another entity speaks to this NPC.
-## Bypasses the normal tick timer for immediate response.
 func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	if _waiting_for_llm:
-		return  # Already processing
+		return
 
+	# Don't respond if dead or in combat
+	if npc.current_state in ["dead", "combat"]:
+		return
+
+	# Prevent infinite ping-pong: don't respond if already responding to this speaker
+	if _responding_to == speaker_id:
+		return
+
+	_responding_to = speaker_id
 	memory.add_observation("%s spoke to me: '%s'" % [speaker_id, spoken_text])
 	memory.add_conversation(speaker_id, speaker_id, spoken_text)
 
 	if _use_llm and LLMClient.is_available():
-		# Build a conversation-focused prompt
 		npc.change_state("thinking")
 		_waiting_for_llm = true
-		_decision_timer = 0.0  # Reset tick timer
+		_decision_timer = 0.0
 
 		var messages: Array = [
 			PromptBuilder.build_system_message(npc.npc_name, npc.personality, npc.current_goal),
@@ -148,9 +159,9 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 		LLMClient.send_chat(npc.npc_id, messages, schema)
 		GameEvents.llm_request_sent.emit(npc.npc_id)
 	else:
-		# Fallback: generic greeting response
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % speaker_id
 		executor.execute("talk_to", speaker_id, greeting)
+		_responding_to = ""
 
 func _on_action_completed(completed_npc_id: String, action: String, success: bool) -> void:
 	if completed_npc_id == npc.npc_id:
@@ -158,13 +169,14 @@ func _on_action_completed(completed_npc_id: String, action: String, success: boo
 		memory.add_observation("Action '%s' %s" % [action, status])
 
 func _on_npc_spoke(speaker_id: String, dialogue: String, target_id: String) -> void:
+	# If we just spoke (we're the speaker), clear the responding guard
+	if speaker_id == npc.npc_id:
+		_responding_to = ""
+		memory.add_conversation(target_id, npc.npc_id, dialogue)
+		return
 	if target_id == npc.npc_id:
-		# Auto-respond to create natural back-and-forth conversations.
-		# request_reactive_response() handles memory, so skip it here to avoid duplicates.
 		if speaker_id != "player":
 			request_reactive_response(speaker_id, dialogue)
 		else:
 			memory.add_conversation(speaker_id, speaker_id, dialogue)
 			memory.add_observation("%s said to me: '%s'" % [speaker_id, dialogue])
-	elif speaker_id == npc.npc_id:
-		memory.add_conversation(target_id, npc.npc_id, dialogue)

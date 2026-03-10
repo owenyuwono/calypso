@@ -1,11 +1,16 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/game_world/game_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_debug_panel.tscn" id="3_debug"]
 [ext_resource type="Script" path="res://scenes/camera/isometric_camera.gd" id="4_camera"]
+[ext_resource type="PackedScene" path="res://scenes/ui/player_hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
+[ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="7_shop"]
+[ext_resource type="Script" path="res://scenes/main.gd" id="8_main"]
 
 [node name="Main" type="Node3D"]
+script = ExtResource("8_main")
 
 [node name="GameWorld" parent="." instance=ExtResource("1_world")]
 
@@ -21,5 +26,11 @@ script = ExtResource("4_camera")
 target_path = NodePath("../Player")
 
 [node name="UILayer" type="CanvasLayer" parent="."]
+
+[node name="PlayerHUD" parent="UILayer" instance=ExtResource("5_hud")]
+
+[node name="InventoryPanel" parent="UILayer" instance=ExtResource("6_inventory")]
+
+[node name="ShopPanel" parent="UILayer" instance=ExtResource("7_shop")]
 
 [node name="NPCDebugPanel" parent="UILayer" instance=ExtResource("3_debug")]

@@ -1,10 +1,8 @@
 extends RefCounted
-## JSON schema for Ollama's structured output (format parameter).
+## JSON schema for Ollama's structured output — adventurer action set.
 
-const VALID_ACTIONS: Array = ["move_to", "pick_up", "drop_item", "use_object", "talk_to", "wait"]
+const VALID_ACTIONS: Array = ["move_to", "attack", "use_item", "buy_item", "sell_item", "talk_to", "wait"]
 
-## Returns the JSON schema dict for Ollama's `format` parameter.
-## This enforces grammar-constrained decoding for guaranteed valid JSON.
 static func get_schema() -> Dictionary:
 	return {
 		"type": "object",
@@ -24,11 +22,19 @@ static func get_schema() -> Dictionary:
 			},
 			"dialogue": {
 				"type": "string",
-				"description": "What to say (only used with talk_to action)",
+				"description": "What to say (only for talk_to action)",
+			},
+			"action_data": {
+				"type": "object",
+				"description": "Extra data for buy_item/sell_item: {item_id, count}",
+				"properties": {
+					"item_id": {"type": "string"},
+					"count": {"type": "integer"},
+				},
 			},
 			"goal_update": {
 				"type": "string",
-				"description": "New goal if the current goal should change, empty string to keep current goal",
+				"description": "New goal if the current goal should change, empty string to keep current",
 			},
 		},
 		"required": ["thinking", "action", "target"],

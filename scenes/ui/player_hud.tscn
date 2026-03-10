@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/player_hud.gd" id="1_script"]
+
+[node name="PlayerHUD" type="Control"]
+script = ExtResource("1_script")
+anchors_preset = 0

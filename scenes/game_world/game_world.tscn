@@ -1,8 +1,9 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=23 format=3]
 
 [ext_resource type="Script" path="res://scenes/game_world/game_world.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/npc_base.tscn" id="2_npc"]
-[ext_resource type="PackedScene" path="res://scenes/objects/pickup_item.tscn" id="3_item"]
+[ext_resource type="PackedScene" path="res://scenes/npcs/shop_npc.tscn" id="3_shop"]
+[ext_resource type="Script" path="res://scenes/monsters/monster_spawner.gd" id="4_spawner"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
 parsed_geometry_type = 2
@@ -14,44 +15,62 @@ background_mode = 1
 background_color = Color(0.529, 0.706, 0.878, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.6, 0.6, 0.65, 1)
-ambient_light_energy = 0.8
-tonemap_mode = 3
+ambient_light_energy = 0.5
+tonemap_mode = 0
+ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 1.5
 
-[sub_resource type="StandardMaterial3D" id="mat_ground"]
-albedo_color = Color(0.306, 0.49, 0.208, 1)
+[sub_resource type="StandardMaterial3D" id="mat_town_ground"]
+albedo_color = Color(0.28, 0.48, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_field_ground"]
+albedo_color = Color(0.32, 0.50, 0.20, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_dungeon_ground"]
+albedo_color = Color(0.18, 0.15, 0.13, 1)
+roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="mat_path"]
 albedo_color = Color(0.45, 0.35, 0.22, 1)
 
-[sub_resource type="StandardMaterial3D" id="mat_blacksmith_wall"]
-albedo_color = Color(0.35, 0.3, 0.25, 1)
+[sub_resource type="BoxMesh" id="ground_mesh_town"]
+size = Vector3(40, 0.2, 40)
 
-[sub_resource type="StandardMaterial3D" id="mat_blacksmith_roof"]
-albedo_color = Color(0.4, 0.15, 0.1, 1)
+[sub_resource type="BoxMesh" id="ground_mesh_field"]
+size = Vector3(40, 0.2, 50)
 
-[sub_resource type="StandardMaterial3D" id="mat_herbalist_wall"]
-albedo_color = Color(0.45, 0.4, 0.3, 1)
+[sub_resource type="BoxMesh" id="ground_mesh_dungeon"]
+size = Vector3(30, 0.2, 30)
 
-[sub_resource type="StandardMaterial3D" id="mat_herbalist_roof"]
-albedo_color = Color(0.2, 0.35, 0.15, 1)
+[sub_resource type="BoxShape3D" id="ground_col_town"]
+size = Vector3(40, 0.2, 40)
 
-[sub_resource type="StandardMaterial3D" id="mat_market_wall"]
-albedo_color = Color(0.55, 0.45, 0.3, 1)
+[sub_resource type="BoxShape3D" id="ground_col_field"]
+size = Vector3(40, 0.2, 50)
 
-[sub_resource type="StandardMaterial3D" id="mat_market_roof"]
-albedo_color = Color(0.6, 0.5, 0.35, 1)
+[sub_resource type="BoxShape3D" id="ground_col_dungeon"]
+size = Vector3(30, 0.2, 30)
+
+[sub_resource type="StandardMaterial3D" id="mat_weapon_shop_wall"]
+albedo_color = Color(0.55, 0.38, 0.22, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_weapon_shop_roof"]
+albedo_color = Color(0.5, 0.18, 0.1, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_item_shop_wall"]
+albedo_color = Color(0.55, 0.48, 0.35, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_item_shop_roof"]
+albedo_color = Color(0.2, 0.4, 0.15, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_fence"]
+albedo_color = Color(0.5, 0.4, 0.25, 1)
 
 [sub_resource type="StandardMaterial3D" id="mat_well"]
 albedo_color = Color(0.45, 0.45, 0.45, 1)
-
-[sub_resource type="StandardMaterial3D" id="mat_forge"]
-albedo_color = Color(0.25, 0.22, 0.2, 1)
-
-[sub_resource type="StandardMaterial3D" id="mat_tree_trunk"]
-albedo_color = Color(0.36, 0.25, 0.15, 1)
-
-[sub_resource type="StandardMaterial3D" id="mat_tree_canopy"]
-albedo_color = Color(0.15, 0.35, 0.12, 1)
 
 [node name="GameWorld" type="Node3D"]
 script = ExtResource("1_script")
@@ -60,80 +79,99 @@ script = ExtResource("1_script")
 environment = SubResource("Environment_1")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.643, -0.766, 0, 0.766, 0.643, 0, 10, 0)
-light_energy = 1.5
+transform = Transform3D(0.707, -0.542, 0.455, 0, 0.643, 0.766, -0.707, -0.542, 0.455, 0, 10, 0)
+light_color = Color(1.0, 0.95, 0.88, 1)
+light_energy = 1.2
 shadow_enabled = true
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
 navigation_mesh = SubResource("NavigationMesh_1")
 
-[node name="Ground" type="CSGBox3D" parent="NavigationRegion3D"]
+; === GROUND (MeshInstance3D + StaticBody3D for navmesh + collision) ===
+[node name="TownGround" type="StaticBody3D" parent="NavigationRegion3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
-use_collision = true
-size = Vector3(50, 0.2, 50)
-material = SubResource("mat_ground")
 
-[node name="PathNS" type="CSGBox3D" parent="NavigationRegion3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
-size = Vector3(2, 0.05, 30)
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/TownGround"]
+mesh = SubResource("ground_mesh_town")
+surface_material_override/0 = SubResource("mat_town_ground")
+
+[node name="Col" type="CollisionShape3D" parent="NavigationRegion3D/TownGround"]
+shape = SubResource("ground_col_town")
+
+[node name="FieldGround" type="StaticBody3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -0.1, 25)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/FieldGround"]
+mesh = SubResource("ground_mesh_field")
+surface_material_override/0 = SubResource("mat_field_ground")
+
+[node name="Col" type="CollisionShape3D" parent="NavigationRegion3D/FieldGround"]
+shape = SubResource("ground_col_field")
+
+[node name="DungeonGround" type="StaticBody3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, -0.1, 35)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/DungeonGround"]
+mesh = SubResource("ground_mesh_dungeon")
+surface_material_override/0 = SubResource("mat_dungeon_ground")
+
+[node name="Col" type="CollisionShape3D" parent="NavigationRegion3D/DungeonGround"]
+shape = SubResource("ground_col_dungeon")
+
+; === PATHS ===
+[node name="PathToField" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.01, 10)
+size = Vector3(20, 0.05, 2)
 material = SubResource("mat_path")
 
-[node name="PathEW" type="CSGBox3D" parent="NavigationRegion3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
-size = Vector3(30, 0.05, 2)
+[node name="PathToDungeon" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0.01, 30)
+size = Vector3(16, 0.05, 2)
 material = SubResource("mat_path")
 
-[node name="Blacksmith" type="Node3D" parent="NavigationRegion3D"]
+[node name="TownPathNS" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+size = Vector3(2, 0.05, 20)
+material = SubResource("mat_path")
+
+[node name="TownPathEW" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+size = Vector3(20, 0.05, 2)
+material = SubResource("mat_path")
+
+; === WEAPON SHOP (west side of town) ===
+[node name="WeaponShop" type="Node3D" parent="NavigationRegion3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, -5)
 
-[node name="Walls" type="CSGBox3D" parent="NavigationRegion3D/Blacksmith"]
+[node name="Walls" type="CSGBox3D" parent="NavigationRegion3D/WeaponShop"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 use_collision = true
 size = Vector3(5, 3, 4)
-material = SubResource("mat_blacksmith_wall")
+material = SubResource("mat_weapon_shop_wall")
 
-[node name="Roof" type="CSGBox3D" parent="NavigationRegion3D/Blacksmith"]
+[node name="Roof" type="CSGBox3D" parent="NavigationRegion3D/WeaponShop"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
 use_collision = true
 size = Vector3(5.5, 0.5, 4.5)
-material = SubResource("mat_blacksmith_roof")
+material = SubResource("mat_weapon_shop_roof")
 
-[node name="Forge" type="CSGBox3D" parent="NavigationRegion3D/Blacksmith"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0.5, 0)
-use_collision = true
-size = Vector3(1.5, 1, 1.5)
-material = SubResource("mat_forge")
-
-[node name="HerbalistShop" type="Node3D" parent="NavigationRegion3D"]
+; === ITEM SHOP (east side of town) ===
+[node name="ItemShop" type="Node3D" parent="NavigationRegion3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -6)
 
-[node name="Walls" type="CSGBox3D" parent="NavigationRegion3D/HerbalistShop"]
+[node name="Walls" type="CSGBox3D" parent="NavigationRegion3D/ItemShop"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 use_collision = true
 size = Vector3(4, 3, 5)
-material = SubResource("mat_herbalist_wall")
+material = SubResource("mat_item_shop_wall")
 
-[node name="Roof" type="CSGBox3D" parent="NavigationRegion3D/HerbalistShop"]
+[node name="Roof" type="CSGBox3D" parent="NavigationRegion3D/ItemShop"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
 use_collision = true
 size = Vector3(4.5, 0.5, 5.5)
-material = SubResource("mat_herbalist_roof")
+material = SubResource("mat_item_shop_roof")
 
-[node name="MarketStall" type="Node3D" parent="NavigationRegion3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
-
-[node name="Walls" type="CSGBox3D" parent="NavigationRegion3D/MarketStall"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
-use_collision = true
-size = Vector3(6, 2.5, 3)
-material = SubResource("mat_market_wall")
-
-[node name="Roof" type="CSGBox3D" parent="NavigationRegion3D/MarketStall"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.65, 0)
-use_collision = true
-size = Vector3(7, 0.3, 4)
-material = SubResource("mat_market_roof")
-
+; === WELL (center of town) ===
 [node name="Well" type="CSGCylinder3D" parent="NavigationRegion3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, -1)
 use_collision = true
@@ -141,116 +179,124 @@ radius = 0.8
 height = 1.0
 material = SubResource("mat_well")
 
-[node name="Trees" type="Node3D" parent="NavigationRegion3D"]
+; === TOWN FENCE ===
+[node name="FenceEast1" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.4, -5)
+size = Vector3(0.2, 0.8, 10)
+material = SubResource("mat_fence")
 
-[node name="Tree1" type="Node3D" parent="NavigationRegion3D/Trees"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 12)
+[node name="FenceEast2" type="CSGBox3D" parent="NavigationRegion3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.4, 12)
+size = Vector3(0.2, 0.8, 6)
+material = SubResource("mat_fence")
 
-[node name="Trunk" type="CSGCylinder3D" parent="NavigationRegion3D/Trees/Tree1"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
-use_collision = true
-radius = 0.2
-height = 3.0
-material = SubResource("mat_tree_trunk")
+; === DUNGEON WALLS (populated by game_world.gd at runtime) ===
+[node name="DungeonWalls" type="Node3D" parent="NavigationRegion3D"]
 
-[node name="Canopy" type="CSGSphere3D" parent="NavigationRegion3D/Trees/Tree1"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
-radius = 1.2
-material = SubResource("mat_tree_canopy")
-
-[node name="Tree2" type="Node3D" parent="NavigationRegion3D/Trees"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 14)
-
-[node name="Trunk" type="CSGCylinder3D" parent="NavigationRegion3D/Trees/Tree2"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
-use_collision = true
-radius = 0.2
-height = 3.0
-material = SubResource("mat_tree_trunk")
-
-[node name="Canopy" type="CSGSphere3D" parent="NavigationRegion3D/Trees/Tree2"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
-radius = 1.0
-material = SubResource("mat_tree_canopy")
-
-[node name="Tree3" type="Node3D" parent="NavigationRegion3D/Trees"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, 12)
-
-[node name="Trunk" type="CSGCylinder3D" parent="NavigationRegion3D/Trees/Tree3"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
-use_collision = true
-radius = 0.25
-height = 3.5
-material = SubResource("mat_tree_trunk")
-
-[node name="Canopy" type="CSGSphere3D" parent="NavigationRegion3D/Trees/Tree3"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
-radius = 1.4
-material = SubResource("mat_tree_canopy")
-
+; === LOCATION MARKERS ===
 [node name="LocationMarkers" type="Node3D" parent="."]
 
 [node name="TownSquare" type="Marker3D" parent="LocationMarkers"]
 
-[node name="MarketArea" type="Marker3D" parent="LocationMarkers"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
-
-[node name="ForestEdge" type="Marker3D" parent="LocationMarkers"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 13)
-
-[node name="WellArea" type="Marker3D" parent="LocationMarkers"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -1)
-
-[node name="BlacksmithArea" type="Marker3D" parent="LocationMarkers"]
+[node name="WeaponShopArea" type="Marker3D" parent="LocationMarkers"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -5)
 
-[node name="HerbalistArea" type="Marker3D" parent="LocationMarkers"]
+[node name="ItemShopArea" type="Marker3D" parent="LocationMarkers"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -6)
 
+[node name="FieldEntrance" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 10)
+
+[node name="FieldCenter" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 0, 25)
+
+[node name="FieldFar" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35, 0, 35)
+
+[node name="DungeonEntrance" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0, 30)
+
+[node name="DungeonCenter" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, 0, 35)
+
+; === SHOP NPCs ===
+[node name="ShopNPCs" type="Node3D" parent="."]
+
+[node name="WeaponShopNPC" parent="ShopNPCs" instance=ExtResource("3_shop")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -5)
+shop_id = "weapon_shop_npc"
+shop_name = "Weapon Shop"
+shop_type = "weapon"
+npc_color = Color(0.6, 0.3, 0.15, 1)
+model_path = "res://assets/models/characters/Barbarian.glb"
+shop_items = PackedStringArray("basic_sword", "iron_sword", "basic_shield", "iron_shield")
+
+[node name="ItemShopNPC" parent="ShopNPCs" instance=ExtResource("3_shop")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -6)
+shop_id = "item_shop_npc"
+shop_name = "Item Shop"
+shop_type = "item"
+npc_color = Color(0.2, 0.5, 0.2, 1)
+model_path = "res://assets/models/characters/Rogue.glb"
+shop_items = PackedStringArray("healing_potion")
+
+; === ADVENTURER NPCs ===
 [node name="NPCs" type="Node3D" parent="."]
 
-[node name="Gareth" parent="NPCs" instance=ExtResource("2_npc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1, -5)
-npc_id = "gareth"
-npc_name = "Gareth"
-personality = "Gruff, practical blacksmith. Values hard work and quality craftsmanship. Speaks plainly."
-starting_goal = "Craft a sword at the forge"
-npc_color = Color(0.6, 0.3, 0.2, 1)
+[node name="Kael" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, 2)
+npc_id = "kael"
+npc_name = "Kael"
+personality = "Bold and confident swordsman. Loves a good fight. Charges headfirst into danger. Competitive but friendly. Talks about his combat feats."
+starting_goal = "Hunt monsters in the field to get stronger"
+npc_color = Color(0.15, 0.2, 0.6, 1)
+model_path = "res://assets/models/characters/Knight.glb"
 
-[node name="Elara" parent="NPCs" instance=ExtResource("2_npc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -4)
-npc_id = "elara"
-npc_name = "Elara"
-personality = "Kind, curious herbalist. Loves nature and helping others. Speaks gently and asks questions."
-starting_goal = "Gather herbs from the forest and check the well"
-npc_color = Color(0.2, 0.5, 0.3, 1)
+[node name="Lyra" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 2)
+npc_id = "lyra"
+npc_name = "Lyra"
+personality = "Cautious and analytical mage. Prefers to prepare before acting. Studies monsters before engaging. Practical, slightly sarcastic. Values efficiency over bravado."
+starting_goal = "Prepare supplies then hunt monsters efficiently"
+npc_color = Color(0.45, 0.15, 0.55, 1)
+model_path = "res://assets/models/characters/Mage.glb"
 
-[node name="Finn" parent="NPCs" instance=ExtResource("2_npc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 6)
-npc_id = "finn"
-npc_name = "Finn"
-personality = "Cheerful, gossipy merchant. Loves trading and hearing news. Always looking for a good deal."
-starting_goal = "Find items to trade and talk to villagers"
-npc_color = Color(0.5, 0.4, 0.1, 1)
+; === MONSTER SPAWNERS ===
+[node name="MonsterSpawners" type="Node3D" parent="."]
 
-[node name="Objects" type="Node3D" parent="."]
+; Field spawners
+[node name="SlimeSpawner" type="Node3D" parent="MonsterSpawners"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0, 18)
+script = ExtResource("4_spawner")
+monster_type = "slime"
+spawn_count = 4
+spawn_radius = 8.0
 
-[node name="IronOre" parent="Objects" instance=ExtResource("3_item")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0.2, 11)
-object_id = "iron_ore"
-object_name = "Iron Ore"
+[node name="WolfSpawner" type="Node3D" parent="MonsterSpawners"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 28)
+script = ExtResource("4_spawner")
+monster_type = "wolf"
+spawn_count = 3
+spawn_radius = 8.0
 
-[node name="Herbs1" parent="Objects" instance=ExtResource("3_item")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 0.2, 13)
-object_id = "herbs_1"
-object_name = "Healing Herbs"
+[node name="GoblinSpawner" type="Node3D" parent="MonsterSpawners"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 0, 38)
+script = ExtResource("4_spawner")
+monster_type = "goblin"
+spawn_count = 2
+spawn_radius = 6.0
 
-[node name="Herbs2" parent="Objects" instance=ExtResource("3_item")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.2, -2)
-object_id = "herbs_2"
-object_name = "Dried Herbs"
+; Dungeon spawners
+[node name="SkeletonSpawner" type="Node3D" parent="MonsterSpawners"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, 35)
+script = ExtResource("4_spawner")
+monster_type = "skeleton"
+spawn_count = 3
+spawn_radius = 6.0
 
-[node name="ClothBundle" parent="Objects" instance=ExtResource("3_item")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.2, 7)
-object_id = "cloth_bundle"
-object_name = "Cloth Bundle"
+[node name="DarkMageSpawner" type="Node3D" parent="MonsterSpawners"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 40)
+script = ExtResource("4_spawner")
+monster_type = "dark_mage"
+spawn_count = 2
+spawn_radius = 5.0
