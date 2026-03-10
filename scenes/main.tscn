@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/game_world/game_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
@@ -12,6 +12,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/status_panel.tscn" id="10_status"]
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_hotbar.tscn" id="11_skill_hotbar"]
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_panel.tscn" id="12_skill_panel"]
+[ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="13_minimap"]
+[ext_resource type="PackedScene" path="res://scenes/ui/chat_log.tscn" id="14_chatlog"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -40,6 +42,10 @@ target_path = NodePath("../Player")
 [node name="ShopPanel" parent="UILayer" instance=ExtResource("7_shop")]
 
 [node name="ChatInput" parent="UILayer" instance=ExtResource("9_chat")]
+
+[node name="ChatLog" parent="UILayer" instance=ExtResource("14_chatlog")]
+
+[node name="Minimap" parent="UILayer" instance=ExtResource("13_minimap")]
 
 [node name="SkillHotbar" parent="UILayer" instance=ExtResource("11_skill_hotbar")]
 

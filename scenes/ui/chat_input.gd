@@ -11,14 +11,14 @@ func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Anchor to bottom-center
-	anchors_preset = PRESET_CENTER_BOTTOM
-	anchor_left = 0.5
-	anchor_right = 0.5
+	# Anchor to bottom-left, directly under chat log
+	anchors_preset = PRESET_BOTTOM_LEFT
+	anchor_left = 0.0
+	anchor_right = 0.0
 	anchor_top = 1.0
 	anchor_bottom = 1.0
-	offset_left = -200
-	offset_right = 200
+	offset_left = 10
+	offset_right = 410
 	offset_top = -50
 	offset_bottom = -10
 
