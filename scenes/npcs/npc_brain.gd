@@ -14,7 +14,15 @@ var _decision_timer: float = 0.0
 var _enabled: bool = true
 var _waiting_for_llm: bool = false
 var _use_llm: bool = true
+var _use_llm_chat: bool = true  # LLM for reactive conversation only
 var _responding_to: String = ""  # Guard against infinite talk_to recursion
+
+var _canned_greetings: Array = [
+	"Hey %s, how's the hunting going?",
+	"Watch yourself out there, %s.",
+	"%s! Good to see you.",
+	"The monsters seem tougher today, %s.",
+]
 
 # Test action queue (fallback when LLM unavailable)
 var _test_actions: Array = []
@@ -64,6 +72,13 @@ func _request_llm_decision() -> void:
 	LLMClient.send_chat(req_id, messages, schema)
 
 func _on_llm_response(req_id: String, response: Dictionary) -> void:
+	# Route chat responses separately
+	if req_id.begins_with("chat_"):
+		if req_id.substr(5) != npc.npc_id:
+			return
+		_handle_chat_response(response)
+		return
+
 	if req_id != npc.npc_id:
 		return
 	_waiting_for_llm = false
@@ -88,6 +103,17 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 	executor.execute(parsed.action, parsed.target, parsed.dialogue, parsed.get("action_data", {}))
 
 func _on_llm_failed(req_id: String, error: String) -> void:
+	# Route chat failures separately
+	if req_id.begins_with("chat_"):
+		if req_id.substr(5) != npc.npc_id:
+			return
+		_waiting_for_llm = false
+		var speaker_id := _responding_to
+		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
+		executor.execute("talk_to", speaker_id, greeting)
+		_responding_to = ""
+		return
+
 	if req_id != npc.npc_id:
 		return
 	_waiting_for_llm = false
@@ -126,6 +152,12 @@ func set_test_actions(actions: Array) -> void:
 func set_use_llm(enabled: bool) -> void:
 	_use_llm = enabled
 
+func set_use_llm_chat(enabled: bool) -> void:
+	_use_llm_chat = enabled
+
+func is_busy() -> bool:
+	return _waiting_for_llm or not _responding_to.is_empty()
+
 ## Reactive conversation — triggered when another entity speaks to this NPC.
 func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	if _waiting_for_llm:
@@ -139,27 +171,85 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	if _responding_to == speaker_id:
 		return
 
+	# Turn limit: stop after MAX_CONVERSATION_TURNS per partner
+	if not memory.can_continue_conversation(speaker_id):
+		return
+
 	_responding_to = speaker_id
+	memory.increment_turn(speaker_id)
 	memory.add_observation("%s spoke to me: '%s'" % [speaker_id, spoken_text])
 	memory.add_conversation(speaker_id, speaker_id, spoken_text)
 
-	if _use_llm and LLMClient.is_available():
+	if _use_llm_chat and LLMClient.is_available():
 		npc.change_state("thinking")
 		_waiting_for_llm = true
 		_decision_timer = 0.0
 
+		var speaker_name := _get_display_name(speaker_id)
+		var activity := PromptBuilder.get_activity_description(npc.current_goal)
 		var messages: Array = [
-			PromptBuilder.build_system_message(npc.npc_name, npc.personality, npc.current_goal),
-			PromptBuilder.build_user_message(npc.npc_id, npc, memory),
-			{"role": "user", "content": "%s just said to you: \"%s\"\nRespond naturally using the talk_to action." % [speaker_id, spoken_text]},
+			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity),
+			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory),
 		]
 
-		var schema := ActionSchema.get_schema()
-		LLMClient.send_chat(npc.npc_id, messages, schema)
+		var req_id := "chat_" + npc.npc_id
+		LLMClient.send_chat(req_id, messages)
 	else:
-		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % speaker_id
+		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
+
+func initiate_social_chat(target_id: String) -> bool:
+	if _waiting_for_llm:
+		return false
+	if npc.current_state in ["dead", "combat"]:
+		return false
+
+	_responding_to = target_id
+	memory.increment_turn(target_id)
+
+	if _use_llm_chat and LLMClient.is_available():
+		npc.change_state("thinking")
+		_waiting_for_llm = true
+
+		var target_name := _get_display_name(target_id)
+		var target_node := WorldState.get_entity(target_id)
+		var target_goal: String = "exploring" if not target_node else target_node.current_goal
+		var target_activity := PromptBuilder.get_activity_description(target_goal)
+		var activity := PromptBuilder.get_activity_description(npc.current_goal)
+
+		var messages: Array = [
+			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name),
+			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory),
+		]
+
+		var req_id := "chat_" + npc.npc_id
+		LLMClient.send_chat(req_id, messages)
+		return true
+	else:
+		var target_name := _get_display_name(target_id)
+		var greeting: String = _canned_greetings[randi() % _canned_greetings.size()] % target_name
+		executor.execute("talk_to", target_id, greeting)
+		_responding_to = ""
+		return true
+
+func _handle_chat_response(response: Dictionary) -> void:
+	_waiting_for_llm = false
+	var speaker_id := _responding_to
+	var parsed := ResponseParser.parse_chat(response)
+	if not parsed.valid:
+		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
+		executor.execute("talk_to", speaker_id, greeting)
+		_responding_to = ""
+		return
+	memory.add_observation("Replied to %s: '%s'" % [speaker_id, parsed.dialogue])
+	executor.execute("talk_to", speaker_id, parsed.dialogue)
+
+func _get_display_name(entity_id: String) -> String:
+	if entity_id == "player":
+		return "Player"
+	var data := WorldState.get_entity_data(entity_id)
+	return data.get("name", entity_id)
 
 func _on_action_completed(completed_npc_id: String, action: String, success: bool) -> void:
 	if completed_npc_id == npc.npc_id:

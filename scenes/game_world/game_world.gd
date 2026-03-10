@@ -146,17 +146,11 @@ func _setup_adventurer_npcs() -> void:
 		WorldState.add_to_inventory("kael", "healing_potion", 3)
 		WorldState.equip_item("kael", "basic_sword")
 
-		kael.get_node("NPCBrain").set_test_actions([
-			{"action": "move_to", "target": "TownEast", "thinking": "Heading to the east side of town"},
-			{"action": "move_to", "target": "FieldEntrance", "thinking": "Time to go hunting!"},
-			{"action": "move_to", "target": "FieldCenter", "thinking": "Let me find some monsters"},
-			{"action": "wait", "target": "", "thinking": "Looking around for targets"},
-			{"action": "move_to", "target": "FieldFar", "thinking": "Pushing deeper into the field"},
-			{"action": "move_to", "target": "DungeonEntrance", "thinking": "Checking out the dungeon entrance"},
-			{"action": "move_to", "target": "TownSquare", "thinking": "Need to resupply"},
-			{"action": "talk_to", "target": "lyra", "dialogue": "Hey Lyra, the field has some tough wolves!", "thinking": "Should warn Lyra about the wolves"},
-		])
 		kael.get_node("NPCBrain").set_use_llm(false)
+		kael.get_node("NPCBrain").set_use_llm_chat(true)
+		var kael_behavior = kael.get_node("NPCBehavior")
+		kael_behavior.default_goal = "hunt_field"
+		kael.set_goal("hunt_field")
 
 	# Lyra (Mage) — cautious, strategic
 	var lyra: Node3D = $NPCs/Lyra
@@ -164,16 +158,11 @@ func _setup_adventurer_npcs() -> void:
 		WorldState.add_to_inventory("lyra", "healing_potion", 5)
 		WorldState.set_entity_data("lyra", "gold", 60)
 
-		lyra.get_node("NPCBrain").set_test_actions([
-			{"action": "move_to", "target": "ItemShopArea", "thinking": "Let me check the item shop first"},
-			{"action": "move_to", "target": "FieldEntrance", "thinking": "Scouting the field carefully"},
-			{"action": "move_to", "target": "FieldCenter", "thinking": "Moving deeper, staying alert"},
-			{"action": "wait", "target": "", "thinking": "Observing the monsters here"},
-			{"action": "move_to", "target": "FieldNorth", "thinking": "Exploring the northern field"},
-			{"action": "move_to", "target": "TownSquare", "thinking": "Time to head back and sell loot"},
-			{"action": "talk_to", "target": "kael", "dialogue": "Kael, you should buy potions before going out.", "thinking": "Kael never prepares properly"},
-		])
 		lyra.get_node("NPCBrain").set_use_llm(false)
+		lyra.get_node("NPCBrain").set_use_llm_chat(true)
+		var lyra_behavior = lyra.get_node("NPCBehavior")
+		lyra_behavior.default_goal = "hunt_field"
+		lyra.set_goal("buy_potions")
 
 # =============================================================================
 # Asset Loading Infrastructure

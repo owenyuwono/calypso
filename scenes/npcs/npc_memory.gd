@@ -7,6 +7,32 @@ const MAX_CONVERSATION_HISTORY: int = 10
 var observations: Array = []
 var conversation_history: Dictionary = {}  # partner_id -> Array of {speaker, text}
 var goals_history: Array = []
+var _conversation_turns: Dictionary = {}  # partner_id -> {count: int, time: float}
+const MAX_CONVERSATION_TURNS: int = 2
+const CONVERSATION_WINDOW: float = 60.0  # Reset after this gap in seconds
+
+func can_continue_conversation(partner_id: String) -> bool:
+	if _conversation_turns.has(partner_id):
+		var entry: Dictionary = _conversation_turns[partner_id]
+		if Time.get_ticks_msec() / 1000.0 - entry["time"] > CONVERSATION_WINDOW:
+			_conversation_turns.erase(partner_id)
+			return true
+		return entry["count"] < MAX_CONVERSATION_TURNS
+	return true
+
+func increment_turn(partner_id: String) -> void:
+	if _conversation_turns.has(partner_id):
+		var entry: Dictionary = _conversation_turns[partner_id]
+		if Time.get_ticks_msec() / 1000.0 - entry["time"] > CONVERSATION_WINDOW:
+			_conversation_turns[partner_id] = {"count": 1, "time": Time.get_ticks_msec() / 1000.0}
+		else:
+			entry["count"] += 1
+			entry["time"] = Time.get_ticks_msec() / 1000.0
+	else:
+		_conversation_turns[partner_id] = {"count": 1, "time": Time.get_ticks_msec() / 1000.0}
+
+func reset_conversation_turns(partner_id: String) -> void:
+	_conversation_turns.erase(partner_id)
 
 func add_observation(text: String) -> void:
 	var entry := "[%s] %s" % [_timestamp(), text]

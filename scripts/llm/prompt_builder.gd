@@ -96,6 +96,137 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 	})
 	return {"role": "user", "content": content}
 
+const CHAT_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
+Personality: {personality}
+You are currently {activity}.
+
+Respond in character with ONE short sentence (under 20 words).
+Do NOT use JSON. Just speak naturally as {npc_name}."""
+
+const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+{context}
+{speaker_name} says to you: "{spoken_text}"
+
+Respond as {npc_name}:"""
+
+const CHAT_INITIATE_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
+Personality: {personality}
+You are currently {activity}.
+
+You see {target_name} nearby and want to chat briefly.
+Comment on what you're doing, ask about their adventures, or share something interesting.
+
+Say ONE short sentence (under 20 words) to start a conversation.
+Do NOT use JSON. Just speak naturally as {npc_name}."""
+
+const CHAT_INITIATE_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+{context}
+You see {target_name}, who is {target_activity}.
+
+Say something to {target_name} as {npc_name}:"""
+
+static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String) -> Dictionary:
+	var content := CHAT_INITIATE_SYSTEM_TEMPLATE.format({
+		"npc_name": npc_name,
+		"personality": personality,
+		"activity": activity,
+		"target_name": target_name,
+	})
+	return {"role": "system", "content": content}
+
+static func build_chat_initiate_user_message(npc_name: String, npc_id: String, target_name: String, target_id: String, target_activity: String, memory_node: Node) -> Dictionary:
+	var data := WorldState.get_entity_data(npc_id)
+	var level: int = data.get("level", 1)
+	var hp: int = data.get("hp", 50)
+	var max_hp: int = data.get("max_hp", 50)
+	var gold: int = data.get("gold", 0)
+
+	var context := ""
+	if memory_node:
+		var history: Array = memory_node.get_conversation_with(target_id)
+		if not history.is_empty():
+			var recent := history.slice(maxi(0, history.size() - 3))
+			var lines: Array = []
+			for entry in recent:
+				lines.append("%s: %s" % [entry["speaker"], entry["text"]])
+			context = "Recent conversation:\n" + "\n".join(lines)
+
+	var content := CHAT_INITIATE_USER_TEMPLATE.format({
+		"npc_name": npc_name,
+		"level": level,
+		"hp": hp,
+		"max_hp": max_hp,
+		"gold": gold,
+		"context": context,
+		"target_name": target_name,
+		"target_activity": target_activity,
+	})
+	return {"role": "user", "content": content}
+
+static func build_chat_system_message(npc_name: String, personality: String, activity: String) -> Dictionary:
+	var content := CHAT_SYSTEM_TEMPLATE.format({
+		"npc_name": npc_name,
+		"personality": personality,
+		"activity": activity,
+	})
+	return {"role": "system", "content": content}
+
+static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node) -> Dictionary:
+	var data := WorldState.get_entity_data(npc_id)
+	var level: int = data.get("level", 1)
+	var hp: int = data.get("hp", 50)
+	var max_hp: int = data.get("max_hp", 50)
+	var gold: int = data.get("gold", 0)
+
+	# Build conversation context from last 3 entries
+	var context := ""
+	if memory_node:
+		var speaker_id := "player" if speaker_name == "Player" else speaker_name.to_lower()
+		var history: Array = memory_node.get_conversation_with(speaker_id)
+		if not history.is_empty():
+			var recent := history.slice(maxi(0, history.size() - 3))
+			var lines: Array = []
+			for entry in recent:
+				lines.append("%s: %s" % [entry["speaker"], entry["text"]])
+			context = "Recent conversation:\n" + "\n".join(lines)
+
+	var content := CHAT_USER_TEMPLATE.format({
+		"npc_name": npc_name,
+		"level": level,
+		"hp": hp,
+		"max_hp": max_hp,
+		"gold": gold,
+		"context": context,
+		"speaker_name": speaker_name,
+		"spoken_text": spoken_text,
+	})
+	return {"role": "user", "content": content}
+
+static func get_activity_description(goal: String) -> String:
+	match goal:
+		"hunt_field":
+			return "hunting monsters in the field"
+		"hunt_dungeon":
+			return "hunting monsters in the dungeon"
+		"buy_potions":
+			return "buying potions in town"
+		"sell_loot":
+			return "selling loot in town"
+		"buy_weapon":
+			return "shopping for a weapon upgrade"
+		"buy_armor":
+			return "shopping for armor"
+		"follow_player":
+			return "following the player"
+		"return_to_town":
+			return "retreating to town"
+		"patrol":
+			return "patrolling the town"
+		"idle":
+			return "resting in town"
+		_:
+			return "exploring the area"
+
 static func _format_perception(perception: Dictionary) -> String:
 	var lines: Array = []
 
