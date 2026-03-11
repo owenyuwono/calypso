@@ -65,12 +65,7 @@ func toggle() -> void:
 		_refresh()
 
 func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
+	UIHelper.center_panel(_panel)
 
 func _refresh() -> void:
 	if not _is_open:

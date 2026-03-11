@@ -21,7 +21,6 @@ var aggro_target: String = ""
 var _attack_timer: float = 0.0
 var _wander_timer: float = 0.0
 var _respawn_timer: float = 0.0
-var _death_tween: Tween
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
@@ -176,9 +175,6 @@ func _play_anim(anim_name: String, force: bool = false) -> void:
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
-func _face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
-
 func _setup_hp_bar() -> void:
 	_hp_bar = ModelHelper.create_hp_bar(self, 2.0)
 
@@ -267,7 +263,7 @@ func _process_wander_movement() -> bool:
 		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
-		_face_direction(dir)
+		ModelHelper.face_direction(_model, dir)
 
 	# Throttled aggro check while wandering
 	if _aggro_check_timer <= 0.0:
@@ -320,7 +316,7 @@ func _process_aggro(delta: float) -> bool:
 			dir = dir.normalized()
 			velocity.x = dir.x * MOVE_SPEED * 1.2
 			velocity.z = dir.z * MOVE_SPEED * 1.2
-			_face_direction(dir)
+			ModelHelper.face_direction(_model, dir)
 			return true
 	return false
 
@@ -337,7 +333,7 @@ func _process_attacking(delta: float) -> void:
 
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	_face_direction(to_target)
+	ModelHelper.face_direction(_model, to_target)
 
 	# Check animation position for hit event before starting new attacks
 	if _pending_hit:
@@ -365,9 +361,11 @@ func _perform_attack() -> void:
 	if not WorldState.is_alive(aggro_target):
 		_drop_aggro()
 		return
+	var target_node := WorldState.get_entity(aggro_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage(monster_id, aggro_target)
-	_spawn_damage_number(aggro_target, damage)
-	_flash_target(aggro_target)
+	_spawn_damage_number(aggro_target, damage, target_pos)
+	ModelHelper.flash_target(aggro_target)
 
 func _drop_aggro() -> void:
 	aggro_target = ""
@@ -420,9 +418,7 @@ func _die(killer_id: String) -> void:
 
 	# Death visual: animation + fade
 	_play_anim("Death_A")
-	if _death_tween:
-		_death_tween.kill()
-	_death_tween = ModelHelper.fade_out(_mesh_instances, self)
+	ModelHelper.fade_out(_mesh_instances, self)
 
 	if _hp_bar:
 		_hp_bar.visible = false
@@ -490,11 +486,8 @@ func _update_hp_bar() -> void:
 	# Only show HP bar if damaged
 	_hp_bar.visible = hp < max_hp
 
-func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2), global_position)
-
-func _flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
+func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
+	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2), global_position, target_pos)
 
 # --- Hover Highlight ---
 
