@@ -49,6 +49,8 @@ var _hit_time: float = 0.0
 const MOVE_SPEED: float = 3.6
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
+const PERSONAL_SPACE: float = 2.5
+const SEPARATION_FORCE: float = 2.0
 
 # 3D Model
 var _model: Node3D
@@ -126,6 +128,29 @@ func _play_anim(anim_name: String, force: bool = false) -> void:
 func _face_direction(dir: Vector3) -> void:
 	ModelHelper.face_direction(_model, dir)
 
+func _get_separation_velocity() -> Vector3:
+	var sep := Vector3.ZERO
+	for eid in WorldState.entities:
+		if eid == npc_id:
+			continue
+		var data: Dictionary = WorldState.get_entity_data(eid)
+		if data.get("type", "") != "npc":
+			continue
+		if not WorldState.is_alive(eid):
+			continue
+		var other: Node3D = WorldState.get_entity(eid)
+		if not other or not is_instance_valid(other):
+			continue
+		var diff := global_position - other.global_position
+		diff.y = 0.0
+		var dist := diff.length()
+		if dist < 0.01 or dist >= PERSONAL_SPACE:
+			continue
+		# Closer = stronger push (inverse linear)
+		var strength: float = SEPARATION_FORCE * (1.0 - dist / PERSONAL_SPACE)
+		sep += diff.normalized() * strength
+	return sep
+
 func _register_with_world() -> void:
 	var stats := LevelData.BASE_ADVENTURER_STATS.duplicate()
 	stats["type"] = "npc"
@@ -159,6 +184,12 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
+
+	# Apply separation force to avoid NPC overlap (not in combat)
+	if current_state != STATE_COMBAT:
+		var sep := _get_separation_velocity()
+		velocity.x += sep.x
+		velocity.z += sep.z
 
 	move_and_slide()
 

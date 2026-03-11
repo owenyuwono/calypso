@@ -68,7 +68,7 @@ static func validate(data: Dictionary) -> Dictionary:
 	return result
 
 static func parse_chat(ollama_response: Dictionary) -> Dictionary:
-	var result := {"valid": false, "dialogue": "", "error": ""}
+	var result := {"valid": false, "dialogue": "", "goal": "", "error": ""}
 
 	var message: Dictionary = ollama_response.get("message", {})
 	var content: String = message.get("content", "")
@@ -82,16 +82,22 @@ static func parse_chat(ollama_response: Dictionary) -> Dictionary:
 		result.error = "Empty after cleaning"
 		return result
 
+	# Extract goal tag before truncation
+	var goal := _extract_goal_tag(cleaned)
+	if not goal.is_empty():
+		cleaned = cleaned.replace("[GOAL:" + goal + "]", "").strip_edges()
+
 	# Truncate to first sentence if too long
-	if cleaned.length() > 200:
+	if cleaned.length() > 100:
 		var period_pos := cleaned.find(".")
-		if period_pos > 0 and period_pos < 200:
+		if period_pos > 0 and period_pos < 100:
 			cleaned = cleaned.substr(0, period_pos + 1)
 		else:
-			cleaned = cleaned.substr(0, 200) + "..."
+			cleaned = cleaned.substr(0, 100) + "..."
 
 	result.valid = true
 	result.dialogue = cleaned
+	result.goal = goal
 	return result
 
 static func _clean_chat_response(text: String) -> String:
@@ -127,7 +133,51 @@ static func _clean_chat_response(text: String) -> String:
 		if " " not in before_colon and before_colon[0] == before_colon[0].to_upper():
 			cleaned = cleaned.substr(colon_pos + 1).strip_edges()
 
+	# Strip *emote* and _emote_ patterns
+	cleaned = _strip_emotes(cleaned)
+
+	# If narration wraps quoted dialogue, extract just the dialogue
+	var quote_start := cleaned.find('"')
+	if quote_start > 0:
+		var quote_end := cleaned.rfind('"')
+		if quote_end > quote_start:
+			cleaned = cleaned.substr(quote_start + 1, quote_end - quote_start - 1).strip_edges()
+
+	# Final: strip any remaining outer quotes
+	if cleaned.length() >= 2:
+		if (cleaned.begins_with('"') and cleaned.ends_with('"')) or \
+		   (cleaned.begins_with("'") and cleaned.ends_with("'")):
+			cleaned = cleaned.substr(1, cleaned.length() - 2).strip_edges()
+
 	return cleaned
+
+const VALID_GOALS: Array = [
+	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
+	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle",
+]
+
+static func _extract_goal_tag(text: String) -> String:
+	var start := text.find("[GOAL:")
+	if start == -1:
+		return ""
+	var end := text.find("]", start + 6)
+	if end == -1:
+		return ""
+	var goal := text.substr(start + 6, end - start - 6).strip_edges().to_lower()
+	if goal in VALID_GOALS:
+		return goal
+	return ""
+
+static func _strip_emotes(text: String) -> String:
+	var result := text
+	# Strip *action* patterns (RP emotes like *grins*, *waves*)
+	while result.find("*") != -1:
+		var start := result.find("*")
+		var end := result.find("*", start + 1)
+		if end == -1:
+			break
+		result = (result.substr(0, start) + result.substr(end + 1)).strip_edges()
+	return result
 
 static func _empty_result() -> Dictionary:
 	return {

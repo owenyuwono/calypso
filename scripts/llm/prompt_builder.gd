@@ -96,12 +96,29 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 	})
 	return {"role": "user", "content": content}
 
+const GOAL_INSTRUCTION := """
+IMPORTANT: When the player asks you to do something, you MUST add a goal tag at the end of your reply.
+Available goals: hunt_field, hunt_dungeon, buy_potions, sell_loot, buy_weapon, buy_armor, follow_player, return_to_town, patrol, idle
+Format: Say your reply, then add [GOAL:goal_name] at the very end.
+Examples:
+- "follow me" → Sure, I'll follow you! [GOAL:follow_player]
+- "go hunt" or "hunt monsters" → Time to hunt! [GOAL:hunt_field]
+- "go to the dungeon" → Heading to the dungeon! [GOAL:hunt_dungeon]
+- "buy potions" → I'll stock up on potions. [GOAL:buy_potions]
+- "sell your loot" → Good idea, time to sell. [GOAL:sell_loot]
+- "stay here" or "wait" → I'll wait here. [GOAL:idle]
+- "go back to town" → Heading back to town. [GOAL:return_to_town]
+- "patrol" or "guard" → I'll keep watch. [GOAL:patrol]
+If the player is just chatting and NOT asking you to do something, do NOT add a goal tag."""
+
 const CHAT_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
 Personality: {personality}
 You are currently {activity}.
 
-Respond in character with ONE short sentence (under 20 words).
-Do NOT use JSON. Just speak naturally as {npc_name}."""
+Respond in character with ONE short sentence (under 10 words).
+Do NOT use JSON. Just speak naturally as {npc_name}.
+Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
+{goal_instruction}"""
 
 const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
 {context}
@@ -114,10 +131,12 @@ Personality: {personality}
 You are currently {activity}.
 
 You see {target_name} nearby and want to chat briefly.
-Comment on what you're doing, ask about their adventures, or share something interesting.
+Talk to {target_name} about {topic}.
 
-Say ONE short sentence (under 20 words) to start a conversation.
-Do NOT use JSON. Just speak naturally as {npc_name}."""
+Say ONE short sentence (under 10 words) to start a conversation.
+Do NOT use JSON. Just speak naturally as {npc_name}.
+Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
+{goal_instruction}"""
 
 const CHAT_INITIATE_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
 {context}
@@ -125,12 +144,15 @@ You see {target_name}, who is {target_activity}.
 
 Say something to {target_name} as {npc_name}:"""
 
-static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String) -> Dictionary:
+static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String, topic: String = "") -> Dictionary:
+	var effective_topic := topic if not topic.is_empty() else "whatever comes to mind"
 	var content := CHAT_INITIATE_SYSTEM_TEMPLATE.format({
 		"npc_name": npc_name,
 		"personality": personality,
 		"activity": activity,
 		"target_name": target_name,
+		"topic": effective_topic,
+		"goal_instruction": "",
 	})
 	return {"role": "system", "content": content}
 
@@ -163,11 +185,12 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	})
 	return {"role": "user", "content": content}
 
-static func build_chat_system_message(npc_name: String, personality: String, activity: String) -> Dictionary:
+static func build_chat_system_message(npc_name: String, personality: String, activity: String, player_speaking: bool = false) -> Dictionary:
 	var content := CHAT_SYSTEM_TEMPLATE.format({
 		"npc_name": npc_name,
 		"personality": personality,
 		"activity": activity,
+		"goal_instruction": GOAL_INSTRUCTION if player_speaking else "",
 	})
 	return {"role": "system", "content": content}
 

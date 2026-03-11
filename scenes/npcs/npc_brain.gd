@@ -2,6 +2,9 @@ extends Node
 ## NPC brain — LLM decision loop for adventurer NPCs with combat awareness.
 
 const NPC_DECISION_INTERVAL: float = 5.0
+const CONVERSATION_HOLD_TIME: float = 10.0
+const CHAT_RANGE: float = 8.0
+const READING_DELAY: float = 3.0  # seconds to "read" before responding to NPC speech
 
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 const ResponseParser = preload("res://scripts/llm/response_parser.gd")
@@ -13,9 +16,12 @@ var executor: Node  # NPCActionExecutor
 var _decision_timer: float = 0.0
 var _enabled: bool = true
 var _waiting_for_llm: bool = false
-var _use_llm: bool = true
+var _use_llm: bool = false
 var _use_llm_chat: bool = true  # LLM for reactive conversation only
 var _responding_to: String = ""  # Guard against infinite talk_to recursion
+var _pending_chat: Dictionary = {}  # {speaker_id, spoken_text} — buffered player chat when decision is in flight
+var _conversation_hold: float = 0.0
+var _reading_queue: Dictionary = {}  # {speaker_id, spoken_text, timer} — delayed NPC-NPC response
 
 var _canned_greetings: Array = [
 	"Hey %s, how's the hunting going?",
@@ -40,6 +46,17 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not _enabled or _waiting_for_llm:
+		return
+	if _conversation_hold > 0.0:
+		_conversation_hold -= delta
+		return
+	# Tick reading delay for NPC-NPC responses
+	if not _reading_queue.is_empty():
+		_reading_queue["timer"] -= delta
+		if _reading_queue["timer"] <= 0.0:
+			var queued := _reading_queue
+			_reading_queue = {}
+			request_reactive_response(queued["speaker_id"], queued["spoken_text"])
 		return
 	# Don't make decisions while in combat, dead, or already acting
 	if npc.current_state in ["combat", "dead"]:
@@ -102,11 +119,18 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 
 	executor.execute(parsed.action, parsed.target, parsed.dialogue, parsed.get("action_data", {}))
 
+	# After processing decision, check for buffered player chat
+	if not _pending_chat.is_empty():
+		var pending := _pending_chat
+		_pending_chat = {}
+		request_reactive_response(pending["speaker_id"], pending["spoken_text"])
+
 func _on_llm_failed(req_id: String, error: String) -> void:
 	# Route chat failures separately
 	if req_id.begins_with("chat_"):
 		if req_id.substr(5) != npc.npc_id:
 			return
+		push_warning("NPC %s: Chat LLM failed: %s — using fallback greeting" % [npc.npc_id, error])
 		_waiting_for_llm = false
 		var speaker_id := _responding_to
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
@@ -125,6 +149,12 @@ func _on_llm_failed(req_id: String, error: String) -> void:
 	npc.change_state("idle")
 	if not _test_actions.is_empty():
 		_use_test_action()
+
+	# After processing failure, check for buffered player chat
+	if not _pending_chat.is_empty():
+		var pending := _pending_chat
+		_pending_chat = {}
+		request_reactive_response(pending["speaker_id"], pending["spoken_text"])
 
 func _use_test_action() -> void:
 	if _test_actions.is_empty():
@@ -156,16 +186,25 @@ func set_use_llm_chat(enabled: bool) -> void:
 	_use_llm_chat = enabled
 
 func is_busy() -> bool:
-	return _waiting_for_llm or not _responding_to.is_empty()
+	return _waiting_for_llm or not _responding_to.is_empty() or _conversation_hold > 0.0 or not _reading_queue.is_empty()
 
 ## Reactive conversation — triggered when another entity speaks to this NPC.
 func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	if _waiting_for_llm:
+		# Buffer the chat — process after current LLM response completes
+		_pending_chat = {"speaker_id": speaker_id, "spoken_text": spoken_text}
 		return
 
 	# Don't respond if dead or in combat
 	if npc.current_state in ["dead", "combat"]:
 		return
+
+	# Range check — ignore if speaker is too far away
+	var speaker_node := WorldState.get_entity(speaker_id)
+	if speaker_node and is_instance_valid(speaker_node):
+		var dist := npc.global_position.distance_to(speaker_node.global_position)
+		if dist > CHAT_RANGE:
+			return
 
 	# Prevent infinite ping-pong: don't respond if already responding to this speaker
 	if _responding_to == speaker_id:
@@ -180,15 +219,16 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	memory.add_observation("%s spoke to me: '%s'" % [speaker_id, spoken_text])
 	memory.add_conversation(speaker_id, speaker_id, spoken_text)
 
-	if _use_llm_chat and LLMClient.is_available():
+	if _use_llm_chat:
 		npc.change_state("thinking")
 		_waiting_for_llm = true
 		_decision_timer = 0.0
 
 		var speaker_name := _get_display_name(speaker_id)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
+		var is_player := speaker_id == "player"
 		var messages: Array = [
-			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity),
+			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player),
 			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory),
 		]
 
@@ -199,7 +239,7 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
 
-func initiate_social_chat(target_id: String) -> bool:
+func initiate_social_chat(target_id: String, topic: String = "") -> bool:
 	if _waiting_for_llm:
 		return false
 	if npc.current_state in ["dead", "combat"]:
@@ -208,7 +248,7 @@ func initiate_social_chat(target_id: String) -> bool:
 	_responding_to = target_id
 	memory.increment_turn(target_id)
 
-	if _use_llm_chat and LLMClient.is_available():
+	if _use_llm_chat:
 		npc.change_state("thinking")
 		_waiting_for_llm = true
 
@@ -219,7 +259,7 @@ func initiate_social_chat(target_id: String) -> bool:
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
 
 		var messages: Array = [
-			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name),
+			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name, topic),
 			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory),
 		]
 
@@ -241,9 +281,17 @@ func _handle_chat_response(response: Dictionary) -> void:
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
+		_conversation_hold = CONVERSATION_HOLD_TIME
 		return
 	memory.add_observation("Replied to %s: '%s'" % [speaker_id, parsed.dialogue])
 	executor.execute("talk_to", speaker_id, parsed.dialogue)
+	_conversation_hold = CONVERSATION_HOLD_TIME
+
+	# Only apply goal changes when the player is speaking (NPC-NPC chat stays behavior-driven)
+	if speaker_id == "player" and not parsed.goal.is_empty():
+		npc.set_goal(parsed.goal)
+		memory.add_goal(parsed.goal)
+		memory.add_observation("Changed goal to '%s' after talking with %s" % [parsed.goal, speaker_id])
 
 func _get_display_name(entity_id: String) -> String:
 	if entity_id == "player":
@@ -260,11 +308,12 @@ func _on_npc_spoke(speaker_id: String, dialogue: String, target_id: String) -> v
 	# If we just spoke (we're the speaker), clear the responding guard
 	if speaker_id == npc.npc_id:
 		_responding_to = ""
+		_conversation_hold = CONVERSATION_HOLD_TIME
 		memory.add_conversation(target_id, npc.npc_id, dialogue)
 		return
 	if target_id == npc.npc_id:
 		if speaker_id != "player":
-			request_reactive_response(speaker_id, dialogue)
+			# Queue with reading delay instead of responding immediately
+			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": READING_DELAY}
 		else:
-			memory.add_conversation(speaker_id, speaker_id, dialogue)
-			memory.add_observation("%s said to me: '%s'" % [speaker_id, dialogue])
+			pass  # Player chat handled via request_reactive_response directly

@@ -8,8 +8,8 @@ var observations: Array = []
 var conversation_history: Dictionary = {}  # partner_id -> Array of {speaker, text}
 var goals_history: Array = []
 var _conversation_turns: Dictionary = {}  # partner_id -> {count: int, time: float}
-const MAX_CONVERSATION_TURNS: int = 2
-const CONVERSATION_WINDOW: float = 60.0  # Reset after this gap in seconds
+const MAX_CONVERSATION_TURNS: int = 1
+const CONVERSATION_WINDOW: float = 180.0  # Reset after this gap in seconds
 
 func can_continue_conversation(partner_id: String) -> bool:
 	if _conversation_turns.has(partner_id):

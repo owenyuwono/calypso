@@ -149,8 +149,8 @@ func _setup_adventurer_npcs() -> void:
 		kael.get_node("NPCBrain").set_use_llm(false)
 		kael.get_node("NPCBrain").set_use_llm_chat(true)
 		var kael_behavior = kael.get_node("NPCBehavior")
-		kael_behavior.default_goal = "hunt_field"
-		kael.set_goal("hunt_field")
+		kael_behavior.default_goal = "idle"
+		kael.set_goal("idle")
 
 	# Lyra (Mage) — cautious, strategic
 	var lyra: Node3D = $NPCs/Lyra
@@ -161,8 +161,68 @@ func _setup_adventurer_npcs() -> void:
 		lyra.get_node("NPCBrain").set_use_llm(false)
 		lyra.get_node("NPCBrain").set_use_llm_chat(true)
 		var lyra_behavior = lyra.get_node("NPCBehavior")
-		lyra_behavior.default_goal = "hunt_field"
-		lyra.set_goal("buy_potions")
+		lyra_behavior.default_goal = "idle"
+		lyra.set_goal("idle")
+
+	# Bjorn (Warrior) — boisterous storyteller
+	var bjorn: Node3D = $NPCs/Bjorn
+	if bjorn:
+		WorldState.add_to_inventory("bjorn", "healing_potion", 3)
+		WorldState.set_entity_data("bjorn", "gold", 80)
+
+		bjorn.get_node("NPCBrain").set_use_llm(false)
+		bjorn.get_node("NPCBrain").set_use_llm_chat(true)
+		var bjorn_behavior = bjorn.get_node("NPCBehavior")
+		bjorn_behavior.default_goal = "idle"
+		bjorn.set_goal("idle")
+
+	# Sera (Rogue) — quick-witted gossip
+	var sera: Node3D = $NPCs/Sera
+	if sera:
+		WorldState.add_to_inventory("sera", "healing_potion", 2)
+		WorldState.set_entity_data("sera", "gold", 100)
+
+		sera.get_node("NPCBrain").set_use_llm(false)
+		sera.get_node("NPCBrain").set_use_llm_chat(true)
+		var sera_behavior = sera.get_node("NPCBehavior")
+		sera_behavior.default_goal = "idle"
+		sera.set_goal("idle")
+
+	# Thane (Knight) — stoic and honorable
+	var thane: Node3D = $NPCs/Thane
+	if thane:
+		WorldState.add_to_inventory("thane", "healing_potion", 2)
+		WorldState.set_entity_data("thane", "gold", 70)
+
+		thane.get_node("NPCBrain").set_use_llm(false)
+		thane.get_node("NPCBrain").set_use_llm_chat(true)
+		var thane_behavior = thane.get_node("NPCBehavior")
+		thane_behavior.default_goal = "idle"
+		thane.set_goal("idle")
+
+	# Mira (Mage) — cheerful and curious
+	var mira: Node3D = $NPCs/Mira
+	if mira:
+		WorldState.add_to_inventory("mira", "healing_potion", 3)
+		WorldState.set_entity_data("mira", "gold", 60)
+
+		mira.get_node("NPCBrain").set_use_llm(false)
+		mira.get_node("NPCBrain").set_use_llm_chat(true)
+		var mira_behavior = mira.get_node("NPCBehavior")
+		mira_behavior.default_goal = "idle"
+		mira.set_goal("idle")
+
+	# Dusk (Rogue) — mysterious and quiet
+	var dusk: Node3D = $NPCs/Dusk
+	if dusk:
+		WorldState.add_to_inventory("dusk", "healing_potion", 2)
+		WorldState.set_entity_data("dusk", "gold", 50)
+
+		dusk.get_node("NPCBrain").set_use_llm(false)
+		dusk.get_node("NPCBrain").set_use_llm_chat(true)
+		var dusk_behavior = dusk.get_node("NPCBehavior")
+		dusk_behavior.default_goal = "idle"
+		dusk.set_goal("idle")
 
 # =============================================================================
 # Asset Loading Infrastructure

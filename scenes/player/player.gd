@@ -199,6 +199,19 @@ func show_chat(text: String) -> void:
 		return
 	_pending_talk_target_id = ""
 	_pending_talk_target_node = null
+	# Proximity: auto-target nearest NPC if within range
+	_send_to_nearby_npc(text)
+
+func _send_to_nearby_npc(text: String) -> void:
+	var nearby := WorldState.get_nearby_entities(global_position, INTERACT_RANGE)
+	for entry in nearby:
+		if entry.id == "player":
+			continue
+		var data := WorldState.get_entity_data(entry.id)
+		var etype: String = data.get("type", "")
+		if etype == "npc":
+			_send_message_to_npc(text, entry.id, entry.node)
+			return
 
 func _show_bubble(text: String) -> void:
 	if _dialogue_bubble:
@@ -393,7 +406,7 @@ func _on_arrived() -> void:
 		_open_shop(_interact_target)
 	elif etype == "npc":
 		if target_node and is_instance_valid(target_node):
-			_talk_to_npc(_interact_target, target_node)
+			_command_npc_follow(target_node)
 
 	_interact_target = ""
 
@@ -565,8 +578,12 @@ func _interact_with_nearest() -> void:
 			_open_shop(entry.id)
 			return
 		if etype == "npc":
-			_talk_to_npc(entry.id, entry.node)
+			_command_npc_follow(entry.node)
 			return
+
+func _command_npc_follow(npc_node: Node3D) -> void:
+	if npc_node.has_method("set_goal"):
+		npc_node.set_goal("follow_player")
 
 func _talk_to_npc(target_npc_id: String, target_node: Node3D) -> void:
 	# Open chat input so player can type what they want to say

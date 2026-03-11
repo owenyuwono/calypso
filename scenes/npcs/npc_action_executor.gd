@@ -159,10 +159,17 @@ func _do_sell_item(shop_id: String, action_data: Dictionary = {}) -> void:
 
 func _do_talk_to(target_id: String, dialogue: String) -> void:
 	npc.change_state("talking")
+	# Face the target
+	var target_node := WorldState.get_entity(target_id)
+	if target_node and is_instance_valid(target_node):
+		var dir := (target_node.global_position - npc.global_position)
+		dir.y = 0.0
+		if dir.length_squared() > 0.01:
+			npc._face_direction(dir.normalized())
 	GameEvents.npc_spoke.emit(npc.npc_id, dialogue, target_id)
 	GameEvents.npc_action_completed.emit(npc.npc_id, "talk_to", true)
 
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(5.0).timeout
 	if npc.current_state == "talking":
 		npc.change_state("idle")
 

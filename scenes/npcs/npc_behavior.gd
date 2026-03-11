@@ -10,13 +10,16 @@ const VALID_GOALS: Array = [
 ]
 
 const TICK_INTERVAL: float = 1.0
+const IDLE_DRIFT_INTERVAL: float = 8.0
+const IDLE_CLUSTER_RANGE: float = 4.0
+const IDLE_DRIFT_CHANCE: float = 0.6
 
 # Alternate hunt spots to roam when no monsters nearby
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
 const DUNGEON_SPOTS: Array = ["DungeonCenter", "DungeonDeep", "DungeonEntrance"]
 const PATROL_SPOTS: Array = ["TownSquare", "TownNorth", "TownEast", "TownSouth"]
 
-var default_goal: String = "hunt_field"
+var default_goal: String = "idle"
 
 var npc: CharacterBody3D
 var memory: Node
@@ -25,10 +28,11 @@ var brain: Node
 
 var _behavior_timer: float = 0.0
 var _social_cooldown: float = 0.0
-const SOCIAL_COOLDOWN_MIN: float = 45.0
+const SOCIAL_COOLDOWN_MIN: float = 30.0
 const SOCIAL_COOLDOWN_MAX: float = 90.0
-const SOCIAL_PROXIMITY: float = 12.0
+const SOCIAL_PROXIMITY: float = 8.0
 var _action_in_progress: bool = false
+var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
 var _patrol_index: int = 0
 
@@ -37,17 +41,20 @@ func _ready() -> void:
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 	brain = npc.get_node("NPCBrain")
-	_social_cooldown = randf_range(10.0, 30.0)
+	_social_cooldown = randf_range(30.0, 60.0)
 	GameEvents.npc_action_completed.connect(_on_action_completed)
 
 func _process(delta: float) -> void:
 	if _social_cooldown > 0.0:
 		_social_cooldown -= delta
+	_idle_drift_timer += delta
 	if _action_in_progress:
 		return
 	if npc.current_state != "idle":
 		return
 	if not WorldState.is_alive(npc.npc_id):
+		return
+	if brain and brain.is_busy():
 		return
 
 	_behavior_timer += delta
@@ -92,17 +99,6 @@ func _check_survival() -> bool:
 		npc.set_goal("return_to_town")
 		_do_action("move_to", "TownSquare")
 		return true
-
-	# Buy potions if running low and can afford
-	if potion_count < 2 and gold >= 40 and npc.current_goal != "buy_potions":
-		npc.set_goal("buy_potions")
-		return false  # Let _execute_goal handle it next tick
-
-	# Sell loot if inventory has >3 materials
-	var material_count := _get_total_material_count()
-	if material_count > 3 and npc.current_goal != "sell_loot":
-		npc.set_goal("sell_loot")
-		return false
 
 	return false
 
@@ -173,7 +169,7 @@ func _execute_goal() -> void:
 		"patrol":
 			_execute_patrol()
 		"idle":
-			pass  # Do nothing
+			_execute_idle()
 
 func _execute_hunt(zone: String) -> void:
 	# Look for nearby alive monsters
@@ -296,6 +292,40 @@ func _execute_patrol() -> void:
 	npc.last_thought = "Patrolling to %s" % spot
 	_do_action("move_to", spot)
 
+func _execute_idle() -> void:
+	if _idle_drift_timer < IDLE_DRIFT_INTERVAL:
+		return
+	_idle_drift_timer = 0.0
+	if randf() > IDLE_DRIFT_CHANCE:
+		return
+
+	var perception := WorldState.get_npc_perception(npc.npc_id, 25.0)
+	var npcs_nearby: Array = perception.get("npcs", [])
+
+	var nearest_id: String = ""
+	var nearest_dist: float = INF
+	for n in npcs_nearby:
+		var nid: String = n["id"]
+		if nid == "player":
+			continue
+		if not WorldState.is_alive(nid):
+			continue
+		var entity_data := WorldState.get_entity_data(nid)
+		if entity_data.get("type", "") != "npc":
+			continue
+		var dist: float = n["distance"]
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest_id = nid
+
+	if nearest_id.is_empty():
+		return
+	if nearest_dist <= IDLE_CLUSTER_RANGE:
+		return
+
+	npc.last_thought = "Drifting toward %s" % nearest_id
+	_do_action("move_to", nearest_id)
+
 # =============================================================================
 # Action Dispatchers
 # =============================================================================
@@ -396,14 +426,27 @@ func _get_best_upgrade(slot: String) -> String:
 # Social Chat
 # =============================================================================
 
-const URGENT_GOALS: Array = ["buy_potions", "return_to_town", "sell_loot", "buy_weapon", "buy_armor"]
+const CHAT_TOPICS: Array = [
+	"the dungeon monsters you've fought",
+	"your favorite weapon",
+	"a rumor about treasure in the dungeon",
+	"how tough the skeletons are",
+	"the best hunting spots in the field",
+	"whether potions are worth the gold",
+	"the strange sounds coming from the dungeon",
+	"what gear upgrades you're saving for",
+	"a close call you had in battle",
+	"the slimes near town",
+]
+
+const SOCIAL_GOALS: Array = ["idle", "patrol"]
 
 func _try_social_chat() -> bool:
 	if _social_cooldown > 0.0:
 		return false
 	if not brain or brain.is_busy():
 		return false
-	if npc.current_goal in URGENT_GOALS:
+	if npc.current_goal not in SOCIAL_GOALS:
 		return false
 
 	var perception := WorldState.get_npc_perception(npc.npc_id, SOCIAL_PROXIMITY)
@@ -419,7 +462,8 @@ func _try_social_chat() -> bool:
 			continue
 		if not memory.can_continue_conversation(nid):
 			continue
-		if brain.initiate_social_chat(nid):
+		var topic: String = CHAT_TOPICS[randi() % CHAT_TOPICS.size()]
+		if brain.initiate_social_chat(nid, topic):
 			_social_cooldown = randf_range(SOCIAL_COOLDOWN_MIN, SOCIAL_COOLDOWN_MAX)
 			return true
 	return false
