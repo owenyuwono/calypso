@@ -2,9 +2,9 @@ extends CharacterBody3D
 ## Monster entity with aggro AI, auto-attack, death, and loot.
 ## Dynamically loads 3D models based on monster type from MonsterDatabase.
 
+const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 @export var monster_type: String = "slime"
 @export var monster_id: String = ""
@@ -39,13 +39,8 @@ var _wander_radius: float = 5.0
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var name_label: Label3D = $NameLabel
 
-# 3D Model
-var _model: Node3D
-var _mesh_instances: Array[MeshInstance3D] = []
-var _overlay_material: StandardMaterial3D
-var _anim_player: AnimationPlayer
-var _current_anim: String = ""
-var _hp_bar: Node3D
+# Visuals component
+var _visuals: Node
 
 func _ready() -> void:
 	spawn_point = global_position
@@ -63,7 +58,9 @@ func _ready() -> void:
 	_attack_speed = stats.get("attack_speed", 1.5)
 	_wander_radius = stats.get("wander_radius", 5.0)
 
-	# Setup 3D model
+	# Setup visuals
+	_visuals = EntityVisuals.new()
+	add_child(_visuals)
 	_setup_model(stats)
 
 	if name_label:
@@ -90,7 +87,7 @@ func _ready() -> void:
 	_aggro_check_timer = randf() * 0.3  # Stagger initial timer
 
 	# Create HP bar
-	_setup_hp_bar()
+	_visuals.setup_hp_bar(2.0)
 
 	# Connect signals
 	GameEvents.entity_died.connect(_on_entity_died)
@@ -103,38 +100,23 @@ func _setup_model(stats: Dictionary) -> void:
 
 	if model_scene_path.is_empty():
 		# No model defined — create colored mesh fallback
-		_create_fallback_mesh(stats)
+		_visuals.setup_model("", scale_val, stats.get("color", Color.WHITE), true)
 		return
 
 	if model_scene_path == "SLIME_PROCEDURAL":
 		_create_slime_mesh(stats)
 		return
 
-	var result := ModelHelper.instantiate_model(model_scene_path, scale_val)
-	if result.model == null:
-		_create_fallback_mesh(stats)
-		return
-
-	_model = result.model
-	add_child(_model)
-	_anim_player = result.anim_player
-
-	_mesh_instances = ModelHelper.find_mesh_instances(_model)
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	_visuals.setup_model(model_scene_path, scale_val, stats.get("color", Color.WHITE), true)
 
 	# Apply color tint overlay for recolored monsters (goblin, dark_mage)
 	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
 	if tint_color.a > 0:
-		_overlay_material.albedo_color = tint_color
-
-	if _anim_player:
-		_play_anim("Idle")
+		_visuals.apply_tint(tint_color)
 
 func _create_slime_mesh(stats: Dictionary) -> void:
-	_model = Node3D.new()
-	add_child(_model)
+	var model := Node3D.new()
+	add_child(model)
 
 	var mesh_inst := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -150,37 +132,14 @@ func _create_slime_mesh(stats: Dictionary) -> void:
 	mat.albedo_color.a = 0.8
 	mesh_inst.set_surface_override_material(0, mat)
 
-	_model.add_child(mesh_inst)
-	_mesh_instances = [mesh_inst]
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
+	model.add_child(mesh_inst)
+	var mesh_instances: Array[MeshInstance3D] = [mesh_inst]
+	_visuals.setup_custom_model(model, mesh_instances)
 
 	# Wobble animation via tween
 	var tween := create_tween().set_loops()
-	tween.tween_property(_model, "scale", Vector3(1.1, 0.9, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_model, "scale", Vector3(0.9, 1.1, 0.9), 0.5).set_trans(Tween.TRANS_SINE)
-
-func _create_fallback_mesh(stats: Dictionary) -> void:
-	var result := ModelHelper.create_fallback_mesh(self, stats.get("color", Color.WHITE), true)
-	_model = result.model
-	_mesh_instances = result.mesh_instances
-	_overlay_material = result.overlay
-
-func _play_anim(anim_name: String, force: bool = false) -> void:
-	if not _anim_player:
-		return
-	if not force and _current_anim == anim_name and _anim_player.is_playing():
-		return
-	if _anim_player.has_animation(anim_name):
-		_anim_player.play(anim_name)
-		_current_anim = anim_name
-
-func _face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
-
-func _setup_hp_bar() -> void:
-	_hp_bar = ModelHelper.create_hp_bar(self, 2.0)
+	tween.tween_property(model, "scale", Vector3(1.1, 0.9, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(model, "scale", Vector3(0.9, 1.1, 0.9), 0.5).set_trans(Tween.TRANS_SINE)
 
 func _physics_process(delta: float) -> void:
 	if state == "dead":
@@ -218,9 +177,9 @@ func _physics_process(delta: float) -> void:
 	elif state == "dead":
 		pass
 	elif is_moving:
-		_play_anim("Walking_A")
+		_visuals.play_anim("Walking_A")
 	else:
-		_play_anim("Idle")
+		_visuals.play_anim("Idle")
 
 func _process_idle(delta: float) -> void:
 	_wander_timer -= delta
@@ -267,7 +226,7 @@ func _process_wander_movement() -> bool:
 		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
-		_face_direction(dir)
+		_visuals.face_direction(dir)
 
 	# Throttled aggro check while wandering
 	if _aggro_check_timer <= 0.0:
@@ -320,7 +279,7 @@ func _process_aggro(delta: float) -> bool:
 			dir = dir.normalized()
 			velocity.x = dir.x * MOVE_SPEED * 1.2
 			velocity.z = dir.z * MOVE_SPEED * 1.2
-			_face_direction(dir)
+			_visuals.face_direction(dir)
 			return true
 	return false
 
@@ -337,12 +296,13 @@ func _process_attacking(delta: float) -> void:
 
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	_face_direction(to_target)
+	_visuals.face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
+	var anim_player := _visuals.get_anim_player()
 	if _pending_hit:
-		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if _anim_player.current_animation_position >= _hit_time:
+		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_perform_attack()
 		else:
@@ -357,17 +317,17 @@ func _process_attacking(delta: float) -> void:
 		_attack_timer += delta
 		if _attack_timer >= _attack_speed:
 			_attack_timer = 0.0
-			_play_anim("1H_Melee_Attack_Chop", true)
+			_visuals.play_anim("1H_Melee_Attack_Chop", true)
 			_pending_hit = true
-			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
+			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
 
 func _perform_attack() -> void:
 	if not WorldState.is_alive(aggro_target):
 		_drop_aggro()
 		return
 	var damage := WorldState.deal_damage(monster_id, aggro_target)
-	_spawn_damage_number(aggro_target, damage)
-	_flash_target(aggro_target)
+	_visuals.spawn_damage_number(aggro_target, damage, Color(1, 0.2, 0.2))
+	_visuals.flash_target(aggro_target)
 
 func _drop_aggro() -> void:
 	aggro_target = ""
@@ -379,12 +339,12 @@ func _drop_aggro() -> void:
 	nav_agent.target_position = spawn_point
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
-	if target_id == monster_id:
-		_update_hp_bar()
+	if target_id == monster_id and state != "dead":
+		_visuals.update_hp_bar(monster_id)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
-	if entity_id == monster_id:
-		_update_hp_bar()
+	if entity_id == monster_id and state != "dead":
+		_visuals.update_hp_bar(monster_id)
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:
@@ -419,13 +379,12 @@ func _die(killer_id: String) -> void:
 	WorldState.grant_xp(killer_id, xp)
 
 	# Death visual: animation + fade
-	_play_anim("Death_A")
+	_visuals.play_anim("Death_A")
 	if _death_tween:
 		_death_tween.kill()
-	_death_tween = ModelHelper.fade_out(_mesh_instances, self)
+	_death_tween = _visuals.fade_out()
 
-	if _hp_bar:
-		_hp_bar.visible = false
+	_visuals.set_hp_bar_visible(false)
 	if name_label:
 		name_label.visible = false
 
@@ -441,25 +400,24 @@ func _respawn() -> void:
 		push_warning("MonsterBase: Cannot respawn, unknown type '%s'" % monster_type)
 		return
 	state = "idle"
-	_current_anim = ""
+	_visuals.reset_anim()
 	global_position = spawn_point
 	collision_shape.disabled = false
 
 	# Restore model visuals
-	if _model:
-		_model.scale = Vector3.ONE * stats.get("model_scale", 0.7)
-	ModelHelper.restore_materials(_mesh_instances)
-	if _overlay_material:
-		# Restore tint if applicable
-		var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
-		_overlay_material.albedo_color = tint_color
+	var model := _visuals.get_model()
+	if model:
+		model.scale = Vector3.ONE * stats.get("model_scale", 0.7)
+	_visuals.restore_materials()
+	# Restore tint if applicable
+	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
+	_visuals.apply_tint(tint_color)
 
-	if _hp_bar:
-		_hp_bar.visible = true
+	_visuals.set_hp_bar_visible(true)
 	if name_label:
 		name_label.visible = true
 
-	_play_anim("Idle")
+	_visuals.play_anim("Idle")
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
 
 	# Re-register
@@ -477,36 +435,18 @@ func _respawn() -> void:
 	})
 
 	GameEvents.entity_respawned.emit(monster_id)
-	_update_hp_bar()
+	_visuals.update_hp_bar(monster_id)
 
-func _update_hp_bar() -> void:
-	if state == "dead":
-		return
-	ModelHelper.update_entity_hp_bar(_hp_bar, monster_id)
-
-func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2))
-
-func _flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
-
-# --- Hover Highlight ---
+# --- Hover Highlight (duck typing delegations) ---
 
 func highlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, true)
+	_visuals.highlight()
 
 func unhighlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, false)
+	_visuals.unhighlight()
 
 func flash_hit() -> void:
-	if not _overlay_material:
-		return
-	ModelHelper.flash_hit(_overlay_material, self)
-
-func _get_hit_delay(anim_name: String) -> float:
-	return ModelHelper.get_hit_delay(_anim_player, anim_name)
+	_visuals.flash_hit()
 
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
 	var loot_scene := preload("res://scenes/objects/loot_drop.gd")

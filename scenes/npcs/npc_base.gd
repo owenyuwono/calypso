@@ -2,8 +2,8 @@ extends CharacterBody3D
 ## NPC base — state machine, navigation, perception, combat, and LLM brain integration.
 ## Uses KayKit 3D character models with overlay-based visual effects.
 
+const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 
 @export var npc_id: String = ""
@@ -50,12 +50,8 @@ const MOVE_SPEED: float = 3.6
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
 
-# 3D Model
-var _model: Node3D
-var _mesh_instances: Array[MeshInstance3D] = []
-var _overlay_material: StandardMaterial3D
-var _anim_player: AnimationPlayer
-var _current_anim: String = ""
+# Visuals component
+var _visuals: Node
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -68,11 +64,13 @@ const STATE_COLORS: Dictionary = {
 	"combat": Color(0.8, 0.2, 0.1, 0.15),
 }
 
-var _hp_bar: Node3D
-
 func _ready() -> void:
 	current_goal = starting_goal
-	_setup_model()
+
+	_visuals = EntityVisuals.new()
+	add_child(_visuals)
+	_visuals.setup_model(model_path, model_scale, npc_color)
+
 	_register_with_world()
 
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
@@ -87,44 +85,8 @@ func _ready() -> void:
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
 
-	_setup_hp_bar()
-
-func _setup_model() -> void:
-	var result := ModelHelper.instantiate_model(model_path, model_scale)
-	if result.model == null:
-		push_warning("NPC %s: Could not load model '%s', using fallback" % [npc_id, model_path])
-		_create_fallback_mesh()
-		return
-
-	_model = result.model
-	add_child(_model)
-	_anim_player = result.anim_player
-
-	_mesh_instances = ModelHelper.find_mesh_instances(_model)
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
-
-	if _anim_player:
-		_play_anim("Idle")
-
-func _create_fallback_mesh() -> void:
-	var result := ModelHelper.create_fallback_mesh(self, npc_color)
-	_model = result.model
-	_mesh_instances = result.mesh_instances
-	_overlay_material = result.overlay
-
-func _play_anim(anim_name: String, force: bool = false) -> void:
-	if not _anim_player:
-		return
-	if not force and _current_anim == anim_name and _anim_player.is_playing():
-		return
-	if _anim_player.has_animation(anim_name):
-		_anim_player.play(anim_name)
-		_current_anim = anim_name
-
-func _face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
+	_visuals.setup_hp_bar()
+	_visuals.set_hp_bar_visible(false)
 
 func _register_with_world() -> void:
 	var stats := LevelData.BASE_ADVENTURER_STATS.duplicate()
@@ -136,10 +98,6 @@ func _register_with_world() -> void:
 	stats["inventory"] = {}
 	stats["equipment"] = {"weapon": "", "armor": ""}
 	WorldState.register_entity(npc_id, self, stats)
-
-func _setup_hp_bar() -> void:
-	_hp_bar = ModelHelper.create_hp_bar(self)
-	_hp_bar.visible = false
 
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
@@ -168,9 +126,9 @@ func _physics_process(delta: float) -> void:
 	elif current_state == STATE_DEAD:
 		pass
 	elif is_moving:
-		_play_anim("Walking_A")
+		_visuals.play_anim("Walking_A")
 	else:
-		_play_anim("Idle")
+		_visuals.play_anim("Idle")
 
 func _process_movement() -> bool:
 	if not _nav_started:
@@ -195,7 +153,7 @@ func _process_movement() -> bool:
 		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
-		_face_direction(dir)
+		_visuals.face_direction(dir)
 		return true
 	return false
 
@@ -224,8 +182,8 @@ func _process_combat(delta: float) -> bool:
 				dir = dir.normalized()
 				velocity.x = dir.x * MOVE_SPEED * 1.1
 				velocity.z = dir.z * MOVE_SPEED * 1.1
-				_face_direction(dir)
-				_play_anim("Running_A")
+				_visuals.face_direction(dir)
+				_visuals.play_anim("Running_A")
 		return true
 
 	# In range — auto-attack
@@ -233,12 +191,13 @@ func _process_combat(delta: float) -> bool:
 	velocity.z = 0.0
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	_face_direction(to_target)
+	_visuals.face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
+	var anim_player := _visuals.get_anim_player()
 	if _pending_hit:
-		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if _anim_player.current_animation_position >= _hit_time:
+		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_do_combat_attack()
 		else:
@@ -254,17 +213,17 @@ func _process_combat(delta: float) -> bool:
 		_attack_timer += delta
 		if _attack_timer >= attack_speed:
 			_attack_timer = 0.0
-			_play_anim("1H_Melee_Attack_Chop", true)
+			_visuals.play_anim("1H_Melee_Attack_Chop", true)
 			_pending_hit = true
-			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
+			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _do_combat_attack() -> void:
 	if not WorldState.is_alive(combat_target):
 		return
 	var damage := WorldState.deal_damage(npc_id, combat_target)
-	_spawn_damage_number(combat_target, damage)
-	_flash_target(combat_target)
+	_visuals.spawn_damage_number(combat_target, damage)
+	_visuals.flash_target(combat_target)
 
 	# Occasionally say something in combat
 	if randf() < 0.15:
@@ -288,9 +247,8 @@ func change_state(new_state: String) -> void:
 	WorldState.set_entity_data(npc_id, "state", new_state)
 
 	# Update overlay tint based on state
-	if _overlay_material:
-		var tint: Color = STATE_COLORS.get(new_state, Color(0, 0, 0, 0))
-		ModelHelper.set_state_tint(_overlay_material, tint)
+	var tint: Color = STATE_COLORS.get(new_state, Color(0, 0, 0, 0))
+	_visuals.set_state_tint(tint)
 
 
 func _on_any_npc_spoke(speaker_id: String, dialogue: String, _target_id: String) -> void:
@@ -325,9 +283,6 @@ func enter_combat(target_id: String) -> void:
 	_last_nav_target_pos = Vector3.INF
 	change_state(STATE_COMBAT)
 
-func _update_hp_bar() -> void:
-	ModelHelper.update_entity_hp_bar(_hp_bar, npc_id)
-
 # --- Death / Respawn ---
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
@@ -358,16 +313,15 @@ func _die() -> void:
 		memory_node.add_observation("I died! Lost %d gold." % lost)
 
 	# Visual: death animation + fade out
-	_play_anim("Death_A")
-	ModelHelper.fade_out(_mesh_instances, self)
+	_visuals.play_anim("Death_A")
+	_visuals.fade_out()
 
-	if _hp_bar:
-		_hp_bar.visible = false
+	_visuals.set_hp_bar_visible(false)
 
 	_respawn_timer = 5.0
 
 func _respawn() -> void:
-	_current_anim = ""
+	_visuals.reset_anim()
 	# Teleport to town
 	global_position = Vector3(randf_range(-2, 2), 1, randf_range(-2, 2))
 	velocity = Vector3.ZERO
@@ -377,17 +331,15 @@ func _respawn() -> void:
 	WorldState.set_entity_data(npc_id, "hp", max_hp)
 
 	# Visual: restore materials and play idle
-	ModelHelper.restore_materials(_mesh_instances)
-	if _overlay_material:
-		ModelHelper.clear_overlay(_overlay_material)
-	_play_anim("Idle")
+	_visuals.restore_materials()
+	_visuals.clear_overlay()
+	_visuals.play_anim("Idle")
 
-	if _hp_bar:
-		_hp_bar.visible = false
+	_visuals.set_hp_bar_visible(false)
 
 	change_state(STATE_IDLE)
 	GameEvents.entity_respawned.emit(npc_id)
-	_update_hp_bar()
+	_visuals.update_hp_bar(npc_id)
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
@@ -396,32 +348,19 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
-		_update_hp_bar()
+		_visuals.update_hp_bar(npc_id)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
-		_update_hp_bar()
+		_visuals.update_hp_bar(npc_id)
+
+# --- Duck typing delegations ---
 
 func flash_hit() -> void:
-	if not _overlay_material:
-		return
-	ModelHelper.flash_hit(_overlay_material, self)
-
-func _get_hit_delay(anim_name: String) -> float:
-	return ModelHelper.get_hit_delay(_anim_player, anim_name)
-
-func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage)
-
-func _flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
-
-# --- Hover Highlight ---
+	_visuals.flash_hit()
 
 func highlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, true)
+	_visuals.highlight()
 
 func unhighlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, false)
+	_visuals.unhighlight()

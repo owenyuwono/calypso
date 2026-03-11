@@ -2,8 +2,8 @@ extends StaticBody3D
 ## Scripted shop NPC — no AI, just a fixed position with shop interaction.
 ## Uses KayKit 3D character model with overlay effects.
 
+const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 @export var shop_id: String = ""
 @export var shop_name: String = "Shop"
@@ -17,14 +17,12 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 @onready var name_label: Label3D = $NameLabel
 
-# 3D Model
-var _model: Node3D
-var _mesh_instances: Array[MeshInstance3D] = []
-var _overlay_material: StandardMaterial3D
-var _anim_player: AnimationPlayer
+var _visuals: Node
 
 func _ready() -> void:
-	_setup_model()
+	_visuals = EntityVisuals.new()
+	add_child(_visuals)
+	_visuals.setup_model(model_path, model_scale, npc_color)
 
 	if name_label:
 		name_label.text = shop_name
@@ -36,40 +34,13 @@ func _ready() -> void:
 		"shop_items": Array(shop_items),
 	})
 
-func _setup_model() -> void:
-	var result := ModelHelper.instantiate_model(model_path, model_scale)
-	if result.model == null:
-		push_warning("ShopNPC %s: Could not load model '%s', using fallback" % [shop_id, model_path])
-		_create_fallback_mesh()
-		return
-
-	_model = result.model
-	add_child(_model)
-	_anim_player = result.anim_player
-
-	_mesh_instances = ModelHelper.find_mesh_instances(_model)
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
-
-	if _anim_player:
-		_anim_player.play("Idle")
-
-func _create_fallback_mesh() -> void:
-	var result := ModelHelper.create_fallback_mesh(self, npc_color)
-	_model = result.model
-	_mesh_instances = result.mesh_instances
-	_overlay_material = result.overlay
-
 func get_shop_items() -> Array:
 	return Array(shop_items)
 
-# --- Hover Highlight ---
+# --- Hover Highlight (duck typing delegations) ---
 
 func highlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, true)
+	_visuals.highlight()
 
 func unhighlight() -> void:
-	if _overlay_material:
-		ModelHelper.set_highlight(_overlay_material, false)
+	_visuals.unhighlight()
