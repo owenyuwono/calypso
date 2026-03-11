@@ -123,9 +123,6 @@ func _play_anim(anim_name: String, force: bool = false) -> void:
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
-func _face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
-
 func _register_with_world() -> void:
 	var stats := LevelData.BASE_ADVENTURER_STATS.duplicate()
 	stats["type"] = "npc"
@@ -195,7 +192,7 @@ func _process_movement() -> bool:
 		dir = dir.normalized()
 		velocity.x = dir.x * MOVE_SPEED
 		velocity.z = dir.z * MOVE_SPEED
-		_face_direction(dir)
+		ModelHelper.face_direction(_model, dir)
 		return true
 	return false
 
@@ -224,7 +221,7 @@ func _process_combat(delta: float) -> bool:
 				dir = dir.normalized()
 				velocity.x = dir.x * MOVE_SPEED * 1.1
 				velocity.z = dir.z * MOVE_SPEED * 1.1
-				_face_direction(dir)
+				ModelHelper.face_direction(_model, dir)
 				_play_anim("Running_A")
 		return true
 
@@ -233,7 +230,7 @@ func _process_combat(delta: float) -> bool:
 	velocity.z = 0.0
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	_face_direction(to_target)
+	ModelHelper.face_direction(_model, to_target)
 
 	# Check animation position for hit event before starting new attacks
 	if _pending_hit:
@@ -262,9 +259,11 @@ func _process_combat(delta: float) -> bool:
 func _do_combat_attack() -> void:
 	if not WorldState.is_alive(combat_target):
 		return
+	var target_node := WorldState.get_entity(combat_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage(npc_id, combat_target)
-	_spawn_damage_number(combat_target, damage)
-	_flash_target(combat_target)
+	_spawn_damage_number(combat_target, damage, target_pos)
+	ModelHelper.flash_target(combat_target)
 
 	# Occasionally say something in combat
 	if randf() < 0.15:
@@ -419,11 +418,8 @@ func _get_hit_delay(anim_name: String) -> float:
 		return _anim_player.get_animation(anim_name).length * 0.5
 	return 0.4
 
-func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position)
-
-func _flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
+func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
+	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position, target_pos)
 
 # --- Hover Highlight ---
 

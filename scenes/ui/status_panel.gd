@@ -75,11 +75,7 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Stats section header
-	var stats_header := Label.new()
-	stats_header.text = "Stats"
-	stats_header.add_theme_font_size_override("font_size", 14)
-	stats_header.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	vbox.add_child(stats_header)
+	vbox.add_child(UIHelper.create_section_header("Stats"))
 
 	# HP row
 	var hp_row := _create_stat_row("HP")
@@ -111,11 +107,7 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Equipment section header
-	var equip_header := Label.new()
-	equip_header.text = "Equipment"
-	equip_header.add_theme_font_size_override("font_size", 14)
-	equip_header.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	vbox.add_child(equip_header)
+	vbox.add_child(UIHelper.create_section_header("Equipment"))
 
 	# Weapon row
 	var weapon_row := _create_equipment_row("Weapon")
@@ -134,11 +126,7 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Progression section header
-	var prog_header := Label.new()
-	prog_header.text = "Progression"
-	prog_header.add_theme_font_size_override("font_size", 14)
-	prog_header.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	vbox.add_child(prog_header)
+	vbox.add_child(UIHelper.create_section_header("Progression"))
 
 	# XP bar
 	var xp_row := HBoxContainer.new()
@@ -249,12 +237,7 @@ func toggle() -> void:
 		_refresh()
 
 func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
+	UIHelper.center_panel(_panel)
 
 func _refresh() -> void:
 	if not _is_open:

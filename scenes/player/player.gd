@@ -68,7 +68,6 @@ var _dialogue_bubble: Node3D
 
 # Pending NPC conversation (set when player clicks NPC, cleared after chat sent)
 var _pending_talk_target_id: String = ""
-var _pending_talk_target_node: Node3D
 
 func _exit_tree() -> void:
 	if _cursor_manager:
@@ -190,15 +189,13 @@ func _setup_hover_ring() -> void:
 func show_chat(text: String) -> void:
 	_show_bubble(text)
 	# If there's a pending NPC conversation, send the message to them
-	if not _pending_talk_target_id.is_empty() and _pending_talk_target_node and is_instance_valid(_pending_talk_target_node):
+	if not _pending_talk_target_id.is_empty():
 		var npc_id := _pending_talk_target_id
-		var npc_node := _pending_talk_target_node
+		var npc_node := WorldState.get_entity(npc_id)
 		_pending_talk_target_id = ""
-		_pending_talk_target_node = null
-		_send_message_to_npc(text, npc_id, npc_node)
-		return
-	_pending_talk_target_id = ""
-	_pending_talk_target_node = null
+		if npc_node and is_instance_valid(npc_node):
+			_send_message_to_npc(text, npc_id, npc_node)
+			return
 
 func _show_bubble(text: String) -> void:
 	if _dialogue_bubble:
@@ -230,7 +227,7 @@ func _physics_process(delta: float) -> void:
 		dir = dir.normalized()
 		velocity.x = dir.x * SPEED
 		velocity.z = dir.z * SPEED
-		_face_direction(dir)
+		ModelHelper.face_direction(_model, dir)
 		is_moving = true
 	else:
 		if _is_navigating:
@@ -277,9 +274,6 @@ func _process(delta: float) -> void:
 		# Keep tooltip following mouse between raycast ticks
 		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
-func _face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
-
 func _process_combat(delta: float) -> bool:
 	var target_node := WorldState.get_entity(_attack_target)
 	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
@@ -302,7 +296,7 @@ func _process_combat(delta: float) -> bool:
 			dir = dir.normalized()
 			velocity.x = dir.x * SPEED
 			velocity.z = dir.z * SPEED
-			_face_direction(dir)
+			ModelHelper.face_direction(_model, dir)
 			_play_anim("Running_A")
 		return true
 
@@ -311,7 +305,7 @@ func _process_combat(delta: float) -> bool:
 	velocity.z = 0.0
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	_face_direction(to_target)
+	ModelHelper.face_direction(_model, to_target)
 
 	# Check animation position for skill hit
 	if _pending_skill_hit:
@@ -354,9 +348,11 @@ func _perform_attack() -> void:
 	if not WorldState.is_alive(_attack_target):
 		_cancel_attack()
 		return
+	var target_node := WorldState.get_entity(_attack_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage("player", _attack_target)
-	_spawn_damage_number(_attack_target, damage)
-	_flash_target(_attack_target)
+	_spawn_damage_number(_attack_target, damage, target_pos)
+	ModelHelper.flash_target(_attack_target)
 
 func _cancel_attack() -> void:
 	_attack_target = ""
@@ -572,7 +568,6 @@ func _talk_to_npc(target_npc_id: String, target_node: Node3D) -> void:
 	# Open chat input so player can type what they want to say
 	if chat_input and not chat_input.is_open():
 		_pending_talk_target_id = target_npc_id
-		_pending_talk_target_node = target_node
 		chat_input.open()
 		return
 	# Fallback if no chat input available
@@ -678,11 +673,8 @@ func _get_hit_delay(anim_name: String) -> float:
 		return _anim_player.get_animation(anim_name).length * 0.5
 	return 0.4
 
-func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position)
-
-func _flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
+func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
+	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position, target_pos)
 
 func _try_use_hotbar_slot(slot: int) -> void:
 	var hotbar: Array = WorldState.get_hotbar("player")
@@ -734,9 +726,11 @@ func _execute_skill_hit() -> void:
 		return
 	if not WorldState.is_alive(_attack_target):
 		return
+	var target_node := WorldState.get_entity(_attack_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var actual_damage := WorldState.deal_damage_amount("player", _attack_target, _pending_skill_damage)
-	_spawn_damage_number(_attack_target, actual_damage)
-	_flash_target(_attack_target)
+	_spawn_damage_number(_attack_target, actual_damage, target_pos)
+	ModelHelper.flash_target(_attack_target)
 	GameEvents.skill_used.emit("player", _pending_skill_id)
 	_pending_skill_damage = 0
 	_pending_skill_id = ""

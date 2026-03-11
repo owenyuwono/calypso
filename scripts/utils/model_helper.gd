@@ -175,10 +175,14 @@ static func apply_toon_to_model(root: Node) -> void:
 
 ## Spawn a floating damage number above a target entity.
 ## caller is needed because static functions can't call get_tree().
-static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO) -> void:
-	var target_node = WorldState.get_entity(target_id)
-	if not target_node:
-		return
+static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO, target_pos: Vector3 = Vector3.INF) -> void:
+	# Use explicit target_pos if provided, otherwise look up from WorldState.
+	# This handles the case where the target is already unregistered (e.g. killing blow).
+	if target_pos == Vector3.INF:
+		var target_node = WorldState.get_entity(target_id)
+		if not target_node:
+			return
+		target_pos = target_node.global_position
 	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
 	if not dmg_scene:
 		return
@@ -187,13 +191,13 @@ static func spawn_damage_number(caller: Node, target_id: String, damage: int, co
 	# Compute direction away from attacker on XZ plane
 	var direction := Vector3.ZERO
 	if attacker_pos.length_squared() > 0.01:
-		direction = target_node.global_position - attacker_pos
+		direction = target_pos - attacker_pos
 		direction.y = 0
 		if direction.length_squared() > 0.01:
 			direction = direction.normalized()
 	# Spawn offset to the side (in the away-from-attacker direction), not on top of target
 	var spawn_offset := direction * 1.0 if direction.length_squared() > 0.01 else Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
-	dmg.global_position = target_node.global_position + Vector3(0, 1.5, 0) + spawn_offset
+	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
 	dmg.setup(damage, color, direction)
 
 ## Flash-hit the target entity (calls its flash_hit() method if available).
