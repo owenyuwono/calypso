@@ -74,6 +74,7 @@ func _send_request(pool_entry: Dictionary, req_id: String, body: Dictionary) -> 
 	var json_body := JSON.stringify(body)
 	var url := OLLAMA_BASE_URL + "/api/chat"
 	var headers := ["Content-Type: application/json"]
+	print("[LLM] Sending request '%s' to %s (model: %s)" % [req_id, url, body.get("model", "?")])
 
 	# Disconnect any previous signal connections
 	if http.request_completed.is_connected(_on_http_completed):
@@ -82,6 +83,7 @@ func _send_request(pool_entry: Dictionary, req_id: String, body: Dictionary) -> 
 
 	var err := http.request(url, headers, HTTPClient.METHOD_POST, json_body)
 	if err != OK:
+		push_warning("[LLM] HTTP request '%s' failed to start: error %d" % [req_id, err])
 		_finish_request(pool_entry, req_id, {}, "HTTP request failed with error %d" % err)
 
 func _on_http_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, pool_entry: Dictionary) -> void:
@@ -105,6 +107,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		return
 
 	var response: Dictionary = json.data if json.data is Dictionary else {}
+	print("[LLM] Request '%s' completed successfully" % req_id)
 	_finish_request(pool_entry, req_id, response, "")
 
 func _finish_request(pool_entry: Dictionary, req_id: String, response: Dictionary, error: String) -> void:
@@ -115,4 +118,5 @@ func _finish_request(pool_entry: Dictionary, req_id: String, response: Dictionar
 	if error.is_empty():
 		request_completed.emit(req_id, response)
 	else:
+		push_warning("[LLM] Request '%s' failed: %s" % [req_id, error])
 		request_failed.emit(req_id, error)

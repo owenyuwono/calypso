@@ -1,9 +1,10 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scenes/game_world/game_world.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/npc_base.tscn" id="2_npc"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/shop_npc.tscn" id="3_shop"]
 [ext_resource type="Script" path="res://scenes/monsters/monster_spawner.gd" id="4_spawner"]
+[ext_resource type="Script" path="res://scenes/ui/npc_debug_overlay.gd" id="5_debug_overlay"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
 parsed_geometry_type = 0
@@ -243,7 +244,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, 2)
 npc_id = "kael"
 npc_name = "Kael"
 personality = "Bold and confident swordsman. Loves a good fight. Charges headfirst into danger. Competitive but friendly. Talks about his combat feats."
-starting_goal = "Hunt monsters in the field to get stronger"
+starting_goal = "idle"
 npc_color = Color(0.15, 0.2, 0.6, 1)
 model_path = "res://assets/models/characters/Knight.glb"
 
@@ -252,9 +253,54 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 2)
 npc_id = "lyra"
 npc_name = "Lyra"
 personality = "Cautious and analytical mage. Prefers to prepare before acting. Studies monsters before engaging. Practical, slightly sarcastic. Values efficiency over bravado."
-starting_goal = "Prepare supplies then hunt monsters efficiently"
+starting_goal = "idle"
 npc_color = Color(0.45, 0.15, 0.55, 1)
 model_path = "res://assets/models/characters/Mage.glb"
+
+[node name="Bjorn" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, 6)
+npc_id = "bjorn"
+npc_name = "Bjorn"
+personality = "Boisterous and loud. Loves telling stories about legendary battles. Friendly but competitive."
+starting_goal = "idle"
+npc_color = Color(0.8, 0.4, 0.1, 1)
+model_path = "res://assets/models/characters/Barbarian.glb"
+
+[node name="Sera" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 6)
+npc_id = "sera"
+npc_name = "Sera"
+personality = "Quick-witted and sly. Always looking for a deal. Gossips about other adventurers."
+starting_goal = "idle"
+npc_color = Color(0.1, 0.6, 0.5, 1)
+model_path = "res://assets/models/characters/Rogue.glb"
+
+[node name="Thane" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -4)
+npc_id = "thane"
+npc_name = "Thane"
+personality = "Stoic and honorable. Speaks formally. Gives unsolicited tactical advice."
+starting_goal = "idle"
+npc_color = Color(0.7, 0.15, 0.15, 1)
+model_path = "res://assets/models/characters/Knight.glb"
+
+[node name="Mira" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -4)
+npc_id = "mira"
+npc_name = "Mira"
+personality = "Cheerful and curious. Asks lots of questions. Fascinated by everything."
+starting_goal = "idle"
+npc_color = Color(0.7, 0.2, 0.5, 1)
+model_path = "res://assets/models/characters/Mage.glb"
+
+[node name="Dusk" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
+npc_id = "dusk"
+npc_name = "Dusk"
+personality = "Mysterious and quiet. Speaks in short sentences. Dry humor."
+starting_goal = "idle"
+npc_color = Color(0.3, 0.3, 0.35, 1)
+model_path = "res://assets/models/characters/Rogue.glb"
 
 ; === MONSTER SPAWNERS ===
 [node name="MonsterSpawners" type="Node3D" parent="."]
@@ -330,3 +376,6 @@ script = ExtResource("4_spawner")
 monster_type = "dark_mage"
 spawn_count = 3
 spawn_radius = 5.0
+
+[node name="NPCDebugOverlay" type="Node3D" parent="."]
+script = ExtResource("5_debug_overlay")

@@ -1,8 +1,7 @@
 extends Control
-## Toggle button bar for Debug, Status, and Skills panels.
+## Toggle button bar for Status and Skills panels.
 ## Anchored top-right below the minimap.
 
-var debug_panel: Control
 var status_panel: Control
 var skill_panel: Control
 var chat_input: Control
@@ -11,7 +10,6 @@ var _buttons: Dictionary = {}  # key -> Button
 var _hbox: HBoxContainer
 
 const BUTTON_DEFS: Array = [
-	{"key": "debug", "label": "Debug", "hint": "D"},
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
 ]
@@ -112,7 +110,6 @@ func _on_button_pressed(key: String) -> void:
 
 func _get_panel(key: String) -> Control:
 	match key:
-		"debug": return debug_panel
 		"status": return status_panel
 		"skills": return skill_panel
 	return null
