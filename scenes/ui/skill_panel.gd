@@ -44,7 +44,7 @@ func _build_ui() -> void:
 	# Draggable title bar
 	var drag_handle := DragHandle.new()
 	drag_handle.setup(_panel, "Skills")
-	drag_handle.close_pressed.connect(_toggle)
+	drag_handle.close_pressed.connect(toggle)
 	vbox.add_child(drag_handle)
 
 	# Skill points label
@@ -68,9 +68,11 @@ func _build_ui() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_skills"):
-		_toggle()
+		if get_viewport().gui_get_focus_owner() is LineEdit:
+			return
+		toggle()
 
-func _toggle() -> void:
+func toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:

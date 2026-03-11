@@ -673,7 +673,7 @@ func _get_hit_delay(anim_name: String) -> float:
 	return 0.4
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage)
+	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position)
 
 func _flash_target(target_id: String) -> void:
 	ModelHelper.flash_target(target_id)

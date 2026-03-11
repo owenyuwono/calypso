@@ -7,42 +7,12 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 @onready var title_label: Label = $Panel/MarginContainer/VBoxContainer/Title
 @onready var panel: Panel = $Panel
 
-var _visible: bool = true
-var _expanded: bool = true
+var _visible: bool = false
 var _update_timer: float = 0.0
-var _minimize_button: Button
-var _collapsed_height: float = 50.0
-var _full_height: float = 600.0
 const UPDATE_INTERVAL: float = 0.5
 
 func _ready() -> void:
 	visible = _visible
-	_full_height = offset_bottom
-
-	# Reparent title into an HBoxContainer with a minimize button
-	var vbox := title_label.get_parent()
-	var hbox := HBoxContainer.new()
-	hbox.name = "TitleBar"
-
-	var title_index := title_label.get_index()
-	vbox.remove_child(title_label)
-	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(title_label)
-
-	_minimize_button = Button.new()
-	_minimize_button.text = "\u2212"
-	_minimize_button.custom_minimum_size = Vector2(30, 0)
-	_minimize_button.pressed.connect(_toggle_expand)
-	hbox.add_child(_minimize_button)
-
-	vbox.add_child(hbox)
-	vbox.move_child(hbox, title_index)
-
-func _toggle_expand() -> void:
-	_expanded = not _expanded
-	content_label.visible = _expanded
-	_minimize_button.text = "\u2212" if _expanded else "+"
-	offset_bottom = _full_height if _expanded else _collapsed_height
 
 func _process(delta: float) -> void:
 	_update_timer += delta
@@ -51,9 +21,17 @@ func _process(delta: float) -> void:
 		_refresh()
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_F1:
-		_visible = not _visible
-		visible = _visible
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_D:
+		if get_viewport().gui_get_focus_owner() is LineEdit:
+			return
+		toggle()
+
+func toggle() -> void:
+	_visible = not _visible
+	visible = _visible
+
+func is_open() -> bool:
+	return _visible
 
 func _refresh() -> void:
 	var text := ""
