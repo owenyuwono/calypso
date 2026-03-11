@@ -491,7 +491,7 @@ func _update_hp_bar() -> void:
 	_hp_bar.visible = hp < max_hp
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2))
+	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2), global_position)
 
 func _flash_target(target_id: String) -> void:
 	ModelHelper.flash_target(target_id)
