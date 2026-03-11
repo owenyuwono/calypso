@@ -40,7 +40,7 @@ func setup(target: Control, title_text: String, extra_right: Control = null) -> 
 	_title_label = Label.new()
 	_title_label.text = title_text
 	_title_label.add_theme_font_size_override("font_size", 18)
-	_title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
+	_title_label.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
 	_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(_title_label)
@@ -56,10 +56,7 @@ func setup(target: Control, title_text: String, extra_right: Control = null) -> 
 	close_btn.add_theme_font_size_override("font_size", 14)
 	var btn_style := StyleBoxFlat.new()
 	btn_style.bg_color = Color(0.3, 0.15, 0.15, 0.8)
-	btn_style.corner_radius_top_left = 3
-	btn_style.corner_radius_top_right = 3
-	btn_style.corner_radius_bottom_left = 3
-	btn_style.corner_radius_bottom_right = 3
+	UIHelper.set_corner_radius(btn_style, 3)
 	btn_style.content_margin_left = 4
 	btn_style.content_margin_right = 4
 	btn_style.content_margin_top = 2
@@ -67,10 +64,7 @@ func setup(target: Control, title_text: String, extra_right: Control = null) -> 
 	close_btn.add_theme_stylebox_override("normal", btn_style)
 	var btn_hover := StyleBoxFlat.new()
 	btn_hover.bg_color = Color(0.5, 0.2, 0.2, 0.9)
-	btn_hover.corner_radius_top_left = 3
-	btn_hover.corner_radius_top_right = 3
-	btn_hover.corner_radius_bottom_left = 3
-	btn_hover.corner_radius_bottom_right = 3
+	UIHelper.set_corner_radius(btn_hover, 3)
 	btn_hover.content_margin_left = 4
 	btn_hover.content_margin_right = 4
 	btn_hover.content_margin_top = 2

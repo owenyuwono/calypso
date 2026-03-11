@@ -66,7 +66,7 @@ func _build_ui() -> void:
 	_gold_label = Label.new()
 	_gold_label.text = "100 G"
 	_gold_label.add_theme_font_size_override("font_size", 16)
-	_gold_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	top_row.add_child(_gold_label)
 
 	# HP bar
@@ -126,27 +126,15 @@ func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, 
 	var bg_style := StyleBoxFlat.new()
 	bg_style.bg_color = bg_color
 	bg_style.border_color = bg_border
-	bg_style.border_width_left = 1
-	bg_style.border_width_right = 1
-	bg_style.border_width_top = 1
-	bg_style.border_width_bottom = 1
-	bg_style.corner_radius_top_left = 3
-	bg_style.corner_radius_top_right = 3
-	bg_style.corner_radius_bottom_left = 3
-	bg_style.corner_radius_bottom_right = 3
+	UIHelper.set_border_width(bg_style, 1)
+	UIHelper.set_corner_radius(bg_style, 3)
 	bar.add_theme_stylebox_override("background", bg_style)
 
 	var fill_style := StyleBoxFlat.new()
 	fill_style.bg_color = fill_color
 	fill_style.border_color = fill_border
-	fill_style.border_width_left = 1
-	fill_style.border_width_right = 1
-	fill_style.border_width_top = 1
-	fill_style.border_width_bottom = 1
-	fill_style.corner_radius_top_left = 3
-	fill_style.corner_radius_top_right = 3
-	fill_style.corner_radius_bottom_left = 3
-	fill_style.corner_radius_bottom_right = 3
+	UIHelper.set_border_width(fill_style, 1)
+	UIHelper.set_corner_radius(fill_style, 3)
 	bar.add_theme_stylebox_override("fill", fill_style)
 
 	return bar

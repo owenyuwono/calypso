@@ -362,14 +362,7 @@ func enter_combat(target_id: String) -> void:
 	change_state(STATE_COMBAT)
 
 func _update_hp_bar() -> void:
-	if not _hp_bar:
-		return
-	var data := WorldState.get_entity_data(npc_id)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
-	if _hp_bar.has_method("update_bar"):
-		_hp_bar.update_bar(hp, max_hp)
-	_hp_bar.visible = hp < max_hp
+	ModelHelper.update_entity_hp_bar(_hp_bar, npc_id)
 
 # --- Death / Respawn ---
 
@@ -456,9 +449,7 @@ func flash_hit() -> void:
 	ModelHelper.flash_hit(_overlay_material, self)
 
 func _get_hit_delay(anim_name: String) -> float:
-	if _anim_player and _anim_player.has_animation(anim_name):
-		return _anim_player.get_animation(anim_name).length * 0.5
-	return 0.4
+	return ModelHelper.get_hit_delay(_anim_player, anim_name)
 
 func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
 	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position, target_pos)

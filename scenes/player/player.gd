@@ -143,10 +143,7 @@ func _setup_tooltip() -> void:
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.1, 0.1, 0.8)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	UIHelper.set_corner_radius(style, 4)
 	style.content_margin_left = 8
 	style.content_margin_right = 8
 	style.content_margin_top = 4
@@ -616,20 +613,13 @@ func _send_message_to_npc(text: String, npc_id: String, npc_node: Node3D) -> voi
 		brain.request_reactive_response("player", text)
 
 func _open_shop(shop_id: String) -> void:
-	if shop_panel and shop_panel.has_method("open_shop"):
+	if shop_panel:
 		shop_panel.open_shop(shop_id)
 
 func _is_ui_open() -> bool:
-	if shop_panel and shop_panel.has_method("is_open") and shop_panel.is_open():
-		return true
-	if inventory_panel and inventory_panel.has_method("is_open") and inventory_panel.is_open():
-		return true
-	if status_panel and status_panel.has_method("is_open") and status_panel.is_open():
-		return true
-	if chat_input and chat_input.is_open():
-		return true
-	if skill_panel and skill_panel.has_method("is_open") and skill_panel.is_open():
-		return true
+	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel]:
+		if panel and panel.is_open():
+			return true
 	return false
 
 # --- Death / Respawn ---
@@ -647,8 +637,6 @@ func _die() -> void:
 	_cancel_attack()
 	_stop_navigation()
 	velocity = Vector3.ZERO
-	_ring_target_id = ""
-	_hover_ring.visible = false
 	_cursor_manager.reset()
 
 	# Lose 10% gold
@@ -690,14 +678,7 @@ func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> voi
 		_update_hp_bar()
 
 func _update_hp_bar() -> void:
-	if not _hp_bar:
-		return
-	var data := WorldState.get_entity_data("player")
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
-	if _hp_bar.has_method("update_bar"):
-		_hp_bar.update_bar(hp, max_hp)
-	_hp_bar.visible = hp < max_hp
+	ModelHelper.update_entity_hp_bar(_hp_bar, "player")
 
 func flash_hit() -> void:
 	if not _overlay_material:
@@ -705,9 +686,7 @@ func flash_hit() -> void:
 	ModelHelper.flash_hit(_overlay_material, self)
 
 func _get_hit_delay(anim_name: String) -> float:
-	if _anim_player and _anim_player.has_animation(anim_name):
-		return _anim_player.get_animation(anim_name).length * 0.5
-	return 0.4
+	return ModelHelper.get_hit_delay(_anim_player, anim_name)
 
 func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
 	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position, target_pos)
@@ -719,7 +698,7 @@ func _try_use_hotbar_slot(slot: int) -> void:
 	var skill_id: String = hotbar[slot]
 	if skill_id.is_empty():
 		return
-	if skill_hotbar and skill_hotbar.has_method("is_on_cooldown") and skill_hotbar.is_on_cooldown(skill_id):
+	if skill_hotbar and skill_hotbar.is_on_cooldown(skill_id):
 		return
 	_use_skill(skill_id)
 
@@ -754,7 +733,7 @@ func _use_skill(skill_id: String) -> void:
 		_pending_hit = false
 		# Start cooldown
 		var cooldown := SkillDatabase.get_effective_cooldown(skill_id, skill_level)
-		if skill_hotbar and skill_hotbar.has_method("start_cooldown"):
+		if skill_hotbar:
 			skill_hotbar.start_cooldown(skill_id, cooldown)
 
 func _execute_skill_hit() -> void:

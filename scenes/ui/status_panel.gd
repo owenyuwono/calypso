@@ -75,7 +75,11 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Stats section header
-	vbox.add_child(UIHelper.create_section_header("Stats"))
+	var stats_header := Label.new()
+	stats_header.text = "Stats"
+	stats_header.add_theme_font_size_override("font_size", 14)
+	stats_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
+	vbox.add_child(stats_header)
 
 	# HP row
 	var hp_row := _create_stat_row("HP")
@@ -107,7 +111,11 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Equipment section header
-	vbox.add_child(UIHelper.create_section_header("Equipment"))
+	var equip_header := Label.new()
+	equip_header.text = "Equipment"
+	equip_header.add_theme_font_size_override("font_size", 14)
+	equip_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
+	vbox.add_child(equip_header)
 
 	# Weapon row
 	var weapon_row := _create_equipment_row("Weapon")
@@ -126,7 +134,11 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# Progression section header
-	vbox.add_child(UIHelper.create_section_header("Progression"))
+	var prog_header := Label.new()
+	prog_header.text = "Progression"
+	prog_header.add_theme_font_size_override("font_size", 14)
+	prog_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
+	vbox.add_child(prog_header)
 
 	# XP bar
 	var xp_row := HBoxContainer.new()
@@ -144,17 +156,11 @@ func _build_ui() -> void:
 	_xp_bar.show_percentage = false
 	var bar_bg := StyleBoxFlat.new()
 	bar_bg.bg_color = Color(0.15, 0.15, 0.2)
-	bar_bg.corner_radius_top_left = 2
-	bar_bg.corner_radius_top_right = 2
-	bar_bg.corner_radius_bottom_left = 2
-	bar_bg.corner_radius_bottom_right = 2
+	UIHelper.set_corner_radius(bar_bg, 2)
 	_xp_bar.add_theme_stylebox_override("background", bar_bg)
 	var bar_fill := StyleBoxFlat.new()
 	bar_fill.bg_color = Color(0.3, 0.6, 1.0)
-	bar_fill.corner_radius_top_left = 2
-	bar_fill.corner_radius_top_right = 2
-	bar_fill.corner_radius_bottom_left = 2
-	bar_fill.corner_radius_bottom_right = 2
+	UIHelper.set_corner_radius(bar_fill, 2)
 	_xp_bar.add_theme_stylebox_override("fill", bar_fill)
 	xp_row.add_child(_xp_bar)
 
@@ -176,7 +182,7 @@ func _build_ui() -> void:
 
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 14)
-	_gold_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	gold_row.add_child(_gold_label)
 
 
@@ -212,7 +218,7 @@ func _create_equipment_row(slot_name: String) -> Dictionary:
 
 	var item_lbl := Label.new()
 	item_lbl.add_theme_font_size_override("font_size", 14)
-	item_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	item_lbl.add_theme_color_override("font_color", UIHelper.COLOR_EQUIPMENT)
 	item_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(item_lbl)
 
@@ -233,11 +239,8 @@ func toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
-		_center_panel()
+		UIHelper.center_panel(_panel)
 		_refresh()
-
-func _center_panel() -> void:
-	UIHelper.center_panel(_panel)
 
 func _refresh() -> void:
 	if not _is_open:

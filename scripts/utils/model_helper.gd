@@ -250,3 +250,20 @@ static func face_direction(model: Node3D, dir: Vector3) -> void:
 	if model and dir.length_squared() > 0.01:
 		model.rotation.y = atan2(dir.x, dir.z)
 
+## Get the delay before a hit lands, based on animation length (50% mark).
+static func get_hit_delay(anim_player: AnimationPlayer, anim_name: String) -> float:
+	if anim_player and anim_player.has_animation(anim_name):
+		return anim_player.get_animation(anim_name).length * 0.5
+	return 0.4
+
+## Update an entity's HP bar from WorldState data.
+static func update_entity_hp_bar(hp_bar: Node, entity_id: String) -> void:
+	if not hp_bar:
+		return
+	var data := WorldState.get_entity_data(entity_id)
+	var hp: int = data.get("hp", 0)
+	var max_hp: int = data.get("max_hp", 1)
+	if hp_bar.has_method("update_bar"):
+		hp_bar.update_bar(hp, max_hp)
+	hp_bar.visible = hp < max_hp
+
