@@ -9,10 +9,10 @@ const HOVER_RAY_LENGTH: float = 100.0
 const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
 const MODEL_SCALE: float = 0.7
 
+const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
@@ -47,15 +47,8 @@ var _pending_skill_id: String = ""
 var _pending_skill_anim: String = ""
 var _skill_hit_time: float = 0.0
 
-# 3D Model
-var _model: Node3D
-var _mesh_instances: Array[MeshInstance3D] = []
-var _overlay_material: StandardMaterial3D
-var _anim_player: AnimationPlayer
-var _current_anim: String = ""
-
-# HP bar above player
-var _hp_bar: Node3D
+# Visuals component
+var _visuals: Node
 
 # UI references (set by main scene setup)
 var shop_panel: Control
@@ -77,7 +70,9 @@ func _exit_tree() -> void:
 		_cursor_manager.cleanup()
 
 func _ready() -> void:
-	_setup_model()
+	_visuals = EntityVisuals.new()
+	add_child(_visuals)
+	_visuals.setup_model("res://assets/models/characters/Knight.glb", MODEL_SCALE, Color(0.2, 0.4, 0.7))
 
 	var stats := LevelData.BASE_PLAYER_STATS.duplicate()
 	stats["type"] = "player"
@@ -92,46 +87,14 @@ func _ready() -> void:
 	_cursor_manager = CursorManager.new()
 	_setup_hover_ring()
 	_setup_tooltip()
-	_setup_hp_bar()
 	_setup_dialogue_bubble()
+
+	_visuals.setup_hp_bar()
+	_visuals.set_hp_bar_visible(false)
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
-
-func _setup_model() -> void:
-	var result := ModelHelper.instantiate_model("res://assets/models/characters/Knight.glb", MODEL_SCALE)
-	if result.model == null:
-		push_warning("Player: Could not load Knight model, using fallback")
-		_create_fallback_mesh()
-		return
-
-	_model = result.model
-	add_child(_model)
-	_anim_player = result.anim_player
-
-	_mesh_instances = ModelHelper.find_mesh_instances(_model)
-	_overlay_material = ModelHelper.create_overlay_material()
-	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
-	ModelHelper.apply_toon_to_model(_model)
-
-	if _anim_player:
-		_play_anim("Idle")
-
-func _create_fallback_mesh() -> void:
-	var result := ModelHelper.create_fallback_mesh(self, Color(0.2, 0.4, 0.7))
-	_model = result.model
-	_mesh_instances = result.mesh_instances
-	_overlay_material = result.overlay
-
-func _play_anim(anim_name: String, force: bool = false) -> void:
-	if not _anim_player:
-		return
-	if not force and _current_anim == anim_name and _anim_player.is_playing():
-		return
-	if _anim_player.has_animation(anim_name):
-		_anim_player.play(anim_name)
-		_current_anim = anim_name
 
 func _setup_tooltip() -> void:
 	var canvas_layer := CanvasLayer.new()
@@ -214,10 +177,6 @@ func _show_bubble(text: String) -> void:
 	if _dialogue_bubble:
 		_dialogue_bubble.show_dialogue(text)
 
-func _setup_hp_bar() -> void:
-	_hp_bar = ModelHelper.create_hp_bar(self)
-	_hp_bar.visible = false
-
 func _physics_process(delta: float) -> void:
 	if _is_dead:
 		_respawn_timer -= delta
@@ -240,7 +199,7 @@ func _physics_process(delta: float) -> void:
 		dir = dir.normalized()
 		velocity.x = dir.x * SPEED
 		velocity.z = dir.z * SPEED
-		ModelHelper.face_direction(_model, dir)
+		_visuals.face_direction(dir)
 		is_moving = true
 	else:
 		if _is_navigating:
@@ -262,9 +221,9 @@ func _physics_process(delta: float) -> void:
 	# Update animation
 	if _attack_target.is_empty():
 		if is_moving:
-			_play_anim("Walking_A")
+			_visuals.play_anim("Walking_A")
 		else:
-			_play_anim("Idle")
+			_visuals.play_anim("Idle")
 
 func _process(delta: float) -> void:
 	if _is_dead:
@@ -309,8 +268,8 @@ func _process_combat(delta: float) -> bool:
 			dir = dir.normalized()
 			velocity.x = dir.x * SPEED
 			velocity.z = dir.z * SPEED
-			ModelHelper.face_direction(_model, dir)
-			_play_anim("Running_A")
+			_visuals.face_direction(dir)
+			_visuals.play_anim("Running_A")
 		return true
 
 	# In range — stop and auto-attack
@@ -318,12 +277,13 @@ func _process_combat(delta: float) -> bool:
 	velocity.z = 0.0
 	# Face the target
 	var to_target := (target_node.global_position - global_position).normalized()
-	ModelHelper.face_direction(_model, to_target)
+	_visuals.face_direction(to_target)
 
 	# Check animation position for skill hit
+	var anim_player: AnimationPlayer = _visuals.get_anim_player()
 	if _pending_skill_hit:
-		if _anim_player and _anim_player.current_animation == _pending_skill_anim:
-			if _anim_player.current_animation_position >= _skill_hit_time:
+		if anim_player and anim_player.current_animation == _pending_skill_anim:
+			if anim_player.current_animation_position >= _skill_hit_time:
 				_pending_skill_hit = false
 				_execute_skill_hit()
 		else:
@@ -335,8 +295,8 @@ func _process_combat(delta: float) -> bool:
 
 	# Check animation position for hit event before starting new attacks
 	if _pending_hit:
-		if _anim_player and _anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if _anim_player.current_animation_position >= _hit_time:
+		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
+			if anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_perform_attack()
 		else:
@@ -352,9 +312,9 @@ func _process_combat(delta: float) -> bool:
 		_attack_timer += delta
 		if _attack_timer >= attack_speed:
 			_attack_timer = 0.0
-			_play_anim("1H_Melee_Attack_Chop", true)
+			_visuals.play_anim("1H_Melee_Attack_Chop", true)
 			_pending_hit = true
-			_hit_time = _get_hit_delay("1H_Melee_Attack_Chop")
+			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
 	return false
 
 func _perform_attack() -> void:
@@ -364,8 +324,8 @@ func _perform_attack() -> void:
 	var target_node := WorldState.get_entity(_attack_target)
 	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage("player", _attack_target)
-	_spawn_damage_number(_attack_target, damage, target_pos)
-	ModelHelper.flash_target(_attack_target)
+	_visuals.spawn_damage_number(_attack_target, damage, Color(1, 1, 1), target_pos)
+	_visuals.flash_target(_attack_target)
 
 func _cancel_attack() -> void:
 	_attack_target = ""
@@ -645,14 +605,14 @@ func _die() -> void:
 	WorldState.remove_gold("player", lost)
 
 	# Visual: death animation + fade out
-	_play_anim("Death_A")
-	ModelHelper.fade_out(_mesh_instances, self)
+	_visuals.play_anim("Death_A")
+	_visuals.fade_out()
 
 	_respawn_timer = 3.0
 
 func _respawn() -> void:
 	_is_dead = false
-	_current_anim = ""
+	_visuals.reset_anim()
 	# Teleport to town
 	global_position = Vector3(0, 1, 0)
 	velocity = Vector3.ZERO
@@ -662,34 +622,25 @@ func _respawn() -> void:
 	WorldState.set_entity_data("player", "hp", max_hp)
 
 	# Visual: restore materials and play idle
-	ModelHelper.restore_materials(_mesh_instances)
-	_play_anim("Idle")
+	_visuals.restore_materials()
+	_visuals.play_anim("Idle")
 
 	GameEvents.entity_respawned.emit("player")
-	_update_hp_bar()
+	_visuals.update_hp_bar("player")
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
-		_update_hp_bar()
+		_visuals.update_hp_bar("player")
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == "player":
-		_update_hp_bar()
+		_visuals.update_hp_bar("player")
 
-func _update_hp_bar() -> void:
-	ModelHelper.update_entity_hp_bar(_hp_bar, "player")
+# --- Duck typing delegations ---
 
 func flash_hit() -> void:
-	if not _overlay_material:
-		return
-	ModelHelper.flash_hit(_overlay_material, self)
-
-func _get_hit_delay(anim_name: String) -> float:
-	return ModelHelper.get_hit_delay(_anim_player, anim_name)
-
-func _spawn_damage_number(target_id: String, damage: int, target_pos: Vector3 = Vector3.INF) -> void:
-	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 1, 1), global_position, target_pos)
+	_visuals.flash_hit()
 
 func _try_use_hotbar_slot(slot: int) -> void:
 	var hotbar: Array = WorldState.get_hotbar("player")
@@ -727,8 +678,8 @@ func _use_skill(skill_id: String) -> void:
 		_pending_skill_damage = raw_damage
 		_pending_skill_id = skill_id
 		_pending_skill_anim = anim_name
-		_play_anim(anim_name, true)
-		_skill_hit_time = _get_hit_delay(anim_name)
+		_visuals.play_anim(anim_name, true)
+		_skill_hit_time = _visuals.get_hit_delay(anim_name)
 		_attack_timer = 0.0
 		_pending_hit = false
 		# Start cooldown
@@ -744,8 +695,8 @@ func _execute_skill_hit() -> void:
 	var target_node := WorldState.get_entity(_attack_target)
 	var target_pos := target_node.global_position if target_node else global_position
 	var actual_damage := WorldState.deal_damage_amount("player", _attack_target, _pending_skill_damage)
-	_spawn_damage_number(_attack_target, actual_damage, target_pos)
-	ModelHelper.flash_target(_attack_target)
+	_visuals.spawn_damage_number(_attack_target, actual_damage, Color(1, 1, 1), target_pos)
+	_visuals.flash_target(_attack_target)
 	GameEvents.skill_used.emit("player", _pending_skill_id)
 	_pending_skill_damage = 0
 	_pending_skill_id = ""
