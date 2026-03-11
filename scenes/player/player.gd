@@ -14,6 +14,8 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -55,13 +57,13 @@ var status_panel: Control
 var chat_input: Control
 var skill_hotbar: Control
 var skill_panel: Control
+var npc_info_panel: Control
 
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
 
 # Pending NPC conversation (set when player clicks NPC, cleared after chat sent)
 var _pending_talk_target_id: String = ""
-var _pending_talk_target_node: Node3D
 
 func _exit_tree() -> void:
 	if _cursor_manager:
@@ -150,15 +152,26 @@ func _setup_hover_ring() -> void:
 func show_chat(text: String) -> void:
 	_show_bubble(text)
 	# If there's a pending NPC conversation, send the message to them
-	if not _pending_talk_target_id.is_empty() and _pending_talk_target_node and is_instance_valid(_pending_talk_target_node):
+	if not _pending_talk_target_id.is_empty():
 		var npc_id := _pending_talk_target_id
-		var npc_node := _pending_talk_target_node
+		var npc_node := WorldState.get_entity(npc_id)
 		_pending_talk_target_id = ""
-		_pending_talk_target_node = null
-		_send_message_to_npc(text, npc_id, npc_node)
-		return
-	_pending_talk_target_id = ""
-	_pending_talk_target_node = null
+		if npc_node and is_instance_valid(npc_node):
+			_send_message_to_npc(text, npc_id, npc_node)
+			return
+	# Proximity: auto-target nearest NPC if within range
+	_send_to_nearby_npc(text)
+
+func _send_to_nearby_npc(text: String) -> void:
+	var nearby := WorldState.get_nearby_entities(global_position, INTERACT_RANGE)
+	for entry in nearby:
+		if entry.id == "player":
+			continue
+		var data := WorldState.get_entity_data(entry.id)
+		var etype: String = data.get("type", "")
+		if etype == "npc":
+			_send_message_to_npc(text, entry.id, entry.node)
+			return
 
 func _show_bubble(text: String) -> void:
 	if _dialogue_bubble:
@@ -308,8 +321,10 @@ func _perform_attack() -> void:
 	if not WorldState.is_alive(_attack_target):
 		_cancel_attack()
 		return
+	var target_node := WorldState.get_entity(_attack_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage("player", _attack_target)
-	_visuals.spawn_damage_number(_attack_target, damage)
+	_visuals.spawn_damage_number(_attack_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
 
 func _cancel_attack() -> void:
@@ -346,8 +361,8 @@ func _on_arrived() -> void:
 	elif etype == "shop_npc":
 		_open_shop(_interact_target)
 	elif etype == "npc":
-		if target_node and is_instance_valid(target_node):
-			_talk_to_npc(_interact_target, target_node)
+		if npc_info_panel and npc_info_panel.has_method("show_npc"):
+			npc_info_panel.show_npc(_interact_target)
 
 	_interact_target = ""
 
@@ -396,9 +411,23 @@ func _process_hover() -> void:
 		elif entity_type == "loot_drop":
 			display_name += " [Loot]"
 			_cursor_manager.set_cursor("move")
-		elif entity_type == "shop_npc" or entity_type == "npc":
-			if entity_type == "shop_npc":
-				display_name += " [Shop]"
+		elif entity_type == "npc":
+			var npc_node := WorldState.get_entity(_hovered_entity_id)
+			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
+			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
+				var trait_summary: String = NpcTraits.get_trait_summary(npc_node.trait_profile)
+				if not trait_summary.is_empty():
+					tooltip_lines.append(trait_summary)
+			var goal: String = data.get("goal", "idle")
+			tooltip_lines.append(PromptBuilder.get_activity_description(goal))
+			if npc_node and is_instance_valid(npc_node) and "current_mood" in npc_node:
+				var mood: String = npc_node.current_mood
+				if not mood.is_empty() and mood != "neutral":
+					tooltip_lines.append("Mood: %s" % mood)
+			display_name = "\n".join(tooltip_lines)
+			_cursor_manager.set_cursor("talk")
+		elif entity_type == "shop_npc":
+			display_name += " [Shop]"
 			_cursor_manager.set_cursor("talk")
 		else:
 			_cursor_manager.set_cursor("default")
@@ -480,7 +509,9 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
-	# Click on ground: move there, cancel target lock
+	# Click on ground: move there, cancel target lock, close NPC info
+	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
+		npc_info_panel.close()
 	var ground_pos := _raycast_ground()
 	if ground_pos != Vector3.INF:
 		_cancel_attack()
@@ -519,14 +550,17 @@ func _interact_with_nearest() -> void:
 			_open_shop(entry.id)
 			return
 		if etype == "npc":
-			_talk_to_npc(entry.id, entry.node)
+			_command_npc_follow(entry.node)
 			return
+
+func _command_npc_follow(npc_node: Node3D) -> void:
+	if npc_node.has_method("set_goal"):
+		npc_node.set_goal("follow_player")
 
 func _talk_to_npc(target_npc_id: String, target_node: Node3D) -> void:
 	# Open chat input so player can type what they want to say
 	if chat_input and not chat_input.is_open():
 		_pending_talk_target_id = target_npc_id
-		_pending_talk_target_node = target_node
 		chat_input.open()
 		return
 	# Fallback if no chat input available
@@ -658,8 +692,10 @@ func _execute_skill_hit() -> void:
 		return
 	if not WorldState.is_alive(_attack_target):
 		return
+	var target_node := WorldState.get_entity(_attack_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var actual_damage := WorldState.deal_damage_amount("player", _attack_target, _pending_skill_damage)
-	_visuals.spawn_damage_number(_attack_target, actual_damage)
+	_visuals.spawn_damage_number(_attack_target, actual_damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
 	GameEvents.skill_used.emit("player", _pending_skill_id)
 	_pending_skill_damage = 0

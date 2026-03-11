@@ -67,6 +67,118 @@ static func validate(data: Dictionary) -> Dictionary:
 	result.valid = true
 	return result
 
+static func parse_chat(ollama_response: Dictionary) -> Dictionary:
+	var result := {"valid": false, "dialogue": "", "goal": "", "error": ""}
+
+	var message: Dictionary = ollama_response.get("message", {})
+	var content: String = message.get("content", "")
+
+	if content.is_empty():
+		result.error = "Empty response content"
+		return result
+
+	var cleaned := _clean_chat_response(content)
+	if cleaned.is_empty():
+		result.error = "Empty after cleaning"
+		return result
+
+	# Extract goal tag before truncation
+	var goal := _extract_goal_tag(cleaned)
+	if not goal.is_empty():
+		cleaned = cleaned.replace("[GOAL:" + goal + "]", "").strip_edges()
+
+	# Truncate to first sentence if too long
+	if cleaned.length() > 200:
+		var period_pos := cleaned.find(".")
+		if period_pos > 0 and period_pos < 200:
+			cleaned = cleaned.substr(0, period_pos + 1)
+		else:
+			cleaned = cleaned.substr(0, 200) + "..."
+
+	result.valid = true
+	result.dialogue = cleaned
+	result.goal = goal
+	return result
+
+static func _clean_chat_response(text: String) -> String:
+	var cleaned := text.strip_edges()
+
+	# Strip JSON wrapping — if it looks like {"response": "..."} or {"dialogue": "..."}
+	if cleaned.begins_with("{") and cleaned.ends_with("}"):
+		var json := JSON.new()
+		if json.parse(cleaned) == OK and json.data is Dictionary:
+			var data: Dictionary = json.data
+			for key in ["response", "dialogue", "text", "content", "message"]:
+				if data.has(key) and data[key] is String:
+					cleaned = data[key].strip_edges()
+					break
+
+	# Strip surrounding quotes
+	if cleaned.length() >= 2:
+		if (cleaned.begins_with("\"") and cleaned.ends_with("\"")) or \
+		   (cleaned.begins_with("'") and cleaned.ends_with("'")):
+			cleaned = cleaned.substr(1, cleaned.length() - 2).strip_edges()
+
+	# Strip common LLM prefixes
+	for prefix in ["Response:", "Reply:", "Answer:", "Output:"]:
+		if cleaned.begins_with(prefix):
+			cleaned = cleaned.substr(prefix.length()).strip_edges()
+			break
+
+	# Strip NPC name prefixes like "Kael:" or "Lyra:"
+	var colon_pos := cleaned.find(":")
+	if colon_pos > 0 and colon_pos < 20:
+		var before_colon := cleaned.substr(0, colon_pos).strip_edges()
+		# If the part before colon is a single word (likely a name), strip it
+		if " " not in before_colon and before_colon[0] == before_colon[0].to_upper():
+			cleaned = cleaned.substr(colon_pos + 1).strip_edges()
+
+	# Strip *emote* and _emote_ patterns
+	cleaned = _strip_emotes(cleaned)
+
+	# If narration wraps quoted dialogue, extract just the dialogue
+	var quote_start := cleaned.find('"')
+	if quote_start > 0:
+		var quote_end := cleaned.rfind('"')
+		if quote_end > quote_start:
+			cleaned = cleaned.substr(quote_start + 1, quote_end - quote_start - 1).strip_edges()
+
+	# Final: strip any remaining outer quotes
+	if cleaned.length() >= 2:
+		if (cleaned.begins_with('"') and cleaned.ends_with('"')) or \
+		   (cleaned.begins_with("'") and cleaned.ends_with("'")):
+			cleaned = cleaned.substr(1, cleaned.length() - 2).strip_edges()
+
+	return cleaned
+
+const VALID_GOALS: Array = [
+	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
+	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle",
+]
+
+static func _extract_goal_tag(text: String) -> String:
+	var start := text.find("[GOAL:")
+	if start == -1:
+		return ""
+	var end := text.find("]", start + 6)
+	if end == -1:
+		return ""
+	var goal := text.substr(start + 6, end - start - 6).strip_edges().to_lower()
+	if goal in VALID_GOALS:
+		return goal
+	return ""
+
+static func _strip_emotes(text: String) -> String:
+	var result := text
+	# Strip *action* patterns (RP emotes like *grins*, *waves*)
+	while result.find("*") != -1:
+		var start := result.find("*")
+		var end := result.find("*", start + 1)
+		if end == -1:
+			break
+		result = (result.substr(0, start) + result.substr(end + 1)).strip_edges()
+	return result
+
 static func _empty_result() -> Dictionary:
 	return {
 		"valid": false,

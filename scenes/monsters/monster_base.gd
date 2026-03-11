@@ -21,7 +21,6 @@ var aggro_target: String = ""
 var _attack_timer: float = 0.0
 var _wander_timer: float = 0.0
 var _respawn_timer: float = 0.0
-var _death_tween: Tween
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
@@ -325,8 +324,10 @@ func _perform_attack() -> void:
 	if not WorldState.is_alive(aggro_target):
 		_drop_aggro()
 		return
+	var target_node := WorldState.get_entity(aggro_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage(monster_id, aggro_target)
-	_visuals.spawn_damage_number(aggro_target, damage, Color(1, 0.2, 0.2))
+	_visuals.spawn_damage_number(aggro_target, damage, Color(1, 0.2, 0.2), target_pos)
 	_visuals.flash_target(aggro_target)
 
 func _drop_aggro() -> void:
@@ -380,9 +381,7 @@ func _die(killer_id: String) -> void:
 
 	# Death visual: animation + fade
 	_visuals.play_anim("Death_A")
-	if _death_tween:
-		_death_tween.kill()
-	_death_tween = _visuals.fade_out()
+	_visuals.fade_out()
 
 	_visuals.set_hp_bar_visible(false)
 	if name_label:

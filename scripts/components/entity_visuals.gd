@@ -115,8 +115,9 @@ func set_hp_bar_visible(vis: bool) -> void:
 
 # --- Damage / Combat Visuals ---
 
-func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1)) -> void:
-	ModelHelper.spawn_damage_number(get_parent(), target_id, damage, color)
+func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1), target_pos: Vector3 = Vector3.INF) -> void:
+	var parent: Node3D = get_parent()
+	ModelHelper.spawn_damage_number(parent, target_id, damage, color, parent.global_position, target_pos)
 
 func flash_target(target_id: String) -> void:
 	ModelHelper.flash_target(target_id)

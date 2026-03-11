@@ -24,3 +24,13 @@ func _ready() -> void:
 	if player and skill_panel:
 		player.skill_panel = skill_panel
 
+	var npc_info_panel := $UILayer/NpcInfoPanel
+	if player and npc_info_panel:
+		player.npc_info_panel = npc_info_panel
+
+	var panel_toggles := $UILayer/PanelToggles
+	if panel_toggles:
+		panel_toggles.status_panel = status_panel
+		panel_toggles.skill_panel = skill_panel
+		panel_toggles.chat_input = chat_input
+

@@ -14,15 +14,15 @@ const UIHelper = preload("res://scripts/utils/ui_helper.gd")
 func _ready() -> void:
 	_build_ui()
 	# Event-driven updates instead of _process polling
-	GameEvents.entity_damaged.connect(_on_entity_damaged)
-	GameEvents.entity_healed.connect(_on_entity_healed)
-	GameEvents.xp_gained.connect(_on_player_event.bind(""))
+	GameEvents.entity_damaged.connect(func(id, _a, _b, _c): _refresh_if_player(id))
+	GameEvents.entity_healed.connect(func(id, _a, _b): _refresh_if_player(id))
+	GameEvents.xp_gained.connect(func(id, _a): _refresh_if_player(id))
 	GameEvents.level_up.connect(_on_level_up)
 	GameEvents.entity_died.connect(_on_entity_died)
-	GameEvents.entity_respawned.connect(_on_player_event.bind(""))
-	GameEvents.item_purchased.connect(_on_economy_event)
-	GameEvents.item_sold.connect(_on_economy_event)
-	GameEvents.item_looted.connect(_on_economy_event)
+	GameEvents.entity_respawned.connect(func(id): _refresh_if_player(id))
+	GameEvents.item_purchased.connect(func(id, _a, _b): _refresh_if_player(id))
+	GameEvents.item_sold.connect(func(id, _a, _b): _refresh_if_player(id))
+	GameEvents.item_looted.connect(func(id, _a, _b): _refresh_if_player(id))
 	# Initial refresh
 	_refresh_all()
 
@@ -173,24 +173,12 @@ func _refresh_all() -> void:
 	_level_label.text = "Lv. %d" % level
 	_gold_label.text = "%s G" % _format_number(gold)
 
-func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
-	if target_id == "player":
-		_refresh_all()
-
-func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
-	if entity_id == "player":
-		_refresh_all()
-
-func _on_player_event(entity_id: String, _arg: Variant, _extra: Variant = null) -> void:
+func _refresh_if_player(entity_id: String) -> void:
 	if entity_id == "player":
 		_refresh_all()
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == "player" or killer_id == "player":
-		_refresh_all()
-
-func _on_economy_event(entity_id: String, _item_id: String, _amount: int) -> void:
-	if entity_id == "player":
 		_refresh_all()
 
 func _on_level_up(entity_id: String, new_level: int) -> void:

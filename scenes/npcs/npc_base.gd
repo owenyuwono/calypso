@@ -13,6 +13,7 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 @export var npc_color: Color = Color(0.6, 0.3, 0.3, 1.0)
 @export var model_path: String = "res://assets/models/characters/Knight.glb"
 @export var model_scale: float = 0.7
+@export var trait_profile: String = ""
 
 # States as strings to avoid cross-script class_name issues
 const STATE_IDLE: String = "idle"
@@ -29,6 +30,7 @@ var current_goal: String = ""
 var current_action: String = ""
 var current_target: String = ""
 var last_thought: String = ""
+var current_mood: String = ""
 var _suppress_nav_complete: bool = false
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
@@ -49,6 +51,8 @@ var _hit_time: float = 0.0
 const MOVE_SPEED: float = 3.6
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
+const PERSONAL_SPACE: float = 2.5
+const SEPARATION_FORCE: float = 2.0
 
 # Visuals component
 var _visuals: Node
@@ -88,6 +92,30 @@ func _ready() -> void:
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
 
+func _get_separation_velocity() -> Vector3:
+	var sep := Vector3.ZERO
+	for eid in WorldState.entities:
+		if eid == npc_id:
+			continue
+		var data: Dictionary = WorldState.get_entity_data(eid)
+		if data.get("type", "") != "npc":
+			continue
+		if not WorldState.is_alive(eid):
+			continue
+		var other: Node3D = WorldState.get_entity(eid)
+		if not other or not is_instance_valid(other):
+			continue
+		var diff := global_position - other.global_position
+		diff.y = 0.0
+		var dist := diff.length()
+		if dist < 0.01 or dist >= PERSONAL_SPACE:
+			continue
+		# Closer = stronger push (inverse linear)
+		var strength: float = SEPARATION_FORCE * (1.0 - dist / PERSONAL_SPACE)
+		sep += diff.normalized() * strength
+	return sep
+
+
 func _register_with_world() -> void:
 	var stats := LevelData.BASE_ADVENTURER_STATS.duplicate()
 	stats["type"] = "npc"
@@ -117,6 +145,12 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
+
+	# Apply separation force to avoid NPC overlap (not in combat)
+	if current_state != STATE_COMBAT:
+		var sep := _get_separation_velocity()
+		velocity.x += sep.x
+		velocity.z += sep.z
 
 	move_and_slide()
 
@@ -221,8 +255,10 @@ func _process_combat(delta: float) -> bool:
 func _do_combat_attack() -> void:
 	if not WorldState.is_alive(combat_target):
 		return
+	var target_node := WorldState.get_entity(combat_target)
+	var target_pos := target_node.global_position if target_node else global_position
 	var damage := WorldState.deal_damage(npc_id, combat_target)
-	_visuals.spawn_damage_number(combat_target, damage)
+	_visuals.spawn_damage_number(combat_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(combat_target)
 
 	# Occasionally say something in combat
@@ -292,7 +328,10 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		# Target died — loot is handled by monster_base, just exit combat
 		var memory_node = get_node_or_null("NPCMemory")
 		if memory_node:
+			var target_name: String = WorldState.get_entity_data(combat_target).get("name", combat_target)
 			memory_node.add_observation("Killed %s in combat" % combat_target)
+			if memory_node.has_method("add_key_memory") and not memory_node.has_key_memory_type("first_kill"):
+				memory_node.add_key_memory("first_kill", "First kill: defeated a %s" % target_name)
 		combat_target = ""
 		_pending_hit = false
 		change_state(STATE_IDLE)
@@ -311,6 +350,8 @@ func _die() -> void:
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
 		memory_node.add_observation("I died! Lost %d gold." % lost)
+		if memory_node.has_method("add_key_memory"):
+			memory_node.add_key_memory("death", "Died and lost %d gold" % lost)
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")

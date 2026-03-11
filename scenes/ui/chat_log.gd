@@ -87,12 +87,16 @@ func _get_entity_name(entity_id: String) -> String:
 
 # --- Signal handlers ---
 
-func _on_npc_spoke(npc_id: String, dialogue: String, _target_id: String) -> void:
+func _on_npc_spoke(npc_id: String, dialogue: String, target_id: String) -> void:
 	var speaker := _get_entity_name(npc_id)
 	var color := COLOR_NPC_SPEECH
 	if npc_id == "player":
 		color = COLOR_PLAYER_SPEECH
-	_add_message("%s: %s" % [speaker, dialogue], color)
+	if not target_id.is_empty():
+		var target := _get_entity_name(target_id)
+		_add_message("%s → %s: %s" % [speaker, target, dialogue], color)
+	else:
+		_add_message("%s: %s" % [speaker, dialogue], color)
 
 func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	var key := "%s->%s" % [attacker_id, target_id]
