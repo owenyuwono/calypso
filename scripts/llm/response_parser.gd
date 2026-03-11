@@ -88,12 +88,12 @@ static func parse_chat(ollama_response: Dictionary) -> Dictionary:
 		cleaned = cleaned.replace("[GOAL:" + goal + "]", "").strip_edges()
 
 	# Truncate to first sentence if too long
-	if cleaned.length() > 100:
+	if cleaned.length() > 200:
 		var period_pos := cleaned.find(".")
-		if period_pos > 0 and period_pos < 100:
+		if period_pos > 0 and period_pos < 200:
 			cleaned = cleaned.substr(0, period_pos + 1)
 		else:
-			cleaned = cleaned.substr(0, 100) + "..."
+			cleaned = cleaned.substr(0, 200) + "..."
 
 	result.valid = true
 	result.dialogue = cleaned

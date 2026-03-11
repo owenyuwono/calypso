@@ -3,6 +3,7 @@ extends Node
 ## Ticks every 1s when NPC is idle. Drives actions via the existing executor.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 
 const VALID_GOALS: Array = [
 	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
@@ -28,9 +29,9 @@ var brain: Node
 
 var _behavior_timer: float = 0.0
 var _social_cooldown: float = 0.0
-const SOCIAL_COOLDOWN_MIN: float = 30.0
-const SOCIAL_COOLDOWN_MAX: float = 90.0
-const SOCIAL_PROXIMITY: float = 8.0
+const SOCIAL_COOLDOWN_MIN: float = 15.0
+const SOCIAL_COOLDOWN_MAX: float = 45.0
+const SOCIAL_PROXIMITY: float = 12.0
 var _action_in_progress: bool = false
 var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
@@ -41,7 +42,7 @@ func _ready() -> void:
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 	brain = npc.get_node("NPCBrain")
-	_social_cooldown = randf_range(30.0, 60.0)
+	_social_cooldown = randf_range(10.0, 20.0)
 	GameEvents.npc_action_completed.connect(_on_action_completed)
 
 func _process(delta: float) -> void:
@@ -89,13 +90,17 @@ func _check_survival() -> bool:
 	var potion_count: int = WorldState.get_item_count(npc.npc_id, "healing_potion")
 	var gold: int = WorldState.get_gold(npc.npc_id)
 
-	# Use potion if HP < 30% and has one
-	if hp_pct < 0.3 and potion_count > 0:
+	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
+	var potion_threshold: float = 0.45 - (boldness * 0.25)  # bold: 0.20, cautious: 0.45
+	var retreat_threshold: float = 0.55 - (boldness * 0.25)  # bold: 0.30, cautious: 0.55
+
+	# Use potion if HP low and has one
+	if hp_pct < potion_threshold and potion_count > 0:
 		_do_action("use_item", "healing_potion")
 		return true
 
-	# Retreat if HP < 40% and no potions and not in town
-	if hp_pct < 0.4 and potion_count == 0 and not _is_in_town():
+	# Retreat if HP low and no potions and not in town
+	if hp_pct < retreat_threshold and potion_count == 0 and not _is_in_town():
 		npc.set_goal("return_to_town")
 		_do_action("move_to", "TownSquare")
 		return true
@@ -142,6 +147,16 @@ func _check_goal_completion() -> bool:
 					else:
 						npc.set_goal(default_goal)
 					return true
+		"hunt_field", "hunt_dungeon":
+			# Sell loot if inventory has enough materials
+			if _get_total_material_count() >= 5:
+				npc.set_goal("sell_loot")
+				return true
+			# Restock potions if out and can afford
+			var potion_count := WorldState.get_item_count(npc.npc_id, "healing_potion")
+			if potion_count == 0 and WorldState.get_gold(npc.npc_id) >= 40:
+				npc.set_goal("buy_potions")
+				return true
 	return false
 
 # =============================================================================
@@ -426,17 +441,19 @@ func _get_best_upgrade(slot: String) -> String:
 # Social Chat
 # =============================================================================
 
-const CHAT_TOPICS: Array = [
-	"the dungeon monsters you've fought",
-	"your favorite weapon",
-	"a rumor about treasure in the dungeon",
-	"how tough the skeletons are",
-	"the best hunting spots in the field",
-	"whether potions are worth the gold",
-	"the strange sounds coming from the dungeon",
-	"what gear upgrades you're saving for",
-	"a close call you had in battle",
-	"the slimes near town",
+const CHAT_INTENTS: Array = [
+	{"intent": "ask_question", "cue": "Ask {target_name} a question about"},
+	{"intent": "share_story", "cue": "Tell {target_name} about your experience with"},
+	{"intent": "brag", "cue": "Boast to {target_name} about"},
+	{"intent": "complain", "cue": "Complain to {target_name} about"},
+	{"intent": "warn", "cue": "Warn {target_name} about"},
+	{"intent": "gossip", "cue": "Tell {target_name} what you noticed about"},
+	{"intent": "joke", "cue": "Say something funny to {target_name} about"},
+	{"intent": "ask_advice", "cue": "Ask {target_name} for advice about"},
+]
+
+const FALLBACK_TOPICS: Array = [
+	"how the hunting is going", "life in town", "the monsters around here",
 ]
 
 const SOCIAL_GOALS: Array = ["idle", "patrol"]
@@ -445,12 +462,16 @@ func _try_social_chat() -> bool:
 	if _social_cooldown > 0.0:
 		return false
 	if not brain or brain.is_busy():
+		print("[CHAT] %s: skip social — brain busy (llm=%s responding=%s hold=%.1f reading=%s)" % [npc.npc_id, brain._waiting_for_llm, brain._responding_to, brain._conversation_hold, not brain._reading_queue.is_empty()])
 		return false
 	if npc.current_goal not in SOCIAL_GOALS:
 		return false
 
 	var perception := WorldState.get_npc_perception(npc.npc_id, SOCIAL_PROXIMITY)
 	var npcs: Array = perception.get("npcs", [])
+
+	# Build candidate list and sort by affinity (highest first)
+	var candidates: Array = []
 	for n in npcs:
 		var nid: String = n["id"]
 		if nid == "player":
@@ -462,8 +483,81 @@ func _try_social_chat() -> bool:
 			continue
 		if not memory.can_continue_conversation(nid):
 			continue
-		var topic: String = CHAT_TOPICS[randi() % CHAT_TOPICS.size()]
-		if brain.initiate_social_chat(nid, topic):
-			_social_cooldown = randf_range(SOCIAL_COOLDOWN_MIN, SOCIAL_COOLDOWN_MAX)
+		var affinity: float = memory.get_relationship(nid)["affinity"]
+		candidates.append({"id": nid, "affinity": affinity})
+
+	if candidates.is_empty():
+		print("[CHAT] %s: no candidates (saw %d npcs within %.0f)" % [npc.npc_id, npcs.size(), SOCIAL_PROXIMITY])
+
+	# Sort by affinity descending — prefer friends
+	candidates.sort_custom(func(a, b): return a["affinity"] > b["affinity"])
+
+	for c in candidates:
+		var facts: Array = memory.gather_chat_facts(c["id"])
+		# Gate: only chat if there's something interesting to say (weight >= 1.5)
+		var interesting := facts.filter(func(f): return f.get("weight", 0.0) >= 1.5)
+		if interesting.is_empty():
+			continue  # nothing worth chatting about
+		# Filter out recently discussed topics
+		var fresh_facts := facts.filter(func(f): return not memory.is_recent_topic(f.get("topic", "")))
+		if fresh_facts.is_empty():
+			fresh_facts = facts  # fallback: allow repeats if everything was used
+		var picked := _pick_weighted_fact(fresh_facts)
+		var subject: String = picked.get("topic", FALLBACK_TOPICS[randi() % FALLBACK_TOPICS.size()])
+		var intent_data: Dictionary = _pick_chat_intent()
+		var target_name: String = WorldState.get_entity_data(c["id"]).get("name", c["id"])
+		var intent_cue: String = intent_data["cue"].format({"target_name": target_name})
+		print("[CHAT] %s: initiating chat with %s — %s %s" % [npc.npc_id, c["id"], intent_data["intent"], subject])
+		if brain.initiate_social_chat(c["id"], subject, intent_cue, facts):
+			memory.add_recent_topic(subject)
+			var sociability: float = NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
+			var min_cd: float = SOCIAL_COOLDOWN_MIN + (1.0 - sociability) * 40.0
+			var max_cd: float = SOCIAL_COOLDOWN_MAX + (1.0 - sociability) * 60.0
+			_social_cooldown = randf_range(min_cd, max_cd)
+			print("[CHAT] %s: next social in %.0fs" % [npc.npc_id, _social_cooldown])
 			return true
 	return false
+
+func _pick_weighted_fact(facts: Array) -> Dictionary:
+	if facts.is_empty():
+		return {}
+	var total: float = 0.0
+	for f in facts:
+		total += f.get("weight", 1.0)
+	var roll: float = randf() * total
+	var cumulative: float = 0.0
+	for f in facts:
+		cumulative += f.get("weight", 1.0)
+		if roll <= cumulative:
+			return f
+	return facts[0]
+
+func _pick_chat_intent() -> Dictionary:
+	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
+	var curiosity: float = NpcTraits.get_trait(npc.trait_profile, "curiosity", 0.5)
+	var sociability: float = NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
+
+	# Build weighted pool based on personality
+	var weights: Dictionary = {
+		"ask_question": 1.0 + curiosity * 2.0,
+		"share_story": 1.0 + sociability * 1.5,
+		"brag": 0.5 + boldness * 2.0,
+		"complain": 1.0 + (1.0 - boldness) * 1.5,
+		"warn": 0.5 + boldness * 1.5,
+		"gossip": 0.5 + curiosity * 1.5,
+		"joke": 0.5 + sociability * 2.0,
+		"ask_advice": 1.0 + (1.0 - boldness) * 1.5,
+	}
+
+	var total_weight: float = 0.0
+	for w in weights.values():
+		total_weight += w
+
+	var roll: float = randf() * total_weight
+	var cumulative: float = 0.0
+	for intent_data in CHAT_INTENTS:
+		cumulative += weights.get(intent_data["intent"], 1.0)
+		if roll <= cumulative:
+			return intent_data
+
+	return CHAT_INTENTS[0]

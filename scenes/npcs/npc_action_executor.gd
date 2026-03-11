@@ -120,6 +120,8 @@ func _do_buy_item(shop_id: String, action_data: Dictionary = {}) -> void:
 	var memory_node = npc.get_node_or_null("NPCMemory")
 	if memory_node:
 		memory_node.add_observation("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost])
+		if item.get("type", "") in ["weapon", "armor"] and memory_node.has_method("add_key_memory"):
+			memory_node.add_key_memory("big_purchase", "Bought %s for %d gold" % [item.get("name", item_id), cost])
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "buy_item", true)
 	npc.change_state("idle")

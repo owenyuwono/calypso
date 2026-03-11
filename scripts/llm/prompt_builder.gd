@@ -111,52 +111,81 @@ Examples:
 - "patrol" or "guard" → I'll keep watch. [GOAL:patrol]
 If the player is just chatting and NOT asking you to do something, do NOT add a goal tag."""
 
+const WORLD_FACTS := """WORLD FACTS:
+- Places: Town (shops, well), Field (slimes, wolves, goblins), Dungeon (skeleton warriors, dark mages)
+- Shops: Weapon Shop, Item Shop (potions, gear)
+- There are NO journals, scrolls, dragons, traps, camps, or magic spells. Do NOT invent things not listed above."""
+
 const CHAT_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
 Personality: {personality}
-You are currently {activity}.
-
-Respond in character with ONE short sentence (under 10 words).
+{trait_line}{backstory_line}You are currently {activity}.
+{grounding_facts}
+Reply in 1 short sentence (under 15 words).
+You may reference YOUR FACTS but do NOT recite them directly. Do NOT invent events, items, or scenarios that are not listed.
+{voice}
+{mood}
+Caps, abbreviations, symbols (??, ..., !), and swearing are all allowed.
+Stay on topic. Reply to what was said.
+{world_facts}
 Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
 {goal_instruction}"""
 
 const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+{key_memories}
 {context}
-{speaker_name} says to you: "{spoken_text}"
+{relationship_line}{speaker_name} says to you: "{spoken_text}"
 
 Respond as {npc_name}:"""
 
 const CHAT_INITIATE_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
 Personality: {personality}
-You are currently {activity}.
+{trait_line}{backstory_line}You are currently {activity}.
+{grounding_facts}
+You see {target_name} nearby. {intent_cue} {topic}.
 
-You see {target_name} nearby and want to chat briefly.
-Talk to {target_name} about {topic}.
-
-Say ONE short sentence (under 10 words) to start a conversation.
+Say 1 short sentence (under 15 words).
+You may reference YOUR FACTS but do NOT recite them directly. Do NOT invent events, items, or scenarios that are not listed.
+{voice}
+{mood}
+Caps, abbreviations, symbols (??, ..., !), and swearing are all allowed.
+{world_facts}
 Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
 {goal_instruction}"""
 
 const CHAT_INITIATE_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+{key_memories}
 {context}
-You see {target_name}, who is {target_activity}.
+{relationship_line}You see {target_name}, who is {target_activity}.
 
 Say something to {target_name} as {npc_name}:"""
 
-static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String, topic: String = "") -> Dictionary:
+static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String, topic: String = "", trait_summary: String = "", intent_cue: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "") -> Dictionary:
 	var effective_topic := topic if not topic.is_empty() else "whatever comes to mind"
+	var effective_cue := intent_cue if not intent_cue.is_empty() else "Chat with %s about" % target_name
+	var trait_line := "Traits: %s\n" % trait_summary if not trait_summary.is_empty() else ""
+	var backstory_line := "Background: %s\n" % backstory if not backstory.is_empty() else ""
+	var effective_voice := ("Your vibe: " + voice_style) if not voice_style.is_empty() else "Talk like a real MMO player. Casual and brief."
+	var effective_mood := ("Current mood: " + mood) if not mood.is_empty() else ""
 	var content := CHAT_INITIATE_SYSTEM_TEMPLATE.format({
 		"npc_name": npc_name,
 		"personality": personality,
+		"trait_line": trait_line,
+		"backstory_line": backstory_line,
 		"activity": activity,
 		"target_name": target_name,
+		"intent_cue": effective_cue,
 		"topic": effective_topic,
+		"voice": effective_voice,
+		"mood": effective_mood,
+		"world_facts": WORLD_FACTS,
+		"grounding_facts": grounding_facts,
 		"goal_instruction": "",
 	})
 	return {"role": "system", "content": content}
 
-static func build_chat_initiate_user_message(npc_name: String, npc_id: String, target_name: String, target_id: String, target_activity: String, memory_node: Node) -> Dictionary:
+static func build_chat_initiate_user_message(npc_name: String, npc_id: String, target_name: String, target_id: String, target_activity: String, memory_node: Node, relationship_label: String = "") -> Dictionary:
 	var data := WorldState.get_entity_data(npc_id)
 	var level: int = data.get("level", 1)
 	var hp: int = data.get("hp", 50)
@@ -164,14 +193,14 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	var gold: int = data.get("gold", 0)
 
 	var context := ""
-	if memory_node:
-		var history: Array = memory_node.get_conversation_with(target_id)
-		if not history.is_empty():
-			var recent := history.slice(maxi(0, history.size() - 3))
-			var lines: Array = []
-			for entry in recent:
-				lines.append("%s: %s" % [entry["speaker"], entry["text"]])
-			context = "Recent conversation:\n" + "\n".join(lines)
+	if memory_node and memory_node.has_method("get_area_chat_context"):
+		context = memory_node.get_area_chat_context(5)
+
+	var relationship_line := "Your relationship with %s: %s\n" % [target_name, relationship_label] if not relationship_label.is_empty() else ""
+
+	var key_memories := ""
+	if memory_node and memory_node.has_method("get_key_memories_summary"):
+		key_memories = memory_node.get_key_memories_summary(2)
 
 	var content := CHAT_INITIATE_USER_TEMPLATE.format({
 		"npc_name": npc_name,
@@ -179,39 +208,50 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 		"hp": hp,
 		"max_hp": max_hp,
 		"gold": gold,
+		"key_memories": key_memories,
 		"context": context,
+		"relationship_line": relationship_line,
 		"target_name": target_name,
 		"target_activity": target_activity,
 	})
 	return {"role": "user", "content": content}
 
-static func build_chat_system_message(npc_name: String, personality: String, activity: String, player_speaking: bool = false) -> Dictionary:
+static func build_chat_system_message(npc_name: String, personality: String, activity: String, player_speaking: bool = false, trait_summary: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "") -> Dictionary:
+	var trait_line := "Traits: %s\n" % trait_summary if not trait_summary.is_empty() else ""
+	var backstory_line := "Background: %s\n" % backstory if not backstory.is_empty() else ""
+	var effective_voice := ("Your vibe: " + voice_style) if not voice_style.is_empty() else "Talk like a real MMO player. Casual and brief."
+	var effective_mood := ("Current mood: " + mood) if not mood.is_empty() else ""
 	var content := CHAT_SYSTEM_TEMPLATE.format({
 		"npc_name": npc_name,
 		"personality": personality,
+		"trait_line": trait_line,
+		"backstory_line": backstory_line,
 		"activity": activity,
+		"voice": effective_voice,
+		"mood": effective_mood,
+		"world_facts": WORLD_FACTS,
+		"grounding_facts": grounding_facts,
 		"goal_instruction": GOAL_INSTRUCTION if player_speaking else "",
 	})
 	return {"role": "system", "content": content}
 
-static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node) -> Dictionary:
+static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node, relationship_label: String = "") -> Dictionary:
 	var data := WorldState.get_entity_data(npc_id)
 	var level: int = data.get("level", 1)
 	var hp: int = data.get("hp", 50)
 	var max_hp: int = data.get("max_hp", 50)
 	var gold: int = data.get("gold", 0)
 
-	# Build conversation context from last 3 entries
+	# Build conversation context from area chat log
 	var context := ""
-	if memory_node:
-		var speaker_id := "player" if speaker_name == "Player" else speaker_name.to_lower()
-		var history: Array = memory_node.get_conversation_with(speaker_id)
-		if not history.is_empty():
-			var recent := history.slice(maxi(0, history.size() - 3))
-			var lines: Array = []
-			for entry in recent:
-				lines.append("%s: %s" % [entry["speaker"], entry["text"]])
-			context = "Recent conversation:\n" + "\n".join(lines)
+	if memory_node and memory_node.has_method("get_area_chat_context"):
+		context = memory_node.get_area_chat_context(5)
+
+	var relationship_line := "Your relationship with %s: %s\n" % [speaker_name, relationship_label] if not relationship_label.is_empty() else ""
+
+	var key_memories := ""
+	if memory_node and memory_node.has_method("get_key_memories_summary"):
+		key_memories = memory_node.get_key_memories_summary(2)
 
 	var content := CHAT_USER_TEMPLATE.format({
 		"npc_name": npc_name,
@@ -219,7 +259,9 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 		"hp": hp,
 		"max_hp": max_hp,
 		"gold": gold,
+		"key_memories": key_memories,
 		"context": context,
+		"relationship_line": relationship_line,
 		"speaker_name": speaker_name,
 		"spoken_text": spoken_text,
 	})

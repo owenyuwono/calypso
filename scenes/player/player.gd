@@ -14,6 +14,8 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -62,6 +64,7 @@ var status_panel: Control
 var chat_input: Control
 var skill_hotbar: Control
 var skill_panel: Control
+var npc_info_panel: Control
 
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
@@ -405,8 +408,8 @@ func _on_arrived() -> void:
 	elif etype == "shop_npc":
 		_open_shop(_interact_target)
 	elif etype == "npc":
-		if target_node and is_instance_valid(target_node):
-			_command_npc_follow(target_node)
+		if npc_info_panel and npc_info_panel.has_method("show_npc"):
+			npc_info_panel.show_npc(_interact_target)
 
 	_interact_target = ""
 
@@ -455,9 +458,23 @@ func _process_hover() -> void:
 		elif entity_type == "loot_drop":
 			display_name += " [Loot]"
 			_cursor_manager.set_cursor("move")
-		elif entity_type == "shop_npc" or entity_type == "npc":
-			if entity_type == "shop_npc":
-				display_name += " [Shop]"
+		elif entity_type == "npc":
+			var npc_node := WorldState.get_entity(_hovered_entity_id)
+			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
+			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
+				var trait_summary: String = NpcTraits.get_trait_summary(npc_node.trait_profile)
+				if not trait_summary.is_empty():
+					tooltip_lines.append(trait_summary)
+			var goal: String = data.get("goal", "idle")
+			tooltip_lines.append(PromptBuilder.get_activity_description(goal))
+			if npc_node and is_instance_valid(npc_node) and "current_mood" in npc_node:
+				var mood: String = npc_node.current_mood
+				if not mood.is_empty() and mood != "neutral":
+					tooltip_lines.append("Mood: %s" % mood)
+			display_name = "\n".join(tooltip_lines)
+			_cursor_manager.set_cursor("talk")
+		elif entity_type == "shop_npc":
+			display_name += " [Shop]"
 			_cursor_manager.set_cursor("talk")
 		else:
 			_cursor_manager.set_cursor("default")
@@ -539,7 +556,9 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
-	# Click on ground: move there, cancel target lock
+	# Click on ground: move there, cancel target lock, close NPC info
+	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
+		npc_info_panel.close()
 	var ground_pos := _raycast_ground()
 	if ground_pos != Vector3.INF:
 		_cancel_attack()

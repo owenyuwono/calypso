@@ -13,6 +13,7 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 @export var npc_color: Color = Color(0.6, 0.3, 0.3, 1.0)
 @export var model_path: String = "res://assets/models/characters/Knight.glb"
 @export var model_scale: float = 0.7
+@export var trait_profile: String = ""
 
 # States as strings to avoid cross-script class_name issues
 const STATE_IDLE: String = "idle"
@@ -29,6 +30,7 @@ var current_goal: String = ""
 var current_action: String = ""
 var current_target: String = ""
 var last_thought: String = ""
+var current_mood: String = ""
 var _suppress_nav_complete: bool = false
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
@@ -375,7 +377,10 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		# Target died — loot is handled by monster_base, just exit combat
 		var memory_node = get_node_or_null("NPCMemory")
 		if memory_node:
+			var target_name: String = WorldState.get_entity_data(combat_target).get("name", combat_target)
 			memory_node.add_observation("Killed %s in combat" % combat_target)
+			if memory_node.has_method("add_key_memory") and not memory_node.has_key_memory_type("first_kill"):
+				memory_node.add_key_memory("first_kill", "First kill: defeated a %s" % target_name)
 		combat_target = ""
 		_pending_hit = false
 		change_state(STATE_IDLE)
@@ -394,6 +399,8 @@ func _die() -> void:
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
 		memory_node.add_observation("I died! Lost %d gold." % lost)
+		if memory_node.has_method("add_key_memory"):
+			memory_node.add_key_memory("death", "Died and lost %d gold" % lost)
 
 	# Visual: death animation + fade out
 	_play_anim("Death_A")

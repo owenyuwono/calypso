@@ -142,6 +142,7 @@ func _setup_adventurer_npcs() -> void:
 	# Kael (Warrior) — bold, charges into combat
 	var kael: Node3D = $NPCs/Kael
 	if kael:
+		kael.trait_profile = "bold_warrior"
 		WorldState.add_to_inventory("kael", "basic_sword")
 		WorldState.add_to_inventory("kael", "healing_potion", 3)
 		WorldState.equip_item("kael", "basic_sword")
@@ -149,12 +150,13 @@ func _setup_adventurer_npcs() -> void:
 		kael.get_node("NPCBrain").set_use_llm(false)
 		kael.get_node("NPCBrain").set_use_llm_chat(true)
 		var kael_behavior = kael.get_node("NPCBehavior")
-		kael_behavior.default_goal = "idle"
-		kael.set_goal("idle")
+		kael_behavior.default_goal = "hunt_field"
+		kael.set_goal("hunt_field")
 
 	# Lyra (Mage) — cautious, strategic
 	var lyra: Node3D = $NPCs/Lyra
 	if lyra:
+		lyra.trait_profile = "cautious_mage"
 		WorldState.add_to_inventory("lyra", "healing_potion", 5)
 		WorldState.set_entity_data("lyra", "gold", 60)
 
@@ -167,42 +169,46 @@ func _setup_adventurer_npcs() -> void:
 	# Bjorn (Warrior) — boisterous storyteller
 	var bjorn: Node3D = $NPCs/Bjorn
 	if bjorn:
+		bjorn.trait_profile = "boisterous_brawler"
 		WorldState.add_to_inventory("bjorn", "healing_potion", 3)
 		WorldState.set_entity_data("bjorn", "gold", 80)
 
 		bjorn.get_node("NPCBrain").set_use_llm(false)
 		bjorn.get_node("NPCBrain").set_use_llm_chat(true)
 		var bjorn_behavior = bjorn.get_node("NPCBehavior")
-		bjorn_behavior.default_goal = "idle"
-		bjorn.set_goal("idle")
+		bjorn_behavior.default_goal = "hunt_field"
+		bjorn.set_goal("hunt_field")
 
 	# Sera (Rogue) — quick-witted gossip
 	var sera: Node3D = $NPCs/Sera
 	if sera:
+		sera.trait_profile = "sly_rogue"
 		WorldState.add_to_inventory("sera", "healing_potion", 2)
 		WorldState.set_entity_data("sera", "gold", 100)
 
 		sera.get_node("NPCBrain").set_use_llm(false)
 		sera.get_node("NPCBrain").set_use_llm_chat(true)
 		var sera_behavior = sera.get_node("NPCBehavior")
-		sera_behavior.default_goal = "idle"
-		sera.set_goal("idle")
+		sera_behavior.default_goal = "patrol"
+		sera.set_goal("patrol")
 
 	# Thane (Knight) — stoic and honorable
 	var thane: Node3D = $NPCs/Thane
 	if thane:
+		thane.trait_profile = "stoic_knight"
 		WorldState.add_to_inventory("thane", "healing_potion", 2)
 		WorldState.set_entity_data("thane", "gold", 70)
 
 		thane.get_node("NPCBrain").set_use_llm(false)
 		thane.get_node("NPCBrain").set_use_llm_chat(true)
 		var thane_behavior = thane.get_node("NPCBehavior")
-		thane_behavior.default_goal = "idle"
-		thane.set_goal("idle")
+		thane_behavior.default_goal = "hunt_dungeon"
+		thane.set_goal("hunt_dungeon")
 
 	# Mira (Mage) — cheerful and curious
 	var mira: Node3D = $NPCs/Mira
 	if mira:
+		mira.trait_profile = "cheerful_scholar"
 		WorldState.add_to_inventory("mira", "healing_potion", 3)
 		WorldState.set_entity_data("mira", "gold", 60)
 
@@ -215,14 +221,15 @@ func _setup_adventurer_npcs() -> void:
 	# Dusk (Rogue) — mysterious and quiet
 	var dusk: Node3D = $NPCs/Dusk
 	if dusk:
+		dusk.trait_profile = "mysterious_loner"
 		WorldState.add_to_inventory("dusk", "healing_potion", 2)
 		WorldState.set_entity_data("dusk", "gold", 50)
 
 		dusk.get_node("NPCBrain").set_use_llm(false)
 		dusk.get_node("NPCBrain").set_use_llm_chat(true)
 		var dusk_behavior = dusk.get_node("NPCBehavior")
-		dusk_behavior.default_goal = "idle"
-		dusk.set_goal("idle")
+		dusk_behavior.default_goal = "hunt_dungeon"
+		dusk.set_goal("hunt_dungeon")
 
 # =============================================================================
 # Asset Loading Infrastructure

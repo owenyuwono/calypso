@@ -5,10 +5,15 @@ const NPC_DECISION_INTERVAL: float = 5.0
 const CONVERSATION_HOLD_TIME: float = 10.0
 const CHAT_RANGE: float = 8.0
 const READING_DELAY: float = 3.0  # seconds to "read" before responding to NPC speech
+const POST_SPEECH_COOLDOWN_MIN: float = 5.0
+const POST_SPEECH_COOLDOWN_MAX: float = 10.0
+const OVERHEARD_DELAY_MIN: float = 2.0
+const OVERHEARD_DELAY_MAX: float = 5.0
 
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 const ResponseParser = preload("res://scripts/llm/response_parser.gd")
 const ActionSchema = preload("res://scripts/llm/action_schema.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 
 var npc: CharacterBody3D  # NPCBase, duck-typed
 var memory: Node  # NPCMemory
@@ -22,6 +27,7 @@ var _responding_to: String = ""  # Guard against infinite talk_to recursion
 var _pending_chat: Dictionary = {}  # {speaker_id, spoken_text} — buffered player chat when decision is in flight
 var _conversation_hold: float = 0.0
 var _reading_queue: Dictionary = {}  # {speaker_id, spoken_text, timer} — delayed NPC-NPC response
+var _speech_cooldown: float = 0.0
 
 var _canned_greetings: Array = [
 	"Hey %s, how's the hunting going?",
@@ -39,6 +45,10 @@ func _ready() -> void:
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 
+	# Pick initial mood
+	var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+	npc.current_mood = mood_data.get("name", "")
+
 	GameEvents.npc_action_completed.connect(_on_action_completed)
 	GameEvents.npc_spoke.connect(_on_npc_spoke)
 	LLMClient.request_completed.connect(_on_llm_response)
@@ -47,6 +57,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _enabled or _waiting_for_llm:
 		return
+	if _speech_cooldown > 0.0:
+		_speech_cooldown -= delta
 	if _conversation_hold > 0.0:
 		_conversation_hold -= delta
 		return
@@ -67,6 +79,9 @@ func _process(delta: float) -> void:
 	_decision_timer += delta
 	if _decision_timer >= NPC_DECISION_INTERVAL:
 		_decision_timer = 0.0
+		# Refresh mood each decision cycle
+		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		npc.current_mood = mood_data.get("name", "")
 		_make_decision()
 
 func _make_decision() -> void:
@@ -186,7 +201,7 @@ func set_use_llm_chat(enabled: bool) -> void:
 	_use_llm_chat = enabled
 
 func is_busy() -> bool:
-	return _waiting_for_llm or not _responding_to.is_empty() or _conversation_hold > 0.0 or not _reading_queue.is_empty()
+	return _waiting_for_llm or not _responding_to.is_empty() or _conversation_hold > 0.0 or not _reading_queue.is_empty() or _speech_cooldown > 0.0
 
 ## Reactive conversation — triggered when another entity speaks to this NPC.
 func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
@@ -218,6 +233,7 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 	memory.increment_turn(speaker_id)
 	memory.add_observation("%s spoke to me: '%s'" % [speaker_id, spoken_text])
 	memory.add_conversation(speaker_id, speaker_id, spoken_text)
+	print("[CHAT] %s: reactive response to %s — '%s'" % [npc.npc_id, speaker_id, spoken_text])
 
 	if _use_llm_chat:
 		npc.change_state("thinking")
@@ -227,9 +243,18 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 		var speaker_name := _get_display_name(speaker_id)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
 		var is_player := speaker_id == "player"
+		var trait_summary: String = NpcTraits.get_trait_summary(npc.trait_profile)
+		var backstory: String = NpcTraits.get_backstory(npc.trait_profile)
+		var voice_style: String = NpcTraits.get_voice_style(npc.trait_profile)
+		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		var mood_prompt: String = mood_data.get("prompt", "")
+		npc.current_mood = mood_data.get("name", "")
+		var rel_label: String = memory.get_relationship_label(speaker_id) if speaker_id != "player" else ""
+		var reactive_facts: Array = memory.gather_chat_facts(speaker_id)
+		var grounding := _format_grounding_facts(reactive_facts, 3)
 		var messages: Array = [
-			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player),
-			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory),
+			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player, trait_summary, backstory, voice_style, mood_prompt, grounding),
+			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory, rel_label),
 		]
 
 		var req_id: String = "chat_" + npc.npc_id
@@ -239,7 +264,7 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
 
-func initiate_social_chat(target_id: String, topic: String = "") -> bool:
+func initiate_social_chat(target_id: String, topic: String = "", intent_cue: String = "", facts: Array = []) -> bool:
 	if _waiting_for_llm:
 		return false
 	if npc.current_state in ["dead", "combat"]:
@@ -257,10 +282,18 @@ func initiate_social_chat(target_id: String, topic: String = "") -> bool:
 		var target_goal: String = "exploring" if not target_node else target_node.current_goal
 		var target_activity := PromptBuilder.get_activity_description(target_goal)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
+		var trait_summary: String = NpcTraits.get_trait_summary(npc.trait_profile)
+		var backstory: String = NpcTraits.get_backstory(npc.trait_profile)
+		var rel_label: String = memory.get_relationship_label(target_id)
 
+		var voice_style: String = NpcTraits.get_voice_style(npc.trait_profile)
+		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		var mood_prompt: String = mood_data.get("prompt", "")
+		npc.current_mood = mood_data.get("name", "")
+		var grounding := _format_grounding_facts(facts, 4)
 		var messages: Array = [
-			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name, topic),
-			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory),
+			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name, topic, trait_summary, intent_cue, backstory, voice_style, mood_prompt, grounding),
+			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory, rel_label),
 		]
 
 		var req_id: String = "chat_" + npc.npc_id
@@ -273,25 +306,45 @@ func initiate_social_chat(target_id: String, topic: String = "") -> bool:
 		_responding_to = ""
 		return true
 
+func _format_grounding_facts(facts: Array, max_count: int = 4) -> String:
+	if facts.is_empty():
+		return ""
+	# Sort by weight descending, take top N
+	var sorted_facts := facts.duplicate()
+	sorted_facts.sort_custom(func(a, b): return a.get("weight", 1.0) > b.get("weight", 1.0))
+	var lines: Array = []
+	var count := 0
+	for f in sorted_facts:
+		if count >= max_count:
+			break
+		lines.append("- %s" % f.get("fact", ""))
+		count += 1
+	return "YOUR FACTS:\n" + "\n".join(lines)
+
 func _handle_chat_response(response: Dictionary) -> void:
 	_waiting_for_llm = false
 	var speaker_id := _responding_to
 	var parsed := ResponseParser.parse_chat(response)
 	if not parsed.valid:
+		print("[CHAT] %s: parse failed for reply to %s — fallback greeting" % [npc.npc_id, speaker_id])
 		var greeting := "Well met, traveler!" if speaker_id == "player" else "Hello, %s." % _get_display_name(speaker_id)
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
 		_conversation_hold = CONVERSATION_HOLD_TIME
 		return
+	print("[CHAT] %s → %s: '%s'" % [npc.npc_id, speaker_id, parsed.dialogue])
 	memory.add_observation("Replied to %s: '%s'" % [speaker_id, parsed.dialogue])
 	executor.execute("talk_to", speaker_id, parsed.dialogue)
 	_conversation_hold = CONVERSATION_HOLD_TIME
+	_speech_cooldown = randf_range(POST_SPEECH_COOLDOWN_MIN, POST_SPEECH_COOLDOWN_MAX)
 
 	# Only apply goal changes when the player is speaking (NPC-NPC chat stays behavior-driven)
 	if speaker_id == "player" and not parsed.goal.is_empty():
 		npc.set_goal(parsed.goal)
 		memory.add_goal(parsed.goal)
 		memory.add_observation("Changed goal to '%s' after talking with %s" % [parsed.goal, speaker_id])
+		if memory.has_method("add_key_memory"):
+			memory.add_key_memory("notable_conversation", "Player asked me to %s" % parsed.goal)
 
 func _get_display_name(entity_id: String) -> String:
 	if entity_id == "player":
@@ -305,15 +358,44 @@ func _on_action_completed(completed_npc_id: String, action: String, success: boo
 		memory.add_observation("Action '%s' %s" % [action, status])
 
 func _on_npc_spoke(speaker_id: String, dialogue: String, target_id: String) -> void:
-	# If we just spoke (we're the speaker), clear the responding guard
+	# We just spoke — clear responding guard, set cooldowns
 	if speaker_id == npc.npc_id:
 		_responding_to = ""
 		_conversation_hold = CONVERSATION_HOLD_TIME
+		_speech_cooldown = randf_range(POST_SPEECH_COOLDOWN_MIN, POST_SPEECH_COOLDOWN_MAX)
 		memory.add_conversation(target_id, npc.npc_id, dialogue)
+		memory.add_area_chat(npc.npc_name, dialogue)
 		return
+
+	# Range check — can we hear the speaker?
+	var speaker_node := WorldState.get_entity(speaker_id)
+	if not speaker_node or not is_instance_valid(speaker_node):
+		return
+	if npc.global_position.distance_to(speaker_node.global_position) > CHAT_RANGE:
+		return
+
+	# Record to area chat log (everyone nearby hears it)
+	var speaker_name := _get_display_name(speaker_id)
+	memory.add_area_chat(speaker_name, dialogue)
+	memory.add_conversation(speaker_id, speaker_id, dialogue)
+
+	# Can we respond? Skip if busy/dead/combat/on cooldown
+	if _speech_cooldown > 0.0 or is_busy():
+		return
+	if npc.current_state in ["dead", "combat"]:
+		return
+	if not memory.can_continue_conversation(speaker_id):
+		return
+
+	# Direct target: shorter delay. Overheard: longer random delay.
 	if target_id == npc.npc_id:
+		print("[CHAT] %s: heard %s say '%s' — queuing response" % [npc.npc_id, speaker_id, dialogue])
 		if speaker_id != "player":
-			# Queue with reading delay instead of responding immediately
 			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": READING_DELAY}
 		else:
 			pass  # Player chat handled via request_reactive_response directly
+	else:
+		# Overheard — free-for-all with staggered delay
+		if speaker_id != "player":
+			print("[CHAT] %s: overheard %s say '%s' — may chime in" % [npc.npc_id, speaker_id, dialogue])
+			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": randf_range(OVERHEARD_DELAY_MIN, OVERHEARD_DELAY_MAX)}
