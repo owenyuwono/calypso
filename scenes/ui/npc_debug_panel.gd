@@ -7,7 +7,6 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 @onready var title_label: Label = $Panel/MarginContainer/VBoxContainer/Title
 @onready var panel: Panel = $Panel
 
-var _visible: bool = true
 var _expanded: bool = true
 var _update_timer: float = 0.0
 var _minimize_button: Button
@@ -16,7 +15,6 @@ var _full_height: float = 600.0
 const UPDATE_INTERVAL: float = 0.5
 
 func _ready() -> void:
-	visible = _visible
 	_full_height = offset_bottom
 
 	# Reparent title into an HBoxContainer with a minimize button
@@ -52,8 +50,7 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_F1:
-		_visible = not _visible
-		visible = _visible
+		visible = not visible
 
 func _refresh() -> void:
 	var text := ""

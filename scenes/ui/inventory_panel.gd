@@ -35,13 +35,13 @@ func _build_ui() -> void:
 	# Equipment section
 	_equipment_label = Label.new()
 	_equipment_label.add_theme_font_size_override("font_size", 14)
-	_equipment_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	_equipment_label.add_theme_color_override("font_color", UIHelper.COLOR_EQUIPMENT)
 	vbox.add_child(_equipment_label)
 
 	# Gold
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 16)
-	_gold_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	vbox.add_child(_gold_label)
 
 	# Separator
@@ -66,16 +66,8 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
-		_center_panel()
+		UIHelper.center_panel(_panel)
 		_refresh()
-
-func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func _refresh() -> void:
 	if not _is_open:
@@ -102,7 +94,7 @@ func _refresh() -> void:
 	if inv.is_empty():
 		var empty_label := Label.new()
 		empty_label.text = "No items"
-		empty_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+		empty_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
 		_item_list.add_child(empty_label)
 		return
 

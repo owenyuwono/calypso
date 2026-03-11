@@ -31,7 +31,7 @@ func _build_ui() -> void:
 	# Gold label (will be reparented into drag handle as extra_right)
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 16)
-	_gold_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	main_vbox.add_child(_gold_label)
 
 	# Draggable title bar with gold label on the right
@@ -100,16 +100,8 @@ func open_shop(shop_id: String) -> void:
 	_drag_handle.set_title(shop_data.get("name", "Shop"))
 	_is_open = true
 	visible = true
-	_center_panel()
+	UIHelper.center_panel(_panel)
 	_refresh()
-
-func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func close_shop() -> void:
 	_is_open = false

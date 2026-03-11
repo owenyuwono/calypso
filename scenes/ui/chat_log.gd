@@ -38,10 +38,7 @@ func _ready() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.05, 0.05, 0.08, 0.6)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	UIHelper.set_corner_radius(style, 4)
 	style.content_margin_left = 8
 	style.content_margin_right = 8
 	style.content_margin_top = 6

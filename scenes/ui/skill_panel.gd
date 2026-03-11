@@ -35,7 +35,7 @@ func _build_ui() -> void:
 	# Skill points label
 	_sp_label = Label.new()
 	_sp_label.add_theme_font_size_override("font_size", 15)
-	_sp_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_sp_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	vbox.add_child(_sp_label)
 
 	vbox.add_child(HSeparator.new())
@@ -59,16 +59,8 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
-		_center_panel()
+		UIHelper.center_panel(_panel)
 		_refresh()
-
-func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func _refresh() -> void:
 	if not _is_open:
@@ -105,7 +97,7 @@ func _refresh() -> void:
 		var name_label := Label.new()
 		name_label.text = skill.get("name", skill_id)
 		name_label.add_theme_font_size_override("font_size", 15)
-		name_label.add_theme_color_override("font_color", skill_color if meets_level else Color(0.5, 0.5, 0.5))
+		name_label.add_theme_color_override("font_color", skill_color if meets_level else UIHelper.COLOR_DISABLED)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		top_row.add_child(name_label)
 
@@ -167,15 +159,9 @@ func _refresh() -> void:
 				if slot_i < hotbar.size() and hotbar[slot_i] == skill_id:
 					var active_style := StyleBoxFlat.new()
 					active_style.bg_color = Color(0.3, 0.25, 0.1, 0.9)
-					active_style.border_color = Color(1, 0.85, 0.3)
-					active_style.border_width_left = 1
-					active_style.border_width_right = 1
-					active_style.border_width_top = 1
-					active_style.border_width_bottom = 1
-					active_style.corner_radius_top_left = 3
-					active_style.corner_radius_top_right = 3
-					active_style.corner_radius_bottom_left = 3
-					active_style.corner_radius_bottom_right = 3
+					active_style.border_color = UIHelper.COLOR_GOLD
+					UIHelper.set_border_width(active_style, 1)
+					UIHelper.set_corner_radius(active_style, 3)
 					slot_btn.add_theme_stylebox_override("normal", active_style)
 				slot_btn.pressed.connect(_assign_hotbar.bind(slot_i, skill_id))
 				hotbar_row.add_child(slot_btn)
@@ -189,7 +175,7 @@ func _assign_hotbar(slot: int, skill_id: String) -> void:
 	_refresh()
 	# Refresh the hotbar UI
 	var hotbar_node := get_parent().get_node_or_null("SkillHotbar")
-	if hotbar_node and hotbar_node.has_method("refresh"):
+	if hotbar_node:
 		hotbar_node.refresh()
 
 func is_open() -> bool:

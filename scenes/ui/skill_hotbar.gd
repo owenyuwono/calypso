@@ -47,14 +47,8 @@ func _create_slot(index: int) -> Dictionary:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.18, 0.9)
 	style.border_color = Color(0.4, 0.35, 0.2)
-	style.border_width_left = 1
-	style.border_width_right = 1
-	style.border_width_top = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	UIHelper.set_border_width(style, 1)
+	UIHelper.set_corner_radius(style, 4)
 	panel.add_theme_stylebox_override("panel", style)
 
 	# Container for layering

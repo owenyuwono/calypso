@@ -480,15 +480,9 @@ func _respawn() -> void:
 	_update_hp_bar()
 
 func _update_hp_bar() -> void:
-	if not _hp_bar or state == "dead":
+	if state == "dead":
 		return
-	var data := WorldState.get_entity_data(monster_id)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
-	if _hp_bar.has_method("update_bar"):
-		_hp_bar.update_bar(hp, max_hp)
-	# Only show HP bar if damaged
-	_hp_bar.visible = hp < max_hp
+	ModelHelper.update_entity_hp_bar(_hp_bar, monster_id)
 
 func _spawn_damage_number(target_id: String, damage: int) -> void:
 	ModelHelper.spawn_damage_number(self, target_id, damage, Color(1, 0.2, 0.2))
@@ -512,9 +506,7 @@ func flash_hit() -> void:
 	ModelHelper.flash_hit(_overlay_material, self)
 
 func _get_hit_delay(anim_name: String) -> float:
-	if _anim_player and _anim_player.has_animation(anim_name):
-		return _anim_player.get_animation(anim_name).length * 0.5
-	return 0.4
+	return ModelHelper.get_hit_delay(_anim_player, anim_name)
 
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
 	var loot_scene := preload("res://scenes/objects/loot_drop.gd")

@@ -26,10 +26,7 @@ func _ready() -> void:
 	_panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.1, 0.1, 0.85)
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
+	UIHelper.set_corner_radius(style, 6)
 	style.content_margin_left = 8
 	style.content_margin_right = 8
 	style.content_margin_top = 4
