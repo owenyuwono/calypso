@@ -299,7 +299,7 @@ func _process_attacking(delta: float) -> void:
 	_visuals.face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
-	var anim_player := _visuals.get_anim_player()
+	var anim_player: AnimationPlayer = _visuals.get_anim_player()
 	if _pending_hit:
 		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
 			if anim_player.current_animation_position >= _hit_time:
@@ -405,7 +405,7 @@ func _respawn() -> void:
 	collision_shape.disabled = false
 
 	# Restore model visuals
-	var model := _visuals.get_model()
+	var model: Node3D = _visuals.get_model()
 	if model:
 		model.scale = Vector3.ONE * stats.get("model_scale", 0.7)
 	_visuals.restore_materials()

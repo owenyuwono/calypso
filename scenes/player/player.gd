@@ -267,7 +267,7 @@ func _process_combat(delta: float) -> bool:
 	_visuals.face_direction(to_target)
 
 	# Check animation position for skill hit
-	var anim_player := _visuals.get_anim_player()
+	var anim_player: AnimationPlayer = _visuals.get_anim_player()
 	if _pending_skill_hit:
 		if anim_player and anim_player.current_animation == _pending_skill_anim:
 			if anim_player.current_animation_position >= _skill_hit_time:

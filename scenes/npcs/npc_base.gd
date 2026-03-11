@@ -194,7 +194,7 @@ func _process_combat(delta: float) -> bool:
 	_visuals.face_direction(to_target)
 
 	# Check animation position for hit event before starting new attacks
-	var anim_player := _visuals.get_anim_player()
+	var anim_player: AnimationPlayer = _visuals.get_anim_player()
 	if _pending_hit:
 		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
 			if anim_player.current_animation_position >= _hit_time:
