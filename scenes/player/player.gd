@@ -22,6 +22,8 @@ const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
+const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
+const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 
 var entity_id: String = "player"
 
@@ -40,6 +42,15 @@ var _hover_timer: float = 0.0
 # Navigation
 var _is_navigating: bool = false
 var _interact_target: String = ""
+
+# Agility XP tracking
+var _distance_traveled: float = 0.0
+var _agility_timer: float = 0.0
+var _last_position: Vector3 = Vector3.ZERO
+const AGILITY_XP_DISTANCE: float = 5.0  # 1 XP per 5 units
+const AGILITY_RESET_INTERVAL: float = 30.0  # Reset timer every 30s
+const AGILITY_MAX_XP_PER_INTERVAL: int = 10  # Cap per interval
+var _agility_xp_granted: int = 0
 
 # Combat
 var _attack_target: String = ""
@@ -116,14 +127,13 @@ func _ready() -> void:
 	_skills_comp = SkillsComponent.new()
 	_skills_comp.name = "SkillsComponent"
 	add_child(_skills_comp)
-	_skills_comp.setup({}, ["", "", "", "", ""], 0)
+	_skills_comp.setup({}, ["", "", "", "", ""])
 
 	var stats := LevelData.BASE_PLAYER_STATS.duplicate()
 	stats["type"] = "player"
 	stats["name"] = "Player"
 	stats["inventory"] = {}
 	stats["equipment"] = {"weapon": "", "armor": ""}
-	stats["skill_points"] = 0
 	stats["skills"] = {}
 	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
@@ -139,6 +149,9 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
+	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
+
+	_last_position = global_position
 
 func _setup_tooltip() -> void:
 	var canvas_layer := CanvasLayer.new()
@@ -257,6 +270,23 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
+	# Agility XP tracking
+	if not _is_dead:
+		var moved := global_position.distance_to(_last_position)
+		if moved > 0.1:  # Ignore tiny movements
+			_distance_traveled += moved
+		_last_position = global_position
+
+		_agility_timer += delta
+		if _agility_timer >= AGILITY_RESET_INTERVAL:
+			_agility_timer = 0.0
+			_agility_xp_granted = 0
+
+		while _distance_traveled >= AGILITY_XP_DISTANCE and _agility_xp_granted < AGILITY_MAX_XP_PER_INTERVAL:
+			_distance_traveled -= AGILITY_XP_DISTANCE
+			_agility_xp_granted += 1
+			_progression.grant_proficiency_xp("agility", 1)
+
 	# Safety teleport if fallen off the world
 	if global_position.y < -10.0:
 		global_position = Vector3(0.0, 2.0, 0.0)
@@ -352,7 +382,8 @@ func _process_combat(delta: float) -> bool:
 
 	# Only accumulate attack cooldown after the pending hit has landed
 	if not _pending_hit and not _pending_skill_hit:
-		var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
+		var base_attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 0.8)
+		var attack_speed: float = base_attack_speed * _combat.get_attack_speed_multiplier()
 		_attack_timer += delta
 		if _attack_timer >= attack_speed:
 			_attack_timer = 0.0
@@ -370,6 +401,14 @@ func _perform_attack() -> void:
 	var damage: int = _combat.deal_damage_to(_attack_target)
 	_visuals.spawn_damage_number(_attack_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
+	# Grant weapon proficiency XP
+	var target_data := WorldState.get_entity_data(_attack_target)
+	var monster_type: String = target_data.get("monster_type", "")
+	if not monster_type.is_empty():
+		var monster_stats := MonsterDatabase.get_monster(monster_type)
+		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
+		var weapon_type: String = _combat.get_equipped_weapon_type()
+		_progression.grant_proficiency_xp(weapon_type, prof_xp)
 
 func _cancel_attack() -> void:
 	_attack_target = ""
@@ -676,10 +715,22 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 	if target_id == "player":
 		flash_hit()
 		_visuals.update_hp_bar("player")
+		_progression.grant_proficiency_xp("constitution", 3)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == "player":
 		_visuals.update_hp_bar("player")
+
+func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
+	if entity_id != "player":
+		return
+	# Check if any active skills should be unlocked
+	for active_skill_id in SkillDatabase.SKILLS:
+		var skill: Dictionary = SkillDatabase.SKILLS[active_skill_id]
+		var req: Dictionary = skill.get("required_proficiency", {})
+		if req.get("skill", "") == skill_id and req.get("level", 1) <= new_level:
+			if not _skills_comp.has_skill(active_skill_id):
+				_skills_comp.unlock_skill(active_skill_id)
 
 # --- Duck typing delegations ---
 
@@ -742,6 +793,16 @@ func _execute_skill_hit() -> void:
 	_visuals.spawn_damage_number(_attack_target, actual_damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
 	GameEvents.skill_used.emit("player", _pending_skill_id)
+	# Grant skill XP for use-based leveling
+	_skills_comp.grant_skill_xp(_pending_skill_id, 5)
+	# Grant weapon XP for skill hits too
+	var target_data := WorldState.get_entity_data(_attack_target)
+	var monster_type: String = target_data.get("monster_type", "")
+	if not monster_type.is_empty():
+		var monster_stats := MonsterDatabase.get_monster(monster_type)
+		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
+		var weapon_type: String = _combat.get_equipped_weapon_type()
+		_progression.grant_proficiency_xp(weapon_type, prof_xp)
 	_pending_skill_damage = 0
 	_pending_skill_id = ""
 

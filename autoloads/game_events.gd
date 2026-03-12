@@ -14,8 +14,8 @@ signal entity_died(entity_id: String, killer_id: String)
 signal entity_respawned(entity_id: String)
 
 # Progression
-signal xp_gained(entity_id: String, amount: int)
-signal level_up(entity_id: String, new_level: int)
+signal proficiency_xp_gained(entity_id: String, skill_id: String, amount: int, new_xp: int)
+signal proficiency_level_up(entity_id: String, skill_id: String, new_level: int)
 
 # Economy
 signal item_looted(entity_id: String, item_id: String, count: int)

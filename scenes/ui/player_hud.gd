@@ -1,15 +1,17 @@
 extends Control
-## Player HUD showing HP bar, XP bar, level, and gold with styled panel.
+## Player HUD showing HP bar, proficiency XP bar, total level, and gold with styled panel.
 
 var _hp_bar: ProgressBar
 var _hp_label: Label
 var _xp_bar: ProgressBar
 var _xp_label: Label
+var _xp_title: Label
 var _level_label: Label
 var _gold_label: Label
 var _player: Node
+var _recent_skill_id: String = ""  # Most recently gained proficiency skill
 
-const LevelData = preload("res://scripts/data/level_data.gd")
+const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
 
 func _ready() -> void:
@@ -17,8 +19,8 @@ func _ready() -> void:
 	# Event-driven updates instead of _process polling
 	GameEvents.entity_damaged.connect(func(id, _a, _b, _c): _refresh_if_player(id))
 	GameEvents.entity_healed.connect(func(id, _a, _b): _refresh_if_player(id))
-	GameEvents.xp_gained.connect(func(id, _a): _refresh_if_player(id))
-	GameEvents.level_up.connect(_on_level_up)
+	GameEvents.proficiency_xp_gained.connect(_on_proficiency_xp_gained)
+	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_respawned.connect(func(id): _refresh_if_player(id))
 	GameEvents.item_purchased.connect(func(id, _a, _b): _refresh_if_player(id))
@@ -55,7 +57,7 @@ func _build_ui() -> void:
 	vbox.add_child(top_row)
 
 	_level_label = Label.new()
-	_level_label.text = "Lv. 1"
+	_level_label.text = "Total Lv: 13/130"
 	_level_label.add_theme_font_size_override("font_size", 18)
 	_level_label.add_theme_color_override("font_color", Color(1, 1, 0.8))
 	top_row.add_child(_level_label)
@@ -98,12 +100,12 @@ func _build_ui() -> void:
 	var xp_row := HBoxContainer.new()
 	vbox.add_child(xp_row)
 
-	var xp_title := Label.new()
-	xp_title.text = "EXP"
-	xp_title.add_theme_font_size_override("font_size", 11)
-	xp_title.add_theme_color_override("font_color", Color(0.4, 0.6, 1.0))
-	xp_title.custom_minimum_size = Vector2(32, 0)
-	xp_row.add_child(xp_title)
+	_xp_title = Label.new()
+	_xp_title.text = "---"
+	_xp_title.add_theme_font_size_override("font_size", 11)
+	_xp_title.add_theme_color_override("font_color", Color(0.4, 0.6, 1.0))
+	_xp_title.custom_minimum_size = Vector2(32, 0)
+	xp_row.add_child(_xp_title)
 
 	_xp_bar = _create_styled_bar(
 		Color(0.2, 0.5, 0.9), Color(0.05, 0.1, 0.2),
@@ -165,20 +167,34 @@ func _refresh_all() -> void:
 
 	var hp: int = stats.hp
 	var max_hp: int = stats.max_hp
-	var level: int = stats.level
 	var gold: int = inv.gold
-	var xp: int = WorldState.get_entity_data("player").get("xp", 0)
 
 	_hp_bar.max_value = max_hp
 	_hp_bar.value = hp
 	_hp_label.text = "%d/%d" % [hp, max_hp]
 
-	var xp_needed := LevelData.xp_to_next_level(level)
-	_xp_bar.max_value = xp_needed
-	_xp_bar.value = xp
-	_xp_label.text = "%d/%d" % [xp, xp_needed]
+	var progression = _player.get_node_or_null("ProgressionComponent")
+	var total_level: int = stats.level
+	if progression and progression.has_method("get_total_level"):
+		total_level = progression.get_total_level()
+	_level_label.text = "Total Lv: %d/130" % total_level
 
-	_level_label.text = "Lv. %d" % level
+	if _recent_skill_id != "" and progression and progression.has_method("get_proficiency_xp"):
+		var prof_data: Dictionary = progression.get_proficiency_xp(_recent_skill_id)
+		var skill_xp: int = prof_data.get("xp", 0)
+		var xp_to_next: int = prof_data.get("xp_to_next", 1)
+		var skill_data := ProficiencyDatabase.get_skill(_recent_skill_id)
+		var skill_name: String = skill_data.get("name", _recent_skill_id)
+		_xp_title.text = skill_name
+		_xp_bar.max_value = xp_to_next
+		_xp_bar.value = skill_xp
+		_xp_label.text = "%d/%d" % [skill_xp, xp_to_next]
+	else:
+		_xp_title.text = "---"
+		_xp_bar.max_value = 1
+		_xp_bar.value = 0
+		_xp_label.text = "---"
+
 	_gold_label.text = "%s G" % _format_number(gold)
 
 func _refresh_if_player(entity_id: String) -> void:
@@ -189,13 +205,21 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == "player" or killer_id == "player":
 		_refresh_all()
 
-func _on_level_up(entity_id: String, new_level: int) -> void:
+func _on_proficiency_xp_gained(entity_id: String, skill_id: String, _amount: int, _new_xp: int) -> void:
+	if entity_id != "player":
+		return
+	_recent_skill_id = skill_id
+	_refresh_all()
+
+func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
 	if entity_id != "player":
 		return
 	_refresh_all()
-	# Spawn a floating "LEVEL UP!" text with outline and scale animation
+	# Spawn a floating "<Skill> Lv <N>!" text with outline and scale animation
+	var skill_data := ProficiencyDatabase.get_skill(skill_id)
+	var skill_name: String = skill_data.get("name", skill_id)
 	var label := Label.new()
-	label.text = "LEVEL UP!"
+	label.text = "%s Lv %d!" % [skill_name, new_level]
 	label.add_theme_font_size_override("font_size", 32)
 	label.add_theme_color_override("font_color", Color(1, 1, 0.3))
 	label.add_theme_constant_override("outline_size", 3)

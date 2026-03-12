@@ -59,7 +59,7 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.item_looted.connect(_on_item_looted)
-	GameEvents.level_up.connect(_on_level_up)
+	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
 func _process(delta: float) -> void:
 	# Flush expired hit batches
@@ -147,6 +147,9 @@ func _on_item_looted(entity_id: String, item_id: String, count: int) -> void:
 		else:
 			_add_message("%s obtained %s" % [looter, item_name], COLOR_LOOT)
 
-func _on_level_up(entity_id: String, new_level: int) -> void:
+func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
+	var ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
+	var skill_data: Dictionary = ProficiencyDatabase.get_skill(skill_id)
+	var skill_name: String = skill_data.get("name", skill_id)
 	var name := _get_entity_name(entity_id)
-	_add_message("%s reached Level %d!" % [name, new_level], COLOR_SYSTEM)
+	_add_message("%s reached %s Level %d!" % [name, skill_name, new_level], COLOR_SYSTEM)

@@ -397,13 +397,15 @@ func _die(killer_id: String) -> void:
 				_spawn_loot_drop(global_position, item_id, 1, 0, drop_index)
 				drop_index += 1
 
-	# Grant XP
-	var xp: int = stats.get("xp", 0)
+	# Grant bonus weapon proficiency XP on kill (same as per-hit value = double XP on killing blow)
+	var prof_xp: int = stats.get("proficiency_xp", 3)
 	var killer = WorldState.get_entity(killer_id)
 	if killer and is_instance_valid(killer):
+		var killer_combat = killer.get_node_or_null("CombatComponent")
 		var prog = killer.get_node_or_null("ProgressionComponent")
-		if prog:
-			prog.grant_xp(killer_id, xp)
+		if killer_combat and prog:
+			var weapon_type: String = killer_combat.get_equipped_weapon_type()
+			prog.grant_proficiency_xp(weapon_type, prof_xp)
 
 	# Death visual: animation + fade
 	_visuals.play_anim("Death_A")

@@ -7,7 +7,7 @@ const SKILLS: Dictionary = {
 		"description": "A powerful melee strike.",
 		"type": "melee_attack",
 		"max_level": 5,
-		"required_level": 2,
+		"required_proficiency": {"skill": "sword", "level": 2},
 		"cooldown": 3.0,
 		"damage_multiplier": 1.5,
 		"damage_multiplier_per_level": 0.1,

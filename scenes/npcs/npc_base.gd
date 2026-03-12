@@ -10,6 +10,8 @@ const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 
 @export var npc_id: String = ""
 @export var npc_name: String = ""
@@ -49,6 +51,15 @@ var _respawn_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
 var _pending_hit: bool = false
 var _hit_time: float = 0.0
+
+# Agility XP tracking
+var _distance_traveled: float = 0.0
+var _agility_timer: float = 0.0
+var _last_position: Vector3 = Vector3.ZERO
+const AGILITY_XP_DISTANCE: float = 5.0
+const AGILITY_RESET_INTERVAL: float = 30.0
+const AGILITY_MAX_XP_PER_INTERVAL: int = 10
+var _agility_xp_granted: int = 0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
@@ -103,6 +114,15 @@ func _ready() -> void:
 	add_child(_equipment)
 	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
 
+	# Equip starting weapon from trait profile
+	if not trait_profile.is_empty():
+		var profile: Dictionary = NpcTraits.get_profile(trait_profile)
+		var weapon_type: String = profile.get("weapon_type", "")
+		if not weapon_type.is_empty():
+			var weapon_id: String = "basic_" + weapon_type
+			_inventory.add_item(weapon_id)
+			_equipment.equip(weapon_id)
+
 	_combat = CombatComponent.new()
 	_combat.name = "CombatComponent"
 	add_child(_combat)
@@ -111,7 +131,12 @@ func _ready() -> void:
 	_progression = ProgressionComponent.new()
 	_progression.name = "ProgressionComponent"
 	add_child(_progression)
-	_progression.setup(_stats)
+	# Get starting proficiencies from trait profile
+	var initial_profs: Dictionary = {}
+	if not trait_profile.is_empty():
+		var profile: Dictionary = NpcTraits.get_profile(trait_profile)
+		initial_profs = profile.get("starting_proficiencies", {})
+	_progression.setup(_stats, initial_profs)
 
 	_register_with_world()
 
@@ -129,6 +154,8 @@ func _ready() -> void:
 
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
+
+	_last_position = global_position
 
 func _get_separation_velocity() -> Vector3:
 	var sep := Vector3.ZERO
@@ -191,6 +218,23 @@ func _physics_process(delta: float) -> void:
 		velocity.z += sep.z
 
 	move_and_slide()
+
+	# Agility XP tracking
+	if current_state != STATE_DEAD:
+		var moved := global_position.distance_to(_last_position)
+		if moved > 0.1:  # Ignore tiny movements
+			_distance_traveled += moved
+		_last_position = global_position
+
+		_agility_timer += delta
+		if _agility_timer >= AGILITY_RESET_INTERVAL:
+			_agility_timer = 0.0
+			_agility_xp_granted = 0
+
+		while _distance_traveled >= AGILITY_XP_DISTANCE and _agility_xp_granted < AGILITY_MAX_XP_PER_INTERVAL:
+			_distance_traveled -= AGILITY_XP_DISTANCE
+			_agility_xp_granted += 1
+			_progression.grant_proficiency_xp("agility", 1)
 
 	# Update animation based on movement
 	if current_state == STATE_COMBAT:
@@ -298,6 +342,14 @@ func _do_combat_attack() -> void:
 	var damage: int = _combat.deal_damage_to(combat_target)
 	_visuals.spawn_damage_number(combat_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(combat_target)
+	# Grant weapon proficiency XP
+	var target_data := WorldState.get_entity_data(combat_target)
+	var monster_type: String = target_data.get("monster_type", "")
+	if not monster_type.is_empty():
+		var monster_stats := MonsterDatabase.get_monster(monster_type)
+		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
+		var weapon_type: String = _combat.get_equipped_weapon_type()
+		_progression.grant_proficiency_xp(weapon_type, prof_xp)
 
 	# Occasionally say something in combat
 	if randf() < 0.15:
@@ -428,6 +480,7 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _r
 	if target_id == npc_id:
 		flash_hit()
 		_visuals.update_hp_bar(npc_id)
+		_progression.grant_proficiency_xp("constitution", 3)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:

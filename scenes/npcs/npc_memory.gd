@@ -27,7 +27,7 @@ func _ready() -> void:
 	_npc_id = get_parent().npc_id
 	GameEvents.npc_spoke.connect(_on_npc_spoke_memory)
 	GameEvents.entity_died.connect(_on_entity_died_memory)
-	GameEvents.level_up.connect(_on_level_up_memory)
+	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up_memory)
 
 # =============================================================================
 # Key Memories
@@ -279,9 +279,12 @@ func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 		# This NPC is a bystander — record shared combat with the killer
 		record_shared_combat(killer_id)
 
-func _on_level_up_memory(entity_id: String, new_level: int) -> void:
+func _on_proficiency_level_up_memory(entity_id: String, skill_id: String, new_level: int) -> void:
 	if entity_id == _npc_id:
-		add_key_memory("level_up", "Reached level %d" % new_level)
+		var ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
+		var skill_data: Dictionary = ProficiencyDatabase.get_skill(skill_id)
+		var skill_name: String = skill_data.get("name", skill_id)
+		add_key_memory("level_up", "Reached %s level %d" % [skill_name, new_level])
 
 # =============================================================================
 # Conversation Turns

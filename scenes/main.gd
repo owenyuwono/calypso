@@ -28,6 +28,10 @@ func _ready() -> void:
 	if player and npc_info_panel:
 		player.npc_info_panel = npc_info_panel
 
+	var proficiency_panel := $UILayer/ProficiencyPanel
+	if player and proficiency_panel:
+		proficiency_panel.set_player(player)
+
 	# Wire player ref to UI panels
 	var player_hud := $UILayer/PlayerHUD
 	if player and player_hud:

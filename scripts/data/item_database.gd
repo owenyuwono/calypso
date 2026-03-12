@@ -4,12 +4,42 @@ extends RefCounted
 const ITEMS: Dictionary = {
 	# Consumables
 	"healing_potion": {"name": "Healing Potion", "type": "consumable", "value": 20, "heal": 30},
-	# Weapons
-	"basic_sword": {"name": "Basic Sword", "type": "weapon", "value": 50, "atk_bonus": 5},
-	"iron_sword": {"name": "Iron Sword", "type": "weapon", "value": 150, "atk_bonus": 10},
-	# Armor
-	"basic_shield": {"name": "Basic Shield", "type": "armor", "value": 40, "def_bonus": 3},
-	"iron_shield": {"name": "Iron Shield", "type": "armor", "value": 120, "def_bonus": 5},
+	# Swords (required_skill: "sword")
+	"basic_sword":   {"name": "Basic Sword",   "type": "weapon", "weapon_type": "sword", "value": 50,   "atk_bonus": 5,  "required_skill": "sword", "required_level": 1},
+	"iron_sword":    {"name": "Iron Sword",    "type": "weapon", "weapon_type": "sword", "value": 150,  "atk_bonus": 10, "required_skill": "sword", "required_level": 3},
+	"steel_sword":   {"name": "Steel Sword",   "type": "weapon", "weapon_type": "sword", "value": 400,  "atk_bonus": 15, "required_skill": "sword", "required_level": 5},
+	"mithril_sword": {"name": "Mithril Sword", "type": "weapon", "weapon_type": "sword", "value": 800,  "atk_bonus": 20, "required_skill": "sword", "required_level": 7},
+	"dragon_sword":  {"name": "Dragon Sword",  "type": "weapon", "weapon_type": "sword", "value": 1500, "atk_bonus": 25, "required_skill": "sword", "required_level": 9},
+	# Axes (required_skill: "axe")
+	"basic_axe":     {"name": "Basic Axe",     "type": "weapon", "weapon_type": "axe", "value": 50,   "atk_bonus": 5,  "required_skill": "axe", "required_level": 1},
+	"iron_axe":      {"name": "Iron Axe",      "type": "weapon", "weapon_type": "axe", "value": 150,  "atk_bonus": 10, "required_skill": "axe", "required_level": 3},
+	"steel_axe":     {"name": "Steel Axe",     "type": "weapon", "weapon_type": "axe", "value": 400,  "atk_bonus": 15, "required_skill": "axe", "required_level": 5},
+	"mithril_axe":   {"name": "Mithril Axe",   "type": "weapon", "weapon_type": "axe", "value": 800,  "atk_bonus": 20, "required_skill": "axe", "required_level": 7},
+	"dragon_axe":    {"name": "Dragon Axe",    "type": "weapon", "weapon_type": "axe", "value": 1500, "atk_bonus": 25, "required_skill": "axe", "required_level": 9},
+	# Maces (required_skill: "mace")
+	"basic_mace":    {"name": "Basic Mace",    "type": "weapon", "weapon_type": "mace", "value": 50,   "atk_bonus": 5,  "required_skill": "mace", "required_level": 1},
+	"iron_mace":     {"name": "Iron Mace",     "type": "weapon", "weapon_type": "mace", "value": 150,  "atk_bonus": 10, "required_skill": "mace", "required_level": 3},
+	"steel_mace":    {"name": "Steel Mace",    "type": "weapon", "weapon_type": "mace", "value": 400,  "atk_bonus": 15, "required_skill": "mace", "required_level": 5},
+	"mithril_mace":  {"name": "Mithril Mace",  "type": "weapon", "weapon_type": "mace", "value": 800,  "atk_bonus": 20, "required_skill": "mace", "required_level": 7},
+	"dragon_mace":   {"name": "Dragon Mace",   "type": "weapon", "weapon_type": "mace", "value": 1500, "atk_bonus": 25, "required_skill": "mace", "required_level": 9},
+	# Daggers (required_skill: "dagger", attack_speed: 0.7, lower atk_bonus)
+	"basic_dagger":   {"name": "Basic Dagger",   "type": "weapon", "weapon_type": "dagger", "value": 50,   "atk_bonus": 4,  "attack_speed": 0.7, "required_skill": "dagger", "required_level": 1},
+	"iron_dagger":    {"name": "Iron Dagger",    "type": "weapon", "weapon_type": "dagger", "value": 150,  "atk_bonus": 8,  "attack_speed": 0.7, "required_skill": "dagger", "required_level": 3},
+	"steel_dagger":   {"name": "Steel Dagger",   "type": "weapon", "weapon_type": "dagger", "value": 400,  "atk_bonus": 12, "attack_speed": 0.7, "required_skill": "dagger", "required_level": 5},
+	"mithril_dagger": {"name": "Mithril Dagger", "type": "weapon", "weapon_type": "dagger", "value": 800,  "atk_bonus": 16, "attack_speed": 0.7, "required_skill": "dagger", "required_level": 7},
+	"dragon_dagger":  {"name": "Dragon Dagger",  "type": "weapon", "weapon_type": "dagger", "value": 1500, "atk_bonus": 20, "attack_speed": 0.7, "required_skill": "dagger", "required_level": 9},
+	# Staves (required_skill: "staff")
+	"basic_staff":    {"name": "Basic Staff",    "type": "weapon", "weapon_type": "staff", "value": 50,   "atk_bonus": 5,  "required_skill": "staff", "required_level": 1},
+	"iron_staff":     {"name": "Iron Staff",     "type": "weapon", "weapon_type": "staff", "value": 150,  "atk_bonus": 10, "required_skill": "staff", "required_level": 3},
+	"steel_staff":    {"name": "Steel Staff",    "type": "weapon", "weapon_type": "staff", "value": 400,  "atk_bonus": 15, "required_skill": "staff", "required_level": 5},
+	"mithril_staff":  {"name": "Mithril Staff",  "type": "weapon", "weapon_type": "staff", "value": 800,  "atk_bonus": 20, "required_skill": "staff", "required_level": 7},
+	"dragon_staff":   {"name": "Dragon Staff",   "type": "weapon", "weapon_type": "staff", "value": 1500, "atk_bonus": 25, "required_skill": "staff", "required_level": 9},
+	# Shields (type: "armor", required_skill: "constitution")
+	"basic_shield":   {"name": "Basic Shield",   "type": "armor", "value": 50,   "def_bonus": 3,  "required_skill": "constitution", "required_level": 1},
+	"iron_shield":    {"name": "Iron Shield",    "type": "armor", "value": 150,  "def_bonus": 6,  "required_skill": "constitution", "required_level": 3},
+	"steel_shield":   {"name": "Steel Shield",   "type": "armor", "value": 400,  "def_bonus": 9,  "required_skill": "constitution", "required_level": 5},
+	"mithril_shield": {"name": "Mithril Shield", "type": "armor", "value": 800,  "def_bonus": 12, "required_skill": "constitution", "required_level": 7},
+	"dragon_shield":  {"name": "Dragon Shield",  "type": "armor", "value": 1500, "def_bonus": 15, "required_skill": "constitution", "required_level": 9},
 	# Monster drops (sell only)
 	"jelly": {"name": "Jelly", "type": "material", "value": 8},
 	"fur": {"name": "Fur", "type": "material", "value": 15},

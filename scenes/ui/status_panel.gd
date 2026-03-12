@@ -2,7 +2,7 @@ extends Control
 ## Player status/character screen toggled with C key.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const LevelData = preload("res://scripts/data/level_data.gd")
+const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 var _panel: PanelContainer
@@ -34,8 +34,8 @@ func _ready() -> void:
 	# Live update signals
 	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): _refresh())
 	GameEvents.entity_healed.connect(func(_a, _b, _c): _refresh())
-	GameEvents.xp_gained.connect(func(_a, _b): _refresh())
-	GameEvents.level_up.connect(func(_a, _b): _refresh())
+	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): _refresh())
+	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
 	GameEvents.item_looted.connect(func(_a, _b, _c): _refresh())
 	GameEvents.item_purchased.connect(func(_a, _b, _c): _refresh())
 	GameEvents.item_sold.connect(func(_a, _b, _c): _refresh())
@@ -263,12 +263,15 @@ func _refresh() -> void:
 	var base_def: int = stats.def
 	var attack_speed: float = stats.attack_speed
 	var attack_range: float = stats.attack_range
-	var xp: int = WorldState.get_entity_data("player").get("xp", 0)
+	var combat_comp = _player.get_node("CombatComponent")
+	var weapon_type: String = combat_comp.get_equipped_weapon_type() if combat_comp else "mace"
+	var progression = _player.get_node("ProgressionComponent")
+	var prof_xp: Dictionary = progression.get_proficiency_xp(weapon_type) if progression else {"xp": 0, "xp_to_next": 50, "level": 1}
 	var gold: int = inv.gold
 	var equipment: Dictionary = equip.get_equipment()
 
 	_name_label.text = "Player"
-	_level_label.text = "Lv. %d" % level
+	_level_label.text = "Total Lv. %d" % level
 
 	# Stats
 	_hp_value.text = "%d / %d" % [hp, max_hp]
@@ -297,11 +300,13 @@ func _refresh() -> void:
 	_armor_name_label.text = armor_name
 	_unequip_armor_btn.visible = not armor_id.is_empty()
 
-	# Progression
-	var xp_needed := LevelData.xp_to_next_level(level) if level < LevelData.MAX_LEVEL else 1
+	# Progression — show equipped weapon proficiency XP
+	var xp_needed: int = prof_xp.get("xp_to_next", 50)
+	var xp: int = prof_xp.get("xp", 0)
+	var prof_level: int = prof_xp.get("level", 1)
 	_xp_bar.max_value = xp_needed
-	_xp_bar.value = xp if level < LevelData.MAX_LEVEL else xp_needed
-	_xp_label.text = "%d/%d" % [xp, xp_needed] if level < LevelData.MAX_LEVEL else "MAX"
+	_xp_bar.value = xp if prof_level < ProficiencyDatabase.MAX_LEVEL else xp_needed
+	_xp_label.text = "%d/%d" % [xp, xp_needed] if prof_level < ProficiencyDatabase.MAX_LEVEL else "MAX"
 
 	_gold_label.text = str(gold)
 

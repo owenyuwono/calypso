@@ -1,12 +1,13 @@
 extends Control
-## Skill learning/upgrading panel toggled with S key.
+## Active skill panel toggled with S key. Shows skills unlocked via proficiency milestones.
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
+const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 var _panel: PanelContainer
 var _is_open: bool = false
-var _sp_label: Label
+var _info_label: Label
 var _skill_list: VBoxContainer
 var _player: Node
 
@@ -16,8 +17,8 @@ func set_player(p: Node) -> void:
 func _ready() -> void:
 	visible = false
 	_build_ui()
-	GameEvents.level_up.connect(func(_a, _b): _refresh())
 	GameEvents.skill_learned.connect(func(_a, _b, _c): _refresh())
+	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
@@ -32,15 +33,15 @@ func _build_ui() -> void:
 
 	# Draggable title bar
 	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Skills")
+	drag_handle.setup(_panel, "Active Skills")
 	drag_handle.close_pressed.connect(toggle)
 	vbox.add_child(drag_handle)
 
-	# Skill points label
-	_sp_label = Label.new()
-	_sp_label.add_theme_font_size_override("font_size", 15)
-	_sp_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	vbox.add_child(_sp_label)
+	# Info label (replaces old SP label)
+	_info_label = Label.new()
+	_info_label.add_theme_font_size_override("font_size", 13)
+	_info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	vbox.add_child(_info_label)
 
 	vbox.add_child(HSeparator.new())
 
@@ -75,23 +76,26 @@ func _refresh() -> void:
 	for child in _skill_list.get_children():
 		child.queue_free()
 
-	var stats = _player.get_node("StatsComponent")
 	var skills_comp = _player.get_node("SkillsComponent")
-	if not stats or not skills_comp:
+	var progression = _player.get_node("ProgressionComponent")
+	if not skills_comp or not progression:
 		return
 
-	var sp: int = skills_comp.get_skill_points()
-	var player_level: int = stats.level
-
-	_sp_label.text = "Skill Points: %d" % sp
+	_info_label.text = "Skills unlock via proficiency milestones"
 
 	for skill_id in SkillDatabase.SKILLS:
 		var skill: Dictionary = SkillDatabase.SKILLS[skill_id]
 		var current_level: int = skills_comp.get_skill_level(skill_id)
 		var max_level: int = skill.get("max_level", 5)
-		var required_level: int = skill.get("required_level", 1)
 		var skill_color: Color = skill.get("color", Color.WHITE)
-		var meets_level := player_level >= required_level
+
+		# Check proficiency requirement
+		var req: Dictionary = skill.get("required_proficiency", {})
+		var req_skill: String = req.get("skill", "")
+		var req_level: int = req.get("level", 1)
+		var meets_req: bool = true
+		if not req_skill.is_empty():
+			meets_req = progression.get_proficiency_level(req_skill) >= req_level
 
 		var row_vbox := VBoxContainer.new()
 		row_vbox.add_theme_constant_override("separation", 2)
@@ -104,24 +108,18 @@ func _refresh() -> void:
 		var name_label := Label.new()
 		name_label.text = skill.get("name", skill_id)
 		name_label.add_theme_font_size_override("font_size", 15)
-		name_label.add_theme_color_override("font_color", skill_color if meets_level else UIHelper.COLOR_DISABLED)
+		name_label.add_theme_color_override("font_color", skill_color if meets_req else UIHelper.COLOR_DISABLED)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		top_row.add_child(name_label)
 
 		var level_label := Label.new()
-		level_label.text = "Lv. %d/%d" % [current_level, max_level]
-		level_label.add_theme_font_size_override("font_size", 13)
-		level_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-		top_row.add_child(level_label)
-
-		var btn := Button.new()
-		if current_level <= 0:
-			btn.text = "Learn"
+		if current_level > 0:
+			level_label.text = "Lv. %d/%d" % [current_level, max_level]
 		else:
-			btn.text = "Upgrade"
-		btn.disabled = sp <= 0 or current_level >= max_level or not meets_level
-		btn.pressed.connect(_learn_skill.bind(skill_id))
-		top_row.add_child(btn)
+			level_label.text = "Locked"
+		level_label.add_theme_font_size_override("font_size", 13)
+		level_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8) if current_level > 0 else UIHelper.COLOR_DISABLED)
+		top_row.add_child(level_label)
 
 		var desc_label := Label.new()
 		desc_label.text = skill.get("description", "")
@@ -133,16 +131,29 @@ func _refresh() -> void:
 		var mult := SkillDatabase.get_effective_multiplier(skill_id, preview_level)
 		var cd := SkillDatabase.get_effective_cooldown(skill_id, preview_level)
 		var stats_text := "DMG: %d%% | CD: %.1fs" % [roundi(mult * 100), cd]
-		if not meets_level:
-			stats_text = "Requires Lv. %d" % required_level
+		if not meets_req:
+			var req_skill_data := ProficiencyDatabase.get_skill(req_skill)
+			var req_skill_name: String = req_skill_data.get("name", req_skill)
+			stats_text = "Requires %s Lv. %d" % [req_skill_name, req_level]
 
 		var stats_label := Label.new()
 		stats_label.text = stats_text
 		stats_label.add_theme_font_size_override("font_size", 12)
-		stats_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.5) if meets_level else Color(0.7, 0.3, 0.3))
+		stats_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.5) if meets_req else Color(0.7, 0.3, 0.3))
 		row_vbox.add_child(stats_label)
 
 		if current_level > 0:
+			# Show XP progress for use-based leveling
+			var skill_xp_key: String = "skill_xp_%s" % skill_id
+			var xp: int = WorldState.get_entity_data("player").get(skill_xp_key, 0)
+			var xp_needed: int = current_level * 50
+			if current_level < max_level:
+				var xp_label := Label.new()
+				xp_label.text = "XP: %d/%d" % [xp, xp_needed]
+				xp_label.add_theme_font_size_override("font_size", 11)
+				xp_label.add_theme_color_override("font_color", Color(0.4, 0.6, 1.0))
+				row_vbox.add_child(xp_label)
+
 			var hotbar_row := HBoxContainer.new()
 			hotbar_row.add_theme_constant_override("separation", 4)
 			row_vbox.add_child(hotbar_row)
@@ -168,11 +179,6 @@ func _refresh() -> void:
 					slot_btn.add_theme_stylebox_override("normal", active_style)
 				slot_btn.pressed.connect(_assign_hotbar.bind(slot_i, skill_id))
 				hotbar_row.add_child(slot_btn)
-
-func _learn_skill(skill_id: String) -> void:
-	if _player:
-		_player.get_node("SkillsComponent").learn_skill(skill_id)
-	_refresh()
 
 func _assign_hotbar(slot: int, skill_id: String) -> void:
 	if _player:

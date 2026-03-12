@@ -15,7 +15,9 @@ func setup(stats: Dictionary) -> void:
 	max_hp = stats.get("max_hp", 0)
 	atk = stats.get("atk", 0)
 	def = stats.get("def", 0)
-	level = stats.get("level", 1)
+	# level now represents total proficiency level (sum of all skill levels).
+	# Default 13 = 13 proficiency skills each starting at level 1.
+	level = stats.get("level", 13)
 	attack_speed = stats.get("attack_speed", 1.0)
 	attack_range = stats.get("attack_range", 2.0)
 

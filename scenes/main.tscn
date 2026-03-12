@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/chat_log.tscn" id="14_chatlog"]
 [ext_resource type="Script" path="res://scenes/ui/panel_toggles.gd" id="15_panel_toggles"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_info_panel.tscn" id="16_npc_info"]
+[ext_resource type="Script" path="res://scenes/ui/proficiency_panel.gd" id="17_prof_panel"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -56,3 +57,6 @@ target_path = NodePath("../Player")
 script = ExtResource("15_panel_toggles")
 
 [node name="NpcInfoPanel" parent="UILayer" instance=ExtResource("16_npc_info")]
+
+[node name="ProficiencyPanel" type="Control" parent="UILayer"]
+script = ExtResource("17_prof_panel")
