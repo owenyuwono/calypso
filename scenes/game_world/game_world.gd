@@ -143,9 +143,9 @@ func _setup_adventurer_npcs() -> void:
 	var kael: Node3D = $NPCs/Kael
 	if kael:
 		kael.trait_profile = "bold_warrior"
-		WorldState.add_to_inventory("kael", "basic_sword")
-		WorldState.add_to_inventory("kael", "healing_potion", 3)
-		WorldState.equip_item("kael", "basic_sword")
+		kael.get_node("InventoryComponent").add_item("basic_sword")
+		kael.get_node("InventoryComponent").add_item("healing_potion", 3)
+		kael.get_node("EquipmentComponent").equip("basic_sword")
 
 		kael.get_node("NPCBrain").set_use_llm(false)
 		kael.get_node("NPCBrain").set_use_llm_chat(true)
@@ -157,8 +157,8 @@ func _setup_adventurer_npcs() -> void:
 	var lyra: Node3D = $NPCs/Lyra
 	if lyra:
 		lyra.trait_profile = "cautious_mage"
-		WorldState.add_to_inventory("lyra", "healing_potion", 5)
-		WorldState.set_entity_data("lyra", "gold", 60)
+		lyra.get_node("InventoryComponent").add_item("healing_potion", 5)
+		lyra.get_node("InventoryComponent").set_gold_amount(60)
 
 		lyra.get_node("NPCBrain").set_use_llm(false)
 		lyra.get_node("NPCBrain").set_use_llm_chat(true)
@@ -170,8 +170,8 @@ func _setup_adventurer_npcs() -> void:
 	var bjorn: Node3D = $NPCs/Bjorn
 	if bjorn:
 		bjorn.trait_profile = "boisterous_brawler"
-		WorldState.add_to_inventory("bjorn", "healing_potion", 3)
-		WorldState.set_entity_data("bjorn", "gold", 80)
+		bjorn.get_node("InventoryComponent").add_item("healing_potion", 3)
+		bjorn.get_node("InventoryComponent").set_gold_amount(80)
 
 		bjorn.get_node("NPCBrain").set_use_llm(false)
 		bjorn.get_node("NPCBrain").set_use_llm_chat(true)
@@ -183,8 +183,8 @@ func _setup_adventurer_npcs() -> void:
 	var sera: Node3D = $NPCs/Sera
 	if sera:
 		sera.trait_profile = "sly_rogue"
-		WorldState.add_to_inventory("sera", "healing_potion", 2)
-		WorldState.set_entity_data("sera", "gold", 100)
+		sera.get_node("InventoryComponent").add_item("healing_potion", 2)
+		sera.get_node("InventoryComponent").set_gold_amount(100)
 
 		sera.get_node("NPCBrain").set_use_llm(false)
 		sera.get_node("NPCBrain").set_use_llm_chat(true)
@@ -196,8 +196,8 @@ func _setup_adventurer_npcs() -> void:
 	var thane: Node3D = $NPCs/Thane
 	if thane:
 		thane.trait_profile = "stoic_knight"
-		WorldState.add_to_inventory("thane", "healing_potion", 2)
-		WorldState.set_entity_data("thane", "gold", 70)
+		thane.get_node("InventoryComponent").add_item("healing_potion", 2)
+		thane.get_node("InventoryComponent").set_gold_amount(70)
 
 		thane.get_node("NPCBrain").set_use_llm(false)
 		thane.get_node("NPCBrain").set_use_llm_chat(true)
@@ -209,8 +209,8 @@ func _setup_adventurer_npcs() -> void:
 	var mira: Node3D = $NPCs/Mira
 	if mira:
 		mira.trait_profile = "cheerful_scholar"
-		WorldState.add_to_inventory("mira", "healing_potion", 3)
-		WorldState.set_entity_data("mira", "gold", 60)
+		mira.get_node("InventoryComponent").add_item("healing_potion", 3)
+		mira.get_node("InventoryComponent").set_gold_amount(60)
 
 		mira.get_node("NPCBrain").set_use_llm(false)
 		mira.get_node("NPCBrain").set_use_llm_chat(true)
@@ -222,8 +222,8 @@ func _setup_adventurer_npcs() -> void:
 	var dusk: Node3D = $NPCs/Dusk
 	if dusk:
 		dusk.trait_profile = "mysterious_loner"
-		WorldState.add_to_inventory("dusk", "healing_potion", 2)
-		WorldState.set_entity_data("dusk", "gold", 50)
+		dusk.get_node("InventoryComponent").add_item("healing_potion", 2)
+		dusk.get_node("InventoryComponent").set_gold_amount(50)
 
 		dusk.get_node("NPCBrain").set_use_llm(false)
 		dusk.get_node("NPCBrain").set_use_llm_chat(true)

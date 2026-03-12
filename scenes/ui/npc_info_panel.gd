@@ -95,24 +95,24 @@ func _refresh() -> void:
 	if _current_npc_id.is_empty():
 		return
 
-	var data := WorldState.get_entity_data(_current_npc_id)
-	if data.is_empty():
-		close()
-		return
-
 	var node: Node3D = WorldState.get_entity(_current_npc_id)
 	if not node or not is_instance_valid(node):
 		close()
 		return
 
-	var npc_name: String = data.get("name", _current_npc_id)
-	var level: int = data.get("level", 1)
-	var state: String = data.get("state", "unknown")
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 0)
-	var gold: int = data.get("gold", 0)
-	var goal: String = data.get("goal", "idle")
-	var personality: String = data.get("personality", "")
+	var stats = node.get_node_or_null("StatsComponent")
+	var inv = node.get_node_or_null("InventoryComponent")
+	var equip = node.get_node_or_null("EquipmentComponent")
+	var combat = node.get_node_or_null("CombatComponent")
+
+	var npc_name: String = node.npc_name if "npc_name" in node else _current_npc_id
+	var level: int = stats.level if stats else 1
+	var state: String = node.current_state if "current_state" in node else "unknown"
+	var hp: int = stats.hp if stats else 0
+	var max_hp: int = stats.max_hp if stats else 0
+	var gold: int = inv.gold if inv else 0
+	var goal: String = node.current_goal if "current_goal" in node else "idle"
+	var personality: String = node.personality if "personality" in node else ""
 
 	_drag_handle.set_title(npc_name)
 
@@ -122,7 +122,8 @@ func _refresh() -> void:
 	text += "[b]%s[/b]  Lv.%d\n" % [npc_name, level]
 	text += "State: [color=%s]%s[/color]" % [_state_color(state), state.to_upper()]
 	if state == "combat" and "combat_target" in node and not node.combat_target.is_empty():
-		var ct_name: String = WorldState.get_entity_data(node.combat_target).get("name", node.combat_target)
+		var ct_node = WorldState.get_entity(node.combat_target)
+		var ct_name: String = ct_node.npc_name if ct_node and "npc_name" in ct_node else node.combat_target
 		text += " vs %s" % ct_name
 	var mood: String = node.current_mood if "current_mood" in node else ""
 	if not mood.is_empty() and mood != "neutral":
@@ -161,20 +162,20 @@ func _refresh() -> void:
 	# Combat stats
 	text += "\n[color=#ffdd88][b]Stats[/b][/color]\n"
 	text += "ATK: %d  DEF: %d\n" % [
-		WorldState.get_effective_atk(_current_npc_id),
-		WorldState.get_effective_def(_current_npc_id)]
-	var equipment: Dictionary = data.get("equipment", {})
+		combat.get_effective_atk() if combat else (stats.atk if stats else 0),
+		combat.get_effective_def() if combat else (stats.def if stats else 0)]
+	var equipment: Dictionary = equip.get_equipment() if equip else {}
 	var weapon_id: String = equipment.get("weapon", "")
 	var armor_id: String = equipment.get("armor", "")
 	text += "Weapon: %s\n" % (ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "[color=#666]None[/color]")
 	text += "Armor: %s\n" % (ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "[color=#666]None[/color]")
 
 	# Inventory
-	var inv: Dictionary = WorldState.get_inventory(_current_npc_id)
-	if not inv.is_empty():
+	var inv_items: Dictionary = inv.get_items() if inv else {}
+	if not inv_items.is_empty():
 		text += "\n[color=#ffdd88][b]Inventory[/b][/color]\n"
-		for item_id in inv:
-			text += "  %s x%d\n" % [ItemDatabase.get_item_name(item_id), inv[item_id]]
+		for item_id in inv_items:
+			text += "  %s x%d\n" % [ItemDatabase.get_item_name(item_id), inv_items[item_id]]
 
 	# Key Memories
 	var memory_node = node.get_node_or_null("NPCMemory")
@@ -192,7 +193,8 @@ func _refresh() -> void:
 			sorted_ids.sort_custom(func(a, b): return memory_node.relationships[b]["affinity"] < memory_node.relationships[a]["affinity"])
 			for partner_id in sorted_ids:
 				var rel: Dictionary = memory_node.relationships[partner_id]
-				var partner_name: String = WorldState.get_entity_data(partner_id).get("name", partner_id)
+				var partner_node = WorldState.get_entity(partner_id)
+				var partner_name: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else partner_id
 				var label: String = memory_node.get_relationship_label(partner_id)
 				var label_color := _relationship_color(label)
 				text += "  %s: [color=%s]%s[/color]" % [partner_name, label_color, label]

@@ -3,11 +3,15 @@ extends CharacterBody3D
 ## Dynamically loads 3D models based on monster type from MonsterDatabase.
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
+const StatsComponent = preload("res://scripts/components/stats_component.gd")
+const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 @export var monster_type: String = "slime"
 @export var monster_id: String = ""
+
+var entity_id: String = ""
 
 const GRAVITY: float = 9.8
 const MOVE_SPEED: float = 3.0
@@ -40,6 +44,8 @@ var _wander_radius: float = 5.0
 
 # Visuals component
 var _visuals: Node
+var _stats: Node
+var _combat: Node
 
 func _ready() -> void:
 	spawn_point = global_position
@@ -51,6 +57,7 @@ func _ready() -> void:
 
 	if monster_id.is_empty():
 		monster_id = "%s_%d" % [monster_type, get_instance_id()]
+	entity_id = monster_id
 
 	_aggro_range = stats.get("aggro_range", 6.0)
 	_attack_range = stats.get("attack_range", 2.0)
@@ -61,6 +68,21 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_setup_model(stats)
+
+	_stats = StatsComponent.new()
+	_stats.name = "StatsComponent"
+	add_child(_stats)
+	_stats.setup({
+		"hp": stats.get("hp", 0), "max_hp": stats.get("hp", 0),
+		"atk": stats.get("atk", 0), "def": stats.get("def", 0),
+		"level": 1,
+		"attack_speed": _attack_speed, "attack_range": _attack_range,
+	})
+
+	_combat = CombatComponent.new()
+	_combat.name = "CombatComponent"
+	add_child(_combat)
+	_combat.setup(_stats, null)
 
 	if name_label:
 		name_label.text = stats.get("name", monster_type)
@@ -326,7 +348,7 @@ func _perform_attack() -> void:
 		return
 	var target_node := WorldState.get_entity(aggro_target)
 	var target_pos := target_node.global_position if target_node else global_position
-	var damage := WorldState.deal_damage(monster_id, aggro_target)
+	var damage: int = _combat.deal_damage_to(aggro_target)
 	_visuals.spawn_damage_number(aggro_target, damage, Color(1, 0.2, 0.2), target_pos)
 	_visuals.flash_target(aggro_target)
 
@@ -377,7 +399,11 @@ func _die(killer_id: String) -> void:
 
 	# Grant XP
 	var xp: int = stats.get("xp", 0)
-	WorldState.grant_xp(killer_id, xp)
+	var killer = WorldState.get_entity(killer_id)
+	if killer and is_instance_valid(killer):
+		var prog = killer.get_node_or_null("ProgressionComponent")
+		if prog:
+			prog.grant_xp(killer_id, xp)
 
 	# Death visual: animation + fade
 	_visuals.play_anim("Death_A")
@@ -432,6 +458,15 @@ func _respawn() -> void:
 		"attack_speed": _attack_speed,
 		"attack_range": _attack_range,
 	})
+
+	_stats.setup({
+		"hp": stats.get("hp", 0), "max_hp": stats.get("hp", 0),
+		"atk": stats.get("atk", 0), "def": stats.get("def", 0),
+		"level": 1,
+		"attack_speed": _attack_speed, "attack_range": _attack_range,
+	})
+
+	_combat.setup(_stats, null)
 
 	GameEvents.entity_respawned.emit(monster_id)
 	_visuals.update_hp_bar(monster_id)

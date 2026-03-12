@@ -53,7 +53,7 @@ func _process(delta: float) -> void:
 		return
 	if npc.current_state != "idle":
 		return
-	if not WorldState.is_alive(npc.npc_id):
+	if not npc._stats.is_alive():
 		return
 	if brain and brain.is_busy():
 		return
@@ -83,12 +83,11 @@ func evaluate() -> void:
 # =============================================================================
 
 func _check_survival() -> bool:
-	var data := WorldState.get_entity_data(npc.npc_id)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
+	var hp: int = npc._stats.hp
+	var max_hp: int = npc._stats.max_hp
 	var hp_pct: float = float(hp) / float(max_hp)
-	var potion_count: int = WorldState.get_item_count(npc.npc_id, "healing_potion")
-	var gold: int = WorldState.get_gold(npc.npc_id)
+	var potion_count: int = npc._inventory.get_item_count("healing_potion")
+	var gold: int = npc._inventory.gold
 
 	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
 	var potion_threshold: float = 0.45 - (boldness * 0.25)  # bold: 0.20, cautious: 0.45
@@ -114,8 +113,8 @@ func _check_survival() -> bool:
 func _check_goal_completion() -> bool:
 	match npc.current_goal:
 		"buy_potions":
-			var potion_count := WorldState.get_item_count(npc.npc_id, "healing_potion")
-			var gold := WorldState.get_gold(npc.npc_id)
+			var potion_count: int = npc._inventory.get_item_count("healing_potion")
+			var gold: int = npc._inventory.gold
 			if potion_count >= 3 or gold < 20:
 				npc.set_goal(default_goal)
 				return true
@@ -137,12 +136,11 @@ func _check_goal_completion() -> bool:
 			pass
 		"return_to_town":
 			if _is_in_town():
-				var data := WorldState.get_entity_data(npc.npc_id)
-				var hp: int = data.get("hp", 0)
-				var max_hp: int = data.get("max_hp", 1)
+				var hp: int = npc._stats.hp
+				var max_hp: int = npc._stats.max_hp
 				if float(hp) / float(max_hp) >= 0.7:
-					var potion_count := WorldState.get_item_count(npc.npc_id, "healing_potion")
-					if potion_count < 2 and WorldState.get_gold(npc.npc_id) >= 40:
+					var potion_count: int = npc._inventory.get_item_count("healing_potion")
+					if potion_count < 2 and npc._inventory.gold >= 40:
 						npc.set_goal("buy_potions")
 					else:
 						npc.set_goal(default_goal)
@@ -153,8 +151,8 @@ func _check_goal_completion() -> bool:
 				npc.set_goal("sell_loot")
 				return true
 			# Restock potions if out and can afford
-			var potion_count := WorldState.get_item_count(npc.npc_id, "healing_potion")
-			if potion_count == 0 and WorldState.get_gold(npc.npc_id) >= 40:
+			var potion_count: int = npc._inventory.get_item_count("healing_potion")
+			if potion_count == 0 and npc._inventory.gold >= 40:
 				npc.set_goal("buy_potions")
 				return true
 	return false
@@ -237,7 +235,7 @@ func _execute_sell_loot() -> void:
 		return
 
 	if _is_near_entity("weapon_shop_npc", 4.0):
-		var count := WorldState.get_item_count(npc.npc_id, material_id)
+		var count: int = npc._inventory.get_item_count(material_id)
 		_do_action_with_data("sell_item", "weapon_shop_npc", {"item_id": material_id, "count": count})
 	else:
 		npc.last_thought = "Going to weapon shop to sell loot"
@@ -285,11 +283,10 @@ func _execute_return_to_town() -> void:
 	if _is_in_town():
 		# HP check will be handled by _check_goal_completion
 		# Use potion if we have one and HP not full
-		var data := WorldState.get_entity_data(npc.npc_id)
-		var hp: int = data.get("hp", 0)
-		var max_hp: int = data.get("max_hp", 1)
+		var hp: int = npc._stats.hp
+		var max_hp: int = npc._stats.max_hp
 		if float(hp) / float(max_hp) < 0.7:
-			var potion_count := WorldState.get_item_count(npc.npc_id, "healing_potion")
+			var potion_count: int = npc._inventory.get_item_count("healing_potion")
 			if potion_count > 0:
 				_do_action("use_item", "healing_potion")
 				return
@@ -362,9 +359,8 @@ func _on_action_completed(completed_npc_id: String, _action: String, _success: b
 # =============================================================================
 
 func _auto_equip() -> void:
-	var data := WorldState.get_entity_data(npc.npc_id)
-	var equipment: Dictionary = data.get("equipment", {})
-	var inv := WorldState.get_inventory(npc.npc_id)
+	var equipment: Dictionary = npc._equipment.get_equipment()
+	var inv: Dictionary = npc._inventory.get_items()
 	for item_id in inv:
 		var item := ItemDatabase.get_item(item_id)
 		var item_type: String = item.get("type", "")
@@ -372,12 +368,12 @@ func _auto_equip() -> void:
 			var current_id: String = equipment.get("weapon", "")
 			var current := ItemDatabase.get_item(current_id)
 			if item.get("atk_bonus", 0) > current.get("atk_bonus", 0):
-				WorldState.equip_item(npc.npc_id, item_id)
+				npc._equipment.equip(item_id)
 		elif item_type == "armor":
 			var current_id: String = equipment.get("armor", "")
 			var current := ItemDatabase.get_item(current_id)
 			if item.get("def_bonus", 0) > current.get("def_bonus", 0):
-				WorldState.equip_item(npc.npc_id, item_id)
+				npc._equipment.equip(item_id)
 
 func _is_in_town() -> bool:
 	return _is_near_location("TownSquare", 25.0)
@@ -395,7 +391,7 @@ func _is_near_entity(entity_id: String, range: float) -> bool:
 	return npc.global_position.distance_to(entity_node.global_position) < range
 
 func _get_first_material() -> String:
-	var inv := WorldState.get_inventory(npc.npc_id)
+	var inv: Dictionary = npc._inventory.get_items()
 	for item_id in inv:
 		var item := ItemDatabase.get_item(item_id)
 		if item.get("type", "") == "material":
@@ -403,7 +399,7 @@ func _get_first_material() -> String:
 	return ""
 
 func _get_total_material_count() -> int:
-	var inv := WorldState.get_inventory(npc.npc_id)
+	var inv: Dictionary = npc._inventory.get_items()
 	var total := 0
 	for item_id in inv:
 		var item := ItemDatabase.get_item(item_id)
@@ -412,11 +408,10 @@ func _get_total_material_count() -> int:
 	return total
 
 func _get_best_upgrade(slot: String) -> String:
-	var data := WorldState.get_entity_data(npc.npc_id)
-	var equipment: Dictionary = data.get("equipment", {})
+	var equipment: Dictionary = npc._equipment.get_equipment()
 	var current_id: String = equipment.get(slot, "")
 	var current_item := ItemDatabase.get_item(current_id)
-	var gold := WorldState.get_gold(npc.npc_id)
+	var gold: int = npc._inventory.gold
 
 	var bonus_key: String = "atk_bonus" if slot == "weapon" else "def_bonus"
 	var current_bonus: int = current_item.get(bonus_key, 0)

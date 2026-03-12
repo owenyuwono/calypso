@@ -7,6 +7,7 @@ const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 var _panel: PanelContainer
 var _is_open: bool = false
+var _player: Node
 
 # Dynamic label refs
 var _name_label: Label
@@ -242,23 +243,31 @@ func toggle() -> void:
 		UIHelper.center_panel(_panel)
 		_refresh()
 
+func set_player(p: Node) -> void:
+	_player = p
+
 func _refresh() -> void:
-	if not _is_open:
+	if not _is_open or not _player:
 		return
 
-	var data := WorldState.get_entity_data("player")
-	var level: int = data.get("level", 1)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 50)
-	var base_atk: int = data.get("atk", 10)
-	var base_def: int = data.get("def", 5)
-	var attack_speed: float = data.get("attack_speed", 0.8)
-	var attack_range: float = data.get("attack_range", 2.0)
-	var xp: int = data.get("xp", 0)
-	var gold: int = data.get("gold", 0)
-	var equipment: Dictionary = data.get("equipment", {})
+	var stats = _player.get_node("StatsComponent")
+	var inv = _player.get_node("InventoryComponent")
+	var equip = _player.get_node("EquipmentComponent")
+	if not stats or not inv or not equip:
+		return
 
-	_name_label.text = data.get("name", "Player")
+	var level: int = stats.level
+	var hp: int = stats.hp
+	var max_hp: int = stats.max_hp
+	var base_atk: int = stats.atk
+	var base_def: int = stats.def
+	var attack_speed: float = stats.attack_speed
+	var attack_range: float = stats.attack_range
+	var xp: int = WorldState.get_entity_data("player").get("xp", 0)
+	var gold: int = inv.gold
+	var equipment: Dictionary = equip.get_equipment()
+
+	_name_label.text = "Player"
 	_level_label.text = "Lv. %d" % level
 
 	# Stats
@@ -266,18 +275,12 @@ func _refresh() -> void:
 	_hp_value.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if hp < max_hp else Color.WHITE)
 
 	# ATK with equipment bonus
-	var weapon_id: String = equipment.get("weapon", "")
-	var atk_bonus: int = 0
-	if not weapon_id.is_empty():
-		atk_bonus = ItemDatabase.get_item(weapon_id).get("atk_bonus", 0)
+	var atk_bonus: int = equip.get_atk_bonus()
 	_atk_value.text = str(base_atk)
 	_atk_bonus.text = "(+%d)" % atk_bonus if atk_bonus > 0 else ""
 
 	# DEF with equipment bonus
-	var armor_id: String = equipment.get("armor", "")
-	var def_bonus: int = 0
-	if not armor_id.is_empty():
-		def_bonus = ItemDatabase.get_item(armor_id).get("def_bonus", 0)
+	var def_bonus: int = equip.get_def_bonus()
 	_def_value.text = str(base_def)
 	_def_bonus.text = "(+%d)" % def_bonus if def_bonus > 0 else ""
 
@@ -285,6 +288,8 @@ func _refresh() -> void:
 	_range_value.text = "%.1f" % attack_range
 
 	# Equipment
+	var weapon_id: String = equipment.get("weapon", "")
+	var armor_id: String = equipment.get("armor", "")
 	var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "None"
 	var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "None"
 	_weapon_name_label.text = weapon_name
@@ -301,11 +306,13 @@ func _refresh() -> void:
 	_gold_label.text = str(gold)
 
 func _unequip_weapon() -> void:
-	WorldState.unequip_item("player", "weapon")
+	if _player:
+		_player.get_node("EquipmentComponent").unequip("weapon")
 	_refresh()
 
 func _unequip_armor() -> void:
-	WorldState.unequip_item("player", "armor")
+	if _player:
+		_player.get_node("EquipmentComponent").unequip("armor")
 	_refresh()
 
 func is_open() -> bool:

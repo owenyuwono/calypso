@@ -3,6 +3,11 @@ extends CharacterBody3D
 ## Uses KayKit 3D character models with overlay-based visual effects.
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
+const StatsComponent = preload("res://scripts/components/stats_component.gd")
+const InventoryComponent = preload("res://scripts/components/inventory_component.gd")
+const EquipmentComponent = preload("res://scripts/components/equipment_component.gd")
+const CombatComponent = preload("res://scripts/components/combat_component.gd")
+const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 
@@ -14,6 +19,8 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 @export var model_path: String = "res://assets/models/characters/Knight.glb"
 @export var model_scale: float = 0.7
 @export var trait_profile: String = ""
+
+var entity_id: String = ""
 
 # States as strings to avoid cross-script class_name issues
 const STATE_IDLE: String = "idle"
@@ -56,6 +63,11 @@ const SEPARATION_FORCE: float = 2.0
 
 # Visuals component
 var _visuals: Node
+var _stats: Node
+var _inventory: Node
+var _equipment: Node
+var _combat: Node
+var _progression: Node
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -69,11 +81,37 @@ const STATE_COLORS: Dictionary = {
 }
 
 func _ready() -> void:
+	entity_id = npc_id
 	current_goal = starting_goal
 
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model(model_path, model_scale, npc_color)
+
+	_stats = StatsComponent.new()
+	_stats.name = "StatsComponent"
+	add_child(_stats)
+	_stats.setup(LevelData.BASE_ADVENTURER_STATS)
+
+	_inventory = InventoryComponent.new()
+	_inventory.name = "InventoryComponent"
+	add_child(_inventory)
+	_inventory.setup({}, LevelData.BASE_ADVENTURER_STATS.get("gold", 80))
+
+	_equipment = EquipmentComponent.new()
+	_equipment.name = "EquipmentComponent"
+	add_child(_equipment)
+	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
+
+	_combat = CombatComponent.new()
+	_combat.name = "CombatComponent"
+	add_child(_combat)
+	_combat.setup(_stats, _equipment)
+
+	_progression = ProgressionComponent.new()
+	_progression.name = "ProgressionComponent"
+	add_child(_progression)
+	_progression.setup(_stats)
 
 	_register_with_world()
 
@@ -257,7 +295,7 @@ func _do_combat_attack() -> void:
 		return
 	var target_node := WorldState.get_entity(combat_target)
 	var target_pos := target_node.global_position if target_node else global_position
-	var damage := WorldState.deal_damage(npc_id, combat_target)
+	var damage: int = _combat.deal_damage_to(combat_target)
 	_visuals.spawn_damage_number(combat_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(combat_target)
 
@@ -343,9 +381,9 @@ func _die() -> void:
 	velocity = Vector3.ZERO
 
 	# Lose 10% gold
-	var gold := WorldState.get_gold(npc_id)
+	var gold: int = _inventory.get_gold_amount()
 	var lost := int(gold * 0.1)
-	WorldState.remove_gold(npc_id, lost)
+	_inventory.remove_gold_amount(lost)
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:

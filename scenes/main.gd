@@ -28,6 +28,21 @@ func _ready() -> void:
 	if player and npc_info_panel:
 		player.npc_info_panel = npc_info_panel
 
+	# Wire player ref to UI panels
+	var player_hud := $UILayer/PlayerHUD
+	if player and player_hud:
+		player_hud.set_player(player)
+	if player and inventory_panel:
+		inventory_panel.set_player(player)
+	if player and status_panel:
+		status_panel.set_player(player)
+	if player and shop_panel:
+		shop_panel.set_player(player)
+	if player and skill_hotbar:
+		skill_hotbar.set_player(player)
+	if player and skill_panel:
+		skill_panel.set_player(player)
+
 	var panel_toggles := $UILayer/PanelToggles
 	if panel_toggles:
 		panel_toggles.status_panel = status_panel
