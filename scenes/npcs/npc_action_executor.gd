@@ -167,7 +167,7 @@ func _do_talk_to(target_id: String, dialogue: String) -> void:
 		var dir := (target_node.global_position - npc.global_position)
 		dir.y = 0.0
 		if dir.length_squared() > 0.01:
-			npc._face_direction(dir.normalized())
+			npc._visuals.face_direction(dir.normalized())
 	GameEvents.npc_spoke.emit(npc.npc_id, dialogue, target_id)
 	GameEvents.npc_action_completed.emit(npc.npc_id, "talk_to", true)
 
