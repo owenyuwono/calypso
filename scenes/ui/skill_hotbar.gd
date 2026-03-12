@@ -10,6 +10,11 @@ const BOTTOM_MARGIN: float = 16.0
 
 var _slots: Array = []  # Array of {panel, name_label, key_label, cooldown_overlay, cooldown_label, skill_id}
 var _cooldowns: Dictionary = {}  # skill_id -> {remaining: float, total: float}
+var _player: Node
+
+func set_player(p: Node) -> void:
+	_player = p
+	refresh()
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -136,7 +141,12 @@ func is_on_cooldown(skill_id: String) -> bool:
 	return _cooldowns.has(skill_id) and _cooldowns[skill_id].remaining > 0.0
 
 func refresh() -> void:
-	var hotbar: Array = WorldState.get_hotbar("player")
+	if not _player:
+		return
+	var skills_comp = _player.get_node("SkillsComponent")
+	if not skills_comp:
+		return
+	var hotbar: Array = skills_comp.get_hotbar()
 	for i in range(SLOT_COUNT):
 		var skill_id: String = hotbar[i] if i < hotbar.size() else ""
 		_slots[i].skill_id = skill_id

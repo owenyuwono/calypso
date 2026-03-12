@@ -1,0 +1,56 @@
+extends Node
+## Component that owns combat stats for an entity.
+## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
+
+var hp: int = 0
+var max_hp: int = 0
+var atk: int = 0
+var def: int = 0
+var level: int = 1
+var attack_speed: float = 1.0
+var attack_range: float = 2.0
+
+func setup(stats: Dictionary) -> void:
+	hp = stats.get("hp", 0)
+	max_hp = stats.get("max_hp", 0)
+	atk = stats.get("atk", 0)
+	def = stats.get("def", 0)
+	level = stats.get("level", 1)
+	attack_speed = stats.get("attack_speed", 1.0)
+	attack_range = stats.get("attack_range", 2.0)
+
+func is_alive() -> bool:
+	return hp > 0
+
+func take_damage(amount: int) -> void:
+	hp = maxi(0, hp - amount)
+	_sync()
+
+func heal(amount: int) -> int:
+	var healed := mini(amount, max_hp - hp)
+	hp += healed
+	_sync()
+	return healed
+
+func get_stats_dict() -> Dictionary:
+	return {
+		"hp": hp, "max_hp": max_hp,
+		"atk": atk, "def": def,
+		"level": level,
+		"attack_speed": attack_speed, "attack_range": attack_range,
+	}
+
+func _sync() -> void:
+	var parent := get_parent()
+	if not parent or not ("entity_id" in parent):
+		return
+	var eid: String = parent.entity_id
+	if eid.is_empty():
+		return
+	WorldState.set_entity_data(eid, "hp", hp)
+	WorldState.set_entity_data(eid, "max_hp", max_hp)
+	WorldState.set_entity_data(eid, "atk", atk)
+	WorldState.set_entity_data(eid, "def", def)
+	WorldState.set_entity_data(eid, "level", level)
+	WorldState.set_entity_data(eid, "attack_speed", attack_speed)
+	WorldState.set_entity_data(eid, "attack_range", attack_range)

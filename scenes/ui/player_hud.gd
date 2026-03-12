@@ -7,6 +7,7 @@ var _xp_bar: ProgressBar
 var _xp_label: Label
 var _level_label: Label
 var _gold_label: Label
+var _player: Node
 
 const LevelData = preload("res://scripts/data/level_data.gd")
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
@@ -150,16 +151,23 @@ func _format_number(n: int) -> String:
 		return "-" + result
 	return result
 
+func set_player(p: Node) -> void:
+	_player = p
+	_refresh_all()
+
 func _refresh_all() -> void:
-	var data := WorldState.get_entity_data("player")
-	if data.is_empty():
+	if not _player:
+		return
+	var stats = _player.get_node("StatsComponent")
+	var inv = _player.get_node("InventoryComponent")
+	if not stats or not inv:
 		return
 
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
-	var xp: int = data.get("xp", 0)
-	var level: int = data.get("level", 1)
-	var gold: int = data.get("gold", 0)
+	var hp: int = stats.hp
+	var max_hp: int = stats.max_hp
+	var level: int = stats.level
+	var gold: int = inv.gold
+	var xp: int = WorldState.get_entity_data("player").get("xp", 0)
 
 	_hp_bar.max_value = max_hp
 	_hp_bar.value = hp

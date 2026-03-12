@@ -9,6 +9,7 @@ var _item_list: VBoxContainer
 var _gold_label: Label
 var _equipment_label: Label
 var _is_open: bool = false
+var _player: Node
 
 func _ready() -> void:
 	visible = false
@@ -58,6 +59,9 @@ func _build_ui() -> void:
 	_item_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_item_list)
 
+func set_player(p: Node) -> void:
+	_player = p
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_inventory"):
 		_toggle()
@@ -70,27 +74,28 @@ func _toggle() -> void:
 		_refresh()
 
 func _refresh() -> void:
-	if not _is_open:
+	if not _is_open or not _player:
 		return
 
-	# Clear old items
 	for child in _item_list.get_children():
 		child.queue_free()
 
-	var data := WorldState.get_entity_data("player")
-	var gold: int = data.get("gold", 0)
+	var inv_comp = _player.get_node("InventoryComponent")
+	var equip_comp = _player.get_node("EquipmentComponent")
+	if not inv_comp or not equip_comp:
+		return
+
+	var gold: int = inv_comp.gold
 	_gold_label.text = "Gold: %d" % gold
 
-	# Equipment info
-	var equipment: Dictionary = data.get("equipment", {})
+	var equipment: Dictionary = equip_comp.get_equipment()
 	var weapon: String = equipment.get("weapon", "")
 	var armor: String = equipment.get("armor", "")
 	var weapon_name := ItemDatabase.get_item_name(weapon) if not weapon.is_empty() else "(none)"
 	var armor_name := ItemDatabase.get_item_name(armor) if not armor.is_empty() else "(none)"
 	_equipment_label.text = "Weapon: %s | Armor: %s" % [weapon_name, armor_name]
 
-	# Items
-	var inv: Dictionary = WorldState.get_inventory("player")
+	var inv: Dictionary = inv_comp.get_items()
 	if inv.is_empty():
 		var empty_label := Label.new()
 		empty_label.text = "No items"
@@ -113,7 +118,6 @@ func _refresh() -> void:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(name_label)
 
-		# Use/Equip button
 		if item_type == "consumable":
 			var use_btn := Button.new()
 			use_btn.text = "Use"
@@ -126,16 +130,23 @@ func _refresh() -> void:
 			row.add_child(equip_btn)
 
 func _use_item(item_id: String) -> void:
+	if not _player:
+		return
 	var item := ItemDatabase.get_item(item_id)
-	if item.get("type", "") == "consumable" and WorldState.has_item("player", item_id):
+	var inv_comp = _player.get_node("InventoryComponent")
+	var combat_comp = _player.get_node("CombatComponent")
+	if item.get("type", "") == "consumable" and inv_comp.has_item(item_id):
 		var heal_amount: int = item.get("heal", 0)
-		if heal_amount > 0:
-			WorldState.heal_entity("player", heal_amount)
-		WorldState.remove_from_inventory("player", item_id)
+		if heal_amount > 0 and combat_comp:
+			combat_comp.heal(heal_amount)
+		inv_comp.remove_item(item_id)
 		_refresh()
 
 func _equip_item(item_id: String) -> void:
-	if WorldState.equip_item("player", item_id):
+	if not _player:
+		return
+	var equip_comp = _player.get_node("EquipmentComponent")
+	if equip_comp and equip_comp.equip(item_id):
 		_refresh()
 
 func is_open() -> bool:

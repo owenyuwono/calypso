@@ -122,7 +122,8 @@ func get_relationships_summary() -> String:
 		if count >= 3:
 			break
 		var label := get_relationship_label(pid)
-		var name: String = WorldState.get_entity_data(pid).get("name", pid)
+		var entity_node = WorldState.get_entity(pid)
+		var name: String = entity_node.npc_name if entity_node and "npc_name" in entity_node else pid
 		parts.append("%s: %s" % [name, label])
 		count += 1
 	return "Relationships: " + ", ".join(parts)
@@ -141,16 +142,16 @@ func gather_chat_facts(target_id: String) -> Array:
 		facts.append({"topic": km["text"].to_lower(), "fact": km["text"], "weight": w})
 
 	# Own state
-	var data := WorldState.get_entity_data(_npc_id)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
+	var npc_node := get_parent()
+	var hp: int = npc_node._stats.hp
+	var max_hp: int = npc_node._stats.max_hp
 	var hp_pct: float = float(hp) / float(max_hp)
-	var gold: int = data.get("gold", 0)
-	var level: int = data.get("level", 1)
-	var equipment: Dictionary = data.get("equipment", {})
+	var gold: int = npc_node._inventory.gold
+	var level: int = npc_node._stats.level
+	var equipment: Dictionary = npc_node._equipment.get_equipment()
 	var weapon_id: String = equipment.get("weapon", "")
 	var armor_id: String = equipment.get("armor", "")
-	var potion_count: int = WorldState.get_item_count(_npc_id, "healing_potion")
+	var potion_count: int = npc_node._inventory.get_item_count("healing_potion")
 
 	if hp_pct < 0.5:
 		facts.append({"topic": "being injured", "fact": "You are at %d/%d HP" % [hp, max_hp], "weight": 2.5})
@@ -167,7 +168,6 @@ func gather_chat_facts(target_id: String) -> Array:
 	else:
 		facts.append({"topic": "running out of potions", "fact": "You have no healing potions left", "weight": 1.5})
 
-	var npc_node := get_parent()
 	var goal: String = npc_node.current_goal if npc_node else "idle"
 	var activity := _goal_to_fact(goal, gold)
 	if not activity.is_empty():
@@ -175,29 +175,33 @@ func gather_chat_facts(target_id: String) -> Array:
 
 	# Target state
 	if not target_id.is_empty():
-		var tdata := WorldState.get_entity_data(target_id)
-		if not tdata.is_empty():
-			var tname: String = tdata.get("name", target_id)
-			var tlevel: int = tdata.get("level", 1)
-			var thp: int = tdata.get("hp", 0)
-			var tmax_hp: int = tdata.get("max_hp", 1)
-			var thp_pct: float = float(thp) / float(tmax_hp)
-			if thp_pct < 0.5:
-				facts.append({"topic": "%s looking rough" % tname, "fact": "%s is at %d/%d HP" % [tname, thp, tmax_hp], "weight": 2.0})
-			if tlevel > level:
-				facts.append({"topic": "%s's level" % tname, "fact": "%s is level %d (higher than you)" % [tname, tlevel], "weight": 1.5})
-			var tequip: Dictionary = tdata.get("equipment", {})
-			var tweapon: String = tequip.get("weapon", "")
-			if not tweapon.is_empty():
-				var twname := ItemDatabase.get_item_name(tweapon)
-				facts.append({"topic": "%s's %s" % [tname, twname.to_lower()], "fact": "%s is using a %s" % [tname, twname], "weight": 1.0})
+		var target_node = WorldState.get_entity(target_id)
+		if target_node and is_instance_valid(target_node):
+			var tstats = target_node.get_node_or_null("StatsComponent")
+			var tequip = target_node.get_node_or_null("EquipmentComponent")
+			var tname: String = target_node.npc_name if "npc_name" in target_node else target_id
+			if tstats:
+				var tlevel: int = tstats.level
+				var thp: int = tstats.hp
+				var tmax_hp: int = tstats.max_hp
+				var thp_pct: float = float(thp) / float(tmax_hp)
+				if thp_pct < 0.5:
+					facts.append({"topic": "%s looking rough" % tname, "fact": "%s is at %d/%d HP" % [tname, thp, tmax_hp], "weight": 2.0})
+				if tlevel > level:
+					facts.append({"topic": "%s's level" % tname, "fact": "%s is level %d (higher than you)" % [tname, tlevel], "weight": 1.5})
+			if tequip:
+				var tweapon: String = tequip.get_equipment().get("weapon", "")
+				if not tweapon.is_empty():
+					var twname := ItemDatabase.get_item_name(tweapon)
+					facts.append({"topic": "%s's %s" % [tname, twname.to_lower()], "fact": "%s is using a %s" % [tname, twname], "weight": 1.0})
 
 	# Relationship with target
 	if relationships.has(target_id):
 		var rel: Dictionary = relationships[target_id]
 		var shared: int = rel.get("shared_combat", 0)
 		if shared > 0:
-			var tname: String = WorldState.get_entity_data(target_id).get("name", target_id)
+			var partner_node = WorldState.get_entity(target_id)
+			var tname: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else target_id
 			facts.append({"topic": "fighting alongside %s" % tname, "fact": "You fought together %d time%s" % [shared, "s" if shared != 1 else ""], "weight": 1.5})
 
 	# Nearby monsters
@@ -242,15 +246,18 @@ func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 	if entity_id == _npc_id:
 		return
 	# Only track shared combat when a monster dies
-	var entity_data := WorldState.get_entity_data(entity_id)
-	if entity_data.get("type", "") != "monster":
+	# Check entity type - monsters have monster_type property
+	var entity_node := WorldState.get_entity(entity_id)
+	if not entity_node or not is_instance_valid(entity_node):
 		return
-	var killer_data := WorldState.get_entity_data(killer_id)
-	if killer_data.get("type", "") != "npc":
+	if not ("monster_type" in entity_node):
+		return
+	# Check killer is an NPC - NPCs have npc_id property
+	var killer_node := WorldState.get_entity(killer_id)
+	if not killer_node or not ("npc_id" in killer_node):
 		return
 	var my_node := get_parent()
-	var entity_node := WorldState.get_entity(entity_id)
-	if not entity_node or not is_instance_valid(entity_node) or not is_instance_valid(my_node):
+	if not is_instance_valid(my_node):
 		return
 	var dist: float = my_node.global_position.distance_to(entity_node.global_position)
 	if dist >= 15.0:
@@ -260,14 +267,14 @@ func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 		for eid in WorldState.entities:
 			if eid == _npc_id or eid == entity_id:
 				continue
-			var edata := WorldState.get_entity_data(eid)
-			if edata.get("type", "") != "npc":
-				continue
 			var ally_node := WorldState.get_entity(eid)
-			if ally_node and is_instance_valid(ally_node):
-				var ally_dist: float = ally_node.global_position.distance_to(entity_node.global_position)
-				if ally_dist < 15.0:
-					record_shared_combat(eid)
+			if not ally_node or not is_instance_valid(ally_node):
+				continue
+			if not ("npc_id" in ally_node):
+				continue
+			var ally_dist: float = ally_node.global_position.distance_to(entity_node.global_position)
+			if ally_dist < 15.0:
+				record_shared_combat(eid)
 	else:
 		# This NPC is a bystander — record shared combat with the killer
 		record_shared_combat(killer_id)

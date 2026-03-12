@@ -10,6 +10,7 @@ var _player_list: VBoxContainer
 var _gold_label: Label
 var _drag_handle: PanelContainer
 var _is_open: bool = false
+var _player: Node
 var _current_shop_id: String = ""
 var _current_shop_items: Array = []
 
@@ -88,6 +89,9 @@ func _build_ui() -> void:
 	_player_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	player_scroll.add_child(_player_list)
 
+func set_player(p: Node) -> void:
+	_player = p
+
 func _input(event: InputEvent) -> void:
 	if _is_open and event.is_action_pressed("ui_cancel"):
 		close_shop()
@@ -109,13 +113,18 @@ func close_shop() -> void:
 	_current_shop_id = ""
 
 func _refresh() -> void:
-	# Clear
 	for child in _shop_list.get_children():
 		child.queue_free()
 	for child in _player_list.get_children():
 		child.queue_free()
 
-	var gold := WorldState.get_gold("player")
+	if not _player:
+		return
+	var inv_comp = _player.get_node("InventoryComponent")
+	if not inv_comp:
+		return
+
+	var gold: int = inv_comp.gold
 	_gold_label.text = "Gold: %d" % gold
 
 	# Shop items (buy)
@@ -140,7 +149,7 @@ func _refresh() -> void:
 		row.add_child(btn)
 
 	# Player items (sell)
-	var inv := WorldState.get_inventory("player")
+	var inv: Dictionary = inv_comp.get_items()
 	for item_id in inv:
 		var count: int = inv[item_id]
 		var item := ItemDatabase.get_item(item_id)
@@ -161,14 +170,20 @@ func _refresh() -> void:
 		row.add_child(btn)
 
 func _buy_item(item_id: String, cost: int) -> void:
-	if WorldState.remove_gold("player", cost):
-		WorldState.add_to_inventory("player", item_id)
+	if not _player:
+		return
+	var inv_comp = _player.get_node("InventoryComponent")
+	if inv_comp and inv_comp.remove_gold_amount(cost):
+		inv_comp.add_item(item_id)
 		GameEvents.item_purchased.emit("player", item_id, cost)
 		_refresh()
 
 func _sell_item(item_id: String, price: int) -> void:
-	if WorldState.remove_from_inventory("player", item_id):
-		WorldState.add_gold("player", price)
+	if not _player:
+		return
+	var inv_comp = _player.get_node("InventoryComponent")
+	if inv_comp and inv_comp.remove_item(item_id):
+		inv_comp.add_gold_amount(price)
 		GameEvents.item_sold.emit("player", item_id, price)
 		_refresh()
 

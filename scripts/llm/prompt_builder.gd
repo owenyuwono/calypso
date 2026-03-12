@@ -52,29 +52,30 @@ static func build_system_message(npc_name: String, personality: String, goal: St
 	return {"role": "system", "content": content}
 
 static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: Node) -> Dictionary:
-	var data := WorldState.get_entity_data(npc_id)
 	var perception := WorldState.get_npc_perception(npc_id)
 	var memory_summary: String = memory_node.get_summary() if memory_node else ""
 
-	# Stats
-	var level: int = data.get("level", 1)
-	var hp: int = data.get("hp", 50)
-	var max_hp: int = data.get("max_hp", 50)
-	var atk: int = data.get("atk", 10)
-	var def: int = data.get("def", 5)
-	var eff_atk: int = WorldState.get_effective_atk(npc_id)
-	var eff_def: int = WorldState.get_effective_def(npc_id)
-	var gold: int = data.get("gold", 0)
+	var stats = npc_node.get_node_or_null("StatsComponent")
+	var inv_comp = npc_node.get_node_or_null("InventoryComponent")
+	var equip_comp = npc_node.get_node_or_null("EquipmentComponent")
+	var combat_comp = npc_node.get_node_or_null("CombatComponent")
 
-	# Equipment
-	var equipment: Dictionary = data.get("equipment", {})
+	var level: int = stats.level if stats else 1
+	var hp: int = stats.hp if stats else 50
+	var max_hp: int = stats.max_hp if stats else 50
+	var atk: int = stats.atk if stats else 10
+	var def: int = stats.def if stats else 5
+	var eff_atk: int = combat_comp.get_effective_atk() if combat_comp else atk
+	var eff_def: int = combat_comp.get_effective_def() if combat_comp else def
+	var gold: int = inv_comp.gold if inv_comp else 0
+
+	var equipment: Dictionary = equip_comp.get_equipment() if equip_comp else {}
 	var weapon_id: String = equipment.get("weapon", "")
 	var armor_id: String = equipment.get("armor", "")
 	var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "(none)"
 	var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "(none)"
 
-	# Inventory
-	var inv: Dictionary = WorldState.get_inventory(npc_id)
+	var inv: Dictionary = inv_comp.get_items() if inv_comp else {}
 	var inventory_text := "(empty)"
 	if not inv.is_empty():
 		var parts: Array = []
@@ -186,11 +187,20 @@ static func build_chat_initiate_system_message(npc_name: String, personality: St
 	return {"role": "system", "content": content}
 
 static func build_chat_initiate_user_message(npc_name: String, npc_id: String, target_name: String, target_id: String, target_activity: String, memory_node: Node, relationship_label: String = "") -> Dictionary:
-	var data := WorldState.get_entity_data(npc_id)
-	var level: int = data.get("level", 1)
-	var hp: int = data.get("hp", 50)
-	var max_hp: int = data.get("max_hp", 50)
-	var gold: int = data.get("gold", 0)
+	var npc_node = WorldState.get_entity(npc_id)
+	var level: int = 1
+	var hp: int = 50
+	var max_hp: int = 50
+	var gold: int = 0
+	if npc_node and is_instance_valid(npc_node):
+		var stats = npc_node.get_node_or_null("StatsComponent")
+		var inv = npc_node.get_node_or_null("InventoryComponent")
+		if stats:
+			level = stats.level
+			hp = stats.hp
+			max_hp = stats.max_hp
+		if inv:
+			gold = inv.gold
 
 	var context := ""
 	if memory_node and memory_node.has_method("get_area_chat_context"):
@@ -236,11 +246,20 @@ static func build_chat_system_message(npc_name: String, personality: String, act
 	return {"role": "system", "content": content}
 
 static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node, relationship_label: String = "") -> Dictionary:
-	var data := WorldState.get_entity_data(npc_id)
-	var level: int = data.get("level", 1)
-	var hp: int = data.get("hp", 50)
-	var max_hp: int = data.get("max_hp", 50)
-	var gold: int = data.get("gold", 0)
+	var npc_node = WorldState.get_entity(npc_id)
+	var level: int = 1
+	var hp: int = 50
+	var max_hp: int = 50
+	var gold: int = 0
+	if npc_node and is_instance_valid(npc_node):
+		var stats = npc_node.get_node_or_null("StatsComponent")
+		var inv = npc_node.get_node_or_null("InventoryComponent")
+		if stats:
+			level = stats.level
+			hp = stats.hp
+			max_hp = stats.max_hp
+		if inv:
+			gold = inv.gold
 
 	# Build conversation context from area chat log
 	var context := ""

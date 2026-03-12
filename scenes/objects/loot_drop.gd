@@ -6,6 +6,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 var loot_id: String = ""
+var entity_id: String = ""
 var item_id: String = ""
 var item_count: int = 1
 var gold_amount: int = 0
@@ -18,6 +19,7 @@ var _label: Label3D
 func _ready() -> void:
 	if loot_id.is_empty():
 		loot_id = "loot_%d" % get_instance_id()
+	entity_id = loot_id
 
 	_build_visual()
 	_build_label()
@@ -95,11 +97,15 @@ func _process(delta: float) -> void:
 		_despawn()
 
 func pickup(entity_id: String) -> void:
+	var entity = WorldState.get_entity(entity_id)
+	var inv = entity.get_node_or_null("InventoryComponent") if entity else null
 	if gold_amount > 0:
-		WorldState.add_gold(entity_id, gold_amount)
+		if inv:
+			inv.add_gold_amount(gold_amount)
 		GameEvents.item_looted.emit(entity_id, "gold", gold_amount)
 	if not item_id.is_empty():
-		WorldState.add_to_inventory(entity_id, item_id, item_count)
+		if inv:
+			inv.add_item(item_id, item_count)
 		GameEvents.item_looted.emit(entity_id, item_id, item_count)
 	WorldState.unregister_entity(loot_id)
 	queue_free()

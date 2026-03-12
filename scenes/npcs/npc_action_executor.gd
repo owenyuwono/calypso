@@ -54,7 +54,8 @@ func _do_attack(target_id: String) -> void:
 	if not target_node or not is_instance_valid(target_node):
 		_fail("attack", "Target '%s' not found" % target_id)
 		return
-	if not WorldState.is_alive(target_id):
+	var target_stats = target_node.get_node_or_null("StatsComponent")
+	if target_stats and not target_stats.is_alive():
 		_fail("attack", "Target '%s' is already dead" % target_id)
 		return
 
@@ -67,7 +68,7 @@ func _do_use_item(item_id: String) -> void:
 	if item.is_empty():
 		_fail("use_item", "Unknown item '%s'" % item_id)
 		return
-	if not WorldState.has_item(npc.npc_id, item_id):
+	if not npc._inventory.has_item(item_id):
 		_fail("use_item", "Don't have item '%s'" % item_id)
 		return
 
@@ -77,13 +78,13 @@ func _do_use_item(item_id: String) -> void:
 		"consumable":
 			var heal: int = item.get("heal", 0)
 			if heal > 0:
-				var healed := WorldState.heal_entity(npc.npc_id, heal)
+				var healed: int = npc._combat.heal(heal)
 				var memory_node = npc.get_node_or_null("NPCMemory")
 				if memory_node:
 					memory_node.add_observation("Used %s, healed %d HP" % [item.get("name", item_id), healed])
-			WorldState.remove_from_inventory(npc.npc_id, item_id)
+			npc._inventory.remove_item(item_id)
 		"weapon", "armor":
-			WorldState.equip_item(npc.npc_id, item_id)
+			npc._equipment.equip(item_id)
 			var memory_node = npc.get_node_or_null("NPCMemory")
 			if memory_node:
 				memory_node.add_observation("Equipped %s" % item.get("name", item_id))
@@ -110,11 +111,11 @@ func _do_buy_item(shop_id: String, action_data: Dictionary = {}) -> void:
 
 	var item := ItemDatabase.get_item(item_id)
 	var cost: int = item.get("value", 0) * count
-	if not WorldState.remove_gold(npc.npc_id, cost):
+	if not npc._inventory.remove_gold_amount(cost):
 		_fail("buy_item", "Not enough gold for %s (need %d)" % [item_id, cost])
 		return
 
-	WorldState.add_to_inventory(npc.npc_id, item_id, count)
+	npc._inventory.add_item(item_id, count)
 	GameEvents.item_purchased.emit(npc.npc_id, item_id, cost)
 
 	var memory_node = npc.get_node_or_null("NPCMemory")
@@ -143,13 +144,13 @@ func _do_sell_item(shop_id: String, action_data: Dictionary = {}) -> void:
 		_fail("sell_item", "No item_id specified")
 		return
 
-	if not WorldState.remove_from_inventory(npc.npc_id, item_id, count):
+	if not npc._inventory.remove_item(item_id, count):
 		_fail("sell_item", "Don't have %dx %s" % [count, item_id])
 		return
 
 	var item := ItemDatabase.get_item(item_id)
 	var revenue: int = int(item.get("value", 0) * 0.5) * count
-	WorldState.add_gold(npc.npc_id, revenue)
+	npc._inventory.add_gold_amount(revenue)
 	GameEvents.item_sold.emit(npc.npc_id, item_id, revenue)
 
 	var memory_node = npc.get_node_or_null("NPCMemory")

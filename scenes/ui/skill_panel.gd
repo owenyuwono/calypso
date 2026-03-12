@@ -8,6 +8,10 @@ var _panel: PanelContainer
 var _is_open: bool = false
 var _sp_label: Label
 var _skill_list: VBoxContainer
+var _player: Node
+
+func set_player(p: Node) -> void:
+	_player = p
 
 func _ready() -> void:
 	visible = false
@@ -65,23 +69,25 @@ func toggle() -> void:
 		_refresh()
 
 func _refresh() -> void:
-	if not _is_open:
+	if not _is_open or not _player:
 		return
 
-	# Clear old rows
 	for child in _skill_list.get_children():
 		child.queue_free()
 
-	var data := WorldState.get_entity_data("player")
-	var sp: int = data.get("skill_points", 0)
-	var player_level: int = data.get("level", 1)
-	var learned_skills: Dictionary = data.get("skills", {})
+	var stats = _player.get_node("StatsComponent")
+	var skills_comp = _player.get_node("SkillsComponent")
+	if not stats or not skills_comp:
+		return
+
+	var sp: int = skills_comp.get_skill_points()
+	var player_level: int = stats.level
 
 	_sp_label.text = "Skill Points: %d" % sp
 
 	for skill_id in SkillDatabase.SKILLS:
 		var skill: Dictionary = SkillDatabase.SKILLS[skill_id]
-		var current_level: int = learned_skills.get(skill_id, 0)
+		var current_level: int = skills_comp.get_skill_level(skill_id)
 		var max_level: int = skill.get("max_level", 5)
 		var required_level: int = skill.get("required_level", 1)
 		var skill_color: Color = skill.get("color", Color.WHITE)
@@ -91,7 +97,6 @@ func _refresh() -> void:
 		row_vbox.add_theme_constant_override("separation", 2)
 		_skill_list.add_child(row_vbox)
 
-		# Row 1: Name | Level | Learn/Upgrade button
 		var top_row := HBoxContainer.new()
 		top_row.add_theme_constant_override("separation", 8)
 		row_vbox.add_child(top_row)
@@ -118,14 +123,12 @@ func _refresh() -> void:
 		btn.pressed.connect(_learn_skill.bind(skill_id))
 		top_row.add_child(btn)
 
-		# Row 2: Description
 		var desc_label := Label.new()
 		desc_label.text = skill.get("description", "")
 		desc_label.add_theme_font_size_override("font_size", 12)
 		desc_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 		row_vbox.add_child(desc_label)
 
-		# Row 3: Stats preview
 		var preview_level := maxi(1, current_level)
 		var mult := SkillDatabase.get_effective_multiplier(skill_id, preview_level)
 		var cd := SkillDatabase.get_effective_cooldown(skill_id, preview_level)
@@ -139,7 +142,6 @@ func _refresh() -> void:
 		stats_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.5) if meets_level else Color(0.7, 0.3, 0.3))
 		row_vbox.add_child(stats_label)
 
-		# Row 4: Hotbar assignment (only if learned)
 		if current_level > 0:
 			var hotbar_row := HBoxContainer.new()
 			hotbar_row.add_theme_constant_override("separation", 4)
@@ -151,13 +153,12 @@ func _refresh() -> void:
 			hotbar_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 			hotbar_row.add_child(hotbar_label)
 
-			var hotbar: Array = WorldState.get_hotbar("player")
+			var hotbar: Array = skills_comp.get_hotbar()
 			for slot_i in range(5):
 				var slot_btn := Button.new()
 				slot_btn.text = str(slot_i + 1)
 				slot_btn.custom_minimum_size = Vector2(28, 24)
 				slot_btn.add_theme_font_size_override("font_size", 11)
-				# Highlight current assignment
 				if slot_i < hotbar.size() and hotbar[slot_i] == skill_id:
 					var active_style := StyleBoxFlat.new()
 					active_style.bg_color = Color(0.3, 0.25, 0.1, 0.9)
@@ -169,13 +170,14 @@ func _refresh() -> void:
 				hotbar_row.add_child(slot_btn)
 
 func _learn_skill(skill_id: String) -> void:
-	WorldState.learn_skill("player", skill_id)
+	if _player:
+		_player.get_node("SkillsComponent").learn_skill(skill_id)
 	_refresh()
 
 func _assign_hotbar(slot: int, skill_id: String) -> void:
-	WorldState.set_hotbar_slot("player", slot, skill_id)
+	if _player:
+		_player.get_node("SkillsComponent").set_hotbar_slot(slot, skill_id)
 	_refresh()
-	# Refresh the hotbar UI
 	var hotbar_node := get_parent().get_node_or_null("SkillHotbar")
 	if hotbar_node:
 		hotbar_node.refresh()

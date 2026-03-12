@@ -10,12 +10,20 @@ const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
 const MODEL_SCALE: float = 0.7
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
+const StatsComponent = preload("res://scripts/components/stats_component.gd")
+const InventoryComponent = preload("res://scripts/components/inventory_component.gd")
+const EquipmentComponent = preload("res://scripts/components/equipment_component.gd")
+const CombatComponent = preload("res://scripts/components/combat_component.gd")
+const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
+const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
+
+var entity_id: String = "player"
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -49,6 +57,12 @@ var _skill_hit_time: float = 0.0
 
 # Visuals component
 var _visuals: Node
+var _stats: Node
+var _inventory: Node
+var _equipment: Node
+var _combat: Node
+var _progression: Node
+var _skills_comp: Node
 
 # UI references (set by main scene setup)
 var shop_panel: Control
@@ -73,6 +87,36 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model("res://assets/models/characters/Knight.glb", MODEL_SCALE, Color(0.2, 0.4, 0.7))
+
+	_stats = StatsComponent.new()
+	_stats.name = "StatsComponent"
+	add_child(_stats)
+	_stats.setup(LevelData.BASE_PLAYER_STATS)
+
+	_inventory = InventoryComponent.new()
+	_inventory.name = "InventoryComponent"
+	add_child(_inventory)
+	_inventory.setup({}, LevelData.BASE_PLAYER_STATS.get("gold", 100))
+
+	_equipment = EquipmentComponent.new()
+	_equipment.name = "EquipmentComponent"
+	add_child(_equipment)
+	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
+
+	_combat = CombatComponent.new()
+	_combat.name = "CombatComponent"
+	add_child(_combat)
+	_combat.setup(_stats, _equipment)
+
+	_progression = ProgressionComponent.new()
+	_progression.name = "ProgressionComponent"
+	add_child(_progression)
+	_progression.setup(_stats)
+
+	_skills_comp = SkillsComponent.new()
+	_skills_comp.name = "SkillsComponent"
+	add_child(_skills_comp)
+	_skills_comp.setup({}, ["", "", "", "", ""], 0)
 
 	var stats := LevelData.BASE_PLAYER_STATS.duplicate()
 	stats["type"] = "player"
@@ -323,7 +367,7 @@ func _perform_attack() -> void:
 		return
 	var target_node := WorldState.get_entity(_attack_target)
 	var target_pos := target_node.global_position if target_node else global_position
-	var damage := WorldState.deal_damage("player", _attack_target)
+	var damage: int = _combat.deal_damage_to(_attack_target)
 	_visuals.spawn_damage_number(_attack_target, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
 
@@ -600,9 +644,9 @@ func _die() -> void:
 	_cursor_manager.reset()
 
 	# Lose 10% gold
-	var gold := WorldState.get_gold("player")
+	var gold: int = _inventory.get_gold_amount()
 	var lost := int(gold * 0.1)
-	WorldState.remove_gold("player", lost)
+	_inventory.remove_gold_amount(lost)
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")
@@ -643,7 +687,7 @@ func flash_hit() -> void:
 	_visuals.flash_hit()
 
 func _try_use_hotbar_slot(slot: int) -> void:
-	var hotbar: Array = WorldState.get_hotbar("player")
+	var hotbar: Array = _skills_comp.get_hotbar()
 	if slot < 0 or slot >= hotbar.size():
 		return
 	var skill_id: String = hotbar[slot]
@@ -657,7 +701,7 @@ func _use_skill(skill_id: String) -> void:
 	var skill := SkillDatabase.get_skill(skill_id)
 	if skill.is_empty():
 		return
-	var skill_level: int = WorldState.get_skill_level("player", skill_id)
+	var skill_level: int = _skills_comp.get_skill_level(skill_id)
 	if skill_level <= 0:
 		return
 	var skill_type: String = skill.get("type", "")
@@ -672,7 +716,7 @@ func _use_skill(skill_id: String) -> void:
 		if dist > attack_range:
 			return
 		var multiplier := SkillDatabase.get_effective_multiplier(skill_id, skill_level)
-		var raw_damage := floori(WorldState.get_effective_atk("player") * multiplier)
+		var raw_damage := floori(_combat.get_effective_atk() * multiplier)
 		var anim_name: String = skill.get("animation", "1H_Melee_Attack_Chop")
 		_pending_skill_hit = true
 		_pending_skill_damage = raw_damage
@@ -694,7 +738,7 @@ func _execute_skill_hit() -> void:
 		return
 	var target_node := WorldState.get_entity(_attack_target)
 	var target_pos := target_node.global_position if target_node else global_position
-	var actual_damage := WorldState.deal_damage_amount("player", _attack_target, _pending_skill_damage)
+	var actual_damage: int = _combat.deal_damage_amount_to(_attack_target, _pending_skill_damage)
 	_visuals.spawn_damage_number(_attack_target, actual_damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(_attack_target)
 	GameEvents.skill_used.emit("player", _pending_skill_id)

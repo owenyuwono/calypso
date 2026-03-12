@@ -17,9 +17,11 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 @onready var name_label: Label3D = $NameLabel
 
+var entity_id: String = ""
 var _visuals: Node
 
 func _ready() -> void:
+	entity_id = shop_id
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model(model_path, model_scale, npc_color)
