@@ -16,8 +16,8 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
 - `EquipmentComponent` — weapon/armor slots. Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_atk_bonus()`, `get_def_bonus()`
 - `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
-- `ProgressionComponent` — XP/level-up. Requires StatsComponent. API: `grant_xp()`
-- `SkillsComponent` — skills dict + hotbar + skill points. API: `learn_skill()`, `get_skill_level()`, `get_hotbar()`, `set_hotbar_slot()`, `get_skill_points()`, `add_skill_points()`
+- `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
+- `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
 
 Components sync state back to `WorldState.entity_data` via `_sync()` (bridge layer — keeps perception/memory reads working).
 
@@ -40,3 +40,12 @@ Do NOT add inventory/gold/equipment/combat/progression/skills methods back to Wo
 - `DragHandle` for draggable panel title bars with close buttons
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
+
+## Proficiency System (RuneScape-style)
+- **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`
+- **Weapon** (5): sword, axe, mace, dagger, staff. **Attribute** (2): constitution, agility. **Gathering** (3): mining, woodcutting, fishing. **Production** (3): smithing, cooking, crafting
+- **Stat derivation**: ATK = 5 + weapon_level * 2, DEF = 3 + constitution_level, Max HP = 40 + constitution_level * 10, player level = sum of all proficiency levels
+- **XP sources**: weapon proficiency XP on combat hits, constitution XP on taking damage. Gathering/production are placeholders (not yet implemented)
+- **Monsters**: `proficiency_xp` field in MonsterDatabase (3–20 per monster type)
+- **Items**: `weapon_type`, `required_skill`, `required_level` fields for equipment proficiency requirements
+- **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`
