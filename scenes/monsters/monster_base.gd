@@ -13,6 +13,8 @@ const GRAVITY: float = 9.8
 const MOVE_SPEED: float = 3.0
 const WANDER_INTERVAL_MIN: float = 3.0
 const WANDER_INTERVAL_MAX: float = 5.0
+const NIGHT_AGGRO_MULTIPLIER: float = 1.3
+const NIGHT_ATK_MULTIPLIER: float = 1.15
 
 # States
 var state: String = "idle"  # idle, wandering, aggro, attacking, dead
@@ -30,6 +32,7 @@ var _pending_hit: bool = false
 var _hit_time: float = 0.0
 
 # Cached stats
+var _base_aggro_range: float = 6.0
 var _aggro_range: float = 6.0
 var _attack_range: float = 2.0
 var _attack_speed: float = 1.5
@@ -58,7 +61,8 @@ func _ready() -> void:
 	if monster_id.is_empty():
 		monster_id = "%s_%d" % [monster_type, get_instance_id()]
 
-	_aggro_range = stats.get("aggro_range", 6.0)
+	_base_aggro_range = stats.get("aggro_range", 6.0)
+	_aggro_range = _base_aggro_range
 	_attack_range = stats.get("attack_range", 2.0)
 	_attack_speed = stats.get("attack_speed", 1.5)
 	_wander_radius = stats.get("wander_radius", 5.0)
@@ -96,6 +100,10 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
+	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
+	# Apply night buffs if spawned during night
+	if TimeManager.is_night():
+		_apply_night_buffs()
 
 func _setup_model(stats: Dictionary) -> void:
 	var model_scene_path: String = stats.get("model_scene", "")
@@ -478,6 +486,9 @@ func _respawn() -> void:
 
 	GameEvents.entity_respawned.emit(monster_id)
 	_update_hp_bar()
+	# Reapply night buffs if respawning during night
+	if TimeManager.is_night():
+		_apply_night_buffs()
 
 func _update_hp_bar() -> void:
 	if not _hp_bar or state == "dead":
@@ -515,6 +526,25 @@ func _get_hit_delay(anim_name: String) -> float:
 	if _anim_player and _anim_player.has_animation(anim_name):
 		return _anim_player.get_animation(anim_name).length * 0.5
 	return 0.4
+
+func _on_time_phase_changed(old_phase: String, new_phase: String) -> void:
+	if state == "dead":
+		return
+	if new_phase == "night":
+		_apply_night_buffs()
+	elif old_phase == "night":
+		_remove_night_buffs()
+
+func _apply_night_buffs() -> void:
+	_aggro_range = _base_aggro_range * NIGHT_AGGRO_MULTIPLIER
+	var stats := MonsterDatabase.get_monster(monster_type)
+	var base_atk: int = stats.get("atk", 0)
+	WorldState.set_entity_data(monster_id, "atk", int(base_atk * NIGHT_ATK_MULTIPLIER))
+
+func _remove_night_buffs() -> void:
+	_aggro_range = _base_aggro_range
+	var stats := MonsterDatabase.get_monster(monster_type)
+	WorldState.set_entity_data(monster_id, "atk", stats.get("atk", 0))
 
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
 	var loot_scene := preload("res://scenes/objects/loot_drop.gd")

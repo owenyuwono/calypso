@@ -79,6 +79,11 @@ func _ready() -> void:
 	_setup_model()
 	_register_with_world()
 
+	# Add StaminaComponent
+	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
+	stamina_comp.name = "StaminaComponent"
+	add_child(stamina_comp)
+
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD

@@ -3,10 +3,14 @@ extends Control
 
 var _hp_bar: ProgressBar
 var _hp_label: Label
+var _sta_bar: ProgressBar
+var _sta_label: Label
 var _xp_bar: ProgressBar
 var _xp_label: Label
 var _level_label: Label
 var _gold_label: Label
+var _time_label: Label
+var _day_label: Label
 
 const LevelData = preload("res://scripts/data/level_data.gd")
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
@@ -23,6 +27,8 @@ func _ready() -> void:
 	GameEvents.item_purchased.connect(_on_economy_event)
 	GameEvents.item_sold.connect(_on_economy_event)
 	GameEvents.item_looted.connect(_on_economy_event)
+	GameEvents.stamina_changed.connect(_on_stamina_changed)
+	GameEvents.game_hour_changed.connect(_on_game_hour_changed)
 	# Initial refresh
 	_refresh_all()
 
@@ -93,6 +99,30 @@ func _build_ui() -> void:
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hp_row.add_child(_hp_label)
 
+	# Stamina bar
+	var sta_row := HBoxContainer.new()
+	vbox.add_child(sta_row)
+
+	var sta_title := Label.new()
+	sta_title.text = "STA"
+	sta_title.add_theme_font_size_override("font_size", 13)
+	sta_title.add_theme_color_override("font_color", Color(0.2, 0.75, 0.5))
+	sta_title.custom_minimum_size = Vector2(32, 0)
+	sta_row.add_child(sta_title)
+
+	_sta_bar = _create_styled_bar(
+		Color(0.15, 0.65, 0.4), Color(0.05, 0.15, 0.1),
+		Color(0.3, 0.8, 0.55), Color(0, 0.05, 0.02), 18
+	)
+	sta_row.add_child(_sta_bar)
+
+	_sta_label = Label.new()
+	_sta_label.text = "100/100"
+	_sta_label.add_theme_font_size_override("font_size", 12)
+	_sta_label.custom_minimum_size = Vector2(60, 0)
+	_sta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	sta_row.add_child(_sta_label)
+
 	# XP bar
 	var xp_row := HBoxContainer.new()
 	vbox.add_child(xp_row)
@@ -116,6 +146,40 @@ func _build_ui() -> void:
 	_xp_label.custom_minimum_size = Vector2(60, 0)
 	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	xp_row.add_child(_xp_label)
+
+	# Time panel — separate panel to the left of the minimap
+	_build_time_panel()
+
+func _build_time_panel() -> void:
+	# Minimap is 184px wide, 10px from right edge.
+	# Place this panel to the left of the minimap using absolute positioning.
+	var viewport_w := get_viewport().get_visible_rect().size.x
+	var minimap_left := viewport_w - 184.0 - 10.0  # minimap left edge
+	var panel_w := 86.0
+	var gap := 6.0
+
+	var time_panel := PanelContainer.new()
+	time_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	time_panel.position = Vector2(minimap_left - panel_w - gap, 10)
+	add_child(time_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.custom_minimum_size = Vector2(72, 0)
+	time_panel.add_child(vbox)
+
+	_time_label = Label.new()
+	_time_label.text = "08:00"
+	_time_label.add_theme_font_size_override("font_size", 18)
+	_time_label.add_theme_color_override("font_color", Color(0.95, 0.9, 0.75))
+	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_time_label)
+
+	_day_label = Label.new()
+	_day_label.text = "Day 1 - day"
+	_day_label.add_theme_font_size_override("font_size", 11)
+	_day_label.add_theme_color_override("font_color", Color(0.7, 0.65, 0.5))
+	_day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_day_label)
 
 func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color, bar_height: int) -> ProgressBar:
 	var bar := ProgressBar.new()
@@ -185,6 +249,9 @@ func _refresh_all() -> void:
 	_level_label.text = "Lv. %d" % level
 	_gold_label.text = "%s G" % _format_number(gold)
 
+	_refresh_stamina()
+	_refresh_time()
+
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		_refresh_all()
@@ -204,6 +271,30 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 func _on_economy_event(entity_id: String, _item_id: String, _amount: int) -> void:
 	if entity_id == "player":
 		_refresh_all()
+
+func _on_stamina_changed(entity_id: String, _stamina: float, _max_stamina: float) -> void:
+	if entity_id == "player":
+		_refresh_stamina()
+
+func _on_game_hour_changed(_hour: int) -> void:
+	_refresh_time()
+
+func _refresh_stamina() -> void:
+	var player_node = WorldState.get_entity("player")
+	if not player_node:
+		return
+	var comp = player_node.get_node_or_null("StaminaComponent")
+	if not comp:
+		return
+	var sta: float = comp.get_stamina()
+	var max_sta: float = comp.get_max_stamina()
+	_sta_bar.max_value = max_sta
+	_sta_bar.value = sta
+	_sta_label.text = "%d/%d" % [int(sta), int(max_sta)]
+
+func _refresh_time() -> void:
+	_time_label.text = TimeManager.get_time_display()
+	_day_label.text = "Day %d - %s" % [TimeManager.get_day(), TimeManager.get_phase()]
 
 func _on_level_up(entity_id: String, new_level: int) -> void:
 	if entity_id != "player":

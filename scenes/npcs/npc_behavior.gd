@@ -7,7 +7,7 @@ const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 
 const VALID_GOALS: Array = [
 	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
-	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle"
+	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -72,6 +72,14 @@ func evaluate() -> void:
 	# Priority 2: Goal completion transitions
 	if _check_goal_completion():
 		return
+	# Priority 2.3: Night pressure — cautious NPCs return to town at night
+	if TimeManager.is_night():
+		var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
+		if boldness < 0.4 and not _is_in_town() and npc.current_goal == "hunt_field":
+			npc.set_goal("return_to_town")
+			npc.last_thought = "It's getting dark, better head back"
+			_do_action("move_to", "TownSquare")
+			return
 	# Priority 2.5: Social chat with nearby NPCs
 	if _try_social_chat():
 		return
@@ -105,6 +113,18 @@ func _check_survival() -> bool:
 		_do_action("move_to", "TownSquare")
 		return true
 
+	# Stamina check — return to town if exhausted
+	var stamina_comp = npc.get_node_or_null("StaminaComponent")
+	if stamina_comp:
+		var stamina_pct: float = stamina_comp.get_stamina_percent()
+		var rest_threshold: float = 0.25 - (boldness * 0.15)  # bold: 0.10, cautious: 0.25
+		# Hard floor: force retreat at 5% regardless
+		if (stamina_pct < rest_threshold or stamina_pct < 0.05) and not _is_in_town():
+			npc.set_goal("return_to_town")
+			npc.last_thought = "Getting tired, heading back"
+			_do_action("move_to", "TownSquare")
+			return true
+
 	return false
 
 # =============================================================================
@@ -135,8 +155,18 @@ func _check_goal_completion() -> bool:
 		"buy_weapon", "buy_armor":
 			# These complete in _execute_goal when purchase done or can't afford
 			pass
+		"rest":
+			var rest_stamina_comp = npc.get_node_or_null("StaminaComponent")
+			if rest_stamina_comp and rest_stamina_comp.get_stamina_percent() >= 0.8:
+				npc.set_goal(default_goal)
+				return true
 		"return_to_town":
 			if _is_in_town():
+				# Check if stamina is low — transition to rest goal
+				var rtt_stamina_comp = npc.get_node_or_null("StaminaComponent")
+				if rtt_stamina_comp and rtt_stamina_comp.get_stamina_percent() < 0.5:
+					npc.set_goal("rest")
+					return true
 				var data := WorldState.get_entity_data(npc.npc_id)
 				var hp: int = data.get("hp", 0)
 				var max_hp: int = data.get("max_hp", 1)
@@ -183,6 +213,8 @@ func _execute_goal() -> void:
 			_execute_return_to_town()
 		"patrol":
 			_execute_patrol()
+		"rest":
+			_execute_rest()
 		"idle":
 			_execute_idle()
 
@@ -298,6 +330,31 @@ func _execute_return_to_town() -> void:
 	else:
 		npc.last_thought = "Retreating to town"
 		_do_action("move_to", "TownSquare")
+
+func _execute_rest() -> void:
+	var stamina_comp = npc.get_node_or_null("StaminaComponent")
+	if stamina_comp and stamina_comp.get_stamina_percent() >= 0.8:
+		npc.set_goal(default_goal)
+		return
+	# Find nearest rest spot and move to it
+	var nearest_spot: String = ""
+	var nearest_dist: float = INF
+	for spot_id in ["TownWell", "TownInn"]:
+		if WorldState.has_location(spot_id):
+			var spot_pos := WorldState.get_location(spot_id)
+			var dist := npc.global_position.distance_to(spot_pos)
+			if dist < nearest_dist:
+				nearest_dist = dist
+				nearest_spot = spot_id
+	if nearest_spot.is_empty():
+		_do_action("wait", "")
+		return
+	if nearest_dist > 4.0:
+		npc.last_thought = "Going to %s to rest" % nearest_spot
+		_do_action("move_to", nearest_spot)
+	else:
+		npc.last_thought = "Resting at %s" % nearest_spot
+		_do_action("wait", "")
 
 func _execute_patrol() -> void:
 	var spot: String = PATROL_SPOTS[_patrol_index]
@@ -456,7 +513,7 @@ const FALLBACK_TOPICS: Array = [
 	"how the hunting is going", "life in town", "the monsters around here",
 ]
 
-const SOCIAL_GOALS: Array = ["idle", "patrol"]
+const SOCIAL_GOALS: Array = ["idle", "patrol", "rest"]
 
 func _try_social_chat() -> bool:
 	if _social_cooldown > 0.0:
