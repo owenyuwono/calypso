@@ -4,7 +4,12 @@ render_mode diffuse_toon, specular_toon, cull_disabled;
 uniform sampler2D texture_grass : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D texture_dirt : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D texture_stone : source_color, filter_linear_mipmap, repeat_enable;
-uniform float uv_scale : hint_range(0.1, 5.0) = 0.5;
+uniform float uv_scale_grass : hint_range(0.05, 5.0) = 0.12;
+uniform float uv_scale_dirt  : hint_range(0.05, 5.0) = 0.25;
+uniform float uv_scale_stone : hint_range(0.05, 5.0) = 0.2;
+uniform float uv_scale_cobble: hint_range(0.05, 5.0) = 0.15;
+uniform float uv_scale_earth : hint_range(0.05, 5.0) = 0.3;
+uniform float anti_tile_cell : hint_range(2.0, 30.0) = 12.0;
 uniform float blend_sharpness : hint_range(0.0, 10.0) = 3.0;
 
 // Toon shading parameters (matched to toon.gdshader)
@@ -32,15 +37,49 @@ void vertex() {
 	vertex_color_full = COLOR;
 }
 
-void fragment() {
-	vec2 tiled_uv = UV * uv_scale;
+vec2 hash22(vec2 p) {
+	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+	return fract(sin(p) * 43758.5453);
+}
 
-	// Sample textures (fall back to uniform color if texture is default white)
-	vec3 grass_col = texture(texture_grass, tiled_uv).rgb;
-	vec3 dirt_col = texture(texture_dirt, tiled_uv).rgb;
-	vec3 stone_col = texture(texture_stone, tiled_uv).rgb;
-	vec3 cobble_col = texture(texture_cobble, tiled_uv).rgb;
-	vec3 earth_col = texture(texture_packed_earth, tiled_uv).rgb;
+vec3 sample_anti_tile(sampler2D tex, vec2 world_uv, float scale) {
+	vec2 scaled_uv = world_uv * scale;
+
+	// Grid A: standard cell grid
+	vec2 coord_a = world_uv / anti_tile_cell;
+	vec2 cell_a = floor(coord_a);
+	vec2 local_a = fract(coord_a);
+	vec2 ha = hash22(cell_a);
+	float aa = ha.x * 6.2832;
+	float ca = cos(aa); float sa = sin(aa);
+	vec2 uva = vec2(scaled_uv.x*ca - scaled_uv.y*sa, scaled_uv.x*sa + scaled_uv.y*ca) + ha * 97.0;
+
+	// Grid B: offset by half cell for organic blend boundaries
+	vec2 coord_b = world_uv / anti_tile_cell + 0.5;
+	vec2 cell_b = floor(coord_b);
+	vec2 local_b = fract(coord_b);
+	vec2 hb = hash22(cell_b + vec2(137.0, 241.0));
+	float ab = hb.x * 6.2832;
+	float cb = cos(ab); float sb = sin(ab);
+	vec2 uvb = vec2(scaled_uv.x*cb - scaled_uv.y*sb, scaled_uv.x*sb + scaled_uv.y*cb) + hb * 97.0;
+
+	vec3 ta = texture(tex, uva).rgb;
+	vec3 tb = texture(tex, uvb).rgb;
+
+	// Voronoi-like blend: whichever grid center is closer wins
+	float da = length(local_a - 0.5);
+	float db = length(local_b - 0.5);
+	float blend = smoothstep(-0.08, 0.08, da - db);
+	return mix(ta, tb, blend);
+}
+
+void fragment() {
+	// Grass gets anti-tile rotation; structured textures tile straight
+	vec3 grass_col = sample_anti_tile(texture_grass, UV, uv_scale_grass);
+	vec3 dirt_col = texture(texture_dirt, UV * uv_scale_dirt).rgb;
+	vec3 stone_col = texture(texture_stone, UV * uv_scale_stone).rgb;
+	vec3 cobble_col = texture(texture_cobble, UV * uv_scale_cobble).rgb;
+	vec3 earth_col = texture(texture_packed_earth, UV * uv_scale_earth).rgb;
 
 	// If textures are all white (not assigned), use fallback colors
 	if (grass_col.r > 0.99 && grass_col.g > 0.99 && grass_col.b > 0.99) {
@@ -64,6 +103,14 @@ void fragment() {
 	float stone_weight = smoothstep(0.0, 1.0 / max(blend_sharpness, 0.01), vertex_color_full.g);
 	float cobble_weight = smoothstep(0.0, 1.0 / max(blend_sharpness, 0.01), vertex_color_full.b);
 	float earth_weight = smoothstep(0.0, 1.0 / max(blend_sharpness, 0.01), 1.0 - vertex_color_full.a);
+	float overlay_sum = dirt_weight + stone_weight + cobble_weight + earth_weight;
+	if (overlay_sum > 1.0) {
+		float inv = 1.0 / overlay_sum;
+		dirt_weight *= inv;
+		stone_weight *= inv;
+		cobble_weight *= inv;
+		earth_weight *= inv;
+	}
 	float grass_weight = max(1.0 - dirt_weight - stone_weight - cobble_weight - earth_weight, 0.0);
 
 	ALBEDO = grass_col * grass_weight + dirt_col * dirt_weight + stone_col * stone_weight + cobble_col * cobble_weight + earth_col * earth_weight;

@@ -32,6 +32,32 @@ func _load_texture(path: String) -> Texture2D:
 		push_warning("Failed to load texture: " + path)
 	return tex
 
+func _generate_cobblestone_texture() -> ImageTexture:
+	var size := 256
+	var cell := 32
+	var mortar := 3
+	var img := Image.create(size, size, false, Image.FORMAT_RGB8)
+	var mortar_color := Color(0.28, 0.26, 0.23)
+	img.fill(mortar_color)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for row in (size / cell):
+		var y_start: int = row * cell + mortar
+		var y_end: int = (row + 1) * cell - mortar
+		var x_offset: int = (cell / 2) if (row % 2 == 1) else 0
+		for col in (size / cell + 1):
+			var x_start: int = col * cell + mortar + x_offset
+			var x_end: int = (col + 1) * cell - mortar + x_offset
+			var r: float = rng.randf_range(0.38, 0.50)
+			var g: float = rng.randf_range(0.35, 0.45)
+			var b: float = rng.randf_range(0.30, 0.40)
+			var stone_color := Color(r, g, b)
+			for y in range(y_start, y_end):
+				for x in range(x_start, x_end):
+					img.set_pixel(x % size, y % size, stone_color)
+	var tex := ImageTexture.create_from_image(img)
+	return tex
+
 func _ready() -> void:
 	# Register location markers with WorldState
 	for marker in $LocationMarkers.get_children():
@@ -74,12 +100,12 @@ func _build_terrain() -> void:
 	var tex_grass := load("res://assets/textures/terrain/grass_albedo.png") as Texture2D
 	var tex_dirt := load("res://assets/textures/terrain/dirt_albedo.png") as Texture2D
 	var tex_stone := load("res://assets/textures/terrain/stone_albedo.png") as Texture2D
-	var tex_cobble: Texture2D = null
-	var tex_packed_earth: Texture2D = null
-	if ResourceLoader.exists("res://assets/textures/terrain/cobble_albedo.png"):
-		tex_cobble = load("res://assets/textures/terrain/cobble_albedo.png") as Texture2D
-	if ResourceLoader.exists("res://assets/textures/terrain/packed_earth_albedo.png"):
-		tex_packed_earth = load("res://assets/textures/terrain/packed_earth_albedo.png") as Texture2D
+
+	# Zone-specific textures
+	var tex_grass_city := load("res://assets/textures/terrain/grass_town.png") as Texture2D
+	var tex_bricks_city := load("res://assets/textures/terrain/bricks_town.png") as Texture2D
+	var tex_tile_city := load("res://assets/textures/terrain/tile_town.png") as Texture2D
+	var tex_grass_field := load("res://assets/textures/terrain/grass_field.png") as Texture2D
 
 	# --- City Terrain (140x100, center at origin) ---
 	var city_rules: Array = [
@@ -101,24 +127,24 @@ func _build_terrain() -> void:
 		{"type": "line", "start": Vector2(-40, -15), "end": Vector2(-55, -30), "width": 0.8, "channel": 0, "falloff": 0.5},
 
 		# District ground textures (cobblestone via channel 2)
-		{"type": "circle", "center": Vector2(0, 0), "radius": 12.0, "channel": 2, "falloff": 0.3},
-		{"type": "circle", "center": Vector2(-45, 25), "radius": 18.0, "channel": 2, "falloff": 0.4},
-		{"type": "circle", "center": Vector2(0, -30), "radius": 16.0, "channel": 2, "falloff": 0.4},
+		{"type": "circle", "center": Vector2(0, 0), "radius": 12.0, "channel": 2, "falloff": 0.5, "noise_perturb": 0.25},
+		{"type": "circle", "center": Vector2(-45, 25), "radius": 18.0, "channel": 2, "falloff": 0.55, "noise_perturb": 0.25},
+		{"type": "circle", "center": Vector2(0, -30), "radius": 16.0, "channel": 2, "falloff": 0.55, "noise_perturb": 0.2},
 		# City Gate area — stone (channel 1)
-		{"type": "circle", "center": Vector2(60, 0), "radius": 10.0, "channel": 1, "falloff": 0.3},
+		{"type": "circle", "center": Vector2(60, 0), "radius": 10.0, "channel": 1, "falloff": 0.5, "noise_perturb": 0.15},
 		# Craft/Workshop — packed earth (channel 3)
-		{"type": "circle", "center": Vector2(0, 30), "radius": 14.0, "channel": 3, "falloff": 0.4},
+		{"type": "circle", "center": Vector2(8, 30), "radius": 14.0, "channel": 3, "falloff": 0.55, "noise_perturb": 0.3},
 		# Garrison — packed earth
-		{"type": "circle", "center": Vector2(45, 30), "radius": 16.0, "channel": 3, "falloff": 0.4},
+		{"type": "circle", "center": Vector2(45, 30), "radius": 16.0, "channel": 3, "falloff": 0.55, "noise_perturb": 0.3},
 
 		# Flatten building sites
 		{"type": "flatten", "center": Vector2(-45, 20), "radius": 6.0},
 		{"type": "flatten", "center": Vector2(-55, 30), "radius": 5.0},
 		{"type": "flatten", "center": Vector2(0, 0), "radius": 8.0},
-		{"type": "flatten", "center": Vector2(0, -35), "radius": 8.0},
+		{"type": "flatten", "center": Vector2(10, -35), "radius": 8.0},
 		{"type": "flatten", "center": Vector2(15, -25), "radius": 6.0},
 		{"type": "flatten", "center": Vector2(-10, -40), "radius": 6.0},
-		{"type": "flatten", "center": Vector2(0, 30), "radius": 6.0},
+		{"type": "flatten", "center": Vector2(8, 30), "radius": 6.0},
 		{"type": "flatten", "center": Vector2(45, 35), "radius": 8.0},
 	]
 	var city := TerrainGenerator.generate_terrain(
@@ -134,28 +160,37 @@ func _build_terrain() -> void:
 		{"type": "line", "start": Vector2(100, 0), "end": Vector2(145, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
 		{"type": "line", "start": Vector2(100, 0), "end": Vector2(110, 25), "width": 1.0, "channel": 0, "falloff": 0.5},
 		{"type": "line", "start": Vector2(100, 0), "end": Vector2(120, -20), "width": 1.0, "channel": 0, "falloff": 0.5},
+		# Rocky clearing — exposed stone
+		{"type": "circle", "center": Vector2(130, -20), "radius": 8.0, "channel": 1, "falloff": 2.0, "noise_perturb": 0.25},
+		{"type": "circle", "center": Vector2(140, -25), "radius": 5.0, "channel": 1, "falloff": 1.5, "noise_perturb": 0.25},
 	]
 	var field := TerrainGenerator.generate_terrain(
 		Vector3(110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
 		_terrain_noise, _terrain_height_scale_field, field_rules
 	)
 
+	# Per-zone texture sets: [grass, dirt/ch0, stone/ch1, cobble/ch2, packed_earth/ch3]
+	var zone_textures := [
+		[tex_grass_city, tex_bricks_city, tex_stone, _generate_cobblestone_texture(), tex_dirt],  # city
+		[tex_grass_city, tex_dirt, tex_stone, null, null],                        # field
+	]
+	var tex_keys := ["texture_grass", "texture_dirt", "texture_stone", "texture_cobble", "texture_packed_earth"]
+
 	# Apply shader material to each terrain mesh
-	for terrain_data in [city, field]:
+	for i in 2:
+		var terrain_data = [city, field][i]
+		var textures = zone_textures[i]
 		var mat := ShaderMaterial.new()
 		mat.shader = terrain_shader
-		if tex_grass:
-			mat.set_shader_parameter("texture_grass", tex_grass)
-		if tex_dirt:
-			mat.set_shader_parameter("texture_dirt", tex_dirt)
-		if tex_stone:
-			mat.set_shader_parameter("texture_stone", tex_stone)
-		if tex_cobble:
-			mat.set_shader_parameter("texture_cobble", tex_cobble)
-		if tex_packed_earth:
-			mat.set_shader_parameter("texture_packed_earth", tex_packed_earth)
-		mat.set_shader_parameter("uv_scale", 0.5)
-		mat.set_shader_parameter("blend_sharpness", 3.0)
+		for j in textures.size():
+			if textures[j]:
+				mat.set_shader_parameter(tex_keys[j], textures[j])
+		mat.set_shader_parameter("uv_scale_grass", 0.12)
+		mat.set_shader_parameter("uv_scale_dirt", 0.25)
+		mat.set_shader_parameter("uv_scale_stone", 0.2)
+		mat.set_shader_parameter("uv_scale_cobble", 0.15)
+		mat.set_shader_parameter("uv_scale_earth", 0.3)
+		mat.set_shader_parameter("blend_sharpness", 1.5)
 		var mi: MeshInstance3D = terrain_data["mesh_instance"]
 		mi.mesh.surface_set_material(0, mat)
 		$NavigationRegion3D.add_child(mi)
@@ -398,10 +433,10 @@ func _setup_exclusion_zones() -> void:
 		# Central plaza
 		{"center": Vector2(0, 0), "radius": 10.0},
 		# Temple
-		{"center": Vector2(0, -35), "radius": 8.0},
+		{"center": Vector2(10, -35), "radius": 8.0},
 		{"center": Vector2(15, -25), "radius": 6.0},
 		# Forge
-		{"center": Vector2(0, 30), "radius": 6.0},
+		{"center": Vector2(8, 30), "radius": 6.0},
 		# Barracks
 		{"center": Vector2(45, 35), "radius": 8.0},
 		# Fountain in park
@@ -678,13 +713,13 @@ func _place_city_props() -> void:
 	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(-57, 0, 28))
 
 	# Temple/Noble quarter
-	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(-2, 0, -33))
-	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(2, 0, -33))
+	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(8, 0, -33))
+	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(12, 0, -33))
 	_spawn_model(DUNGEON_DIR + "banner_red.gltf.glb", Vector3(15, 0, -23))
 
 	# Craft district
-	_spawn_model(DUNGEON_DIR + "barrel_large.gltf.glb", Vector3(-2, 0, 28))
-	_spawn_model(DUNGEON_DIR + "crates_stacked.gltf.glb", Vector3(3, 0, 32), 0.5)
+	_spawn_model(DUNGEON_DIR + "barrel_large.gltf.glb", Vector3(6, 0, 28))
+	_spawn_model(DUNGEON_DIR + "crates_stacked.gltf.glb", Vector3(11, 0, 32), 0.5)
 
 	# Garrison
 	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(38, 0, 28))

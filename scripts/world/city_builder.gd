@@ -345,7 +345,7 @@ static func _build_residential_quarter(nav_region: Node3D, noise: FastNoiseLite,
 
 static func _build_noble_quarter(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	# Temple at (0, 0, -35) — tall with spire
-	var temple_pos := Vector3(0, _snap_y(noise, 0, -35, hs), -35)
+	var temple_pos := Vector3(10, _snap_y(noise, 10, -35, hs), -35)
 	_create_building(nav_region, temple_pos,
 		Vector3(8, 5, 10), Color(0.6, 0.58, 0.55), "peaked", Color(0.35, 0.3, 0.28), 0.8, false, true)
 
@@ -491,7 +491,7 @@ static func _build_park_gardens(nav_region: Node3D, noise: FastNoiseLite, hs: fl
 static func _build_craft_district(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	# Forge at (0, 0, 30) — stone walls, flat roof, chimney
 	_create_building(nav_region,
-		Vector3(0, _snap_y(noise, 0, 30, hs), 30),
+		Vector3(8, _snap_y(noise, 8, 30, hs), 30),
 		Vector3(6, 3.5, 5), Color(0.4, 0.38, 0.35), "flat", Color(0.3, 0.28, 0.25), 0.3, true, true, PI / 4)
 
 	# Workshop 1 at (-10, 0, 35) — open-sided lean-to style
@@ -545,7 +545,7 @@ static func _build_craft_district(nav_region: Node3D, noise: FastNoiseLite, hs: 
 	var anvil_mesh := BoxMesh.new()
 	anvil_mesh.size = Vector3(0.6, 0.5, 0.4)
 	anvil.mesh = anvil_mesh
-	anvil.position = Vector3(3, _snap_y(noise, 3, 28, hs) + 0.25, 28)
+	anvil.position = Vector3(11, _snap_y(noise, 11, 28, hs) + 0.25, 28)
 	var anvil_mat := StandardMaterial3D.new()
 	anvil_mat.albedo_color = Color(0.2, 0.2, 0.22)
 	anvil.set_surface_override_material(0, anvil_mat)
@@ -559,7 +559,7 @@ static func _build_craft_district(nav_region: Node3D, noise: FastNoiseLite, hs: 
 		var log_mesh := BoxMesh.new()
 		log_mesh.size = Vector3(2.0, 0.3, 0.3)
 		log.mesh = log_mesh
-		log.position = Vector3(15, _snap_y(noise, 15, 25, hs) + 0.15 + i * 0.3, 25 + i * 0.15)
+		log.position = Vector3(20, _snap_y(noise, 20, 25, hs) + 0.15 + i * 0.3, 25 + i * 0.15)
 		log.rotation.y = 0.1 * i
 		log.set_surface_override_material(0, lumber_mat)
 		nav_region.add_child(log)
