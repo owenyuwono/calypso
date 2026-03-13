@@ -8,6 +8,7 @@ const InventoryComponent = preload("res://scripts/components/inventory_component
 const EquipmentComponent = preload("res://scripts/components/equipment_component.gd")
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
+const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
@@ -46,11 +47,7 @@ var _nav_wait_frames: int = 0
 
 # Combat
 var combat_target: String = ""
-var _attack_timer: float = 0.0
 var _respawn_timer: float = 0.0
-var _last_nav_target_pos: Vector3 = Vector3.INF
-var _pending_hit: bool = false
-var _hit_time: float = 0.0
 
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
@@ -70,6 +67,7 @@ var _inventory: Node
 var _equipment: Node
 var _combat: Node
 var _progression: Node
+var _auto_attack: Node
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -128,6 +126,13 @@ func _ready() -> void:
 		var profile: Dictionary = NpcTraits.get_profile(trait_profile)
 		initial_profs = profile.get("starting_proficiencies", {})
 	_progression.setup(_stats, initial_profs)
+
+	_auto_attack = AutoAttackComponent.new()
+	_auto_attack.name = "AutoAttackComponent"
+	add_child(_auto_attack)
+	_auto_attack.setup(_visuals, _combat, nav_agent)
+	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
+	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
 
 	_register_with_world()
 
@@ -251,88 +256,35 @@ func _process_movement() -> bool:
 	return false
 
 func _process_combat(delta: float) -> bool:
-	var target_node := WorldState.get_entity(combat_target)
-	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(combat_target):
-		# Target dead or gone — exit combat
-		combat_target = ""
-		change_state(STATE_IDLE)
-		return false
-
-	var dist := global_position.distance_to(target_node.global_position)
 	var attack_range: float = WorldState.get_entity_data(npc_id).get("attack_range", 2.0)
+	var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
+	# NPCs run slightly faster than base speed when chasing
+	var result: Dictionary = _auto_attack.process_attack(
+		delta, combat_target, global_position,
+		MOVE_SPEED, attack_range, attack_speed, 1.1
+	)
+	return result.get("is_moving", false)
 
-	if dist > attack_range * 1.5:
-		# Chase target — only update nav if target moved significantly
-		var target_pos := target_node.global_position
-		if _last_nav_target_pos.distance_to(target_pos) > 1.0:
-			_last_nav_target_pos = target_pos
-			nav_agent.target_position = target_pos
-		if not nav_agent.is_navigation_finished():
-			var next_pos := nav_agent.get_next_path_position()
-			var dir := (next_pos - global_position)
-			dir.y = 0.0
-			if dir.length_squared() > 0.01:
-				dir = dir.normalized()
-				velocity.x = dir.x * MOVE_SPEED * 1.1
-				velocity.z = dir.z * MOVE_SPEED * 1.1
-				_visuals.face_direction(dir)
-				_visuals.play_anim("Running_A")
-		return true
-
-	# In range — auto-attack
-	velocity.x = 0.0
-	velocity.z = 0.0
-	# Face the target
-	var to_target := (target_node.global_position - global_position).normalized()
-	_visuals.face_direction(to_target)
-
-	# Check animation position for hit event before starting new attacks
-	var anim_player: AnimationPlayer = _visuals.get_anim_player()
-	if _pending_hit:
-		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if anim_player.current_animation_position >= _hit_time:
-				_pending_hit = false
-				_do_combat_attack()
-		else:
-			# Fallback countdown when attack animation isn't playing
-			_hit_time -= delta
-			if _hit_time <= 0.0:
-				_pending_hit = false
-				_do_combat_attack()
-
-	# Only accumulate attack cooldown after the pending hit has landed
-	if not _pending_hit:
-		var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
-		_attack_timer += delta
-		if _attack_timer >= attack_speed:
-			_attack_timer = 0.0
-			_visuals.play_anim("1H_Melee_Attack_Chop", true)
-			_pending_hit = true
-			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
-	return false
-
-func _do_combat_attack() -> void:
-	if not WorldState.is_alive(combat_target):
-		return
-	var target_node := WorldState.get_entity(combat_target)
-	var target_pos := target_node.global_position if target_node else global_position
-	var damage: int = _combat.deal_damage_to(combat_target)
-	_visuals.spawn_damage_number(combat_target, damage, Color(1, 1, 1), target_pos)
-	_visuals.flash_target(combat_target)
+func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
+	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
+	_visuals.flash_target(target_id)
 	# Grant weapon proficiency XP
-	var target_data := WorldState.get_entity_data(combat_target)
+	var target_data := WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
 		var monster_stats := MonsterDatabase.get_monster(monster_type)
 		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
 		var weapon_type: String = _combat.get_equipped_weapon_type()
 		_progression.grant_proficiency_xp(weapon_type, prof_xp)
-
 	# Occasionally say something in combat
 	if randf() < 0.15:
 		var shouts := ["Take that!", "Ha!", "Got you!", "Come on!", "Not bad!"]
 		var shout: String = shouts[randi() % shouts.size()]
-		GameEvents.npc_spoke.emit(npc_id, shout, combat_target)
+		GameEvents.npc_spoke.emit(npc_id, shout, target_id)
+
+func _on_auto_attack_target_lost() -> void:
+	combat_target = ""
+	change_state(STATE_IDLE)
 
 func _on_navigation_finished() -> void:
 	if current_state == STATE_MOVING and _nav_started:
@@ -382,8 +334,7 @@ func set_goal(new_goal: String) -> void:
 
 func enter_combat(target_id: String) -> void:
 	combat_target = target_id
-	_attack_timer = 0.0
-	_last_nav_target_pos = Vector3.INF
+	_auto_attack.cancel()
 	change_state(STATE_COMBAT)
 
 # --- Death / Respawn ---
@@ -400,13 +351,13 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 			if memory_node.has_method("add_key_memory") and not memory_node.has_key_memory_type("first_kill"):
 				memory_node.add_key_memory("first_kill", "First kill: defeated a %s" % target_name)
 		combat_target = ""
-		_pending_hit = false
+		_auto_attack.cancel()
 		change_state(STATE_IDLE)
 
 func _die() -> void:
 	change_state(STATE_DEAD)
 	combat_target = ""
-	_pending_hit = false
+	_auto_attack.cancel()
 	velocity = Vector3.ZERO
 
 	# Lose 10% gold

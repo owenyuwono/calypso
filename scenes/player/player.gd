@@ -16,6 +16,7 @@ const EquipmentComponent = preload("res://scripts/components/equipment_component
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const SkillsComponent = preload("res://scripts/components/skills_component.gd")
+const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
@@ -45,12 +46,8 @@ var _interact_target: String = ""
 
 # Combat
 var _attack_target: String = ""
-var _attack_timer: float = 0.0
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
-var _last_nav_target_pos: Vector3 = Vector3.INF
-var _pending_hit: bool = false
-var _hit_time: float = 0.0
 var _pending_skill_hit: bool = false
 var _pending_skill_damage: int = 0
 var _pending_skill_id: String = ""
@@ -65,6 +62,7 @@ var _equipment: Node
 var _combat: Node
 var _progression: Node
 var _skills_comp: Node
+var _auto_attack: Node
 
 # UI references (set by main scene setup)
 var shop_panel: Control
@@ -119,6 +117,13 @@ func _ready() -> void:
 	_skills_comp.name = "SkillsComponent"
 	add_child(_skills_comp)
 	_skills_comp.setup({}, ["", "", "", "", ""])
+
+	_auto_attack = AutoAttackComponent.new()
+	_auto_attack.name = "AutoAttackComponent"
+	add_child(_auto_attack)
+	_auto_attack.setup(_visuals, _combat, nav_agent)
+	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
+	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
 
 	var stats := LevelData.BASE_PLAYER_STATS.duplicate()
 	stats["type"] = "player"
@@ -298,104 +303,72 @@ func _process(delta: float) -> void:
 		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
 func _process_combat(delta: float) -> bool:
+	var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
+	var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
+
+	# While a skill hit is pending, handle it here — auto-attack is suppressed
+	if _pending_skill_hit:
+		return _process_skill_hit(delta, attack_range)
+
+	# Normal auto-attack: delegate to component
+	var result: Dictionary = _auto_attack.process_attack(
+		delta, _attack_target, global_position, SPEED, attack_range, attack_speed
+	)
+	return result.get("is_moving", false)
+
+## Handles the pending skill hit timing while suppressing auto-attack.
+## Returns true if the player is moving (chasing out-of-range target).
+func _process_skill_hit(delta: float, attack_range: float) -> bool:
+	# Validate target first
 	var target_node := WorldState.get_entity(_attack_target)
 	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
 		_cancel_attack()
 		return false
 
-	var dist := global_position.distance_to(target_node.global_position)
-	var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
-
+	# If out of range, chase the target (without auto-attack accumulating)
+	var dist: float = global_position.distance_to(target_node.global_position)
 	if dist > attack_range:
-		# Navigate toward target — only update nav if target moved significantly
-		var target_pos := target_node.global_position
-		if _last_nav_target_pos.distance_to(target_pos) > 1.0:
-			_last_nav_target_pos = target_pos
-			nav_agent.target_position = target_pos
+		nav_agent.target_position = target_node.global_position
 		if not nav_agent.is_navigation_finished():
 			var next_pos := nav_agent.get_next_path_position()
 			var dir := (next_pos - global_position)
 			dir.y = 0.0
-			dir = dir.normalized()
-			velocity.x = dir.x * SPEED
-			velocity.z = dir.z * SPEED
-			_visuals.face_direction(dir)
-			_visuals.play_anim("Running_A")
+			if dir.length_squared() > 0.01:
+				dir = dir.normalized()
+				velocity.x = dir.x * SPEED
+				velocity.z = dir.z * SPEED
+				_visuals.face_direction(dir)
+				_visuals.play_anim("Running_A")
 		return true
 
-	# In range — stop and auto-attack
+	# In range — resolve skill hit timing
 	velocity.x = 0.0
 	velocity.z = 0.0
-	# Face the target
-	var to_target := (target_node.global_position - global_position).normalized()
-	_visuals.face_direction(to_target)
+	var to_target := (target_node.global_position - global_position)
+	to_target.y = 0.0
+	if to_target.length_squared() > 0.01:
+		_visuals.face_direction(to_target.normalized())
 
-	# Check animation position for skill hit
 	var anim_player: AnimationPlayer = _visuals.get_anim_player()
-	if _pending_skill_hit:
-		if anim_player and anim_player.current_animation == _pending_skill_anim:
-			if anim_player.current_animation_position >= _skill_hit_time:
-				_pending_skill_hit = false
-				_execute_skill_hit()
-		else:
-			# Fallback countdown when skill animation isn't playing
-			_skill_hit_time -= delta
-			if _skill_hit_time <= 0.0:
-				_pending_skill_hit = false
-				_execute_skill_hit()
-
-	# Check animation position for hit event before starting new attacks
-	if _pending_hit:
-		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if anim_player.current_animation_position >= _hit_time:
-				_pending_hit = false
-				_perform_attack()
-		else:
-			# Fallback countdown when attack animation isn't playing
-			_hit_time -= delta
-			if _hit_time <= 0.0:
-				_pending_hit = false
-				_perform_attack()
-
-	# Only accumulate attack cooldown after the pending hit has landed
-	if not _pending_hit and not _pending_skill_hit:
-		var base_attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 0.8)
-		var attack_speed: float = base_attack_speed * _combat.get_attack_speed_multiplier()
-		_attack_timer += delta
-		if _attack_timer >= attack_speed:
-			_attack_timer = 0.0
-			_visuals.play_anim("1H_Melee_Attack_Chop", true)
-			_pending_hit = true
-			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
+	if anim_player and anim_player.current_animation == _pending_skill_anim:
+		if anim_player.current_animation_position >= _skill_hit_time:
+			_pending_skill_hit = false
+			_execute_skill_hit()
+	else:
+		# Fallback countdown when skill animation isn't playing
+		_skill_hit_time -= delta
+		if _skill_hit_time <= 0.0:
+			_pending_skill_hit = false
+			_execute_skill_hit()
 	return false
-
-func _perform_attack() -> void:
-	if not WorldState.is_alive(_attack_target):
-		_cancel_attack()
-		return
-	var target_node := WorldState.get_entity(_attack_target)
-	var target_pos := target_node.global_position if target_node else global_position
-	var damage: int = _combat.deal_damage_to(_attack_target)
-	_visuals.spawn_damage_number(_attack_target, damage, Color(1, 1, 1), target_pos)
-	_visuals.flash_target(_attack_target)
-	# Grant weapon proficiency XP
-	var target_data := WorldState.get_entity_data(_attack_target)
-	var monster_type: String = target_data.get("monster_type", "")
-	if not monster_type.is_empty():
-		var monster_stats := MonsterDatabase.get_monster(monster_type)
-		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
-		var weapon_type: String = _combat.get_equipped_weapon_type()
-		_progression.grant_proficiency_xp(weapon_type, prof_xp)
 
 func _cancel_attack() -> void:
 	_attack_target = ""
-	_attack_timer = 0.0
-	_pending_hit = false
+	_auto_attack.cancel()
 	_pending_skill_hit = false
 	_pending_skill_damage = 0
 	_pending_skill_id = ""
 	_pending_skill_anim = ""
-	_last_nav_target_pos = Vector3.INF
 	_ring_target_id = ""
 	_hover_ring.visible = false
 
@@ -532,7 +505,7 @@ func _handle_left_click() -> void:
 			# Click monster: walk to + auto-attack, lock ring on target
 			_interact_target = ""
 			_attack_target = _hovered_entity_id
-			_attack_timer = 0.0
+			_auto_attack.cancel()
 			_is_navigating = false
 			_ring_target_id = _hovered_entity_id
 			_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
@@ -752,8 +725,7 @@ func _use_skill(skill_id: String) -> void:
 		_pending_skill_anim = anim_name
 		_visuals.play_anim(anim_name, true)
 		_skill_hit_time = _visuals.get_hit_delay(anim_name)
-		_attack_timer = 0.0
-		_pending_hit = false
+		_auto_attack.cancel()
 		# Drain stamina for skill use
 		var stamina_comp_node = get_node_or_null("StaminaComponent")
 		if stamina_comp_node:
@@ -786,6 +758,21 @@ func _execute_skill_hit() -> void:
 		_progression.grant_proficiency_xp(weapon_type, prof_xp)
 	_pending_skill_damage = 0
 	_pending_skill_id = ""
+
+func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
+	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
+	_visuals.flash_target(target_id)
+	# Grant weapon proficiency XP
+	var target_data := WorldState.get_entity_data(target_id)
+	var monster_type: String = target_data.get("monster_type", "")
+	if not monster_type.is_empty():
+		var monster_stats := MonsterDatabase.get_monster(monster_type)
+		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
+		var weapon_type: String = _combat.get_equipped_weapon_type()
+		_progression.grant_proficiency_xp(weapon_type, prof_xp)
+
+func _on_auto_attack_target_lost() -> void:
+	_cancel_attack()
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	var marker := MeshInstance3D.new()

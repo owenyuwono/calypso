@@ -5,6 +5,7 @@ extends CharacterBody3D
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
+const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
@@ -24,15 +25,12 @@ const NIGHT_ATK_MULTIPLIER: float = 1.15
 var state: String = "idle"  # idle, wandering, aggro, attacking, dead
 var spawn_point: Vector3
 var aggro_target: String = ""
-var _attack_timer: float = 0.0
 var _wander_timer: float = 0.0
 var _respawn_timer: float = 0.0
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
-var _pending_hit: bool = false
-var _hit_time: float = 0.0
 
 # Cached stats
 var _base_aggro_range: float = 6.0
@@ -49,6 +47,7 @@ var _wander_radius: float = 5.0
 var _visuals: Node
 var _stats: Node
 var _combat: Node
+var _auto_attack: Node
 
 func _ready() -> void:
 	spawn_point = global_position
@@ -87,6 +86,13 @@ func _ready() -> void:
 	_combat.name = "CombatComponent"
 	add_child(_combat)
 	_combat.setup(_stats, null)
+
+	_auto_attack = AutoAttackComponent.new()
+	_auto_attack.name = "AutoAttackComponent"
+	add_child(_auto_attack)
+	_auto_attack.setup(_visuals, _combat, nav_agent)
+	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
+	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
 
 	if name_label:
 		name_label.text = stats.get("name", monster_type)
@@ -290,7 +296,7 @@ func _process_aggro(delta: float) -> bool:
 
 	if dist <= _attack_range:
 		state = "attacking"
-		_attack_timer = 0.0
+		_auto_attack.cancel()
 		velocity.x = 0.0
 		velocity.z = 0.0
 		return false
@@ -313,57 +319,26 @@ func _process_aggro(delta: float) -> bool:
 	return false
 
 func _process_attacking(delta: float) -> void:
-	var target_node := WorldState.get_entity(aggro_target)
-	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(aggro_target):
-		_drop_aggro()
-		return
-
-	var dist := global_position.distance_to(target_node.global_position)
-	if dist > _attack_range * 1.5:
+	# Delegate the in-range attack loop to the component.
+	# Pass attack_range * 1.5 so the component chases if target moves just outside melee,
+	# and returns is_chasing=true when target leaves that zone so we revert to aggro state.
+	var result: Dictionary = _auto_attack.process_attack(
+		delta, aggro_target, global_position, MOVE_SPEED, _attack_range * 1.5, _attack_speed, 1.0
+	)
+	if result.get("is_chasing", false):
 		state = "aggro"
-		return
 
-	# Face the target
-	var to_target := (target_node.global_position - global_position).normalized()
-	_visuals.face_direction(to_target)
+func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
+	_visuals.spawn_damage_number(target_id, damage, Color(1, 0.2, 0.2), target_pos)
+	_visuals.flash_target(target_id)
 
-	# Check animation position for hit event before starting new attacks
-	var anim_player: AnimationPlayer = _visuals.get_anim_player()
-	if _pending_hit:
-		if anim_player and anim_player.current_animation == "1H_Melee_Attack_Chop":
-			if anim_player.current_animation_position >= _hit_time:
-				_pending_hit = false
-				_perform_attack()
-		else:
-			# Fallback countdown for monsters without attack animation (e.g. slime)
-			_hit_time -= delta
-			if _hit_time <= 0.0:
-				_pending_hit = false
-				_perform_attack()
-
-	# Only accumulate attack cooldown after the pending hit has landed
-	if not _pending_hit:
-		_attack_timer += delta
-		if _attack_timer >= _attack_speed:
-			_attack_timer = 0.0
-			_visuals.play_anim("1H_Melee_Attack_Chop", true)
-			_pending_hit = true
-			_hit_time = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
-
-func _perform_attack() -> void:
-	if not WorldState.is_alive(aggro_target):
-		_drop_aggro()
-		return
-	var target_node := WorldState.get_entity(aggro_target)
-	var target_pos := target_node.global_position if target_node else global_position
-	var damage: int = _combat.deal_damage_to(aggro_target)
-	_visuals.spawn_damage_number(aggro_target, damage, Color(1, 0.2, 0.2), target_pos)
-	_visuals.flash_target(aggro_target)
+func _on_auto_attack_target_lost() -> void:
+	_drop_aggro()
 
 func _drop_aggro() -> void:
 	aggro_target = ""
 	state = "idle"
-	_pending_hit = false
+	_auto_attack.cancel()
 	_wander_timer = randf_range(1.0, 3.0)
 	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area
@@ -386,6 +361,7 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 func _die(killer_id: String) -> void:
 	state = "dead"
 	aggro_target = ""
+	_auto_attack.cancel()
 	collision_shape.disabled = true
 	velocity = Vector3.ZERO
 
@@ -477,6 +453,7 @@ func _respawn() -> void:
 	})
 
 	_combat.setup(_stats, null)
+	_auto_attack.cancel()
 
 	GameEvents.entity_respawned.emit(monster_id)
 	_visuals.update_hp_bar(monster_id)
