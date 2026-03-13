@@ -53,4 +53,5 @@ func _ready() -> void:
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.chat_input = chat_input
+		panel_toggles.world_map_panel = $UILayer/WorldMapPanel
 

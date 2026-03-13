@@ -8,7 +8,8 @@
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
-- **No automated tests**: Verify manually in editor (panels, combat, minimap, chat)
+- **No automated tests**: Verify manually in editor (panels, combat, minimap, world map, chat)
+- **Input**: Left-click move/attack/interact, E interact, Tab inventory, C status, S skills, P proficiencies, M minimap, W world map, 1-5 hotbar, D debug, Esc close panel
 
 ## Entity Component System
 Each entity (player, NPC, monster) owns its state via child Node components:
