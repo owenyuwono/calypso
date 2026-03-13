@@ -215,6 +215,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 0, -25)
 [node name="DungeonDeep" type="Marker3D" parent="LocationMarkers"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 0, 5)
 
+[node name="TownWell" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -1)
+
+[node name="TownInn" type="Marker3D" parent="LocationMarkers"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 8)
+
 ; === SHOP NPCs ===
 [node name="ShopNPCs" type="Node3D" parent="."]
 

@@ -29,12 +29,17 @@ RULES:
 - If you have monster drops, consider selling them at a shop
 - If you can afford better equipment, consider buying upgrades
 - Update your goal when circumstances change
-- Don't attack monsters much stronger than you"""
+- Don't attack monsters much stronger than you
+- At night, the field is more dangerous (monsters are more aggressive)
+- If your stamina is low, consider resting at a rest spot (Town Well, Town Inn)
+- You can rest to recover stamina"""
 
 const USER_TEMPLATE := """STATS: Level {level}, HP {hp}/{max_hp}, ATK {atk} (effective {eff_atk}), DEF {def} (effective {eff_def})
 EQUIPMENT: Weapon: {weapon}, Armor: {armor}
 INVENTORY: {inventory_text}
 GOLD: {gold}
+TIME: {time_display} ({phase})
+STAMINA: {stamina_text}
 
 NEARBY:
 {perception}
@@ -94,12 +99,15 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 		"inventory_text": inventory_text, "gold": gold,
 		"perception": perception_text,
 		"memory": memory_summary,
+		"time_display": TimeManager.get_time_display(),
+		"phase": TimeManager.get_phase(),
+		"stamina_text": _get_stamina_text(npc_node),
 	})
 	return {"role": "user", "content": content}
 
 const GOAL_INSTRUCTION := """
 IMPORTANT: When the player asks you to do something, you MUST add a goal tag at the end of your reply.
-Available goals: hunt_field, hunt_dungeon, buy_potions, sell_loot, buy_weapon, buy_armor, follow_player, return_to_town, patrol, idle
+Available goals: hunt_field, hunt_dungeon, buy_potions, sell_loot, buy_weapon, buy_armor, follow_player, return_to_town, patrol, idle, rest
 Format: Say your reply, then add [GOAL:goal_name] at the very end.
 Examples:
 - "follow me" → Sure, I'll follow you! [GOAL:follow_player]
@@ -110,11 +118,14 @@ Examples:
 - "stay here" or "wait" → I'll wait here. [GOAL:idle]
 - "go back to town" → Heading back to town. [GOAL:return_to_town]
 - "patrol" or "guard" → I'll keep watch. [GOAL:patrol]
+- "rest" or "take a break" → I need to rest. [GOAL:rest]
 If the player is just chatting and NOT asking you to do something, do NOT add a goal tag."""
 
 const WORLD_FACTS := """WORLD FACTS:
 - Places: Town (shops, well), Field (slimes, wolves, goblins), Dungeon (skeleton warriors, dark mages)
 - Shops: Weapon Shop, Item Shop (potions, gear)
+- Rest spots: Town Well, Town Inn
+- The field is slightly more dangerous at night
 - There are NO journals, scrolls, dragons, traps, camps, or magic spells. Do NOT invent things not listed above."""
 
 const CHAT_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
@@ -133,6 +144,7 @@ Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken word
 {goal_instruction}"""
 
 const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+TIME: {time_display} ({phase}). STAMINA: {stamina_text}.
 {key_memories}
 {context}
 {relationship_line}{speaker_name} says to you: "{spoken_text}"
@@ -156,6 +168,7 @@ Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken word
 {goal_instruction}"""
 
 const CHAT_INITIATE_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+TIME: {time_display} ({phase}). STAMINA: {stamina_text}.
 {key_memories}
 {context}
 {relationship_line}You see {target_name}, who is {target_activity}.
@@ -212,6 +225,7 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
 		key_memories = memory_node.get_key_memories_summary(2)
 
+	var npc_node = WorldState.get_entity(npc_id)
 	var content := CHAT_INITIATE_USER_TEMPLATE.format({
 		"npc_name": npc_name,
 		"level": level,
@@ -223,6 +237,9 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 		"relationship_line": relationship_line,
 		"target_name": target_name,
 		"target_activity": target_activity,
+		"time_display": TimeManager.get_time_display(),
+		"phase": TimeManager.get_phase(),
+		"stamina_text": _get_stamina_text(npc_node) if npc_node else "N/A",
 	})
 	return {"role": "user", "content": content}
 
@@ -272,6 +289,7 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
 		key_memories = memory_node.get_key_memories_summary(2)
 
+	var npc_node = WorldState.get_entity(npc_id)
 	var content := CHAT_USER_TEMPLATE.format({
 		"npc_name": npc_name,
 		"level": level,
@@ -283,6 +301,9 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 		"relationship_line": relationship_line,
 		"speaker_name": speaker_name,
 		"spoken_text": spoken_text,
+		"time_display": TimeManager.get_time_display(),
+		"phase": TimeManager.get_phase(),
+		"stamina_text": _get_stamina_text(npc_node) if npc_node else "N/A",
 	})
 	return {"role": "user", "content": content}
 
@@ -306,6 +327,8 @@ static func get_activity_description(goal: String) -> String:
 			return "retreating to town"
 		"patrol":
 			return "patrolling the town"
+		"rest":
+			return "resting to recover stamina"
 		"idle":
 			return "resting in town"
 		_:
@@ -344,3 +367,9 @@ static func _format_perception(perception: Dictionary) -> String:
 			lines.append("Location: %s - %.1fm away" % [loc.id, loc.distance])
 
 	return "\n".join(lines)
+
+static func _get_stamina_text(npc_node: Node) -> String:
+	var comp = npc_node.get_node_or_null("StaminaComponent")
+	if not comp:
+		return "N/A"
+	return "%d/%d" % [int(comp.get_stamina()), int(comp.get_max_stamina())]

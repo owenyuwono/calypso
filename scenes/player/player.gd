@@ -129,6 +129,11 @@ func _ready() -> void:
 	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
 
+	# Add StaminaComponent
+	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
+	stamina_comp.name = "StaminaComponent"
+	add_child(stamina_comp)
+
 	_cursor_manager = CursorManager.new()
 	_setup_hover_ring()
 	_setup_tooltip()
@@ -749,6 +754,10 @@ func _use_skill(skill_id: String) -> void:
 		_skill_hit_time = _visuals.get_hit_delay(anim_name)
 		_attack_timer = 0.0
 		_pending_hit = false
+		# Drain stamina for skill use
+		var stamina_comp_node = get_node_or_null("StaminaComponent")
+		if stamina_comp_node:
+			stamina_comp_node.drain_flat(5.0)
 		# Start cooldown
 		var cooldown := SkillDatabase.get_effective_cooldown(skill_id, skill_level)
 		if skill_hotbar:

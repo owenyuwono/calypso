@@ -25,3 +25,10 @@ signal item_sold(seller_id: String, item_id: String, revenue: int)
 # Skills
 signal skill_used(entity_id: String, skill_id: String)
 signal skill_learned(entity_id: String, skill_id: String, new_level: int)
+
+# Time
+signal time_phase_changed(old_phase: String, new_phase: String)
+signal game_hour_changed(hour: int)
+
+# Stamina
+signal stamina_changed(entity_id: String, stamina: float, max_stamina: float)

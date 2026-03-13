@@ -204,6 +204,19 @@ func gather_chat_facts(target_id: String) -> Array:
 			var tname: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else target_id
 			facts.append({"topic": "fighting alongside %s" % tname, "fact": "You fought together %d time%s" % [shared, "s" if shared != 1 else ""], "weight": 1.5})
 
+	# Stamina awareness
+	var stamina_comp = get_parent().get_node_or_null("StaminaComponent")
+	if stamina_comp:
+		var sta_pct: float = stamina_comp.get_stamina_percent()
+		if sta_pct < 0.3:
+			facts.append({"topic": "being tired", "fact": "You are exhausted (stamina at %d%%)" % int(sta_pct * 100), "weight": 2.5})
+		elif sta_pct < 0.5:
+			facts.append({"topic": "getting tired", "fact": "You are getting tired (stamina at %d%%)" % int(sta_pct * 100), "weight": 1.5})
+
+	# Time-of-day awareness
+	if TimeManager.is_night():
+		facts.append({"topic": "nighttime", "fact": "It is nighttime and the field is more dangerous", "weight": 1.5})
+
 	# Nearby monsters
 	var perception := WorldState.get_npc_perception(_npc_id)
 	var monsters: Array = perception.get("monsters", [])
@@ -223,6 +236,8 @@ func _goal_to_fact(goal: String, gold: int) -> Dictionary:
 			return {"topic": "stocking up on potions", "fact": "You are buying potions", "weight": 1.0}
 		"sell_loot":
 			return {"topic": "selling your loot", "fact": "You are selling loot at the shop", "weight": 1.0}
+		"rest":
+			return {"topic": "resting", "fact": "You are resting to recover stamina", "weight": 1.0}
 		"idle":
 			return {"topic": "how things are going", "fact": "You are resting in town with %d gold" % gold, "weight": 0.5}
 		_:

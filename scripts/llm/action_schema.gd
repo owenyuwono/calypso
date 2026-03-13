@@ -1,7 +1,7 @@
 extends RefCounted
 ## JSON schema for Ollama's structured output — adventurer action set.
 
-const VALID_ACTIONS: Array = ["move_to", "attack", "use_item", "buy_item", "sell_item", "talk_to", "wait"]
+const VALID_ACTIONS: Array = ["move_to", "attack", "use_item", "buy_item", "sell_item", "talk_to", "wait", "rest"]
 
 static func get_schema() -> Dictionary:
 	return {
