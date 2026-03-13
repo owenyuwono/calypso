@@ -85,12 +85,17 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 			var radius: float = rule["radius"]
 			var channel: int = rule["channel"]
 			var falloff: float = rule.get("falloff", 0.3)
+			var noise_perturb: float = rule.get("noise_perturb", 0.0)
 			for i in vertices.size():
 				var world_x: float = center.x + vertices[i].x
 				var world_z: float = center.z + vertices[i].z
+				var eff_radius := radius
+				if noise_perturb > 0.0 and noise:
+					var n: float = noise.get_noise_2d(world_x * 1.2, world_z * 1.2)
+					eff_radius = radius * (1.0 + n * noise_perturb)
 				var dist: float = Vector2(world_x, world_z).distance_to(circle_center)
-				if dist < radius:
-					var strength: float = 1.0 - smoothstep(radius * (1.0 - falloff), radius, dist)
+				if dist < eff_radius:
+					var strength: float = 1.0 - smoothstep(eff_radius * (1.0 - falloff), eff_radius, dist)
 					var c := colors[i]
 					if channel == 0:
 						c.r = maxf(c.r, strength)
