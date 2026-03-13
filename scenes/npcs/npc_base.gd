@@ -146,8 +146,6 @@ func _ready() -> void:
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
 
-	_last_position = global_position
-
 func _get_separation_velocity() -> Vector3:
 	var sep := Vector3.ZERO
 	for eid in WorldState.entities:
