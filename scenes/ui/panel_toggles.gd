@@ -4,6 +4,7 @@ extends Control
 
 var status_panel: Control
 var skill_panel: Control
+var proficiency_panel: Control
 var chat_input: Control
 
 var _buttons: Dictionary = {}  # key -> Button
@@ -12,6 +13,7 @@ var _hbox: HBoxContainer
 const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
+	{"key": "proficiencies", "label": "Prof", "hint": "P"},
 ]
 
 func _ready() -> void:
@@ -20,7 +22,7 @@ func _ready() -> void:
 	anchor_top = 0.0
 	anchor_right = 1.0
 	anchor_bottom = 0.0
-	offset_left = -200
+	offset_left = -280
 	offset_top = 220
 	offset_right = -10
 	offset_bottom = 260
@@ -112,6 +114,7 @@ func _get_panel(key: String) -> Control:
 	match key:
 		"status": return status_panel
 		"skills": return skill_panel
+		"proficiencies": return proficiency_panel
 	return null
 
 func _is_panel_open(key: String) -> bool:

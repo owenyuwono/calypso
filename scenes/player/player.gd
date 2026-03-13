@@ -43,15 +43,6 @@ var _hover_timer: float = 0.0
 var _is_navigating: bool = false
 var _interact_target: String = ""
 
-# Agility XP tracking
-var _distance_traveled: float = 0.0
-var _agility_timer: float = 0.0
-var _last_position: Vector3 = Vector3.ZERO
-const AGILITY_XP_DISTANCE: float = 5.0  # 1 XP per 5 units
-const AGILITY_RESET_INTERVAL: float = 30.0  # Reset timer every 30s
-const AGILITY_MAX_XP_PER_INTERVAL: int = 10  # Cap per interval
-var _agility_xp_granted: int = 0
-
 # Combat
 var _attack_target: String = ""
 var _attack_timer: float = 0.0
@@ -150,8 +141,6 @@ func _ready() -> void:
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-
-	_last_position = global_position
 
 func _setup_tooltip() -> void:
 	var canvas_layer := CanvasLayer.new()
@@ -269,23 +258,6 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 
 	move_and_slide()
-
-	# Agility XP tracking
-	if not _is_dead:
-		var moved := global_position.distance_to(_last_position)
-		if moved > 0.1:  # Ignore tiny movements
-			_distance_traveled += moved
-		_last_position = global_position
-
-		_agility_timer += delta
-		if _agility_timer >= AGILITY_RESET_INTERVAL:
-			_agility_timer = 0.0
-			_agility_xp_granted = 0
-
-		while _distance_traveled >= AGILITY_XP_DISTANCE and _agility_xp_granted < AGILITY_MAX_XP_PER_INTERVAL:
-			_distance_traveled -= AGILITY_XP_DISTANCE
-			_agility_xp_granted += 1
-			_progression.grant_proficiency_xp("agility", 1)
 
 	# Safety teleport if fallen off the world
 	if global_position.y < -10.0:

@@ -52,15 +52,6 @@ var _last_nav_target_pos: Vector3 = Vector3.INF
 var _pending_hit: bool = false
 var _hit_time: float = 0.0
 
-# Agility XP tracking
-var _distance_traveled: float = 0.0
-var _agility_timer: float = 0.0
-var _last_position: Vector3 = Vector3.ZERO
-const AGILITY_XP_DISTANCE: float = 5.0
-const AGILITY_RESET_INTERVAL: float = 30.0
-const AGILITY_MAX_XP_PER_INTERVAL: int = 10
-var _agility_xp_granted: int = 0
-
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var dialogue_bubble: Node3D = $DialogueBubble
@@ -218,23 +209,6 @@ func _physics_process(delta: float) -> void:
 		velocity.z += sep.z
 
 	move_and_slide()
-
-	# Agility XP tracking
-	if current_state != STATE_DEAD:
-		var moved := global_position.distance_to(_last_position)
-		if moved > 0.1:  # Ignore tiny movements
-			_distance_traveled += moved
-		_last_position = global_position
-
-		_agility_timer += delta
-		if _agility_timer >= AGILITY_RESET_INTERVAL:
-			_agility_timer = 0.0
-			_agility_xp_granted = 0
-
-		while _distance_traveled >= AGILITY_XP_DISTANCE and _agility_xp_granted < AGILITY_MAX_XP_PER_INTERVAL:
-			_distance_traveled -= AGILITY_XP_DISTANCE
-			_agility_xp_granted += 1
-			_progression.grant_proficiency_xp("agility", 1)
 
 	# Update animation based on movement
 	if current_state == STATE_COMBAT:

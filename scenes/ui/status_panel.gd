@@ -23,8 +23,7 @@ var _weapon_name_label: Label
 var _armor_name_label: Label
 var _unequip_weapon_btn: Button
 var _unequip_armor_btn: Button
-var _xp_bar: ProgressBar
-var _xp_label: Label
+var _prof_grid: GridContainer
 var _gold_label: Label
 
 func _ready() -> void:
@@ -134,42 +133,19 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Progression section header
-	var prog_header := Label.new()
-	prog_header.text = "Progression"
-	prog_header.add_theme_font_size_override("font_size", 14)
-	prog_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
-	vbox.add_child(prog_header)
+	# Proficiency levels section header
+	var prof_header := Label.new()
+	prof_header.text = "Proficiencies"
+	prof_header.add_theme_font_size_override("font_size", 14)
+	prof_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
+	vbox.add_child(prof_header)
 
-	# XP bar
-	var xp_row := HBoxContainer.new()
-	vbox.add_child(xp_row)
-
-	var xp_name := Label.new()
-	xp_name.text = "XP"
-	xp_name.add_theme_font_size_override("font_size", 14)
-	xp_name.custom_minimum_size.x = 60
-	xp_row.add_child(xp_name)
-
-	_xp_bar = ProgressBar.new()
-	_xp_bar.custom_minimum_size = Vector2(120, 18)
-	_xp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_xp_bar.show_percentage = false
-	var bar_bg := StyleBoxFlat.new()
-	bar_bg.bg_color = Color(0.15, 0.15, 0.2)
-	UIHelper.set_corner_radius(bar_bg, 2)
-	_xp_bar.add_theme_stylebox_override("background", bar_bg)
-	var bar_fill := StyleBoxFlat.new()
-	bar_fill.bg_color = Color(0.3, 0.6, 1.0)
-	UIHelper.set_corner_radius(bar_fill, 2)
-	_xp_bar.add_theme_stylebox_override("fill", bar_fill)
-	xp_row.add_child(_xp_bar)
-
-	_xp_label = Label.new()
-	_xp_label.add_theme_font_size_override("font_size", 12)
-	_xp_label.custom_minimum_size.x = 70
-	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	xp_row.add_child(_xp_label)
+	# 2-column grid: skill name + level
+	_prof_grid = GridContainer.new()
+	_prof_grid.columns = 4  # name1 level1 name2 level2
+	_prof_grid.add_theme_constant_override("h_separation", 6)
+	_prof_grid.add_theme_constant_override("v_separation", 1)
+	vbox.add_child(_prof_grid)
 
 	# Gold
 	var gold_row := HBoxContainer.new()
@@ -263,10 +239,7 @@ func _refresh() -> void:
 	var base_def: int = stats.def
 	var attack_speed: float = stats.attack_speed
 	var attack_range: float = stats.attack_range
-	var combat_comp = _player.get_node("CombatComponent")
-	var weapon_type: String = combat_comp.get_equipped_weapon_type() if combat_comp else "mace"
 	var progression = _player.get_node("ProgressionComponent")
-	var prof_xp: Dictionary = progression.get_proficiency_xp(weapon_type) if progression else {"xp": 0, "xp_to_next": 50, "level": 1}
 	var gold: int = inv.gold
 	var equipment: Dictionary = equip.get_equipment()
 
@@ -300,13 +273,29 @@ func _refresh() -> void:
 	_armor_name_label.text = armor_name
 	_unequip_armor_btn.visible = not armor_id.is_empty()
 
-	# Progression — show equipped weapon proficiency XP
-	var xp_needed: int = prof_xp.get("xp_to_next", 50)
-	var xp: int = prof_xp.get("xp", 0)
-	var prof_level: int = prof_xp.get("level", 1)
-	_xp_bar.max_value = xp_needed
-	_xp_bar.value = xp if prof_level < ProficiencyDatabase.MAX_LEVEL else xp_needed
-	_xp_label.text = "%d/%d" % [xp, xp_needed] if prof_level < ProficiencyDatabase.MAX_LEVEL else "MAX"
+	# Proficiency levels grid
+	for child in _prof_grid.get_children():
+		child.queue_free()
+	if progression:
+		var skills := ProficiencyDatabase.get_all_skills()
+		# Show only weapon + attribute categories in compact 2-col layout
+		for skill_id in skills:
+			var skill_def: Dictionary = skills[skill_id]
+			var cat: String = skill_def.get("category", "")
+			if cat != "weapon" and cat != "attribute":
+				continue
+			var lvl: int = progression.get_proficiency_level(skill_id)
+			var name_lbl := Label.new()
+			name_lbl.text = skill_def.get("name", skill_id)
+			name_lbl.add_theme_font_size_override("font_size", 12)
+			name_lbl.custom_minimum_size.x = 70
+			_prof_grid.add_child(name_lbl)
+			var lvl_lbl := Label.new()
+			lvl_lbl.text = str(lvl)
+			lvl_lbl.add_theme_font_size_override("font_size", 12)
+			lvl_lbl.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if lvl >= ProficiencyDatabase.MAX_LEVEL else Color(0.7, 0.9, 0.7))
+			lvl_lbl.custom_minimum_size.x = 20
+			_prof_grid.add_child(lvl_lbl)
 
 	_gold_label.text = str(gold)
 

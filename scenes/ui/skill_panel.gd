@@ -18,6 +18,7 @@ func _ready() -> void:
 	visible = false
 	_build_ui()
 	GameEvents.skill_learned.connect(func(_a, _b, _c): _refresh())
+	GameEvents.skill_used.connect(func(_a, _b): _refresh())
 	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
 
 func _build_ui() -> void:
@@ -81,7 +82,7 @@ func _refresh() -> void:
 	if not skills_comp or not progression:
 		return
 
-	_info_label.text = "Skills unlock via proficiency milestones"
+	_info_label.text = "Skills unlock via proficiency milestones. Level up by using them."
 
 	for skill_id in SkillDatabase.SKILLS:
 		var skill: Dictionary = SkillDatabase.SKILLS[skill_id]
