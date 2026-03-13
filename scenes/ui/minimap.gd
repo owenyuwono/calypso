@@ -11,13 +11,11 @@ const COLOR_BG := Color(0.1, 0.1, 0.15, 0.85)
 const COLOR_BORDER := Color(0.4, 0.35, 0.2)
 
 # Zone rectangles in world XZ (Rect2 uses x,y = world x,z)
-const ZONE_TOWN := Rect2(-35, -35, 70, 70)
-const ZONE_FIELD := Rect2(35, -35, 80, 80)
-const ZONE_DUNGEON := Rect2(115, -20, 50, 50)
+const ZONE_TOWN := Rect2(-70, -50, 140, 100)
+const ZONE_FIELD := Rect2(70, -40, 80, 80)
 
 const COLOR_ZONE_TOWN := Color(0.2, 0.3, 0.2, 0.15)
 const COLOR_ZONE_FIELD := Color(0.3, 0.3, 0.15, 0.15)
-const COLOR_ZONE_DUNGEON := Color(0.3, 0.15, 0.15, 0.15)
 
 var _timer: float = 0.0
 var _dots: Array = []  # [{pos: Vector2, color: Color, radius: float, is_player: bool}]
@@ -55,12 +53,10 @@ func _update_dots() -> void:
 	_player_pos = player_node.global_position
 
 	# Determine zone
-	if _player_pos.x >= 115:
-		_zone_label_text = "Dungeon"
-	elif _player_pos.x >= 35:
+	if _player_pos.x >= 70:
 		_zone_label_text = "Field"
 	else:
-		_zone_label_text = "Town"
+		_zone_label_text = "City"
 
 	for id in WorldState.entities:
 		var node: Node3D = WorldState.entities[id]
@@ -125,7 +121,6 @@ func _draw() -> void:
 	# Zone hint rectangles
 	_draw_zone_rect(ZONE_TOWN, COLOR_ZONE_TOWN)
 	_draw_zone_rect(ZONE_FIELD, COLOR_ZONE_FIELD)
-	_draw_zone_rect(ZONE_DUNGEON, COLOR_ZONE_DUNGEON)
 
 	# Draw non-player dots first, player last
 	for dot in _dots:

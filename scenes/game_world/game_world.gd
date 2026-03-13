@@ -1,6 +1,6 @@
 extends Node3D
-## Game world — town, field, and dungeon zones with shops, monsters, and adventurer NPCs.
-## Spawns environment decoration (trees, rocks, dungeon props) programmatically.
+## Game world — walled city and field zones with shops, monsters, and adventurer NPCs.
+## Spawns environment decoration (trees, rocks, city props) programmatically.
 
 # Asset directories
 const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
@@ -12,7 +12,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
 # Terrain noise (shared for height queries)
 var _terrain_noise: FastNoiseLite
-var _terrain_height_scale_town: float = 0.3
+var _terrain_height_scale_city: float = 0.15
 var _terrain_height_scale_field: float = 0.5
 
 var _texture_cache: Dictionary = {}
@@ -37,16 +37,16 @@ func _ready() -> void:
 	for marker in $LocationMarkers.get_children():
 		WorldState.register_location(marker.name, marker.global_position)
 
-	# Build procedural terrain (replaces old flat BoxMesh grounds + path meshes)
 	_build_terrain()
-
-	# Spawn environment decorations
-	_build_dungeon_walls()
-	_spawn_dungeon_decorations()
+	_build_city_walls()
 	_setup_exclusion_zones()
-	_decorate_town_biomes()
-	_place_town_props()
+	_decorate_city_biomes()
+	_place_city_props()
 	_decorate_field_biomes()
+
+	# Build district buildings via CityBuilder
+	const CityBuilder = preload("res://scripts/world/city_builder.gd")
+	CityBuilder.build_all_districts($NavigationRegion3D, _terrain_noise, _terrain_height_scale_city)
 
 	# Bake navmesh after environment is ready
 	var nav_region := $NavigationRegion3D
@@ -74,55 +74,74 @@ func _build_terrain() -> void:
 	var tex_grass := load("res://assets/textures/terrain/grass_albedo.png") as Texture2D
 	var tex_dirt := load("res://assets/textures/terrain/dirt_albedo.png") as Texture2D
 	var tex_stone := load("res://assets/textures/terrain/stone_albedo.png") as Texture2D
+	var tex_cobble: Texture2D = null
+	var tex_packed_earth: Texture2D = null
+	if ResourceLoader.exists("res://assets/textures/terrain/cobble_albedo.png"):
+		tex_cobble = load("res://assets/textures/terrain/cobble_albedo.png") as Texture2D
+	if ResourceLoader.exists("res://assets/textures/terrain/packed_earth_albedo.png"):
+		tex_packed_earth = load("res://assets/textures/terrain/packed_earth_albedo.png") as Texture2D
 
-	# --- Town Terrain (70x70, center at origin) ---
-	var town_rules: Array = [
-		# North-south road through town center
-		{"type": "line", "start": Vector2(0, -30), "end": Vector2(0, 30), "width": 1.5, "channel": 0, "falloff": 0.5},
-		# East-west road through town center
-		{"type": "line", "start": Vector2(-30, 0), "end": Vector2(30, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
-		# Path to field (east side)
-		{"type": "line", "start": Vector2(10, 5), "end": Vector2(35, 5), "width": 1.5, "channel": 0, "falloff": 0.5},
-		# Flatten around weapon shop (-8, -5)
-		{"type": "flatten", "center": Vector2(-8, -5), "radius": 4.0},
-		# Flatten around item shop (8, -6)
-		{"type": "flatten", "center": Vector2(8, -6), "radius": 4.0},
-		# Flatten around well (3, -1)
-		{"type": "flatten", "center": Vector2(3, -1), "radius": 2.0},
-		# Flatten town center
-		{"type": "flatten", "center": Vector2(0, 0), "radius": 3.0},
+	# --- City Terrain (140x100, center at origin) ---
+	var city_rules: Array = [
+		# Main E-W road (gate road through center)
+		{"type": "line", "start": Vector2(-65, 0), "end": Vector2(65, 0), "width": 2.0, "channel": 0, "falloff": 0.5},
+		# Main N-S road
+		{"type": "line", "start": Vector2(0, -45), "end": Vector2(0, 45), "width": 2.0, "channel": 0, "falloff": 0.5},
+		# Secondary roads along district boundaries
+		{"type": "line", "start": Vector2(-65, -10), "end": Vector2(65, -10), "width": 1.2, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-65, 10), "end": Vector2(65, 10), "width": 1.2, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-20, -45), "end": Vector2(-20, 45), "width": 1.2, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(25, -45), "end": Vector2(25, 45), "width": 1.2, "channel": 0, "falloff": 0.5},
+		# Gate road (wider near gate)
+		{"type": "line", "start": Vector2(55, 0), "end": Vector2(75, 0), "width": 3.0, "channel": 0, "falloff": 0.3},
+		# Diagonal secondary paths
+		{"type": "line", "start": Vector2(0, 0), "end": Vector2(-35, 20), "width": 1.0, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(0, 0), "end": Vector2(35, -25), "width": 1.0, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(55, 0), "end": Vector2(45, 25), "width": 1.0, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-40, -15), "end": Vector2(-55, -30), "width": 0.8, "channel": 0, "falloff": 0.5},
+
+		# District ground textures (cobblestone via channel 2)
+		{"type": "circle", "center": Vector2(0, 0), "radius": 12.0, "channel": 2, "falloff": 0.3},
+		{"type": "circle", "center": Vector2(-45, 25), "radius": 18.0, "channel": 2, "falloff": 0.4},
+		{"type": "circle", "center": Vector2(0, -30), "radius": 16.0, "channel": 2, "falloff": 0.4},
+		# City Gate area — stone (channel 1)
+		{"type": "circle", "center": Vector2(60, 0), "radius": 10.0, "channel": 1, "falloff": 0.3},
+		# Craft/Workshop — packed earth (channel 3)
+		{"type": "circle", "center": Vector2(0, 30), "radius": 14.0, "channel": 3, "falloff": 0.4},
+		# Garrison — packed earth
+		{"type": "circle", "center": Vector2(45, 30), "radius": 16.0, "channel": 3, "falloff": 0.4},
+
+		# Flatten building sites
+		{"type": "flatten", "center": Vector2(-45, 20), "radius": 6.0},
+		{"type": "flatten", "center": Vector2(-55, 30), "radius": 5.0},
+		{"type": "flatten", "center": Vector2(0, 0), "radius": 8.0},
+		{"type": "flatten", "center": Vector2(0, -35), "radius": 8.0},
+		{"type": "flatten", "center": Vector2(15, -25), "radius": 6.0},
+		{"type": "flatten", "center": Vector2(-10, -40), "radius": 6.0},
+		{"type": "flatten", "center": Vector2(0, 30), "radius": 6.0},
+		{"type": "flatten", "center": Vector2(45, 35), "radius": 8.0},
 	]
-	var town := TerrainGenerator.generate_terrain(
-		Vector3(0, 0, 0), Vector2(70, 70), Vector2i(35, 35),
-		_terrain_noise, _terrain_height_scale_town, town_rules
+	var city := TerrainGenerator.generate_terrain(
+		Vector3(0, 0, 0), Vector2(140, 100), Vector2i(70, 50),
+		_terrain_noise, 0.15, city_rules
 	)
 
-	# --- Field Terrain (80x80, center at 75,0,5) ---
+	# --- Field Terrain (80x80, center at 110,0,0) ---
 	var field_rules: Array = [
-		# Main path from town border to dungeon entrance
-		{"type": "line", "start": Vector2(38, 5), "end": Vector2(65, 5), "width": 1.5, "channel": 0, "falloff": 0.5},
-		{"type": "line", "start": Vector2(65, 5), "end": Vector2(118, 5), "width": 1.5, "channel": 0, "falloff": 0.5},
-		# Branch to north
-		{"type": "line", "start": Vector2(65, 5), "end": Vector2(75, 30), "width": 1.0, "channel": 0, "falloff": 0.5},
-		# Branch to south
-		{"type": "line", "start": Vector2(65, 5), "end": Vector2(85, -25), "width": 1.0, "channel": 0, "falloff": 0.5},
+		# Flatten field terrain at gate boundary so heights match city terrain
+		{"type": "flatten", "center": Vector2(75, 0), "radius": 8.0},
+		{"type": "line", "start": Vector2(70, 0), "end": Vector2(100, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(100, 0), "end": Vector2(145, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(100, 0), "end": Vector2(110, 25), "width": 1.0, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(100, 0), "end": Vector2(120, -20), "width": 1.0, "channel": 0, "falloff": 0.5},
 	]
 	var field := TerrainGenerator.generate_terrain(
-		Vector3(75, 0, 5), Vector2(80, 80), Vector2i(40, 40),
+		Vector3(110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
 		_terrain_noise, _terrain_height_scale_field, field_rules
 	)
 
-	# --- Dungeon Terrain (50x50, flat stone) ---
-	var dungeon_rules: Array = [
-		{"type": "fill", "channel": 1, "strength": 1.0},
-	]
-	var dungeon := TerrainGenerator.generate_terrain(
-		Vector3(140, 0, 5), Vector2(50, 50), Vector2i(1, 1),
-		_terrain_noise, 0.0, dungeon_rules
-	)
-
 	# Apply shader material to each terrain mesh
-	for terrain_data in [town, field, dungeon]:
+	for terrain_data in [city, field]:
 		var mat := ShaderMaterial.new()
 		mat.shader = terrain_shader
 		if tex_grass:
@@ -131,6 +150,10 @@ func _build_terrain() -> void:
 			mat.set_shader_parameter("texture_dirt", tex_dirt)
 		if tex_stone:
 			mat.set_shader_parameter("texture_stone", tex_stone)
+		if tex_cobble:
+			mat.set_shader_parameter("texture_cobble", tex_cobble)
+		if tex_packed_earth:
+			mat.set_shader_parameter("texture_packed_earth", tex_packed_earth)
 		mat.set_shader_parameter("uv_scale", 0.5)
 		mat.set_shader_parameter("blend_sharpness", 3.0)
 		var mi: MeshInstance3D = terrain_data["mesh_instance"]
@@ -202,8 +225,8 @@ func _setup_adventurer_npcs() -> void:
 		thane.get_node("NPCBrain").set_use_llm(false)
 		thane.get_node("NPCBrain").set_use_llm_chat(true)
 		var thane_behavior = thane.get_node("NPCBehavior")
-		thane_behavior.default_goal = "hunt_dungeon"
-		thane.set_goal("hunt_dungeon")
+		thane_behavior.default_goal = "hunt_field"
+		thane.set_goal("hunt_field")
 
 	# Mira (Mage) — cheerful and curious
 	var mira: Node3D = $NPCs/Mira
@@ -228,8 +251,8 @@ func _setup_adventurer_npcs() -> void:
 		dusk.get_node("NPCBrain").set_use_llm(false)
 		dusk.get_node("NPCBrain").set_use_llm_chat(true)
 		var dusk_behavior = dusk.get_node("NPCBehavior")
-		dusk_behavior.default_goal = "hunt_dungeon"
-		dusk.set_goal("hunt_dungeon")
+		dusk_behavior.default_goal = "hunt_field"
+		dusk.set_goal("hunt_field")
 
 # =============================================================================
 # Asset Loading Infrastructure
@@ -243,11 +266,9 @@ func _spawn_model(path: String, pos: Vector3, rot_y: float = 0.0, scale_val: flo
 	# Snap to terrain height when placed at ground level
 	if pos.y == 0.0 and _terrain_noise:
 		var height_scale := _terrain_height_scale_field
-		# Use town height scale for town area
-		if pos.x >= -35 and pos.x <= 35 and pos.z >= -35 and pos.z <= 35:
-			height_scale = _terrain_height_scale_town
-		elif pos.x >= 115 and pos.x <= 165 and pos.z >= -20 and pos.z <= 30:
-			height_scale = 0.0  # Dungeon: flat
+		# Use city height scale for city area
+		if pos.x >= -70 and pos.x <= 70 and pos.z >= -50 and pos.z <= 50:
+			height_scale = _terrain_height_scale_city
 		pos.y = TerrainGenerator.get_height_at(_terrain_noise, pos.x, pos.z, height_scale)
 	instance.position = pos
 	if rot_y != 0.0:
@@ -344,36 +365,48 @@ func _spawn_tree(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: 
 		instance.add_child(body)
 	return instance
 
-func _spawn_dungeon_model(filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
-	return _spawn_model(DUNGEON_DIR + filename, pos, rot_y, scale_val)
-
 # =============================================================================
 # Biome Decoration Infrastructure
 # =============================================================================
 
 func _setup_exclusion_zones() -> void:
-	# Path lines — same data as terrain paint rules
 	_path_lines = [
-		# Town paths
-		{"start": Vector2(0, -30), "end": Vector2(0, 30), "buffer": 2.5},
-		{"start": Vector2(-30, 0), "end": Vector2(30, 0), "buffer": 2.5},
-		{"start": Vector2(10, 5), "end": Vector2(35, 5), "buffer": 2.5},
+		# City roads
+		{"start": Vector2(-65, 0), "end": Vector2(65, 0), "buffer": 3.0},
+		{"start": Vector2(0, -45), "end": Vector2(0, 45), "buffer": 3.0},
+		{"start": Vector2(-65, -10), "end": Vector2(65, -10), "buffer": 2.0},
+		{"start": Vector2(-65, 10), "end": Vector2(65, 10), "buffer": 2.0},
+		{"start": Vector2(-20, -45), "end": Vector2(-20, 45), "buffer": 2.0},
+		{"start": Vector2(25, -45), "end": Vector2(25, 45), "buffer": 2.0},
+		# Diagonal secondary paths
+		{"start": Vector2(0, 0), "end": Vector2(-35, 20), "buffer": 2.0},
+		{"start": Vector2(0, 0), "end": Vector2(35, -25), "buffer": 2.0},
+		{"start": Vector2(55, 0), "end": Vector2(45, 25), "buffer": 2.0},
+		{"start": Vector2(-40, -15), "end": Vector2(-55, -30), "buffer": 1.5},
+		# Gate road
+		{"start": Vector2(55, 0), "end": Vector2(80, 0), "buffer": 3.5},
 		# Field paths
-		{"start": Vector2(38, 5), "end": Vector2(65, 5), "buffer": 2.5},
-		{"start": Vector2(65, 5), "end": Vector2(118, 5), "buffer": 2.5},
-		{"start": Vector2(65, 5), "end": Vector2(75, 30), "buffer": 2.0},
-		{"start": Vector2(65, 5), "end": Vector2(85, -25), "buffer": 2.0},
+		{"start": Vector2(73, 0), "end": Vector2(100, 0), "buffer": 2.5},
+		{"start": Vector2(100, 0), "end": Vector2(145, 0), "buffer": 2.5},
+		{"start": Vector2(100, 0), "end": Vector2(110, 25), "buffer": 2.0},
+		{"start": Vector2(100, 0), "end": Vector2(120, -20), "buffer": 2.0},
 	]
-
-	# Building zones — from flatten rules
 	_building_zones = [
-		{"center": Vector2(-8, -5), "radius": 5.0},
-		{"center": Vector2(8, -6), "radius": 5.0},
-		{"center": Vector2(3, -1), "radius": 3.0},
-		{"center": Vector2(0, 0), "radius": 4.0},
+		# Shops in market district
+		{"center": Vector2(-45, 20), "radius": 6.0},
+		{"center": Vector2(-55, 30), "radius": 5.0},
+		# Central plaza
+		{"center": Vector2(0, 0), "radius": 10.0},
+		# Temple
+		{"center": Vector2(0, -35), "radius": 8.0},
+		{"center": Vector2(15, -25), "radius": 6.0},
+		# Forge
+		{"center": Vector2(0, 30), "radius": 6.0},
+		# Barracks
+		{"center": Vector2(45, 35), "radius": 8.0},
+		# Fountain in park
+		{"center": Vector2(45, -30), "radius": 5.0},
 	]
-
-	# Decoration density noise
 	_deco_noise = FastNoiseLite.new()
 	_deco_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_deco_noise.seed = 137
@@ -386,20 +419,12 @@ func _point_to_segment_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 	return p.distance_to(a + ab * t)
 
 func _is_position_blocked(pos: Vector2) -> bool:
-	# Check path lines
 	for line in _path_lines:
 		if _point_to_segment_dist(pos, line["start"], line["end"]) < line["buffer"]:
 			return true
-	# Check building zones
 	for zone in _building_zones:
 		if pos.distance_to(zone["center"]) < zone["radius"]:
 			return true
-	# Fence at x=30
-	if absf(pos.x - 30.0) < 1.0 and pos.y >= -22.0 and pos.y <= 25.0:
-		return true
-	# Dungeon boundary
-	if pos.x > 113.0:
-		return true
 	return false
 
 func _scatter_biome(biome: Dictionary, rng: RandomNumberGenerator) -> int:
@@ -480,203 +505,112 @@ func _scatter_biome(biome: Dictionary, rng: RandomNumberGenerator) -> int:
 	return total_placed
 
 # =============================================================================
-# Dungeon Zone
+# City Walls
 # =============================================================================
 
-func _build_dungeon_walls() -> void:
-	var walls_parent := $NavigationRegion3D/DungeonWalls
+func _build_city_walls() -> void:
+	var wall_color := Color(0.45, 0.42, 0.38)
+	var wall_mat := _get_or_create_color_mat(wall_color)
+	var wall_height := 4.0
+	var wall_thickness := 1.0
 
-	# Measure wall tile width from model AABB
-	var wall_scene := ModelHelper.load_model(DUNGEON_DIR + "wall.gltf.glb")
-	var wall_width := 2.0  # default fallback
-	if wall_scene:
-		var temp := wall_scene.instantiate() as Node3D
-		var aabb := _get_node_aabb(temp)
-		if aabb.size.x > 0.1:
-			wall_width = aabb.size.x
-		elif aabb.size.z > 0.1:
-			wall_width = aabb.size.z
-		temp.queue_free()
+	# North wall: z=-50, x from -70 to 70
+	_place_city_wall_segment(Vector3(-70, 0, -50), Vector3(70, 0, -50), wall_height, wall_thickness, wall_mat)
+	# South wall: z=50
+	_place_city_wall_segment(Vector3(-70, 0, 50), Vector3(70, 0, 50), wall_height, wall_thickness, wall_mat)
+	# West wall: x=-70
+	_place_city_wall_segment(Vector3(-70, 0, -50), Vector3(-70, 0, 50), wall_height, wall_thickness, wall_mat)
+	# East wall with gate gap: x=70, z:-50..-5 and z:5..50
+	_place_city_wall_segment(Vector3(70, 0, -50), Vector3(70, 0, -5), wall_height, wall_thickness, wall_mat)
+	_place_city_wall_segment(Vector3(70, 0, 5), Vector3(70, 0, 50), wall_height, wall_thickness, wall_mat)
 
-	# Outer walls — x:115→165, z:-20→30
-	# North wall: z=-20, x from 115 to 165
-	_place_wall_line(Vector3(115, 0, -20), Vector3(165, 0, -20), wall_width, 0.0, walls_parent)
-	# South wall: z=30, x from 115 to 165
-	_place_wall_line(Vector3(115, 0, 30), Vector3(165, 0, 30), wall_width, PI, walls_parent)
-	# East wall: x=165, z from -20 to 30
-	_place_wall_line(Vector3(165, 0, -20), Vector3(165, 0, 30), wall_width, -PI / 2.0, walls_parent)
-	# West wall with entrance gap: x=115, z=-20→-2 and z=8→30
-	_place_wall_line(Vector3(115, 0, -20), Vector3(115, 0, -2), wall_width, PI / 2.0, walls_parent)
-	_place_wall_line(Vector3(115, 0, 8), Vector3(115, 0, 30), wall_width, PI / 2.0, walls_parent)
+	# Corner towers
+	for corner in [Vector3(-70, 0, -50), Vector3(70, 0, -50), Vector3(70, 0, 50), Vector3(-70, 0, 50)]:
+		_build_tower(corner, 5.5, 3.0, wall_mat)
 
-	# Doorway at entrance
-	var doorway := _spawn_dungeon_model("wall_doorway.glb", Vector3(115, 0, 3), PI / 2.0)
-	if doorway:
-		doorway.reparent(walls_parent)
-		_add_wall_collision(doorway, Vector3(1, 3, 4))
+	# Gate towers — placed outside the gap so they don't block passage
+	_build_tower(Vector3(70, 0, -7), 6.0, 3.0, wall_mat)
+	_build_tower(Vector3(70, 0, 7), 6.0, 3.0, wall_mat)
 
-	# Corners
-	_spawn_dungeon_model("wall_corner.gltf.glb", Vector3(115, 0, -20), 0.0)
-	_spawn_dungeon_model("wall_corner.gltf.glb", Vector3(165, 0, -20), -PI / 2.0)
-	_spawn_dungeon_model("wall_corner.gltf.glb", Vector3(165, 0, 30), PI)
-	_spawn_dungeon_model("wall_corner.gltf.glb", Vector3(115, 0, 30), PI / 2.0)
+	# Gatehouse archway — visual only (no collision), placed above walking height
+	var arch := MeshInstance3D.new()
+	var arch_mesh := BoxMesh.new()
+	arch_mesh.size = Vector3(wall_thickness, 1.5, 10.0)
+	arch.mesh = arch_mesh
+	arch.position = Vector3(70, wall_height + 0.75, 0)
+	arch.set_surface_override_material(0, wall_mat)
+	add_child(arch)  # Add to root, not NavigationRegion3D — so navmesh ignores it
 
-	# Inner walls — create rooms: entry chamber, south wing, north wing, deep chamber
-	# Horizontal wall: x=125→135, z=-5
-	_place_wall_line(Vector3(125, 0, -5), Vector3(135, 0, -5), wall_width, 0.0, walls_parent, true)
-	# Horizontal wall: x=140→150, z=10
-	_place_wall_line(Vector3(140, 0, 10), Vector3(150, 0, 10), wall_width, 0.0, walls_parent, true)
-	# Vertical wall: x=135, z=-15→-5
-	_place_wall_line(Vector3(135, 0, -15), Vector3(135, 0, -5), wall_width, PI / 2.0, walls_parent, true)
-	# Vertical wall: x=150, z=10→20
-	_place_wall_line(Vector3(150, 0, 10), Vector3(150, 0, 20), wall_width, PI / 2.0, walls_parent, true)
+	# Gate torches
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(69, 0, -4))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(69, 0, 4))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(71, 0, -4))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(71, 0, 4))
 
-func _place_wall_line(start: Vector3, end: Vector3, tile_w: float, rot_y: float, parent: Node, is_inner: bool = false) -> void:
-	var direction := (end - start).normalized()
-	var total_dist := start.distance_to(end)
-	var count := int(total_dist / tile_w)
-	if count < 1:
-		count = 1
+func _place_city_wall_segment(start: Vector3, end: Vector3, height: float, thickness: float, mat: Material) -> void:
+	var dir := end - start
+	var length := dir.length()
+	var center := (start + end) * 0.5
+	center.y = height * 0.5
 
-	for i in count:
-		var pos := start + direction * (tile_w * i + tile_w * 0.5)
-		# Every 4th-5th wall segment use broken variant for variety
-		var wall_file := "wall.gltf.glb"
-		if is_inner:
-			wall_file = "wall_arched.gltf.glb"
-		elif i % 5 == 3:
-			wall_file = "wall_broken.gltf.glb"
+	var wall := StaticBody3D.new()
+	wall.position = center
 
-		var wall := _spawn_dungeon_model(wall_file, pos, rot_y)
-		if wall:
-			wall.reparent(parent)
-			_add_wall_collision(wall, Vector3(tile_w, 3, 1))
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	# Determine orientation
+	if absf(dir.x) > absf(dir.z):
+		box.size = Vector3(length, height, thickness)
+	else:
+		box.size = Vector3(thickness, height, length)
+	mesh_inst.mesh = box
+	mesh_inst.set_surface_override_material(0, mat)
+	wall.add_child(mesh_inst)
 
-func _add_wall_collision(wall_node: Node3D, box_size: Vector3) -> void:
-	var body := StaticBody3D.new()
-	body.position = Vector3(0, box_size.y * 0.5, 0)
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = box_size
+	shape.size = box.size
 	col.shape = shape
-	body.add_child(col)
-	wall_node.add_child(body)
+	wall.add_child(col)
 
-func _get_node_aabb(node: Node3D) -> AABB:
-	var result := AABB()
-	var found := false
-	for child in node.get_children():
-		if child is MeshInstance3D:
-			var mesh_aabb: AABB = child.get_aabb()
-			if not found:
-				result = mesh_aabb
-				found = true
-			else:
-				result = result.merge(mesh_aabb)
-	if not found:
-		for child in node.get_children():
-			if child is Node3D:
-				var child_aabb := _get_node_aabb(child)
-				if child_aabb.size.length() > 0.01:
-					if not found:
-						result = child_aabb
-						found = true
-					else:
-						result = result.merge(child_aabb)
-	return result
+	$NavigationRegion3D.add_child(wall)
 
-func _spawn_dungeon_decorations() -> void:
-	# Torches along walls — dungeon bounds x:115→165, z:-20→30
-	var torch_positions := [
-		# North wall torches (z=-20)
-		Vector3(120, 0, -19.5), Vector3(128, 0, -19.5), Vector3(136, 0, -19.5),
-		Vector3(144, 0, -19.5), Vector3(152, 0, -19.5), Vector3(160, 0, -19.5),
-		# South wall torches (z=30)
-		Vector3(120, 0, 29.5), Vector3(128, 0, 29.5), Vector3(136, 0, 29.5),
-		Vector3(144, 0, 29.5), Vector3(152, 0, 29.5), Vector3(160, 0, 29.5),
-		# East wall torches (x=165)
-		Vector3(164.5, 0, -12), Vector3(164.5, 0, -2), Vector3(164.5, 0, 8),
-		Vector3(164.5, 0, 18), Vector3(164.5, 0, 25),
-		# West wall torches (x=115)
-		Vector3(115.5, 0, -14), Vector3(115.5, 0, 14), Vector3(115.5, 0, 24),
-		# Inner area torches
-		Vector3(130, 0, 5), Vector3(140, 0, -8), Vector3(145, 0, 18),
-		Vector3(155, 0, 5), Vector3(135, 0, 15), Vector3(125, 0, -10),
-	]
+func _build_tower(pos: Vector3, height: float, width: float, mat: Material) -> void:
+	var tower := StaticBody3D.new()
+	tower.position = Vector3(pos.x, height * 0.5, pos.z)
 
-	for pos in torch_positions:
-		var rot := 0.0
-		if pos.z < -19:  # North wall
-			rot = PI
-		elif pos.z > 29:  # South wall
-			rot = 0.0
-		elif pos.x > 164:  # East wall
-			rot = PI / 2.0
-		elif pos.x < 116:  # West wall
-			rot = -PI / 2.0
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(width, height, width)
+	mesh_inst.mesh = box
+	mesh_inst.set_surface_override_material(0, mat)
+	tower.add_child(mesh_inst)
 
-		_spawn_dungeon_model("torch_mounted.gltf.glb", pos, rot)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = box.size
+	col.shape = shape
+	tower.add_child(col)
 
-	# Decorated pillars at room corners
-	_spawn_dungeon_model("pillar_decorated.gltf.glb", Vector3(118, 0, -17))
-	_spawn_dungeon_model("pillar_decorated.gltf.glb", Vector3(162, 0, -17))
-	_spawn_dungeon_model("pillar_decorated.gltf.glb", Vector3(162, 0, 27))
-	_spawn_dungeon_model("pillar_decorated.gltf.glb", Vector3(118, 0, 27))
+	$NavigationRegion3D.add_child(tower)
 
-	# Plain pillars at inner wall junctions
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(125, 0, -5))
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(135, 0, -5))
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(135, 0, -15))
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(140, 0, 10))
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(150, 0, 10))
-	_spawn_dungeon_model("pillar.gltf.glb", Vector3(150, 0, 20))
-
-	# Banners at entrance and in rooms
-	_spawn_dungeon_model("banner_red.gltf.glb", Vector3(115.5, 0, -1), -PI / 2.0)
-	_spawn_dungeon_model("banner_red.gltf.glb", Vector3(115.5, 0, 7), -PI / 2.0)
-	_spawn_dungeon_model("banner_red.gltf.glb", Vector3(158, 0, 26))
-
-	# Storage clusters — SW corner
-	_spawn_dungeon_model("barrel_large.gltf.glb", Vector3(117, 0, 26))
-	_spawn_dungeon_model("barrel_small.gltf.glb", Vector3(118.5, 0, 27))
-	_spawn_dungeon_model("crates_stacked.gltf.glb", Vector3(119, 0, 28), 0.3)
-	# Storage clusters — NE corner
-	_spawn_dungeon_model("barrel_large.gltf.glb", Vector3(162, 0, -17))
-	_spawn_dungeon_model("crates_stacked.gltf.glb", Vector3(161, 0, -16), -0.5)
-
-	# Chests — deep chamber + south wing
-	_spawn_dungeon_model("chest.glb", Vector3(158, 0, 5), PI)
-	_spawn_dungeon_model("chest.glb", Vector3(130, 0, -15), 0.0)
-
-	# Ferns near entrance for transition feel
-	var dark_green := Color(0.08, 0.18, 0.06)
-	_spawn_foliage("SM_RedFern01.FBX", Vector3(114, 0, -1), dark_green, 0.0, 0.25)
-	_spawn_foliage("SM_RedFern02.FBX", Vector3(114, 0, 7), dark_green, 1.2, 0.25)
-	_spawn_foliage("SM_Fern1.FBX", Vector3(113, 0, 3), dark_green, 0.5, 0.25)
-
-	# Dungeon atmosphere — dark ceiling
-	_create_dungeon_ceiling()
-
-func _create_dungeon_ceiling() -> void:
-	var ceiling := MeshInstance3D.new()
-	var mesh := PlaneMesh.new()
-	mesh.size = Vector2(50, 50)
-	ceiling.mesh = mesh
-	ceiling.position = Vector3(140, 3.5, 5)
-	ceiling.rotation.x = PI  # Flip to face downward
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.05, 0.05, 0.08, 0.5)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	ceiling.material_override = mat
-	$NavigationRegion3D.add_child(ceiling)
+	# Crenellations on top
+	var cren_size := Vector3(0.4, 0.6, 0.4)
+	var offsets := [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]
+	for offset in offsets:
+		var cren := MeshInstance3D.new()
+		var cren_mesh := BoxMesh.new()
+		cren_mesh.size = cren_size
+		cren.mesh = cren_mesh
+		cren.position = Vector3(pos.x + offset.x, height + cren_size.y * 0.5, pos.z + offset.z)
+		cren.set_surface_override_material(0, mat)
+		$NavigationRegion3D.add_child(cren)
 
 # =============================================================================
-# Town Zone
+# City Zone
 # =============================================================================
 
-func _decorate_town_biomes() -> void:
+func _decorate_city_biomes() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 200
 
@@ -695,58 +629,32 @@ func _decorate_town_biomes() -> void:
 	var leafy_bush_files := ["SM_BushLeafy01.FBX", "SM_BushLeafy02.FBX"]
 
 	var biomes := [
-		# NW Outskirt — wild trees and ferns
+		# Park/Gardens district (x:25..70, z:-50..-10)
 		{
-			"center": Vector2(-25, -25), "radius": 10.0, "noise_threshold": -0.1,
+			"center": Vector2(45, -30), "radius": 22.0, "noise_threshold": -0.2,
 			"recipes": [
-				{"type": "tree", "count": 5, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
+				{"type": "tree", "count": 10, "min_spacing": 3.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 8, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow, flower_white], "scale": 0.25},
+				{"type": "foliage", "count": 6, "min_spacing": 2.0, "files": leafy_bush_files, "colors": [green, dark_green], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
 			]
 		},
-		# NE Outskirt — wild trees and ferns
+		# Residential gardens (x:-70..-20, z:-50..-10)
 		{
-			"center": Vector2(22, -25), "radius": 10.0, "noise_threshold": -0.1,
+			"bounds": [-66, -46, 44, 34], "noise_threshold": 0.1,
 			"recipes": [
-				{"type": "tree", "count": 4, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
+				{"type": "tree", "count": 6, "min_spacing": 4.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow], "scale": 0.25},
+				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green], "scale": 0.25},
 			]
 		},
-		# West Park — organized trees and flowers
+		# Noble/Temple garden (x:-20..25, z:-50..-10) — sparse, manicured
 		{
-			"bounds": [-30, 5, 15, 20], "noise_threshold": 0.3,
+			"bounds": [-18, -48, 41, 36], "noise_threshold": 0.3,
 			"recipes": [
-				{"type": "tree", "count": 5, "min_spacing": 3.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow, flower_white], "scale": 0.25},
-				{"type": "foliage", "count": 6, "min_spacing": 2.0, "files": leafy_bush_files + ["SM_FlowerBush01.FBX", "SM_FlowerBush02.FBX"], "colors": [green, flower_pink], "scale": 0.25},
-			]
-		},
-		# East Garden — flowers and some trees
-		{
-			"bounds": [18, -8, 12, 20], "noise_threshold": 0.2,
-			"recipes": [
-				{"type": "tree", "count": 4, "min_spacing": 3.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow, flower_white], "scale": 0.25},
-				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": leafy_bush_files, "colors": [green, dark_green], "scale": 0.25},
-			]
-		},
-		# SW Outskirt
-		{
-			"center": Vector2(-20, 28), "radius": 8.0, "noise_threshold": -0.1,
-			"recipes": [
-				{"type": "tree", "count": 4, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
-			]
-		},
-		# SE Outskirt
-		{
-			"center": Vector2(20, 28), "radius": 8.0, "noise_threshold": -0.1,
-			"recipes": [
-				{"type": "tree", "count": 3, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
-				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
-				{"type": "foliage", "count": 1, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
+				{"type": "tree", "count": 4, "min_spacing": 5.0, "files": tree_files, "colors": [leaf_green], "scale": 0.25},
+				{"type": "foliage", "count": 3, "min_spacing": 3.0, "files": leafy_bush_files, "colors": [green], "scale": 0.25},
+				{"type": "foliage", "count": 3, "min_spacing": 3.0, "files": flower_files, "colors": [flower_white, flower_pink], "scale": 0.25},
 			]
 		},
 	]
@@ -754,53 +662,41 @@ func _decorate_town_biomes() -> void:
 	var total := 0
 	for biome in biomes:
 		total += _scatter_biome(biome, rng)
-	print("[Town] Biome scatter placed %d objects" % total)
+	print("[City] Biome scatter placed %d objects" % total)
 
-func _place_town_props() -> void:
-	var green := Color(0.2, 0.45, 0.15)
-	var dark_green := Color(0.15, 0.35, 0.1)
+func _place_city_props() -> void:
+	# Market district props
+	_spawn_model(DUNGEON_DIR + "barrel_large.gltf.glb", Vector3(-42, 0, 22))
+	_spawn_model(DUNGEON_DIR + "crates_stacked.gltf.glb", Vector3(-48, 0, 18), 0.3)
+	_spawn_model(DUNGEON_DIR + "barrel_small.gltf.glb", Vector3(-53, 0, 28))
+	_spawn_model(DUNGEON_DIR + "barrel_large.gltf.glb", Vector3(-58, 0, 32))
+
+	# Torches at shops
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(-43, 0, 18))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(-47, 0, 18))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(-53, 0, 28))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(-57, 0, 28))
+
+	# Temple/Noble quarter
+	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(-2, 0, -33))
+	_spawn_model(DUNGEON_DIR + "pillar_decorated.gltf.glb", Vector3(2, 0, -33))
+	_spawn_model(DUNGEON_DIR + "banner_red.gltf.glb", Vector3(15, 0, -23))
+
+	# Craft district
+	_spawn_model(DUNGEON_DIR + "barrel_large.gltf.glb", Vector3(-2, 0, 28))
+	_spawn_model(DUNGEON_DIR + "crates_stacked.gltf.glb", Vector3(3, 0, 32), 0.5)
+
+	# Garrison
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(38, 0, 28))
+	_spawn_model(DUNGEON_DIR + "torch_lit.gltf.glb", Vector3(52, 0, 28))
+	_spawn_model(DUNGEON_DIR + "banner_red.gltf.glb", Vector3(45, 0, 33))
+
+	# Central plaza — flowers near well/fountain
 	var flower_pink := Color(0.85, 0.4, 0.55)
 	var flower_yellow := Color(0.9, 0.85, 0.3)
-	var flower_white := Color(0.9, 0.9, 0.85)
-
-	# Shop props — barrels and crates outside weapon shop
-	_spawn_dungeon_model("barrel_large.gltf.glb", Vector3(-5.5, 0, -3))
-	_spawn_dungeon_model("crates_stacked.gltf.glb", Vector3(-10.5, 0, -3.5), 0.3)
-
-	# Barrel outside item shop
-	_spawn_dungeon_model("barrel_small.gltf.glb", Vector3(10, 0, -4))
-
-	# Barrels/crates near path to field
-	_spawn_dungeon_model("barrel_large.gltf.glb", Vector3(25, 0, 3))
-	_spawn_dungeon_model("crates_stacked.gltf.glb", Vector3(27, 0, 4), 0.5)
-	_spawn_dungeon_model("barrel_small.gltf.glb", Vector3(26, 0, 6))
-
-	# Leafy bushes flanking shop entrances
-	_spawn_foliage("SM_BushLeafy01.FBX", Vector3(-5.5, 0, -5), green, 0.0)
-	_spawn_foliage("SM_BushLeafy02.FBX", Vector3(5.5, 0, -6), green, 1.0)
-
-	# Torches at shop fronts
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-6.5, 0, -3))
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(-9.5, 0, -3))
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(6.5, 0, -4))
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(9.5, 0, -4))
-
-	# Bushes along fence line (x=30 border)
-	_spawn_foliage("SM_BushChina01.FBX", Vector3(29, 0, -15), dark_green, 0.0)
-	_spawn_foliage("SM_BushChina02.FBX", Vector3(29, 0, -3), dark_green, 1.2)
-	_spawn_foliage("SM_BushChina03.FBX", Vector3(29, 0, 12), dark_green, 2.0)
-
-	# Torches at field entrance gateposts (x≈30)
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 4))
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(30, 0, 8))
-
-	# Flowers near well
-	_spawn_foliage("SM_Flower_Daisies1.FBX", Vector3(4.5, 0, -1), flower_white, 0.0)
-	_spawn_foliage("SM_FlowerBush01.FBX", Vector3(2, 0, -2.5), flower_pink, 0.5)
-
-	# Flowers at shop fronts
-	_spawn_foliage("SM_Flower_TulipsRed.FBX", Vector3(-6, 0, -3), flower_pink, 0.0)
-	_spawn_foliage("SM_Flower_TulipsYellow.FBX", Vector3(6, 0, -4), flower_yellow, 0.0)
+	_spawn_foliage("SM_Flower_Daisies1.FBX", Vector3(3, 0, 2), Color(0.9, 0.9, 0.85))
+	_spawn_foliage("SM_FlowerBush01.FBX", Vector3(-3, 0, -2), flower_pink)
+	_spawn_foliage("SM_Flower_TulipsYellow.FBX", Vector3(2, 0, -3), flower_yellow)
 
 # =============================================================================
 # Field Zone
@@ -862,7 +758,7 @@ func _decorate_field_biomes() -> void:
 	var biomes := [
 		# Dense Forest — NW field, thick trees
 		{
-			"bounds": [38, 22, 22, 20], "noise_threshold": -0.1,
+			"bounds": [73, 22, 22, 20], "noise_threshold": -0.1,
 			"recipes": [
 				{"type": "tree", "count": 14, "min_spacing": 2.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
 				{"type": "foliage", "count": 8, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
@@ -871,7 +767,7 @@ func _decorate_field_biomes() -> void:
 		},
 		# Open Meadow — center-south, wildflowers and grass only
 		{
-			"center": Vector2(68, -15), "radius": 18.0, "noise_threshold": -0.2,
+			"center": Vector2(103, -15), "radius": 18.0, "noise_threshold": -0.2,
 			"recipes": [
 				{"type": "foliage", "count": 15, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 8, "min_spacing": 2.5, "files": flower_files, "colors": [flower_yellow, flower_orange, flower_pink, flower_white], "scale": 0.25},
@@ -879,7 +775,7 @@ func _decorate_field_biomes() -> void:
 		},
 		# Rocky Clearing — east field, rocks and stumps
 		{
-			"bounds": [82, -32, 30, 22], "noise_threshold": -0.2,
+			"bounds": [117, -32, 30, 22], "noise_threshold": -0.2,
 			"recipes": [
 				{"type": "rock_cluster", "count": 8, "min_spacing": 4.0, "files": [], "colors": []},
 				{"type": "stump", "count": 3, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},
@@ -889,7 +785,7 @@ func _decorate_field_biomes() -> void:
 		},
 		# Transitional NE — sparse mix
 		{
-			"bounds": [75, 22, 30, 20], "noise_threshold": 0.0,
+			"bounds": [110, 22, 30, 20], "noise_threshold": 0.0,
 			"recipes": [
 				{"type": "tree", "count": 6, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
@@ -898,7 +794,7 @@ func _decorate_field_biomes() -> void:
 		},
 		# Transitional SW — sparse mix near entrance
 		{
-			"bounds": [38, -10, 17, 20], "noise_threshold": 0.0,
+			"bounds": [73, -10, 17, 20], "noise_threshold": 0.0,
 			"recipes": [
 				{"type": "tree", "count": 5, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
@@ -908,20 +804,11 @@ func _decorate_field_biomes() -> void:
 		},
 		# Path-edge scatter — sparse along main path
 		{
-			"bounds": [38, 0, 77, 10], "noise_threshold": 0.2,
+			"bounds": [73, 0, 77, 10], "noise_threshold": 0.2,
 			"recipes": [
 				{"type": "tree", "count": 2, "min_spacing": 4.0, "files": sapling_files, "colors": [leaf_green], "scale": 0.25},
 				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": fern_files, "colors": [fern_color], "scale": 0.25},
-			]
-		},
-		# Dungeon approach — eerie, stumps and rocks
-		{
-			"bounds": [100, -10, 15, 20], "noise_threshold": -0.1,
-			"recipes": [
-				{"type": "stump", "count": 3, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},
-				{"type": "foliage", "count": 5, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
-				{"type": "rock_cluster", "count": 2, "min_spacing": 4.0, "files": [], "colors": []},
 			]
 		},
 	]
@@ -930,8 +817,3 @@ func _decorate_field_biomes() -> void:
 	for biome in biomes:
 		total += _scatter_biome(biome, rng)
 	print("[Field] Biome scatter placed %d objects" % total)
-
-	# Manual: torches flanking dungeon entrance
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 2))
-	_spawn_dungeon_model("torch_lit.gltf.glb", Vector3(116, 0, 8))
-

@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/game_world/game_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scenes/ui/panel_toggles.gd" id="15_panel_toggles"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_info_panel.tscn" id="16_npc_info"]
 [ext_resource type="Script" path="res://scenes/ui/proficiency_panel.gd" id="17_prof_panel"]
+[ext_resource type="Script" path="res://scenes/ui/world_map_panel.gd" id="18_world_map"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -23,10 +24,10 @@ script = ExtResource("8_main")
 [node name="GameWorld" parent="." instance=ExtResource("1_world")]
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, 3)
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(0.7071, -0.3536, 0.6124, 0, 0.866, 0.5, -0.7071, -0.3536, 0.6124, 25, 20, 25)
+transform = Transform3D(0.7071, -0.3536, 0.6124, 0, 0.866, 0.5, -0.7071, -0.3536, 0.6124, 33, 20, 28)
 projection = 1
 current = true
 size = 15.0
@@ -60,3 +61,6 @@ script = ExtResource("15_panel_toggles")
 
 [node name="ProficiencyPanel" type="Control" parent="UILayer"]
 script = ExtResource("17_prof_panel")
+
+[node name="WorldMapPanel" type="Control" parent="UILayer"]
+script = ExtResource("18_world_map")
