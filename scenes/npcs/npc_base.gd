@@ -431,7 +431,8 @@ func _die() -> void:
 func _respawn() -> void:
 	_visuals.reset_anim()
 	# Teleport to town
-	global_position = Vector3(randf_range(-2, 2), 1, randf_range(-2, 2))
+	# Respawn near town square, offset to avoid fountain
+	global_position = Vector3(randf_range(-8, -4), 1, randf_range(-4, 4))
 	velocity = Vector3.ZERO
 
 	# Restore HP

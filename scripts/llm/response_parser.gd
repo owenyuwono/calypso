@@ -152,7 +152,7 @@ static func _clean_chat_response(text: String) -> String:
 	return cleaned
 
 const VALID_GOALS: Array = [
-	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
+	"hunt_field", "buy_potions", "sell_loot",
 	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle",
 ]
 

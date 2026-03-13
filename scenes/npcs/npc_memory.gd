@@ -230,8 +230,6 @@ func _goal_to_fact(goal: String, gold: int) -> Dictionary:
 	match goal:
 		"hunt_field":
 			return {"topic": "how the hunting is going", "fact": "You are hunting in the field", "weight": 1.0}
-		"hunt_dungeon":
-			return {"topic": "the dungeon", "fact": "You are hunting in the dungeon", "weight": 1.0}
 		"buy_potions":
 			return {"topic": "stocking up on potions", "fact": "You are buying potions", "weight": 1.0}
 		"sell_loot":

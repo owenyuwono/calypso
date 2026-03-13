@@ -6,7 +6,7 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 
 const VALID_GOALS: Array = [
-	"hunt_field", "hunt_dungeon", "buy_potions", "sell_loot",
+	"hunt_field", "buy_potions", "sell_loot",
 	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest"
 ]
 
@@ -17,8 +17,7 @@ const IDLE_DRIFT_CHANCE: float = 0.6
 
 # Alternate hunt spots to roam when no monsters nearby
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
-const DUNGEON_SPOTS: Array = ["DungeonCenter", "DungeonDeep", "DungeonEntrance"]
-const PATROL_SPOTS: Array = ["TownSquare", "TownNorth", "TownEast", "TownSouth"]
+const PATROL_SPOTS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
 
 var default_goal: String = "idle"
 
@@ -175,7 +174,7 @@ func _check_goal_completion() -> bool:
 					else:
 						npc.set_goal(default_goal)
 					return true
-		"hunt_field", "hunt_dungeon":
+		"hunt_field":
 			# Sell loot if inventory has enough materials
 			if _get_total_material_count() >= 5:
 				npc.set_goal("sell_loot")
@@ -194,9 +193,7 @@ func _check_goal_completion() -> bool:
 func _execute_goal() -> void:
 	match npc.current_goal:
 		"hunt_field":
-			_execute_hunt("field")
-		"hunt_dungeon":
-			_execute_hunt("dungeon")
+			_execute_hunt()
 		"buy_potions":
 			_execute_buy_potions()
 		"sell_loot":
@@ -216,7 +213,7 @@ func _execute_goal() -> void:
 		"idle":
 			_execute_idle()
 
-func _execute_hunt(zone: String) -> void:
+func _execute_hunt() -> void:
 	# Look for nearby alive monsters
 	var perception := WorldState.get_npc_perception(npc.npc_id)
 	var monsters: Array = perception.get("monsters", [])
@@ -235,8 +232,8 @@ func _execute_hunt(zone: String) -> void:
 		return
 
 	# No monsters nearby — move to hunt zone
-	var zone_center: String = "FieldCenter" if zone == "field" else "DungeonCenter"
-	var spots: Array = FIELD_SPOTS if zone == "field" else DUNGEON_SPOTS
+	var zone_center: String = "FieldCenter"
+	var spots: Array = FIELD_SPOTS
 
 	# Check if we're already in the zone
 	if _is_near_location(zone_center, 20.0):
@@ -433,7 +430,7 @@ func _auto_equip() -> void:
 				npc._equipment.equip(item_id)
 
 func _is_in_town() -> bool:
-	return _is_near_location("TownSquare", 25.0)
+	return _is_near_location("TownSquare", 60.0)
 
 func _is_near_location(location_id: String, range: float) -> bool:
 	if not WorldState.has_location(location_id):

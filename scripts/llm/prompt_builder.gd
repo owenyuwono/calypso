@@ -107,12 +107,11 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 
 const GOAL_INSTRUCTION := """
 IMPORTANT: When the player asks you to do something, you MUST add a goal tag at the end of your reply.
-Available goals: hunt_field, hunt_dungeon, buy_potions, sell_loot, buy_weapon, buy_armor, follow_player, return_to_town, patrol, idle, rest
+Available goals: hunt_field, buy_potions, sell_loot, buy_weapon, buy_armor, follow_player, return_to_town, patrol, idle, rest
 Format: Say your reply, then add [GOAL:goal_name] at the very end.
 Examples:
 - "follow me" → Sure, I'll follow you! [GOAL:follow_player]
 - "go hunt" or "hunt monsters" → Time to hunt! [GOAL:hunt_field]
-- "go to the dungeon" → Heading to the dungeon! [GOAL:hunt_dungeon]
 - "buy potions" → I'll stock up on potions. [GOAL:buy_potions]
 - "sell your loot" → Good idea, time to sell. [GOAL:sell_loot]
 - "stay here" or "wait" → I'll wait here. [GOAL:idle]
@@ -122,7 +121,7 @@ Examples:
 If the player is just chatting and NOT asking you to do something, do NOT add a goal tag."""
 
 const WORLD_FACTS := """WORLD FACTS:
-- Places: Town (shops, well), Field (slimes, wolves, goblins), Dungeon (skeleton warriors, dark mages)
+- Places: City (shops, districts, training grounds), Field (slimes, wolves, goblins)
 - Shops: Weapon Shop, Item Shop (potions, gear)
 - Rest spots: Town Well, Town Inn
 - The field is slightly more dangerous at night
@@ -311,8 +310,6 @@ static func get_activity_description(goal: String) -> String:
 	match goal:
 		"hunt_field":
 			return "hunting monsters in the field"
-		"hunt_dungeon":
-			return "hunting monsters in the dungeon"
 		"buy_potions":
 			return "buying potions in town"
 		"sell_loot":
@@ -326,11 +323,11 @@ static func get_activity_description(goal: String) -> String:
 		"return_to_town":
 			return "retreating to town"
 		"patrol":
-			return "patrolling the town"
+			return "patrolling the city"
 		"rest":
 			return "resting to recover stamina"
 		"idle":
-			return "resting in town"
+			return "resting in the city"
 		_:
 			return "exploring the area"
 
