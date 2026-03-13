@@ -1,8 +1,6 @@
-extends RefCounted
+class_name NpcLoadouts
 ## Starting loadouts for adventurer NPCs — trait profiles, inventory, equipment, gold, and goal.
 ## gold: -1 means "keep default" (no set_gold_amount call).
-
-class_name NpcLoadouts
 
 const LOADOUTS: Dictionary = {
 	"kael": {

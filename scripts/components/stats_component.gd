@@ -34,6 +34,10 @@ func heal(amount: int) -> int:
 	_sync()
 	return healed
 
+func restore_full_hp() -> void:
+	hp = max_hp
+	_sync()
+
 func apply_level_up(gains: Dictionary) -> void:
 	max_hp += gains.get("max_hp", 0)
 	hp = max_hp

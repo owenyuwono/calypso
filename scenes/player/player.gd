@@ -650,9 +650,8 @@ func _respawn() -> void:
 	global_position = Vector3(0, 1, 0)
 	velocity = Vector3.ZERO
 
-	# Restore HP
-	var max_hp: int = WorldState.get_entity_data("player").get("max_hp", 50)
-	WorldState.set_entity_data("player", "hp", max_hp)
+	# Restore HP via StatsComponent (source of truth)
+	_stats.restore_full_hp()
 
 	# Visual: restore materials and play idle
 	_visuals.restore_materials()

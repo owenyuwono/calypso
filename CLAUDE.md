@@ -3,8 +3,8 @@
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
 - **Autoload singletons**: WorldState (registry + spatial only), LLMClient, GameEvents (signals, LLM)
-- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers)
-- **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
+- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), world builders (see below)
+- **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
@@ -13,7 +13,7 @@
 
 ## Entity Component System
 Each entity (player, NPC, monster) owns its state via child Node components:
-- `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**
+- `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `apply_level_up(gains)`, `is_alive()`, `get_stats_dict()`
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
 - `EquipmentComponent` — weapon/armor slots. Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_atk_bonus()`, `get_def_bonus()`
 - `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
@@ -41,6 +41,8 @@ Do NOT add inventory/gold/equipment/combat/progression/skills methods back to Wo
 - `DragHandle` for draggable panel title bars with close buttons
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
+- `AutoAttackComponent` — emits `attack_landed(target_id, damage, target_pos)` and `target_lost()` signals; entities connect handlers for visual feedback (damage numbers, flash, shouts)
+- `NpcLoadouts.LOADOUTS` — static Dictionary of NPC starting data (trait, items, equip, gold, goal)
 
 ## Proficiency System (RuneScape-style)
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`
@@ -50,3 +52,12 @@ Do NOT add inventory/gold/equipment/combat/progression/skills methods back to Wo
 - **Monsters**: `proficiency_xp` field in MonsterDatabase (3–20 per monster type)
 - **Items**: `weapon_type`, `required_skill`, `required_level` fields for equipment proficiency requirements
 - **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`
+
+## World Builder Utilities (`scripts/world/`)
+Static utility classes for procedural world construction (one-shot builders, no per-frame lifecycle):
+- `WorldBuilderContext` — shared mutable context (terrain_noise, caches, exclusion zones, nav_region)
+- `AssetSpawner` — model spawning, material caching, tree/foliage model helpers
+- `BiomeScatter` — exclusion zones, scatter algorithm, rock clusters
+- `TownBuilder` — city walls, city biome definitions + props
+- `CityBuilder` — district building placement
+- `FieldBuilder` — field biome definitions
