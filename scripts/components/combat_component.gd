@@ -132,10 +132,5 @@ func _apply_damage_to(target_id: String, damage: int) -> void:
 		if not target_stats.is_alive():
 			GameEvents.entity_died.emit(target_id, attacker_id)
 	else:
-		# Fallback: direct entity_data mutation
-		var data := WorldState.get_entity_data(target_id)
-		var hp: int = maxi(data.get("hp", 0) - damage, 0)
-		data["hp"] = hp
-		GameEvents.entity_damaged.emit(target_id, attacker_id, damage, hp)
-		if hp <= 0:
-			GameEvents.entity_died.emit(target_id, attacker_id)
+		push_warning("CombatComponent: target '%s' has no StatsComponent — damage dropped" % target_id)
+		return
