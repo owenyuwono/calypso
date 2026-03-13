@@ -1,0 +1,174 @@
+class_name BiomeScatter
+## Static utility class for exclusion zones and biome scatter algorithm.
+## Manages path/building exclusion and density-modulated scatter placement.
+
+const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
+
+static func setup_exclusion_zones(ctx: WorldBuilderContext) -> void:
+	# City roads
+	ctx.path_lines = [
+		{"start": Vector2(-65, 0), "end": Vector2(65, 0), "buffer": 3.0},
+		{"start": Vector2(0, -45), "end": Vector2(0, 45), "buffer": 3.0},
+		{"start": Vector2(-65, -10), "end": Vector2(65, -10), "buffer": 2.0},
+		{"start": Vector2(-65, 10), "end": Vector2(65, 10), "buffer": 2.0},
+		{"start": Vector2(-20, -45), "end": Vector2(-20, 45), "buffer": 2.0},
+		{"start": Vector2(25, -45), "end": Vector2(25, 45), "buffer": 2.0},
+		# Diagonal secondary paths
+		{"start": Vector2(0, 0), "end": Vector2(-35, 20), "buffer": 2.0},
+		{"start": Vector2(0, 0), "end": Vector2(35, -25), "buffer": 2.0},
+		{"start": Vector2(55, 0), "end": Vector2(45, 25), "buffer": 2.0},
+		{"start": Vector2(-40, -15), "end": Vector2(-55, -30), "buffer": 1.5},
+		# Gate road
+		{"start": Vector2(55, 0), "end": Vector2(80, 0), "buffer": 3.5},
+		# Field paths
+		{"start": Vector2(73, 0), "end": Vector2(100, 0), "buffer": 2.5},
+		{"start": Vector2(100, 0), "end": Vector2(145, 0), "buffer": 2.5},
+		{"start": Vector2(100, 0), "end": Vector2(110, 25), "buffer": 2.0},
+		{"start": Vector2(100, 0), "end": Vector2(120, -20), "buffer": 2.0},
+	]
+
+	ctx.building_zones = [
+		# Shops in market district
+		{"center": Vector2(-45, 20), "radius": 6.0},
+		{"center": Vector2(-55, 30), "radius": 5.0},
+		# Central plaza
+		{"center": Vector2(0, 0), "radius": 10.0},
+		# Temple
+		{"center": Vector2(0, -35), "radius": 8.0},
+		{"center": Vector2(15, -25), "radius": 6.0},
+		# Forge
+		{"center": Vector2(0, 30), "radius": 6.0},
+		# Barracks
+		{"center": Vector2(45, 35), "radius": 8.0},
+		# Fountain in park
+		{"center": Vector2(45, -30), "radius": 5.0},
+	]
+
+	# Decoration density noise
+	ctx.deco_noise = FastNoiseLite.new()
+	ctx.deco_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	ctx.deco_noise.seed = 137
+	ctx.deco_noise.frequency = 0.08
+
+static func point_to_segment_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var ap := p - a
+	var t := clampf(ap.dot(ab) / ab.dot(ab), 0.0, 1.0)
+	return p.distance_to(a + ab * t)
+
+static func is_position_blocked(ctx: WorldBuilderContext, pos: Vector2) -> bool:
+	for line in ctx.path_lines:
+		if point_to_segment_dist(pos, line["start"], line["end"]) < line["buffer"]:
+			return true
+	for zone in ctx.building_zones:
+		if pos.distance_to(zone["center"]) < zone["radius"]:
+			return true
+	return false
+
+static func scatter_biome(ctx: WorldBuilderContext, biome: Dictionary, rng: RandomNumberGenerator) -> int:
+	var total_placed := 0
+	var recipes: Array = biome["recipes"]
+	var noise_threshold: float = biome.get("noise_threshold", -0.1)
+
+	for recipe in recipes:
+		var count: int = recipe["count"]
+		var min_spacing: float = recipe.get("min_spacing", 2.0)
+		var placed := 0
+		var attempts := 0
+		var max_attempts := count * 15
+
+		while placed < count and attempts < max_attempts:
+			attempts += 1
+
+			# Generate random point within biome shape
+			var x: float
+			var z: float
+			if biome.has("center") and biome.has("radius"):
+				# Circle shape
+				var angle := rng.randf() * TAU
+				var dist: float = sqrt(rng.randf()) * float(biome["radius"])
+				x = biome["center"].x + cos(angle) * dist
+				z = biome["center"].y + sin(angle) * dist
+			else:
+				# Rect shape: [x, z, width, height]
+				var bounds: Array = biome["bounds"]
+				x = bounds[0] + rng.randf() * bounds[2]
+				z = bounds[1] + rng.randf() * bounds[3]
+
+			# Noise rejection
+			if ctx.deco_noise.get_noise_2d(x, z) < noise_threshold:
+				continue
+
+			var pos2d := Vector2(x, z)
+
+			# Exclusion zone rejection
+			if is_position_blocked(ctx, pos2d):
+				continue
+
+			# Min-spacing rejection
+			var too_close := false
+			for existing in ctx.spawned_positions:
+				if pos2d.distance_to(existing) < min_spacing:
+					too_close = true
+					break
+			if too_close:
+				continue
+
+			# Spawn based on type
+			var rot_y := rng.randf() * TAU
+			var scale_val: float = recipe.get("scale", 0.25)
+			var type: String = recipe["type"]
+			var files: Array = recipe.get("files", [])
+			var colors: Array = recipe.get("colors", [])
+			var file: String = files[rng.randi() % files.size()] if files.size() > 0 else ""
+			var color: Color = colors[rng.randi() % colors.size()] if colors.size() > 0 else Color.WHITE
+
+			match type:
+				"tree":
+					AssetSpawner.spawn_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, color)
+				"foliage":
+					AssetSpawner.spawn_foliage(ctx, file, Vector3(x, 0, z), color, rot_y, scale_val)
+				"rock_cluster":
+					create_rock_cluster(ctx, Vector3(x, 0, z))
+				"stump", "fallen":
+					var inst := AssetSpawner.spawn_model(ctx, AssetSpawner.TREE_DIR + file, Vector3(x, 0, z), rot_y, scale_val)
+					if inst:
+						var muted_leaf := Color(0.15, 0.35, 0.1)
+						AssetSpawner.apply_tree_materials(ctx, inst, muted_leaf, true)
+
+			ctx.spawned_positions.append(pos2d)
+			placed += 1
+
+		total_placed += placed
+	return total_placed
+
+static func create_rock_cluster(ctx: WorldBuilderContext, center: Vector3) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(center.x * 100 + center.z * 10)
+	var rock_mat := AssetSpawner.get_or_create_color_mat(ctx, Color(0.4, 0.38, 0.36))
+	for i in 2:
+		var offset := Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.8, 0.8))
+		var radius := rng.randf_range(0.3, 0.7)
+		var pos := center + offset
+		var terrain_y: float = TerrainGenerator.get_height_at(ctx.terrain_noise, pos.x, pos.z, ctx.terrain_height_scale_field)
+		pos.y = terrain_y + radius * 0.3
+
+		var rock := StaticBody3D.new()
+		rock.position = pos
+		ctx.nav_region.add_child(rock)
+
+		var mesh_inst := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = radius
+		sphere.height = radius * rng.randf_range(1.0, 1.6)
+		mesh_inst.mesh = sphere
+		mesh_inst.rotation.y = rng.randf() * TAU
+		mesh_inst.rotation.x = rng.randf_range(-0.2, 0.2)
+		mesh_inst.set_surface_override_material(0, rock_mat)
+		rock.add_child(mesh_inst)
+
+		var col := CollisionShape3D.new()
+		var shape := SphereShape3D.new()
+		shape.radius = radius
+		col.shape = shape
+		rock.add_child(col)
