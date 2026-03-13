@@ -75,6 +75,10 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 						c.r = maxf(c.r, strength)
 					elif channel == 1:
 						c.g = maxf(c.g, strength)
+					elif channel == 2:
+						c.b = maxf(c.b, strength)
+					elif channel == 3:
+						c.a = minf(c.a, 1.0 - strength)  # lower alpha = more packed earth
 					colors[i] = c
 		elif rtype == "circle":
 			var circle_center: Vector2 = rule["center"]
@@ -92,6 +96,10 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 						c.r = maxf(c.r, strength)
 					elif channel == 1:
 						c.g = maxf(c.g, strength)
+					elif channel == 2:
+						c.b = maxf(c.b, strength)
+					elif channel == 3:
+						c.a = minf(c.a, 1.0 - strength)  # lower alpha = more packed earth
 					colors[i] = c
 		elif rtype == "fill":
 			var channel: int = rule["channel"]
@@ -102,6 +110,10 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 					c.r = strength
 				elif channel == 1:
 					c.g = strength
+				elif channel == 2:
+					c.b = strength
+				elif channel == 3:
+					c.a = 1.0 - strength  # lower alpha = more packed earth
 				colors[i] = c
 
 	# Generate indices (two triangles per quad, CCW winding for upward normals)
