@@ -224,7 +224,6 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
 		key_memories = memory_node.get_key_memories_summary(2)
 
-	var npc_node = WorldState.get_entity(npc_id)
 	var content := CHAT_INITIATE_USER_TEMPLATE.format({
 		"npc_name": npc_name,
 		"level": level,
@@ -288,7 +287,6 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
 		key_memories = memory_node.get_key_memories_summary(2)
 
-	var npc_node = WorldState.get_entity(npc_id)
 	var content := CHAT_USER_TEMPLATE.format({
 		"npc_name": npc_name,
 		"level": level,
