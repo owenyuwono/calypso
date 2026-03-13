@@ -162,97 +162,37 @@ func _build_terrain() -> void:
 		$NavigationRegion3D.add_child(terrain_data["static_body"])
 
 func _setup_adventurer_npcs() -> void:
-	# Kael (Warrior) — bold, charges into combat
-	var kael: Node3D = $NPCs/Kael
-	if kael:
-		kael.trait_profile = "bold_warrior"
-		kael.get_node("InventoryComponent").add_item("basic_sword")
-		kael.get_node("InventoryComponent").add_item("healing_potion", 3)
-		kael.get_node("EquipmentComponent").equip("basic_sword")
+	for npc_id in NpcLoadouts.LOADOUTS:
+		var loadout: Dictionary = NpcLoadouts.LOADOUTS[npc_id]
+		var npc_name: String = npc_id.capitalize()
+		var npc: Node3D = $NPCs.get_node_or_null(npc_name)
+		if not npc:
+			continue
 
-		kael.get_node("NPCBrain").set_use_llm(false)
-		kael.get_node("NPCBrain").set_use_llm_chat(true)
-		var kael_behavior = kael.get_node("NPCBehavior")
-		kael_behavior.default_goal = "hunt_field"
-		kael.set_goal("hunt_field")
+		npc.trait_profile = loadout["trait_profile"]
 
-	# Lyra (Mage) — cautious, strategic
-	var lyra: Node3D = $NPCs/Lyra
-	if lyra:
-		lyra.trait_profile = "cautious_mage"
-		lyra.get_node("InventoryComponent").add_item("healing_potion", 5)
-		lyra.get_node("InventoryComponent").set_gold_amount(60)
+		var inventory: Node = npc.get_node("InventoryComponent")
+		for item_id in loadout["items"]:
+			inventory.add_item(item_id, loadout["items"][item_id])
 
-		lyra.get_node("NPCBrain").set_use_llm(false)
-		lyra.get_node("NPCBrain").set_use_llm_chat(true)
-		var lyra_behavior = lyra.get_node("NPCBehavior")
-		lyra_behavior.default_goal = "idle"
-		lyra.set_goal("idle")
+		var equipment: Node = npc.get_node("EquipmentComponent")
+		for item_id in loadout["equip"]:
+			equipment.equip(item_id)
 
-	# Bjorn (Warrior) — boisterous storyteller
-	var bjorn: Node3D = $NPCs/Bjorn
-	if bjorn:
-		bjorn.trait_profile = "boisterous_brawler"
-		bjorn.get_node("InventoryComponent").add_item("healing_potion", 3)
-		bjorn.get_node("InventoryComponent").set_gold_amount(80)
+		var gold: int = loadout["gold"]
+		if gold != -1:
+			inventory.set_gold_amount(gold)
 
-		bjorn.get_node("NPCBrain").set_use_llm(false)
-		bjorn.get_node("NPCBrain").set_use_llm_chat(true)
-		var bjorn_behavior = bjorn.get_node("NPCBehavior")
-		bjorn_behavior.default_goal = "hunt_field"
-		bjorn.set_goal("hunt_field")
+		var brain: Node = npc.get_node_or_null("NPCBrain")
+		if brain:
+			brain.set_use_llm(false)
+			brain.set_use_llm_chat(true)
 
-	# Sera (Rogue) — quick-witted gossip
-	var sera: Node3D = $NPCs/Sera
-	if sera:
-		sera.trait_profile = "sly_rogue"
-		sera.get_node("InventoryComponent").add_item("healing_potion", 2)
-		sera.get_node("InventoryComponent").set_gold_amount(100)
-
-		sera.get_node("NPCBrain").set_use_llm(false)
-		sera.get_node("NPCBrain").set_use_llm_chat(true)
-		var sera_behavior = sera.get_node("NPCBehavior")
-		sera_behavior.default_goal = "patrol"
-		sera.set_goal("patrol")
-
-	# Thane (Knight) — stoic and honorable
-	var thane: Node3D = $NPCs/Thane
-	if thane:
-		thane.trait_profile = "stoic_knight"
-		thane.get_node("InventoryComponent").add_item("healing_potion", 2)
-		thane.get_node("InventoryComponent").set_gold_amount(70)
-
-		thane.get_node("NPCBrain").set_use_llm(false)
-		thane.get_node("NPCBrain").set_use_llm_chat(true)
-		var thane_behavior = thane.get_node("NPCBehavior")
-		thane_behavior.default_goal = "hunt_field"
-		thane.set_goal("hunt_field")
-
-	# Mira (Mage) — cheerful and curious
-	var mira: Node3D = $NPCs/Mira
-	if mira:
-		mira.trait_profile = "cheerful_scholar"
-		mira.get_node("InventoryComponent").add_item("healing_potion", 3)
-		mira.get_node("InventoryComponent").set_gold_amount(60)
-
-		mira.get_node("NPCBrain").set_use_llm(false)
-		mira.get_node("NPCBrain").set_use_llm_chat(true)
-		var mira_behavior = mira.get_node("NPCBehavior")
-		mira_behavior.default_goal = "idle"
-		mira.set_goal("idle")
-
-	# Dusk (Rogue) — mysterious and quiet
-	var dusk: Node3D = $NPCs/Dusk
-	if dusk:
-		dusk.trait_profile = "mysterious_loner"
-		dusk.get_node("InventoryComponent").add_item("healing_potion", 2)
-		dusk.get_node("InventoryComponent").set_gold_amount(50)
-
-		dusk.get_node("NPCBrain").set_use_llm(false)
-		dusk.get_node("NPCBrain").set_use_llm_chat(true)
-		var dusk_behavior = dusk.get_node("NPCBehavior")
-		dusk_behavior.default_goal = "hunt_field"
-		dusk.set_goal("hunt_field")
+		var goal: String = loadout["default_goal"]
+		var behavior: Node = npc.get_node_or_null("NPCBehavior")
+		if behavior:
+			behavior.default_goal = goal
+		npc.set_goal(goal)
 
 # =============================================================================
 # Asset Loading Infrastructure
