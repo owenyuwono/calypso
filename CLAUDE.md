@@ -53,6 +53,16 @@ Do NOT add inventory/gold/equipment/combat/progression/skills methods back to Wo
 - **Items**: `weapon_type`, `required_skill`, `required_level` fields for equipment proficiency requirements
 - **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`
 
+## Terrain & Texturing
+- **Shader**: `terrain_blend.gdshader` — vertex-color-based blending, no anti-tiling/rotation (straight tiling only)
+- **Texture channels**: R=dirt, G=stone, B=cobble (roads), A(inverted)=packed_earth (pavements). Default (no channel)=pavement base texture
+- **Paint rule types**: `line` (roads), `rect` (district grounds — axis-aligned rectangles), `flatten` / `flatten_rect` (height smoothing), `fill`, `clear_rect`
+- **No circles for texturing** — use `rect` rules with `center` + `size` for all rectangular texture areas. Circles only for height flattening around buildings
+- **No noise_perturb or falloff on texture rules** — keep edges sharp and tidy
+- **Road textures**: Bricks_17 (`texture_cobble`, channel 2), UV scale 0.5
+- **Pavement textures**: Bricks_23 (`texture_packed_earth`, channel 3 + base `texture_grass`), UV scale 0.5
+- **All UV scales**: 0.5 for pavement/cobble/earth, other channels as set in shader defaults
+
 ## World Builder Utilities (`scripts/world/`)
 Static utility classes for procedural world construction (one-shot builders, no per-frame lifecycle):
 - `WorldBuilderContext` — shared mutable context (terrain_noise, caches, exclusion zones, nav_region)

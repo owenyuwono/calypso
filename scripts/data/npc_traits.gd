@@ -43,6 +43,26 @@ const PROFILES: Dictionary = {
 		"weapon_type": "dagger",
 		"starting_proficiencies": {"dagger": 3, "agility": 2, "constitution": 1},
 	},
+	"stern_guardian": {
+		"boldness": 0.7, "sociability": 0.2, "generosity": 0.75, "curiosity": 0.15,
+		"weapon_type": "sword",
+		"starting_proficiencies": {"sword": 4, "constitution": 3, "agility": 1},
+	},
+	"gentle_healer": {
+		"boldness": 0.15, "sociability": 0.75, "generosity": 0.95, "curiosity": 0.5,
+		"weapon_type": "staff",
+		"starting_proficiencies": {"staff": 2, "constitution": 3, "agility": 1},
+	},
+	"charming_bard": {
+		"boldness": 0.45, "sociability": 0.95, "generosity": 0.55, "curiosity": 0.8,
+		"weapon_type": "dagger",
+		"starting_proficiencies": {"dagger": 2, "agility": 2, "constitution": 1},
+	},
+	"earnest_apprentice": {
+		"boldness": 0.5, "sociability": 0.6, "generosity": 0.7, "curiosity": 0.55,
+		"weapon_type": "mace",
+		"starting_proficiencies": {"mace": 2, "constitution": 2, "smithing": 2},
+	},
 }
 
 # Label mappings for compact LLM trait summaries
@@ -68,6 +88,10 @@ const BACKSTORIES: Dictionary = {
 	"stoic_knight": "Thane served the Order of the Silver Wall for fifteen years before they disbanded in disgrace. He still follows their code: protect the weak, face the dark, never run. The dungeon is his penance for a failure he won't talk about.",
 	"cheerful_scholar": "Mira left her family's library in the eastern isles to see the world firsthand. She keeps a journal of every monster, herb, and ruin she encounters. She believes every creature has a story worth documenting — even the slimes.",
 	"mysterious_loner": "Dusk doesn't share where he came from, only that he can't go back. He fights in the dungeon alone because the last party he joined didn't come out alive. He keeps a tally of kills scratched into his blade's handle.",
+	"stern_guardian": "Twenty years on the border watch, reassigned to city duty after a knee wound that never quite healed. Runs the guard rotation like a military campaign — every sentry post manned, every patrol on schedule. Respects discipline above all else, but quietly ensures his guards' families never go hungry.",
+	"gentle_healer": "Left the temple healers when they started charging the poor for treatment. Now she gathers herbs in the fields and treats anyone who comes to her door. Sleeps little, eats less, and somehow always has a healing potion ready for emergencies.",
+	"charming_bard": "Former court musician who fled after satirizing a lord's wife in a popular ballad. Now he wanders from town to town, collecting stories and trading songs for meals. Knows everyone's secrets but keeps them — unless they make a good verse.",
+	"earnest_apprentice": "Too clumsy for farming, too restless for scholarship, too honest for politics. Found his calling the first time he held a hammer at the forge. Dreams of forging a legendary weapon someday, but for now mostly makes nails and horseshoes.",
 }
 
 static func get_backstory(profile_name: String) -> String:
@@ -81,6 +105,10 @@ const VOICE_STYLES: Dictionary = {
 	"stoic_knight": "Minimal. Few words. Formal but not wordy. Prefers one-word acknowledgments. Rarely shows emotion. Can respond with just a word or two. Never swears.",
 	"cheerful_scholar": "Warm and excitable. Uses !! and ?? freely. Gets genuinely hyped about discoveries. Friendly energy, asks lots of questions. Speaks with breathless enthusiasm. Rarely swears.",
 	"mysterious_loner": "Extremely terse. Cryptic. Uses '...' and fragments. Prefers silence, speaks only when necessary. Single words or short phrases. Cold, guarded. Swears only when frustrated.",
+	"stern_guardian": "Clipped, authoritative. Short declarative sentences. Military jargon. Zero humor while on duty.",
+	"gentle_healer": "Warm, nurturing tone. Uses 'dear' and 'oh my' frequently. Lots of concern for others. Never raises her voice.",
+	"charming_bard": "Theatrical, expressive. Dramatic pauses and metaphors. Everything is framed as a story or performance.",
+	"earnest_apprentice": "Earnest, slightly nervous. Uses 'uh' and 'well' as filler words. Gets genuinely excited when talking about metalwork.",
 }
 
 static func get_voice_style(profile_name: String) -> String:

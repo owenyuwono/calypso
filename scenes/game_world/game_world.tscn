@@ -187,6 +187,42 @@ starting_goal = "idle"
 npc_color = Color(0.3, 0.3, 0.35, 1)
 model_path = "res://assets/models/characters/Rogue.glb"
 
+[node name="Garen" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 1, 5)
+npc_id = "garen"
+npc_name = "Garen"
+personality = "Stern and disciplined guard captain. Military bearing, clipped speech. Quietly protective of those under his charge."
+starting_goal = "patrol"
+npc_color = Color(0.4, 0.4, 0.5, 1)
+model_path = "res://assets/models/characters/Knight.glb"
+
+[node name="Elara" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -25)
+npc_id = "elara"
+npc_name = "Elara"
+personality = "Warm and nurturing healer. Always concerned for others' wellbeing. Treats everyone regardless of ability to pay."
+starting_goal = "idle"
+npc_color = Color(0.3, 0.7, 0.4, 1)
+model_path = "res://assets/models/characters/Mage.glb"
+
+[node name="Finn" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, 5)
+npc_id = "finn"
+npc_name = "Finn"
+personality = "Theatrical bard who frames everything as a story. Charming and sociable. Knows everyone's secrets."
+starting_goal = "idle"
+npc_color = Color(0.8, 0.6, 0.2, 1)
+model_path = "res://assets/models/characters/Rogue.glb"
+
+[node name="Rook" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 28)
+npc_id = "rook"
+npc_name = "Rook"
+personality = "Earnest blacksmith apprentice. Slightly nervous but enthusiastic. Dreams of forging legendary weapons."
+starting_goal = "idle"
+npc_color = Color(0.5, 0.35, 0.2, 1)
+model_path = "res://assets/models/characters/Barbarian.glb"
+
 ; === MONSTER SPAWNERS ===
 [node name="MonsterSpawners" type="Node3D" parent="."]
 

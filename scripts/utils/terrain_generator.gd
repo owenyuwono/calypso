@@ -45,6 +45,14 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 					if dist < fr:
 						var blend: float = smoothstep(fr * 0.7, fr, dist)
 						height = lerpf(0.0, height, blend)
+				elif rule["type"] == "flatten_rect":
+					var fc: Vector2 = rule["center"]
+					var fs: Vector2 = rule["size"]
+					var half_w: float = fs.x * 0.5
+					var half_h: float = fs.y * 0.5
+					if world_x >= fc.x - half_w and world_x <= fc.x + half_w and \
+							world_z >= fc.y - half_h and world_z <= fc.y + half_h:
+						height = 0.0
 
 			vertices[vi] = Vector3(local_x, height, local_z)
 			uvs[vi] = Vector2(world_x, world_z)
@@ -95,7 +103,7 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 					eff_radius = radius * (1.0 + n * noise_perturb)
 				var dist: float = Vector2(world_x, world_z).distance_to(circle_center)
 				if dist < eff_radius:
-					var strength: float = 1.0 - smoothstep(eff_radius * (1.0 - falloff), eff_radius, dist)
+					var strength: float = (1.0 - smoothstep(eff_radius * (1.0 - falloff), eff_radius, dist)) * rule.get("strength", 1.0)
 					var c := colors[i]
 					if channel == 0:
 						c.r = maxf(c.r, strength)
@@ -120,6 +128,72 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 				elif channel == 3:
 					c.a = 1.0 - strength  # lower alpha = more packed earth
 				colors[i] = c
+		elif rtype == "clear_circle":
+			var circle_center: Vector2 = rule["center"]
+			var radius: float = rule["radius"]
+			var channel: int = rule["channel"]
+			for i in vertices.size():
+				var world_x: float = center.x + vertices[i].x
+				var world_z: float = center.z + vertices[i].z
+				var dist: float = Vector2(world_x, world_z).distance_to(circle_center)
+				if dist < radius:
+					# smoothstep falloff: full clear at center, fades to no-clear at edge
+					var clear_strength: float = 1.0 - smoothstep(radius * 0.5, radius, dist)
+					var c := colors[i]
+					if channel == 0:
+						c.r = maxf(c.r - clear_strength, 0.0)
+					elif channel == 1:
+						c.g = maxf(c.g - clear_strength, 0.0)
+					elif channel == 2:
+						c.b = maxf(c.b - clear_strength, 0.0)
+					elif channel == 3:
+						c.a = minf(c.a + clear_strength, 1.0)  # restore alpha = remove packed earth
+					colors[i] = c
+		elif rtype == "rect":
+			var rect_center: Vector2 = rule["center"]
+			var rect_size: Vector2 = rule["size"]
+			var channel: int = rule["channel"]
+			var strength: float = rule.get("strength", 1.0)
+			var half_w: float = rect_size.x * 0.5
+			var half_h: float = rect_size.y * 0.5
+			for i in vertices.size():
+				var world_x: float = center.x + vertices[i].x
+				var world_z: float = center.z + vertices[i].z
+				if world_x >= rect_center.x - half_w and world_x <= rect_center.x + half_w and \
+						world_z >= rect_center.y - half_h and world_z <= rect_center.y + half_h:
+					var c := colors[i]
+					if channel == 0:
+						c.r = maxf(c.r, strength)
+					elif channel == 1:
+						c.g = maxf(c.g, strength)
+					elif channel == 2:
+						c.b = maxf(c.b, strength)
+					elif channel == 3:
+						c.a = minf(c.a, 1.0 - strength)  # lower alpha = more packed earth
+					colors[i] = c
+		elif rtype == "clear_rect":
+			var rect_center: Vector2 = rule["center"]
+			var rect_size: Vector2 = rule["size"]
+			var channel: int = rule["channel"]
+			var half_w: float = rect_size.x * 0.5
+			var half_h: float = rect_size.y * 0.5
+			for i in vertices.size():
+				var world_x: float = center.x + vertices[i].x
+				var world_z: float = center.z + vertices[i].z
+				if world_x >= rect_center.x - half_w and world_x <= rect_center.x + half_w and \
+						world_z >= rect_center.y - half_h and world_z <= rect_center.y + half_h:
+					var c := colors[i]
+					if channel == 0:
+						c.r = 0.0
+					elif channel == 1:
+						c.g = 0.0
+					elif channel == 2:
+						c.b = 0.0
+					elif channel == 3:
+						c.a = 1.0  # restore alpha = remove packed earth
+					colors[i] = c
+		elif rtype == "flatten_rect":
+			pass  # height flattening is handled in the vertex height pass above
 
 	# Generate indices (two triangles per quad, CCW winding for upward normals)
 	for z_idx in subdivisions.y:
