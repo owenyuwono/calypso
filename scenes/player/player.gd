@@ -79,6 +79,11 @@ var _click_marker_tween: Tween
 var _dialogue_bubble: Node3D
 
 
+# Conversation awareness
+var _nearby_conversation_id: String = ""
+var _conv_manager: Node = null
+var _conv_scan_timer: float = 0.0
+
 func _exit_tree() -> void:
 	if _cursor_manager:
 		_cursor_manager.cleanup()
@@ -170,6 +175,8 @@ func _ready() -> void:
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
+
+	_conv_manager = get_tree().get_first_node_in_group("conversation_manager")
 
 func _setup_click_marker() -> void:
 	_click_marker = MeshInstance3D.new()
@@ -264,6 +271,46 @@ func _physics_process(delta: float) -> void:
 		else:
 			_visuals.play_anim("Idle")
 
+
+func _process(delta: float) -> void:
+	if _is_dead:
+		return
+
+	_conv_scan_timer += delta
+	if _conv_scan_timer < 0.5:
+		return
+	_conv_scan_timer = 0.0
+
+	# Scan for nearby active conversations to allow the player to join
+	_nearby_conversation_id = ""
+	if _conv_manager:
+		for conv_id in _conv_manager.active_conversations:
+			var state: ConversationState = _conv_manager.active_conversations[conv_id]
+			if not state:
+				continue
+			for pid in state.participant_ids:
+				var entity: Node = WorldState.get_entity(pid)
+				if entity and global_position.distance_to(entity.global_position) < 15.0:
+					_nearby_conversation_id = conv_id
+					break
+			if not _nearby_conversation_id.is_empty():
+				break
+
+		# Auto-leave if all conversation participants moved out of range
+		var player_conv_id: String = _conv_manager.entity_to_conversation.get("player", "")
+		if not player_conv_id.is_empty() and _conv_manager.active_conversations.has(player_conv_id):
+			var player_state: ConversationState = _conv_manager.active_conversations[player_conv_id]
+			var all_far: bool = true
+			for pid in player_state.participant_ids:
+				if pid == "player":
+					continue
+				var entity: Node = WorldState.get_entity(pid)
+				if entity and global_position.distance_to(entity.global_position) < 15.0:
+					all_far = false
+					break
+			if all_far:
+				_conv_manager.leave_conversation(player_conv_id, "player")
+
 func _process_combat(delta: float) -> bool:
 	var attack_range: float = _stats.attack_range
 	var attack_speed: float = _stats.attack_speed
@@ -341,6 +388,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 	if event.is_action_pressed("interact"):
+		if _conv_manager:
+			var player_conv_id: String = _conv_manager.entity_to_conversation.get("player", "")
+			if not player_conv_id.is_empty():
+				# Player is in a conversation — E key leaves it
+				_conv_manager.leave_conversation(player_conv_id, "player")
+				get_viewport().set_input_as_handled()
+				return
+			elif not _nearby_conversation_id.is_empty():
+				# Nearby conversation exists — E key joins it
+				_conv_manager.join_conversation(_nearby_conversation_id, "player")
+				get_viewport().set_input_as_handled()
+				return
 		_interact_with_nearest()
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

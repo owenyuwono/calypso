@@ -4,7 +4,14 @@ extends Node3D
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 
+var _conversation_manager: Node
+
 func _ready() -> void:
+	# Instantiate ConversationManager — NPCBehavior/NPCBrain find it via group "conversation_manager"
+	_conversation_manager = ConversationManager.new()
+	_conversation_manager.name = "ConversationManager"
+	add_child(_conversation_manager)
+
 	# Register location markers with WorldState
 	for marker in $LocationMarkers.get_children():
 		WorldState.register_location(marker.name, marker.global_position)

@@ -154,6 +154,7 @@ static func _clean_chat_response(text: String) -> String:
 const VALID_GOALS: Array = [
 	"hunt_field", "buy_potions", "sell_loot",
 	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle",
+	"rest", "vend", "buy_from_vendor", "tend_shop",
 ]
 
 static func _extract_goal_tag(text: String) -> String:
@@ -178,6 +179,34 @@ static func _strip_emotes(text: String) -> String:
 			break
 		result = (result.substr(0, start) + result.substr(end + 1)).strip_edges()
 	return result
+
+static func parse_conversation_response(response: Dictionary) -> Dictionary:
+	var message: Dictionary = response.get("message", {})
+	var content: String = message.get("content", "")
+
+	if content.is_empty():
+		return { "valid": true, "dialogue": "", "action": ConversationState.ACTION_SILENCE }
+
+	var text := _clean_chat_response(content)
+
+	if text.is_empty():
+		return { "valid": true, "dialogue": "", "action": ConversationState.ACTION_SILENCE }
+
+	if text.begins_with("[SILENCE]"):
+		return { "valid": true, "dialogue": "", "action": ConversationState.ACTION_SILENCE }
+
+	if text.begins_with("[LEAVE]"):
+		var after_leave := text.substr(7).strip_edges()
+		return { "valid": true, "dialogue": after_leave, "action": ConversationState.ACTION_WALK_AWAY }
+
+	if text.begins_with("[TOPIC:"):
+		var close_bracket := text.find("]")
+		if close_bracket != -1:
+			var topic := text.substr(7, close_bracket - 7).strip_edges()
+			var after_tag := text.substr(close_bracket + 1).strip_edges()
+			return { "valid": true, "dialogue": after_tag, "action": ConversationState.ACTION_TOPIC_CHANGE, "new_topic": topic }
+
+	return { "valid": true, "dialogue": text, "action": ConversationState.ACTION_SPEAK }
 
 static func _empty_result() -> Dictionary:
 	return {

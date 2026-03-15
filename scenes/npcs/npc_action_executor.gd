@@ -83,13 +83,13 @@ func _do_use_item(item_id: String) -> void:
 				var healed: int = npc._combat.heal(heal)
 				var memory_node = npc.get_node_or_null("NPCMemory")
 				if memory_node:
-					memory_node.add_observation("Used %s, healed %d HP" % [item.get("name", item_id), healed])
+					memory_node.add_memory("Used %s, healed %d HP" % [item.get("name", item_id), healed], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
 			npc._inventory.remove_item(item_id)
 		"weapon", "armor":
 			npc._equipment.equip(item_id)
 			var memory_node = npc.get_node_or_null("NPCMemory")
 			if memory_node:
-				memory_node.add_observation("Equipped %s" % item.get("name", item_id))
+				memory_node.add_memory("Equipped %s" % item.get("name", item_id), memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "use_item", true)
 	npc.change_state("idle")
@@ -111,6 +111,7 @@ func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 		_fail("buy_item", "No item_id specified")
 		return
 
+	var cost: int = 0
 	var vending_comp: Node = vendor_node.get_node_or_null("VendingComponent")
 	if vending_comp and vending_comp.is_vending():
 		# Buy via VendingComponent — handles gold transfer and inventory on both sides
@@ -121,7 +122,7 @@ func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 	else:
 		# Vendor has no active vending — fall back to direct purchase at base value
 		var fallback_item: Dictionary = ItemDatabase.get_item(item_id)
-		var cost: int = fallback_item.get("value", 0) * count
+		cost = fallback_item.get("value", 0) * count
 		if not npc._inventory.remove_gold_amount(cost):
 			_fail("buy_item", "Not enough gold for %s (need %d)" % [item_id, cost])
 			return
@@ -131,9 +132,9 @@ func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 	var item: Dictionary = ItemDatabase.get_item(item_id)
 	var memory_node = npc.get_node_or_null("NPCMemory")
 	if memory_node:
-		memory_node.add_observation("Bought %dx %s" % [count, item.get("name", item_id)])
-		if item.get("type", "") in ["weapon", "armor"] and memory_node.has_method("add_key_memory"):
-			memory_node.add_key_memory("big_purchase", "Bought %s" % item.get("name", item_id))
+		memory_node.add_memory("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
+		if item.get("type", "") in ["weapon", "armor"]:
+			memory_node.add_memory("Bought %s for %d gold" % [item.get("name", item_id), cost], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM, false, "big_purchase")
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "buy_item", true)
 	npc.change_state("idle")
@@ -173,7 +174,7 @@ func _do_sell_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 
 	var memory_node = npc.get_node_or_null("NPCMemory")
 	if memory_node:
-		memory_node.add_observation("Sold %dx %s for %d gold" % [count, item.get("name", item_id), revenue])
+		memory_node.add_memory("Sold %dx %s for %d gold" % [count, item.get("name", item_id), revenue], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "sell_item", true)
 	npc.change_state("idle")
