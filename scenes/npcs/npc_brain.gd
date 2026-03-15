@@ -46,7 +46,7 @@ func _ready() -> void:
 	executor = npc.get_node("NPCActionExecutor")
 
 	# Pick initial mood
-	var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+	var mood_data: Dictionary = NpcTraitHelpers.pick_mood(npc.trait_profile)
 	npc.current_mood = mood_data.get("name", "")
 
 	GameEvents.npc_action_completed.connect(
@@ -84,7 +84,7 @@ func _process(delta: float) -> void:
 	if _decision_timer >= NPC_DECISION_INTERVAL:
 		_decision_timer = 0.0
 		# Refresh mood each decision cycle
-		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		var mood_data: Dictionary = NpcTraitHelpers.pick_mood(npc.trait_profile)
 		npc.current_mood = mood_data.get("name", "")
 		_make_decision()
 
@@ -247,10 +247,10 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 		var speaker_name := _get_display_name(speaker_id)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
 		var is_player := speaker_id == "player"
-		var trait_summary: String = NpcTraits.get_trait_summary(npc.trait_profile)
+		var trait_summary: String = NpcTraitHelpers.get_trait_summary(npc.trait_profile)
 		var backstory: String = NpcTraits.get_backstory(npc.trait_profile)
 		var voice_style: String = NpcTraits.get_voice_style(npc.trait_profile)
-		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		var mood_data: Dictionary = NpcTraitHelpers.pick_mood(npc.trait_profile)
 		var mood_prompt: String = mood_data.get("prompt", "")
 		npc.current_mood = mood_data.get("name", "")
 		var rel_label: String = memory.get_relationship_label(speaker_id) if speaker_id != "player" else ""
@@ -286,12 +286,12 @@ func initiate_social_chat(target_id: String, topic: String = "", intent_cue: Str
 		var target_goal: String = "exploring" if not target_node else target_node.current_goal
 		var target_activity := PromptBuilder.get_activity_description(target_goal)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
-		var trait_summary: String = NpcTraits.get_trait_summary(npc.trait_profile)
+		var trait_summary: String = NpcTraitHelpers.get_trait_summary(npc.trait_profile)
 		var backstory: String = NpcTraits.get_backstory(npc.trait_profile)
 		var rel_label: String = memory.get_relationship_label(target_id)
 
 		var voice_style: String = NpcTraits.get_voice_style(npc.trait_profile)
-		var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
+		var mood_data: Dictionary = NpcTraitHelpers.pick_mood(npc.trait_profile)
 		var mood_prompt: String = mood_data.get("prompt", "")
 		npc.current_mood = mood_data.get("name", "")
 		var grounding := _format_grounding_facts(facts, 4)

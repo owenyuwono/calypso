@@ -116,6 +116,54 @@ static func is_position_blocked(ctx: WorldBuilderContext, pos: Vector2) -> bool:
 			return true
 	return false
 
+static func _generate_candidate(biome: Dictionary, rng: RandomNumberGenerator) -> Vector2:
+	if biome.has("center") and biome.has("radius"):
+		# Circle shape
+		var angle := rng.randf() * TAU
+		var dist: float = sqrt(rng.randf()) * float(biome["radius"])
+		return Vector2(
+			biome["center"].x + cos(angle) * dist,
+			biome["center"].y + sin(angle) * dist
+		)
+	else:
+		# Rect shape: [x, z, width, height]
+		var bounds: Array = biome["bounds"]
+		return Vector2(
+			bounds[0] + rng.randf() * bounds[2],
+			bounds[1] + rng.randf() * bounds[3]
+		)
+
+static func _passes_noise(ctx: WorldBuilderContext, x: float, z: float, threshold: float) -> bool:
+	return ctx.deco_noise.get_noise_2d(x, z) >= threshold
+
+static func _passes_spacing(ctx: WorldBuilderContext, pos: Vector2, min_spacing: float) -> bool:
+	for existing in ctx.spawned_positions:
+		if pos.distance_to(existing) < min_spacing:
+			return false
+	return true
+
+static func _spawn_recipe(ctx: WorldBuilderContext, recipe: Dictionary, x: float, z: float, rng: RandomNumberGenerator) -> void:
+	var rot_y := rng.randf() * TAU
+	var scale_val: float = recipe.get("scale", 0.25)
+	var type: String = recipe["type"]
+	var files: Array = recipe.get("files", [])
+	var colors: Array = recipe.get("colors", [])
+	var file: String = files[rng.randi() % files.size()] if files.size() > 0 else ""
+	var color: Color = colors[rng.randi() % colors.size()] if colors.size() > 0 else Color.WHITE
+
+	match type:
+		"tree":
+			AssetSpawner.spawn_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, color)
+		"foliage":
+			AssetSpawner.spawn_foliage(ctx, file, Vector3(x, 0, z), color, rot_y, scale_val)
+		"rock_cluster":
+			create_rock_cluster(ctx, Vector3(x, 0, z))
+		"stump", "fallen":
+			var inst := AssetSpawner.spawn_model(ctx, AssetSpawner.TREE_DIR + file, Vector3(x, 0, z), rot_y, scale_val)
+			if inst:
+				var muted_leaf := Color(0.15, 0.35, 0.1)
+				AssetSpawner.apply_tree_materials(ctx, inst, muted_leaf, true)
+
 static func scatter_biome(ctx: WorldBuilderContext, biome: Dictionary, rng: RandomNumberGenerator) -> int:
 	var total_placed := 0
 	var recipes: Array = biome["recipes"]
@@ -125,69 +173,20 @@ static func scatter_biome(ctx: WorldBuilderContext, biome: Dictionary, rng: Rand
 		var count: int = recipe["count"]
 		var min_spacing: float = recipe.get("min_spacing", 2.0)
 		var placed := 0
-		var attempts := 0
 		var max_attempts := count * 15
 
-		while placed < count and attempts < max_attempts:
-			attempts += 1
-
-			# Generate random point within biome shape
-			var x: float
-			var z: float
-			if biome.has("center") and biome.has("radius"):
-				# Circle shape
-				var angle := rng.randf() * TAU
-				var dist: float = sqrt(rng.randf()) * float(biome["radius"])
-				x = biome["center"].x + cos(angle) * dist
-				z = biome["center"].y + sin(angle) * dist
-			else:
-				# Rect shape: [x, z, width, height]
-				var bounds: Array = biome["bounds"]
-				x = bounds[0] + rng.randf() * bounds[2]
-				z = bounds[1] + rng.randf() * bounds[3]
-
-			# Noise rejection
-			if ctx.deco_noise.get_noise_2d(x, z) < noise_threshold:
+		for attempt in max_attempts:
+			if placed >= count:
+				break
+			var candidate := _generate_candidate(biome, rng)
+			if not _passes_noise(ctx, candidate.x, candidate.y, noise_threshold):
 				continue
-
-			var pos2d := Vector2(x, z)
-
-			# Exclusion zone rejection
-			if is_position_blocked(ctx, pos2d):
+			if is_position_blocked(ctx, candidate):
 				continue
-
-			# Min-spacing rejection
-			var too_close := false
-			for existing in ctx.spawned_positions:
-				if pos2d.distance_to(existing) < min_spacing:
-					too_close = true
-					break
-			if too_close:
+			if not _passes_spacing(ctx, candidate, min_spacing):
 				continue
-
-			# Spawn based on type
-			var rot_y := rng.randf() * TAU
-			var scale_val: float = recipe.get("scale", 0.25)
-			var type: String = recipe["type"]
-			var files: Array = recipe.get("files", [])
-			var colors: Array = recipe.get("colors", [])
-			var file: String = files[rng.randi() % files.size()] if files.size() > 0 else ""
-			var color: Color = colors[rng.randi() % colors.size()] if colors.size() > 0 else Color.WHITE
-
-			match type:
-				"tree":
-					AssetSpawner.spawn_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, color)
-				"foliage":
-					AssetSpawner.spawn_foliage(ctx, file, Vector3(x, 0, z), color, rot_y, scale_val)
-				"rock_cluster":
-					create_rock_cluster(ctx, Vector3(x, 0, z))
-				"stump", "fallen":
-					var inst := AssetSpawner.spawn_model(ctx, AssetSpawner.TREE_DIR + file, Vector3(x, 0, z), rot_y, scale_val)
-					if inst:
-						var muted_leaf := Color(0.15, 0.35, 0.1)
-						AssetSpawner.apply_tree_materials(ctx, inst, muted_leaf, true)
-
-			ctx.spawned_positions.append(pos2d)
+			_spawn_recipe(ctx, recipe, candidate.x, candidate.y, rng)
+			ctx.spawned_positions.append(candidate)
 			placed += 1
 
 		total_placed += placed

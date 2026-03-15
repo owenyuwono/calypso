@@ -12,6 +12,7 @@ var spawned_positions: Array = []
 var path_lines: Array = []    # [{start: Vector2, end: Vector2, buffer: float}]
 var building_zones: Array = []  # [{center: Vector2, radius: float}]
 var nav_region: Node           # NavigationRegion3D
+var world_root: Node3D         # Scene root — parent of nav_region
 var city_bounds: Rect2 = Rect2(-70, -50, 140, 100)
 
 func is_in_city(pos: Vector3) -> bool:

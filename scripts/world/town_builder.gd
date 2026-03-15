@@ -32,7 +32,7 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	arch.mesh = arch_mesh
 	arch.position = Vector3(70, wall_height + 0.75, 0)
 	arch.set_surface_override_material(0, wall_mat)
-	ctx.nav_region.get_parent().add_child(arch)  # Add to scene root, not nav region
+	ctx.world_root.add_child(arch)  # Add to scene root, not nav region
 
 	# Gate torches
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(69, 0, -4))

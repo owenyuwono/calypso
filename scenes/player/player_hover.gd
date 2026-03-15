@@ -228,7 +228,7 @@ func _process_hover() -> void:
 			var npc_node := WorldState.get_entity(_hovered_entity_id)
 			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
 			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
-				var trait_summary: String = NpcTraits.get_trait_summary(npc_node.trait_profile)
+				var trait_summary: String = NpcTraitHelpers.get_trait_summary(npc_node.trait_profile)
 				if not trait_summary.is_empty():
 					tooltip_lines.append(trait_summary)
 			var goal: String = data.get("goal", "idle")

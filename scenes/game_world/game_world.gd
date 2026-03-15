@@ -12,6 +12,7 @@ func _ready() -> void:
 	# Create shared context for all builder utilities
 	var ctx := WorldBuilderContext.new()
 	ctx.nav_region = $NavigationRegion3D
+	ctx.world_root = self
 
 	# Build procedural terrain
 	_build_terrain(ctx)
@@ -61,9 +62,46 @@ func _build_terrain(ctx: WorldBuilderContext) -> void:
 	# Zone-specific textures
 	var tex_grass_city := load("res://assets/textures/terrain/grass_town.png") as Texture2D
 	var tex_bricks_city := load("res://assets/textures/terrain/Bricks/Bricks_23-512x512.png") as Texture2D
+	var tex_tile_city := load("res://assets/textures/terrain/Bricks/Bricks_17-512x512.png") as Texture2D
 
-	# --- City Terrain (140x100, center at origin) ---
-	var city_rules: Array = [
+	var city := TerrainGenerator.generate_terrain(
+		Vector3(0, 0, 0), Vector2(140, 100), Vector2i(70, 50),
+		terrain_noise, ctx.terrain_height_scale_city, _city_terrain_rules()
+	)
+	var field := TerrainGenerator.generate_terrain(
+		Vector3(110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
+		terrain_noise, ctx.terrain_height_scale_field, _field_terrain_rules()
+	)
+
+	# Per-zone texture sets: [grass, dirt/ch0, stone/ch1, tile_town/ch2, bricks/ch3]
+	var zone_textures := [
+		[tex_bricks_city, tex_dirt, tex_stone, tex_tile_city, tex_bricks_city],  # city
+		[tex_grass_city, tex_dirt, tex_stone, null, null],                       # field
+	]
+	var tex_keys := ["texture_grass", "texture_dirt", "texture_stone", "texture_cobble", "texture_packed_earth"]
+
+	# Apply shader material to each terrain mesh
+	for i in 2:
+		var terrain_data = [city, field][i]
+		var textures = zone_textures[i]
+		var mat := ShaderMaterial.new()
+		mat.shader = terrain_shader
+		for j in textures.size():
+			if textures[j]:
+				mat.set_shader_parameter(tex_keys[j], textures[j])
+		mat.set_shader_parameter("uv_scale_pavement", 0.5)
+		mat.set_shader_parameter("uv_scale_dirt", 0.25)
+		mat.set_shader_parameter("uv_scale_stone", 0.2)
+		mat.set_shader_parameter("uv_scale_cobble", 0.5)
+		mat.set_shader_parameter("uv_scale_earth", 0.5)
+		mat.set_shader_parameter("blend_sharpness", 1.5)
+		var mi: MeshInstance3D = terrain_data["mesh_instance"]
+		mi.mesh.surface_set_material(0, mat)
+		$NavigationRegion3D.add_child(mi)
+		$NavigationRegion3D.add_child(terrain_data["static_body"])
+
+func _city_terrain_rules() -> Array:
+	return [
 		# Roads — tile_town paving (channel 2)
 		# Main E-W road (gate road through center)
 		{"type": "line", "start": Vector2(-65, 0), "end": Vector2(65, 0), "width": 2.0, "channel": 2, "falloff": 0.0},
@@ -146,13 +184,9 @@ func _build_terrain(ctx: WorldBuilderContext) -> void:
 		{"type": "flatten", "center": Vector2(55, -4), "radius": 3.0},
 		{"type": "flatten", "center": Vector2(40, -38), "radius": 3.0},
 	]
-	var city := TerrainGenerator.generate_terrain(
-		Vector3(0, 0, 0), Vector2(140, 100), Vector2i(70, 50),
-		terrain_noise, ctx.terrain_height_scale_city, city_rules
-	)
 
-	# --- Field Terrain (80x80, center at 110,0,0) ---
-	var field_rules: Array = [
+func _field_terrain_rules() -> Array:
+	return [
 		# Flatten field terrain at gate boundary so heights match city terrain
 		{"type": "flatten", "center": Vector2(75, 0), "radius": 8.0},
 		{"type": "line", "start": Vector2(70, 0), "end": Vector2(100, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
@@ -163,38 +197,6 @@ func _build_terrain(ctx: WorldBuilderContext) -> void:
 		{"type": "circle", "center": Vector2(130, -20), "radius": 8.0, "channel": 1, "falloff": 2.0, "noise_perturb": 0.25},
 		{"type": "circle", "center": Vector2(140, -25), "radius": 5.0, "channel": 1, "falloff": 1.5, "noise_perturb": 0.25},
 	]
-	var field := TerrainGenerator.generate_terrain(
-		Vector3(110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
-		terrain_noise, ctx.terrain_height_scale_field, field_rules
-	)
-
-	# Per-zone texture sets: [grass, dirt/ch0, stone/ch1, tile_town/ch2, bricks/ch3]
-	var tex_tile_city := load("res://assets/textures/terrain/Bricks/Bricks_17-512x512.png") as Texture2D
-	var zone_textures := [
-		[tex_bricks_city, tex_dirt, tex_stone, tex_tile_city, tex_bricks_city],  # city
-		[tex_grass_city, tex_dirt, tex_stone, null, null],                       # field
-	]
-	var tex_keys := ["texture_grass", "texture_dirt", "texture_stone", "texture_cobble", "texture_packed_earth"]
-
-	# Apply shader material to each terrain mesh
-	for i in 2:
-		var terrain_data = [city, field][i]
-		var textures = zone_textures[i]
-		var mat := ShaderMaterial.new()
-		mat.shader = terrain_shader
-		for j in textures.size():
-			if textures[j]:
-				mat.set_shader_parameter(tex_keys[j], textures[j])
-		mat.set_shader_parameter("uv_scale_pavement", 0.5)
-		mat.set_shader_parameter("uv_scale_dirt", 0.25)
-		mat.set_shader_parameter("uv_scale_stone", 0.2)
-		mat.set_shader_parameter("uv_scale_cobble", 0.5)
-		mat.set_shader_parameter("uv_scale_earth", 0.5)
-		mat.set_shader_parameter("blend_sharpness", 1.5)
-		var mi: MeshInstance3D = terrain_data["mesh_instance"]
-		mi.mesh.surface_set_material(0, mat)
-		$NavigationRegion3D.add_child(mi)
-		$NavigationRegion3D.add_child(terrain_data["static_body"])
 
 func _setup_adventurer_npcs() -> void:
 	for npc_id in NpcLoadouts.LOADOUTS:
