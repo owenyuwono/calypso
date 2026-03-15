@@ -137,16 +137,20 @@ You may reference YOUR FACTS but do NOT recite them directly. Do NOT invent even
 {mood}
 Caps, abbreviations, symbols (??, ..., !), and swearing are all allowed.
 Stay on topic. Reply to what was said.
+No modern language, concepts, or technology. This is a medieval fantasy world.
+Only reference items and equipment you actually have. Do not invent weapons or items.
 {world_facts}
 Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
 {goal_instruction}"""
 
 const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
+Equipment: {equipment}
+Inventory: {inventory}
 TIME: {time_display} ({phase}). STAMINA: {stamina_text}.
 {key_memories}
 {context}
-{relationship_line}{speaker_name} says to you: "{spoken_text}"
+{relationship_line}{speaker_line}
 
 Respond as {npc_name}:"""
 
@@ -161,6 +165,7 @@ You may reference YOUR FACTS but do NOT recite them directly. Do NOT invent even
 {voice}
 {mood}
 Caps, abbreviations, symbols (??, ..., !), and swearing are all allowed.
+No modern language, concepts, or technology. This is a medieval fantasy world.
 {world_facts}
 Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
@@ -260,21 +265,39 @@ static func build_chat_system_message(npc_name: String, personality: String, act
 	})
 	return {"role": "system", "content": content}
 
-static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node, relationship_label: String = "") -> Dictionary:
+static func build_chat_user_message(npc_name: String, npc_id: String, speaker_name: String, spoken_text: String, memory_node: Node, relationship_label: String = "", overheard: bool = false, original_target_name: String = "") -> Dictionary:
 	var npc_node = WorldState.get_entity(npc_id)
 	var level: int = 1
 	var hp: int = 50
 	var max_hp: int = 50
 	var gold: int = 0
+	var equipment_text := "(none)"
+	var inventory_text := "(empty)"
 	if npc_node and is_instance_valid(npc_node):
 		var stats = npc_node.get_node_or_null("StatsComponent")
-		var inv = npc_node.get_node_or_null("InventoryComponent")
+		var inv_comp = npc_node.get_node_or_null("InventoryComponent")
+		var equip_comp = npc_node.get_node_or_null("EquipmentComponent")
 		if stats:
 			level = stats.level
 			hp = stats.hp
 			max_hp = stats.max_hp
-		if inv:
-			gold = inv.gold
+		if inv_comp:
+			gold = inv_comp.gold
+			var inv: Dictionary = inv_comp.get_items()
+			if not inv.is_empty():
+				var parts: Array = []
+				for item_id in inv:
+					var count: int = inv[item_id]
+					var item_name := ItemDatabase.get_item_name(item_id)
+					parts.append("%s x%d" % [item_name, count])
+				inventory_text = ", ".join(parts)
+		if equip_comp:
+			var equipment: Dictionary = equip_comp.get_equipment()
+			var weapon_id: String = equipment.get("weapon", "")
+			var armor_id: String = equipment.get("armor", "")
+			var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "(none)"
+			var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "(none)"
+			equipment_text = "Weapon: %s, Armor: %s" % [weapon_name, armor_name]
 
 	# Build conversation context from area chat log
 	var context := ""
@@ -287,17 +310,24 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
 		key_memories = memory_node.get_key_memories_summary(2)
 
+	var speaker_line: String
+	if overheard and not original_target_name.is_empty():
+		speaker_line = "You overhear %s say to %s: \"%s\"\nYou were NOT addressed directly. Only respond if you have something relevant to add." % [speaker_name, original_target_name, spoken_text]
+	else:
+		speaker_line = "%s says to you: \"%s\"" % [speaker_name, spoken_text]
+
 	var content := CHAT_USER_TEMPLATE.format({
 		"npc_name": npc_name,
 		"level": level,
 		"hp": hp,
 		"max_hp": max_hp,
 		"gold": gold,
+		"equipment": equipment_text,
+		"inventory": inventory_text,
 		"key_memories": key_memories,
 		"context": context,
 		"relationship_line": relationship_line,
-		"speaker_name": speaker_name,
-		"spoken_text": spoken_text,
+		"speaker_line": speaker_line,
 		"time_display": TimeManager.get_time_display(),
 		"phase": TimeManager.get_phase(),
 		"stamina_text": _get_stamina_text(npc_node) if npc_node else "N/A",

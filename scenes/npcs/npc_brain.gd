@@ -80,7 +80,9 @@ func _process(delta: float) -> void:
 		if _reading_queue["timer"] <= 0.0:
 			var queued := _reading_queue
 			_reading_queue = {}
-			request_reactive_response(queued["speaker_id"], queued["spoken_text"])
+			var is_overheard: bool = queued.get("overheard", false)
+			var original_target: String = queued.get("original_target", "")
+			request_reactive_response(queued["speaker_id"], queued["spoken_text"], is_overheard, original_target)
 		return
 	# Don't make decisions while in combat, dead, or already acting
 	if npc.current_state in ["combat", "dead"]:
@@ -181,7 +183,7 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 	if not _pending_chat.is_empty():
 		var pending := _pending_chat
 		_pending_chat = {}
-		request_reactive_response(pending["speaker_id"], pending["spoken_text"])
+		request_reactive_response(pending["speaker_id"], pending["spoken_text"], pending.get("overheard", false), pending.get("original_target_id", ""))
 
 func _on_llm_failed(req_id: String, error: String) -> void:
 	# Route chat failures separately
@@ -212,7 +214,7 @@ func _on_llm_failed(req_id: String, error: String) -> void:
 	if not _pending_chat.is_empty():
 		var pending := _pending_chat
 		_pending_chat = {}
-		request_reactive_response(pending["speaker_id"], pending["spoken_text"])
+		request_reactive_response(pending["speaker_id"], pending["spoken_text"], pending.get("overheard", false), pending.get("original_target_id", ""))
 
 func _use_test_action() -> void:
 	if _test_actions.is_empty():
@@ -268,10 +270,10 @@ func generate_conversation_turn(conversation_id: String) -> void:
 
 
 ## Reactive conversation — triggered when another entity speaks to this NPC.
-func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
+func request_reactive_response(speaker_id: String, spoken_text: String, overheard: bool = false, original_target_id: String = "") -> void:
 	if _waiting_for_llm:
 		# Buffer the chat — process after current LLM response completes
-		_pending_chat = {"speaker_id": speaker_id, "spoken_text": spoken_text}
+		_pending_chat = {"speaker_id": speaker_id, "spoken_text": spoken_text, "overheard": overheard, "original_target_id": original_target_id}
 		return
 
 	# Don't respond if dead or in combat
@@ -314,9 +316,12 @@ func request_reactive_response(speaker_id: String, spoken_text: String) -> void:
 			rel_label = _relationship.get_tier(speaker_id) if _relationship else "stranger"
 		var reactive_facts: Array = memory.gather_chat_facts(speaker_id)
 		var grounding := _format_grounding_facts(reactive_facts, 3)
+		var original_target_name: String = ""
+		if overheard and not original_target_id.is_empty():
+			original_target_name = _get_display_name(original_target_id)
 		var messages: Array = [
 			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player, trait_summary, ctx.backstory, ctx.voice_style, ctx.mood_prompt, grounding),
-			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory, rel_label),
+			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory, rel_label, overheard, original_target_name),
 		]
 
 		var req_id: String = "chat_" + npc.npc_id
@@ -459,14 +464,14 @@ func _on_npc_spoke(speaker_id: String, dialogue: String, target_id: String) -> v
 	if target_id == npc.npc_id:
 		print("[CHAT] %s: heard %s say '%s' — queuing response" % [npc.npc_id, speaker_id, dialogue])
 		if speaker_id != "player":
-			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": READING_DELAY}
+			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": READING_DELAY, "overheard": false}
 		else:
 			pass  # Player chat handled via request_reactive_response directly
 	else:
 		# Overheard — free-for-all with staggered delay
 		if speaker_id != "player":
 			print("[CHAT] %s: overheard %s say '%s' — may chime in" % [npc.npc_id, speaker_id, dialogue])
-			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": randf_range(OVERHEARD_DELAY_MIN, OVERHEARD_DELAY_MAX)}
+			_reading_queue = {"speaker_id": speaker_id, "spoken_text": dialogue, "timer": randf_range(OVERHEARD_DELAY_MIN, OVERHEARD_DELAY_MAX), "overheard": true, "original_target": target_id}
 
 # --- LLM response handlers (specialized) ---
 
