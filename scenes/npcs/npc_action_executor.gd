@@ -92,15 +92,15 @@ func _do_use_item(item_id: String) -> void:
 	GameEvents.npc_action_completed.emit(npc.npc_id, "use_item", true)
 	npc.change_state("idle")
 
-func _do_buy_item(shop_id: String, action_data: Dictionary = {}) -> void:
-	var shop_node := WorldState.get_entity(shop_id)
-	if not shop_node:
-		_fail("buy_item", "Shop '%s' not found" % shop_id)
+func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
+	var vendor_node := WorldState.get_entity(vendor_id)
+	if not vendor_node:
+		_fail("buy_item", "Vendor '%s' not found" % vendor_id)
 		return
 
-	var close_enough: bool = await _approach_entity(shop_node)
+	var close_enough: bool = await _approach_entity(vendor_node)
 	if not close_enough:
-		_fail("buy_item", "Shop '%s' unreachable" % shop_id)
+		_fail("buy_item", "Vendor '%s' unreachable" % vendor_id)
 		return
 
 	var item_id: String = action_data.get("item_id", "")
@@ -109,33 +109,42 @@ func _do_buy_item(shop_id: String, action_data: Dictionary = {}) -> void:
 		_fail("buy_item", "No item_id specified")
 		return
 
-	var item := ItemDatabase.get_item(item_id)
-	var cost: int = item.get("value", 0) * count
-	if not npc._inventory.remove_gold_amount(cost):
-		_fail("buy_item", "Not enough gold for %s (need %d)" % [item_id, cost])
-		return
+	var vending_comp: Node = vendor_node.get_node_or_null("VendingComponent")
+	if vending_comp and vending_comp.is_vending():
+		# Buy via VendingComponent — handles gold transfer and inventory on both sides
+		var success: bool = vending_comp.buy_from(npc, item_id, count)
+		if not success:
+			_fail("buy_item", "VendingComponent refused purchase of %s from %s" % [item_id, vendor_id])
+			return
+	else:
+		# Vendor has no active vending — fall back to direct purchase at base value
+		var fallback_item: Dictionary = ItemDatabase.get_item(item_id)
+		var cost: int = fallback_item.get("value", 0) * count
+		if not npc._inventory.remove_gold_amount(cost):
+			_fail("buy_item", "Not enough gold for %s (need %d)" % [item_id, cost])
+			return
+		npc._inventory.add_item(item_id, count)
+		GameEvents.item_purchased.emit(npc.npc_id, item_id, cost)
 
-	npc._inventory.add_item(item_id, count)
-	GameEvents.item_purchased.emit(npc.npc_id, item_id, cost)
-
+	var item: Dictionary = ItemDatabase.get_item(item_id)
 	var memory_node = npc.get_node_or_null("NPCMemory")
 	if memory_node:
-		memory_node.add_observation("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost])
+		memory_node.add_observation("Bought %dx %s" % [count, item.get("name", item_id)])
 		if item.get("type", "") in ["weapon", "armor"] and memory_node.has_method("add_key_memory"):
-			memory_node.add_key_memory("big_purchase", "Bought %s for %d gold" % [item.get("name", item_id), cost])
+			memory_node.add_key_memory("big_purchase", "Bought %s" % item.get("name", item_id))
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "buy_item", true)
 	npc.change_state("idle")
 
-func _do_sell_item(shop_id: String, action_data: Dictionary = {}) -> void:
-	var shop_node := WorldState.get_entity(shop_id)
-	if not shop_node:
-		_fail("sell_item", "Shop '%s' not found" % shop_id)
+func _do_sell_item(vendor_id: String, action_data: Dictionary = {}) -> void:
+	var vendor_node := WorldState.get_entity(vendor_id)
+	if not vendor_node:
+		_fail("sell_item", "Vendor '%s' not found" % vendor_id)
 		return
 
-	var close_enough: bool = await _approach_entity(shop_node)
+	var close_enough: bool = await _approach_entity(vendor_node)
 	if not close_enough:
-		_fail("sell_item", "Shop '%s' unreachable" % shop_id)
+		_fail("sell_item", "Vendor '%s' unreachable" % vendor_id)
 		return
 
 	var item_id: String = action_data.get("item_id", "")
@@ -149,9 +158,16 @@ func _do_sell_item(shop_id: String, action_data: Dictionary = {}) -> void:
 		return
 
 	var item := ItemDatabase.get_item(item_id)
+	# Pay the selling NPC 50% of base value (vendor absorbs the item)
 	var revenue: int = int(item.get("value", 0) * 0.5) * count
 	npc._inventory.add_gold_amount(revenue)
 	GameEvents.item_sold.emit(npc.npc_id, item_id, revenue)
+
+	# Vendor gains the item in their inventory (they can re-list it)
+	var vendor_inv: Node = vendor_node.get_node_or_null("InventoryComponent")
+	if vendor_inv:
+		vendor_inv.remove_gold_amount(revenue)
+		vendor_inv.add_item(item_id, count)
 
 	var memory_node = npc.get_node_or_null("NPCMemory")
 	if memory_node:

@@ -17,6 +17,7 @@ const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
+const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
@@ -43,6 +44,12 @@ var _hover_timer: float = 0.0
 # Navigation
 var _is_navigating: bool = false
 var _interact_target: String = ""
+
+# Vending
+var _is_vending: bool = false
+var _hovered_vend_sign: bool = false
+var _hovered_vend_sign_owner_id: String = ""
+var _pending_vend_sign_click: bool = false
 
 # Combat
 var _attack_target: String = ""
@@ -72,6 +79,7 @@ var chat_input: Control
 var skill_hotbar: Control
 var skill_panel: Control
 var npc_info_panel: Control
+var vend_setup_panel: Control
 
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
@@ -134,6 +142,10 @@ func _ready() -> void:
 	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
 
+	var _vending_comp := VendingComponent.new()
+	_vending_comp.name = "VendingComponent"
+	add_child(_vending_comp)
+
 	# Add StaminaComponent
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
 	stamina_comp.name = "StaminaComponent"
@@ -151,6 +163,8 @@ func _ready() -> void:
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
+	GameEvents.vending_started.connect(_on_vending_started)
+	GameEvents.vending_stopped.connect(_on_vending_stopped)
 
 func _setup_tooltip() -> void:
 	var canvas_layer := CanvasLayer.new()
@@ -242,7 +256,7 @@ func _physics_process(delta: float) -> void:
 
 	var is_moving := false
 
-	if _is_ui_open():
+	if _is_vending or _is_ui_open():
 		_stop_navigation()
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
@@ -391,10 +405,13 @@ func _on_arrived() -> void:
 	if etype == "loot_drop":
 		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
 			target_node.pickup("player")
-	elif etype == "shop_npc":
-		_open_shop(_interact_target)
 	elif etype == "npc":
-		if npc_info_panel and npc_info_panel.has_method("show_npc"):
+		if _pending_vend_sign_click:
+			_pending_vend_sign_click = false
+			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
+			if vending_comp and vending_comp.is_vending():
+				_open_shop(_interact_target)
+		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
 
 	_interact_target = ""
@@ -410,12 +427,23 @@ func _process_hover() -> void:
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.exclude = [self.get_rid()]
+	query.collision_mask |= (1 << 5)
 	var result := space.intersect_ray(query)
 
 	var new_entity_id: String = ""
+	var prev_vend_sign: bool = _hovered_vend_sign
+	var prev_vend_sign_owner: String = _hovered_vend_sign_owner_id
+	_hovered_vend_sign = false
+	_hovered_vend_sign_owner_id = ""
+
 	if result:
 		var collider: Node = result.collider
-		if collider is Node3D:
+		if collider.is_in_group("vend_sign"):
+			# Hovered a vend sign — find the owner entity
+			_hovered_vend_sign = true
+			var owner_entity: Node3D = collider.get_parent()
+			_hovered_vend_sign_owner_id = WorldState.get_entity_id_for_node(owner_entity)
+		elif collider is Node3D:
 			new_entity_id = WorldState.get_entity_id_for_node(collider)
 			if new_entity_id == "player" or new_entity_id == "":
 				new_entity_id = ""
@@ -430,6 +458,40 @@ func _process_hover() -> void:
 			if new_node and is_instance_valid(new_node) and new_node.has_method("highlight"):
 				new_node.highlight()
 		_hovered_entity_id = new_entity_id
+
+	# Highlight / unhighlight vend sign border
+	if prev_vend_sign and not _hovered_vend_sign and not prev_vend_sign_owner.is_empty():
+		var prev_owner := WorldState.get_entity(prev_vend_sign_owner)
+		if prev_owner and is_instance_valid(prev_owner):
+			var sign_node: Node = prev_owner.get_node_or_null("VendSign")
+			if sign_node:
+				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
+				if border:
+					border.visible = false
+	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty():
+		var cur_owner := WorldState.get_entity(_hovered_vend_sign_owner_id)
+		if cur_owner and is_instance_valid(cur_owner):
+			var sign_node: Node = cur_owner.get_node_or_null("VendSign")
+			if sign_node:
+				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
+				if border:
+					border.visible = true
+
+	# Vend sign hover — show shop tooltip
+	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty():
+		var mouse_pos_for_tooltip := get_viewport().get_mouse_position()
+		var owner_node := WorldState.get_entity(_hovered_vend_sign_owner_id)
+		var vending_comp: Node = owner_node.get_node_or_null("VendingComponent") if owner_node and is_instance_valid(owner_node) else null
+		if vending_comp and vending_comp.is_vending():
+			var shop_title: String = vending_comp.get_shop_title()
+			_tooltip_label.text = shop_title if not shop_title.is_empty() else "[Shop]"
+			_tooltip_panel.visible = true
+			_tooltip_panel.position = mouse_pos_for_tooltip + TOOLTIP_OFFSET
+			_cursor_manager.set_cursor("talk")
+		else:
+			_tooltip_panel.visible = false
+			_cursor_manager.set_cursor("default")
+		return  # Skip normal entity tooltip handling
 
 	# Update tooltip, cursor, and hover ring
 	if _hovered_entity_id != "":
@@ -459,9 +521,6 @@ func _process_hover() -> void:
 					tooltip_lines.append("Mood: %s" % mood)
 			display_name = "\n".join(tooltip_lines)
 			_cursor_manager.set_cursor("talk")
-		elif entity_type == "shop_npc":
-			display_name += " [Shop]"
-			_cursor_manager.set_cursor("talk")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name
@@ -473,6 +532,15 @@ func _process_hover() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
+		return
+
+	if _is_vending:
+		if event.is_action_pressed("ui_cancel"):
+			if shop_panel and shop_panel.is_open():
+				shop_panel.close_shop()
+			else:
+				stop_vending()
+			get_viewport().set_input_as_handled()
 		return
 
 	if not _is_ui_open():
@@ -497,6 +565,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_left_click()
 
 func _handle_left_click() -> void:
+	# Vend sign click — walk to vendor NPC, then open shop
+	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty() and _hovered_vend_sign_owner_id != "player":
+		_cancel_attack()
+		_interact_target = _hovered_vend_sign_owner_id
+		_pending_vend_sign_click = true
+		var target_node := WorldState.get_entity(_hovered_vend_sign_owner_id)
+		if target_node and is_instance_valid(target_node):
+			var dist := global_position.distance_to(target_node.global_position)
+			if dist <= INTERACT_RANGE:
+				_on_arrived()
+				return
+			_navigate_to(target_node.global_position)
+		return
+
 	if not _hovered_entity_id.is_empty():
 		var data := WorldState.get_entity_data(_hovered_entity_id)
 		var etype: String = data.get("type", "")
@@ -528,7 +610,7 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
-		if etype == "shop_npc" or etype == "npc":
+		if etype == "npc":
 			# Click NPC: walk to + interact on arrival
 			_cancel_attack()
 			_interact_target = _hovered_entity_id
@@ -579,10 +661,11 @@ func _interact_with_nearest() -> void:
 			continue
 		var data := WorldState.get_entity_data(entry.id)
 		var etype: String = data.get("type", "")
-		if etype == "shop_npc":
-			_open_shop(entry.id)
-			return
 		if etype == "npc":
+			var vending_comp: Node = entry.node.get_node_or_null("VendingComponent") if entry.node else null
+			if vending_comp and vending_comp.is_vending():
+				_open_shop(entry.id)
+				return
 			_command_npc_follow(entry.node)
 			return
 
@@ -607,10 +690,25 @@ func _send_message_to_npc(text: String, npc_id: String, npc_node: Node3D) -> voi
 
 func _open_shop(shop_id: String) -> void:
 	if shop_panel:
-		shop_panel.open_shop(shop_id)
+		var vendor_node := WorldState.get_entity(shop_id)
+		if vendor_node and is_instance_valid(vendor_node):
+			enter_vending_state()
+			shop_panel.open_shop(vendor_node)
+
+func enter_vending_state() -> void:
+	_is_vending = true
+	_cancel_attack()
+	_stop_navigation()
+	velocity = Vector3.ZERO
+
+func stop_vending() -> void:
+	_is_vending = false
+	var vending_comp: Node = get_node_or_null("VendingComponent")
+	if vending_comp and vending_comp.is_vending():
+		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
-	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel]:
+	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel]:
 		if panel and panel.is_open():
 			return true
 	return false
@@ -626,6 +724,7 @@ func _on_entity_died(entity_id: String, _killer_id: String) -> void:
 	_die()
 
 func _die() -> void:
+	stop_vending()
 	_is_dead = true
 	_cancel_attack()
 	_stop_navigation()
@@ -680,6 +779,14 @@ func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: in
 		if req.get("skill", "") == skill_id and req.get("level", 1) <= new_level:
 			if not _skills_comp.has_skill(active_skill_id):
 				_skills_comp.unlock_skill(active_skill_id)
+
+func _on_vending_started(eid: String, shop_title: String) -> void:
+	if eid == entity_id:
+		_visuals.show_vend_sign(shop_title)
+
+func _on_vending_stopped(eid: String) -> void:
+	if eid == entity_id:
+		_visuals.hide_vend_sign()
 
 # --- Duck typing delegations ---
 

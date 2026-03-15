@@ -4,12 +4,11 @@ render_mode diffuse_toon, specular_toon, cull_disabled;
 uniform sampler2D texture_grass : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D texture_dirt : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D texture_stone : source_color, filter_linear_mipmap, repeat_enable;
-uniform float uv_scale_grass : hint_range(0.05, 5.0) = 0.12;
+uniform float uv_scale_pavement : hint_range(0.05, 5.0) = 0.12;
 uniform float uv_scale_dirt  : hint_range(0.05, 5.0) = 0.25;
 uniform float uv_scale_stone : hint_range(0.05, 5.0) = 0.2;
 uniform float uv_scale_cobble: hint_range(0.05, 5.0) = 0.15;
 uniform float uv_scale_earth : hint_range(0.05, 5.0) = 0.3;
-uniform float anti_tile_cell : hint_range(2.0, 30.0) = 12.0;
 uniform float blend_sharpness : hint_range(0.0, 10.0) = 3.0;
 
 // Toon shading parameters (matched to toon.gdshader)
@@ -37,45 +36,9 @@ void vertex() {
 	vertex_color_full = COLOR;
 }
 
-vec2 hash22(vec2 p) {
-	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-	return fract(sin(p) * 43758.5453);
-}
-
-vec3 sample_anti_tile(sampler2D tex, vec2 world_uv, float scale) {
-	vec2 scaled_uv = world_uv * scale;
-
-	// Grid A: standard cell grid
-	vec2 coord_a = world_uv / anti_tile_cell;
-	vec2 cell_a = floor(coord_a);
-	vec2 local_a = fract(coord_a);
-	vec2 ha = hash22(cell_a);
-	float aa = ha.x * 6.2832;
-	float ca = cos(aa); float sa = sin(aa);
-	vec2 uva = vec2(scaled_uv.x*ca - scaled_uv.y*sa, scaled_uv.x*sa + scaled_uv.y*ca) + ha * 97.0;
-
-	// Grid B: offset by half cell for organic blend boundaries
-	vec2 coord_b = world_uv / anti_tile_cell + 0.5;
-	vec2 cell_b = floor(coord_b);
-	vec2 local_b = fract(coord_b);
-	vec2 hb = hash22(cell_b + vec2(137.0, 241.0));
-	float ab = hb.x * 6.2832;
-	float cb = cos(ab); float sb = sin(ab);
-	vec2 uvb = vec2(scaled_uv.x*cb - scaled_uv.y*sb, scaled_uv.x*sb + scaled_uv.y*cb) + hb * 97.0;
-
-	vec3 ta = texture(tex, uva).rgb;
-	vec3 tb = texture(tex, uvb).rgb;
-
-	// Voronoi-like blend: whichever grid center is closer wins
-	float da = length(local_a - 0.5);
-	float db = length(local_b - 0.5);
-	float blend = smoothstep(-0.08, 0.08, da - db);
-	return mix(ta, tb, blend);
-}
-
 void fragment() {
-	// Grass gets anti-tile rotation; structured textures tile straight
-	vec3 grass_col = sample_anti_tile(texture_grass, UV, uv_scale_grass);
+	// All textures tile straight (no rotation)
+	vec3 grass_col = texture(texture_grass, UV * uv_scale_pavement).rgb;
 	vec3 dirt_col = texture(texture_dirt, UV * uv_scale_dirt).rgb;
 	vec3 stone_col = texture(texture_stone, UV * uv_scale_stone).rgb;
 	vec3 cobble_col = texture(texture_cobble, UV * uv_scale_cobble).rgb;

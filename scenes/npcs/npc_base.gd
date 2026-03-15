@@ -9,6 +9,7 @@ const EquipmentComponent = preload("res://scripts/components/equipment_component
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
+const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
@@ -136,6 +137,10 @@ func _ready() -> void:
 
 	_register_with_world()
 
+	var _vending_comp := VendingComponent.new()
+	_vending_comp.name = "VendingComponent"
+	add_child(_vending_comp)
+
 	# Add StaminaComponent
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
 	stamina_comp.name = "StaminaComponent"
@@ -152,6 +157,8 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
+	GameEvents.vending_started.connect(_on_vending_started)
+	GameEvents.vending_stopped.connect(_on_vending_stopped)
 
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
@@ -355,6 +362,9 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		change_state(STATE_IDLE)
 
 func _die() -> void:
+	var vc = get_node_or_null("VendingComponent")
+	if vc and vc.is_vending():
+		vc.stop_vending()
 	change_state(STATE_DEAD)
 	combat_target = ""
 	_auto_attack.cancel()
@@ -413,6 +423,14 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _r
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
 		_visuals.update_hp_bar(npc_id)
+
+func _on_vending_started(eid: String, shop_title: String) -> void:
+	if eid == npc_id:
+		_visuals.show_vend_sign(shop_title)
+
+func _on_vending_stopped(eid: String) -> void:
+	if eid == npc_id:
+		_visuals.hide_vend_sign()
 
 # --- Duck typing delegations ---
 

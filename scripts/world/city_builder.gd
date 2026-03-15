@@ -289,6 +289,67 @@ static func _build_market_district(nav_region: Node3D, noise: FastNoiseLite, hs:
 
 		nav_region.add_child(stall)
 
+	# Bakery at (-30, 0, 30) — peaked roof, chimney + door
+	_create_building(nav_region,
+		Vector3(-30, _snap_y(noise, -30, 30, hs), 30),
+		Vector3(4, 3, 4), Color(0.62, 0.52, 0.38), "peaked", Color(0.45, 0.25, 0.15), 0.5, true, true)
+
+	# Storage Shed at (-65, 0, 15) — flat roof, no door
+	_create_building(nav_region,
+		Vector3(-65, _snap_y(noise, -65, 15, hs), 15),
+		Vector3(3.5, 2.5, 3), Color(0.42, 0.35, 0.28), "flat", Color(0.35, 0.3, 0.25), 0.3, false, false)
+
+	# --- Cluster A: Market South Street (x:-36..-24, z:3..8) ---
+	# A1 Merchant Office at (-36, 0, 5)
+	_create_building(nav_region,
+		Vector3(-36, _snap_y(noise, -36, 5, hs), 5),
+		Vector3(4, 3, 3.5), Color(0.58, 0.50, 0.40), "peaked", Color(0.40, 0.25, 0.15), 0.5, false, true)
+
+	# A2 Tax Office at (-30, 0, 5)
+	_create_building(nav_region,
+		Vector3(-30, _snap_y(noise, -30, 5, hs), 5),
+		Vector3(3.5, 3, 3), Color(0.55, 0.48, 0.38), "peaked", Color(0.38, 0.22, 0.14), 0.5, false, true)
+
+	# A3 Courier Post at (-24, 0, 5)
+	_create_building(nav_region,
+		Vector3(-24, _snap_y(noise, -24, 5, hs), 5),
+		Vector3(3.5, 3, 3), Color(0.52, 0.46, 0.36), "flat", Color(0.35, 0.30, 0.25), 0.5, false, true)
+
+	# Market Stall 5 at (-48, 0, 42) — open-air: 4 posts + canopy
+	var stall5 := Node3D.new()
+	stall5.position = Vector3(-48, _snap_y(noise, -48, 42, hs), 42)
+	stall5.rotation.y = 0.1
+	var stall5_mat := StandardMaterial3D.new()
+	stall5_mat.albedo_color = Color(0.45, 0.35, 0.22)
+	for px: float in [-1.2, 1.2]:
+		for pz: float in [-0.8, 0.8]:
+			var post := MeshInstance3D.new()
+			var post_mesh := CylinderMesh.new()
+			post_mesh.top_radius = 0.06
+			post_mesh.bottom_radius = 0.08
+			post_mesh.height = 2.5
+			post.mesh = post_mesh
+			post.position = Vector3(px, 1.25, pz)
+			post.set_surface_override_material(0, stall5_mat)
+			stall5.add_child(post)
+	var canopy5 := MeshInstance3D.new()
+	var canopy5_mesh := BoxMesh.new()
+	canopy5_mesh.size = Vector3(3.0, 0.1, 2.0)
+	canopy5.mesh = canopy5_mesh
+	canopy5.position = Vector3(0, 2.55, 0)
+	var canopy5_mat := StandardMaterial3D.new()
+	canopy5_mat.albedo_color = Color(0.55, 0.35, 0.15)
+	canopy5.set_surface_override_material(0, canopy5_mat)
+	stall5.add_child(canopy5)
+	var counter5 := MeshInstance3D.new()
+	var counter5_mesh := BoxMesh.new()
+	counter5_mesh.size = Vector3(2.4, 0.8, 0.4)
+	counter5.mesh = counter5_mesh
+	counter5.position = Vector3(0, 0.4, 0.6)
+	counter5.set_surface_override_material(0, stall5_mat)
+	stall5.add_child(counter5)
+	nav_region.add_child(stall5)
+
 # ---------------------------------------------------------------------------
 # District: Residential Quarter (x:-70..-20, z:-50..-10)
 # ---------------------------------------------------------------------------
@@ -296,6 +357,8 @@ static func _build_market_district(nav_region: Node3D, noise: FastNoiseLite, hs:
 static func _build_residential_quarter(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	# Houses with varied sizes, colors and chimney options
 	var house_configs: Array = [
+		{"pos": Vector3(-62, 0, -20), "size": Vector3(4, 3, 4),   "color": Color(0.6, 0.53, 0.42),  "roof": Color(0.38, 0.22, 0.14), "chimney": true,  "rot_y": 0.0},
+		{"pos": Vector3(-38, 0, -40), "size": Vector3(4.5, 3, 4), "color": Color(0.57, 0.5, 0.38),  "roof": Color(0.42, 0.24, 0.16), "chimney": false, "rot_y": 0.0},
 		{"pos": Vector3(-53, 0, -21), "size": Vector3(4, 3, 4),   "color": Color(0.65, 0.58, 0.45), "roof": Color(0.45, 0.25, 0.15), "chimney": false, "rot_y": 0.15},
 		{"pos": Vector3(-62, 0, -33), "size": Vector3(5, 3.5, 5), "color": Color(0.6, 0.55, 0.42),  "roof": Color(0.35, 0.2, 0.15),  "chimney": true, "rot_y": PI / 2},
 		{"pos": Vector3(-46, 0, -42), "size": Vector3(4.5, 3, 4), "color": Color(0.62, 0.56, 0.48), "roof": Color(0.4, 0.22, 0.12),  "chimney": false, "rot_y": -0.1},
@@ -307,6 +370,22 @@ static func _build_residential_quarter(nav_region: Node3D, noise: FastNoiseLite,
 		_create_building(nav_region,
 			Vector3(p.x, _snap_y(noise, p.x, p.z, hs), p.z),
 			cfg["size"], cfg["color"], "peaked", cfg["roof"], 0.5, cfg["chimney"], true, cfg.get("rot_y", 0.0))
+
+	# --- Cluster B: Residential Middle Band (x:-47..-36, z:-16..-12) ---
+	# B1 Boarding House at (-47, 0, -14)
+	_create_building(nav_region,
+		Vector3(-47, _snap_y(noise, -47, -14, hs), -14),
+		Vector3(3.5, 3, 3), Color(0.60, 0.52, 0.40), "peaked", Color(0.40, 0.24, 0.16), 0.5, true, false)
+
+	# B2 Tailor Shop at (-41, 0, -14)
+	_create_building(nav_region,
+		Vector3(-41, _snap_y(noise, -41, -14, hs), -14),
+		Vector3(3.5, 3, 3), Color(0.56, 0.48, 0.36), "peaked", Color(0.36, 0.22, 0.14), 0.5, false, true)
+
+	# B3 Cobbler at (-36, 0, -14)
+	_create_building(nav_region,
+		Vector3(-36, _snap_y(noise, -36, -14, hs), -14),
+		Vector3(3, 3, 3), Color(0.54, 0.46, 0.34), "peaked", Color(0.38, 0.24, 0.16), 0.5, false, true)
 
 	# Inn/Tavern at (-45, 0, -30) — two-story
 	var inn_pos := Vector3(-45, 0, -30)
@@ -338,6 +417,60 @@ static func _build_residential_quarter(nav_region: Node3D, noise: FastNoiseLite,
 	inn_roof_mat.albedo_color = Color(0.4, 0.18, 0.1)
 	inn_roof.set_surface_override_material(0, inn_roof_mat)
 	nav_region.add_child(inn_roof)
+
+	# Well at (-42, 0, -35) — stone basin + 2 posts + crossbar
+	var well := Node3D.new()
+	well.position = Vector3(-42, _snap_y(noise, -42, -35, hs), -35)
+	var well_stone_mat := StandardMaterial3D.new()
+	well_stone_mat.albedo_color = Color(0.5, 0.47, 0.42)
+	var well_wood_mat := StandardMaterial3D.new()
+	well_wood_mat.albedo_color = Color(0.4, 0.3, 0.2)
+
+	# Basin ring
+	var basin := MeshInstance3D.new()
+	var basin_mesh := CylinderMesh.new()
+	basin_mesh.top_radius = 0.8
+	basin_mesh.bottom_radius = 0.8
+	basin_mesh.height = 0.6
+	basin_mesh.rings = 1
+	basin.mesh = basin_mesh
+	basin.position = Vector3(0, 0.3, 0)
+	basin.set_surface_override_material(0, well_stone_mat)
+	well.add_child(basin)
+
+	# Two vertical posts
+	for px: float in [-0.6, 0.6]:
+		var post := MeshInstance3D.new()
+		var post_mesh := CylinderMesh.new()
+		post_mesh.top_radius = 0.06
+		post_mesh.bottom_radius = 0.08
+		post_mesh.height = 1.6
+		post.mesh = post_mesh
+		post.position = Vector3(px, 1.4, 0)
+		post.set_surface_override_material(0, well_wood_mat)
+		well.add_child(post)
+
+	# Crossbar
+	var crossbar := MeshInstance3D.new()
+	var cb_mesh := BoxMesh.new()
+	cb_mesh.size = Vector3(1.4, 0.1, 0.1)
+	crossbar.mesh = cb_mesh
+	crossbar.position = Vector3(0, 2.25, 0)
+	crossbar.set_surface_override_material(0, well_wood_mat)
+	well.add_child(crossbar)
+
+	# Collision
+	var well_body := StaticBody3D.new()
+	var well_col := CollisionShape3D.new()
+	var well_shape := CylinderShape3D.new()
+	well_shape.radius = 0.8
+	well_shape.height = 0.6
+	well_col.shape = well_shape
+	well_body.position = Vector3(0, 0.3, 0)
+	well_body.add_child(well_col)
+	well.add_child(well_body)
+
+	nav_region.add_child(well)
 
 # ---------------------------------------------------------------------------
 # District: Noble/Temple Quarter (x:-20..25, z:-50..-10)
@@ -414,6 +547,27 @@ static func _build_noble_quarter(nav_region: Node3D, noise: FastNoiseLite, hs: f
 
 	nav_region.add_child(statue)
 
+	# --- Cluster C: Noble Infill ---
+	# C1 Scriptorium at (6, 0, -26)
+	_create_building(nav_region,
+		Vector3(6, _snap_y(noise, 6, -26, hs), -26),
+		Vector3(4, 3, 3.5), Color(0.56, 0.53, 0.48), "peaked", Color(0.32, 0.26, 0.20), 0.5, false, true)
+
+	# C2 Records Hall at (18, 0, -35)
+	_create_building(nav_region,
+		Vector3(18, _snap_y(noise, 18, -35, hs), -35),
+		Vector3(3.5, 3, 3.5), Color(0.58, 0.55, 0.50), "peaked", Color(0.30, 0.25, 0.20), 0.5, false, true)
+
+	# Library at (0, 0, -20) — peaked roof, door
+	_create_building(nav_region,
+		Vector3(0, _snap_y(noise, 0, -20, hs), -20),
+		Vector3(6, 4, 5), Color(0.55, 0.52, 0.48), "peaked", Color(0.3, 0.25, 0.2), 0.5, false, true)
+
+	# Chapel Annex at (18, 0, -40) — peaked roof, door
+	_create_building(nav_region,
+		Vector3(18, _snap_y(noise, 18, -40, hs), -40),
+		Vector3(3.5, 3, 3), Color(0.6, 0.58, 0.55), "peaked", Color(0.35, 0.28, 0.22), 0.5, false, true)
+
 # ---------------------------------------------------------------------------
 # District: Park/Gardens (x:25..70, z:-50..-10)
 # ---------------------------------------------------------------------------
@@ -483,6 +637,44 @@ static func _build_park_gardens(nav_region: Node3D, noise: FastNoiseLite, hs: fl
 		bench.position = Vector3(bp.x, _snap_y(noise, bp.x, bp.z, hs) + 0.2, bp.z)
 		bench.set_surface_override_material(0, bench_mat)
 		nav_region.add_child(bench)
+
+	# P1 Gardener Cottage at (40, 0, -38) — standalone
+	_create_building(nav_region,
+		Vector3(40, _snap_y(noise, 40, -38, hs), -38),
+		Vector3(3.5, 3, 3.5), Color(0.52, 0.48, 0.40), "peaked", Color(0.38, 0.24, 0.16), 0.5, true, false)
+
+	# Gazebo at (35, 0, -20) — 6 cylinder posts in circle + flat box roof
+	var gazebo := Node3D.new()
+	var gz_y: float = _snap_y(noise, 35, -20, hs)
+	gazebo.position = Vector3(35, gz_y, -20)
+	var gz_post_mat := StandardMaterial3D.new()
+	gz_post_mat.albedo_color = Color(0.55, 0.45, 0.3)
+	var gz_roof_mat := StandardMaterial3D.new()
+	gz_roof_mat.albedo_color = Color(0.38, 0.3, 0.22)
+
+	# 6 posts arranged in a circle (radius 1.5)
+	for i: int in 6:
+		var angle: float = i * PI / 3.0
+		var gz_post := MeshInstance3D.new()
+		var gz_post_mesh := CylinderMesh.new()
+		gz_post_mesh.top_radius = 0.07
+		gz_post_mesh.bottom_radius = 0.09
+		gz_post_mesh.height = 2.5
+		gz_post.mesh = gz_post_mesh
+		gz_post.position = Vector3(cos(angle) * 1.5, 1.25, sin(angle) * 1.5)
+		gz_post.set_surface_override_material(0, gz_post_mat)
+		gazebo.add_child(gz_post)
+
+	# Flat roof
+	var gz_roof := MeshInstance3D.new()
+	var gz_roof_mesh := BoxMesh.new()
+	gz_roof_mesh.size = Vector3(3.6, 0.15, 3.6)
+	gz_roof.mesh = gz_roof_mesh
+	gz_roof.position = Vector3(0, 2.575, 0)
+	gz_roof.set_surface_override_material(0, gz_roof_mat)
+	gazebo.add_child(gz_roof)
+
+	nav_region.add_child(gazebo)
 
 # ---------------------------------------------------------------------------
 # District: Craft/Workshop (x:-20..25, z:10..50)
@@ -563,6 +755,46 @@ static func _build_craft_district(nav_region: Node3D, noise: FastNoiseLite, hs: 
 		log.rotation.y = 0.1 * i
 		log.set_surface_override_material(0, lumber_mat)
 		nav_region.add_child(log)
+
+	# Stables at (-15, 0, 20) — flat roof, door + fence posts
+	_create_building(nav_region,
+		Vector3(-15, _snap_y(noise, -15, 20, hs), 20),
+		Vector3(6, 3, 5), Color(0.5, 0.42, 0.32), "flat", Color(0.38, 0.32, 0.25), 0.3, false, true)
+
+	# Fence posts along stable front
+	var fence_mat := StandardMaterial3D.new()
+	fence_mat.albedo_color = Color(0.45, 0.35, 0.22)
+	for fx: float in [-13.5, -12.5, -11.5, -10.5]:
+		var fpost := MeshInstance3D.new()
+		var fp_mesh := CylinderMesh.new()
+		fp_mesh.top_radius = 0.05
+		fp_mesh.bottom_radius = 0.06
+		fp_mesh.height = 1.2
+		fpost.mesh = fp_mesh
+		fpost.position = Vector3(fx, _snap_y(noise, fx, 23, hs) + 0.6, 23)
+		fpost.set_surface_override_material(0, fence_mat)
+		nav_region.add_child(fpost)
+
+	# --- Cluster D: Craft Workshop Column (x:-6..-2, z:24..40) ---
+	# D1 Tannery at (-4, 0, 26)
+	_create_building(nav_region,
+		Vector3(-4, _snap_y(noise, -4, 26, hs), 26),
+		Vector3(4, 3, 3.5), Color(0.48, 0.40, 0.30), "flat", Color(0.36, 0.30, 0.24), 0.5, true, false)
+
+	# D2 Potter Shop at (-4, 0, 33)
+	_create_building(nav_region,
+		Vector3(-4, _snap_y(noise, -4, 33, hs), 33),
+		Vector3(3.5, 3, 3), Color(0.50, 0.42, 0.32), "flat", Color(0.38, 0.32, 0.26), 0.5, false, true)
+
+	# D3 Weaver Hut at (-4, 0, 38)
+	_create_building(nav_region,
+		Vector3(-4, _snap_y(noise, -4, 38, hs), 38),
+		Vector3(3, 3, 3), Color(0.46, 0.38, 0.28), "flat", Color(0.34, 0.28, 0.22), 0.5, false, true)
+
+	# Storage Hut at (20, 0, 38) — flat roof, no door
+	_create_building(nav_region,
+		Vector3(20, _snap_y(noise, 20, 38, hs), 38),
+		Vector3(3, 2.5, 3), Color(0.45, 0.38, 0.3), "flat", Color(0.35, 0.3, 0.25), 0.3, false, false)
 
 # ---------------------------------------------------------------------------
 # District: Garrison/Training (x:25..70, z:10..50)
@@ -676,11 +908,43 @@ static func _build_garrison(nav_region: Node3D, noise: FastNoiseLite, hs: float)
 		target_face.set_surface_override_material(0, target_mat)
 		nav_region.add_child(target_face)
 
+	# Guard Tower at (30, 0, 40) — tall flat roof, stone
+	_create_building(nav_region,
+		Vector3(30, _snap_y(noise, 30, 40, hs), 40),
+		Vector3(3, 5, 3), Color(0.45, 0.42, 0.38), "flat", Color(0.35, 0.32, 0.28), 0.3, false, false)
+
+	# --- Cluster E: Garrison Flanks ---
+	# E1 Quartermaster at (38, 0, 30)
+	_create_building(nav_region,
+		Vector3(38, _snap_y(noise, 38, 30, hs), 30),
+		Vector3(4, 3, 3.5), Color(0.46, 0.42, 0.36), "flat", Color(0.34, 0.30, 0.26), 0.5, false, true)
+
+	# E2 Mess Hall at (52, 0, 32)
+	_create_building(nav_region,
+		Vector3(52, _snap_y(noise, 52, 32, hs), 32),
+		Vector3(3.5, 3, 3), Color(0.48, 0.44, 0.38), "flat", Color(0.36, 0.32, 0.28), 0.5, false, true)
+
+	# Armory at (55, 0, 25) — flat roof, door
+	_create_building(nav_region,
+		Vector3(55, _snap_y(noise, 55, 25, hs), 25),
+		Vector3(5, 3.5, 4), Color(0.48, 0.44, 0.38), "flat", Color(0.32, 0.28, 0.24), 0.3, false, true)
+
 # ---------------------------------------------------------------------------
 # District: City Gate Area (x:55..70, z:-10..10)
 # ---------------------------------------------------------------------------
 
 static func _build_gate_area(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# --- Cluster F: Gate Approach ---
+	# F1 Waystation at (49, 0, -4)
+	_create_building(nav_region,
+		Vector3(49, _snap_y(noise, 49, -4, hs), -4),
+		Vector3(3.5, 3, 3), Color(0.50, 0.46, 0.40), "flat", Color(0.36, 0.32, 0.28), 0.5, false, true)
+
+	# F2 Gatehouse Office at (55, 0, -4)
+	_create_building(nav_region,
+		Vector3(55, _snap_y(noise, 55, -4, hs), -4),
+		Vector3(3.5, 3, 3), Color(0.48, 0.44, 0.38), "flat", Color(0.34, 0.30, 0.26), 0.5, false, true)
+
 	# Guard posts flanking the gate on the inside
 	_create_building(nav_region,
 		Vector3(65, _snap_y(noise, 65, -7, hs), -7),
@@ -688,3 +952,8 @@ static func _build_gate_area(nav_region: Node3D, noise: FastNoiseLite, hs: float
 	_create_building(nav_region,
 		Vector3(65, _snap_y(noise, 65, 7, hs), 7),
 		Vector3(2, 2.5, 2), Color(0.45, 0.42, 0.38), "flat", Color(0.35, 0.32, 0.28), 0.2)
+
+	# Gatehouse Storage at (60, 0, -7) — flat roof, no door
+	_create_building(nav_region,
+		Vector3(60, _snap_y(noise, 60, -7, hs), -7),
+		Vector3(3, 2.5, 3), Color(0.45, 0.42, 0.38), "flat", Color(0.35, 0.32, 0.28), 0.3, false, false)

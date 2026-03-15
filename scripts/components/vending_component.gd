@@ -1,0 +1,96 @@
+extends Node
+## Component that owns vending state for an entity (player-run shop).
+## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
+
+var _vending: bool = false
+var _shop_title: String = ""
+var _listings: Dictionary = {}  # {item_id: {count: int, price: int}}
+
+func start_vending(title: String, listings: Dictionary) -> void:
+	_vending = true
+	_shop_title = title
+	_listings = listings.duplicate(true)
+	_sync()
+	var eid: String = _get_entity_id()
+	if not eid.is_empty():
+		GameEvents.vending_started.emit(eid, _shop_title)
+
+func stop_vending() -> void:
+	var eid: String = _get_entity_id()
+	_vending = false
+	_shop_title = ""
+	_listings = {}
+	_sync()
+	if not eid.is_empty():
+		GameEvents.vending_stopped.emit(eid)
+
+func is_vending() -> bool:
+	return _vending
+
+func get_listings() -> Dictionary:
+	return _listings
+
+func get_shop_title() -> String:
+	return _shop_title
+
+func buy_from(buyer: Node, item_id: String, count: int) -> bool:
+	if not _vending:
+		return false
+	if not _listings.has(item_id):
+		return false
+
+	var listing: Dictionary = _listings[item_id]
+	var available_count: int = listing.get("count", 0)
+	var price_each: int = listing.get("price", 0)
+
+	if available_count < count:
+		return false
+
+	var total_cost: int = price_each * count
+
+	var buyer_inv: Node = buyer.get_node_or_null("InventoryComponent")
+	if not buyer_inv:
+		return false
+	if buyer_inv.get_gold_amount() < total_cost:
+		return false
+
+	var seller_inv: Node = get_parent().get_node_or_null("InventoryComponent")
+	if not seller_inv:
+		return false
+	if not seller_inv.has_item(item_id, count):
+		return false
+
+	buyer_inv.remove_gold_amount(total_cost)
+	seller_inv.add_gold_amount(total_cost)
+	seller_inv.remove_item(item_id, count)
+	buyer_inv.add_item(item_id, count)
+
+	var new_count: int = available_count - count
+	if new_count <= 0:
+		_listings.erase(item_id)
+	else:
+		_listings[item_id]["count"] = new_count
+
+	_sync()
+
+	var buyer_id: String = WorldState.get_entity_id_for_node(buyer)
+	GameEvents.item_purchased.emit(buyer_id, item_id, total_cost)
+
+	if _listings.is_empty():
+		stop_vending()
+
+	return true
+
+func _get_entity_id() -> String:
+	var parent := get_parent()
+	if not parent:
+		return ""
+	return WorldState.get_entity_id_for_node(parent)
+
+func _sync() -> void:
+	var eid: String = _get_entity_id()
+	if eid.is_empty():
+		return
+	WorldState.set_entity_data(eid, "vending", _vending)
+	WorldState.set_entity_data(eid, "shop_title", _shop_title)
+	WorldState.set_entity_data(eid, "listings", _listings)

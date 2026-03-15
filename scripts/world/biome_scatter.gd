@@ -42,6 +42,57 @@ static func setup_exclusion_zones(ctx: WorldBuilderContext) -> void:
 		{"center": Vector2(45, 35), "radius": 8.0},
 		# Fountain in park
 		{"center": Vector2(45, -30), "radius": 5.0},
+		# House 6
+		{"center": Vector2(-62, -20), "radius": 3.5},
+		# House 7
+		{"center": Vector2(-38, -40), "radius": 3.5},
+		# Well
+		{"center": Vector2(-42, -35), "radius": 2.0},
+		# Bakery
+		{"center": Vector2(-30, 30), "radius": 3.5},
+		# Storage Shed
+		{"center": Vector2(-65, 15), "radius": 3.0},
+		# Market Stall 5
+		{"center": Vector2(-48, 42), "radius": 3.0},
+		# Library
+		{"center": Vector2(0, -20), "radius": 4.5},
+		# Chapel Annex
+		{"center": Vector2(18, -40), "radius": 3.0},
+		# Stables
+		{"center": Vector2(-15, 20), "radius": 4.5},
+		# Storage Hut
+		{"center": Vector2(20, 38), "radius": 2.5},
+		# Guard Tower
+		{"center": Vector2(30, 40), "radius": 3.0},
+		# Armory
+		{"center": Vector2(55, 25), "radius": 4.0},
+		# Gazebo
+		{"center": Vector2(35, -20), "radius": 3.5},
+		# Gatehouse Storage
+		{"center": Vector2(60, -7), "radius": 2.5},
+		# Cluster A: Commerce Row
+		{"center": Vector2(-36, 5), "radius": 3.5},
+		{"center": Vector2(-30, 5), "radius": 3.0},
+		{"center": Vector2(-24, 5), "radius": 3.0},
+		# Cluster B: Artisan Quarter
+		{"center": Vector2(-47, -14), "radius": 3.0},
+		{"center": Vector2(-41, -14), "radius": 3.0},
+		{"center": Vector2(-36, -14), "radius": 2.5},
+		# Cluster C: Civic District
+		{"center": Vector2(6, -26), "radius": 3.5},
+		{"center": Vector2(18, -35), "radius": 3.0},
+		# Cluster D: Craft Row
+		{"center": Vector2(-4, 26), "radius": 3.5},
+		{"center": Vector2(-4, 33), "radius": 3.0},
+		{"center": Vector2(-4, 38), "radius": 2.5},
+		# Cluster E: Military Compound
+		{"center": Vector2(38, 30), "radius": 3.5},
+		{"center": Vector2(52, 32), "radius": 3.0},
+		# Cluster F: Gate District
+		{"center": Vector2(49, -4), "radius": 3.0},
+		{"center": Vector2(55, -4), "radius": 3.0},
+		# Cluster P: Park Area
+		{"center": Vector2(40, -38), "radius": 3.0},
 	]
 
 	# Decoration density noise
