@@ -49,7 +49,12 @@ func _ready() -> void:
 	add_child(_social)
 	_social.setup(npc, brain, memory)
 
-	GameEvents.npc_action_completed.connect(_on_action_completed)
+	GameEvents.npc_action_completed.connect(
+		func(n_id: String, action: String, success: bool) -> void:
+			if n_id == npc.npc_id:
+				_on_action_completed(n_id, action, success)
+	)
+	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
 
 func _process(delta: float) -> void:
 	_idle_drift_timer += delta
@@ -492,6 +497,10 @@ func _do_action_with_data(action: String, target: String, data: Dictionary) -> v
 func _on_action_completed(completed_npc_id: String, _action: String, _success: bool) -> void:
 	if completed_npc_id == npc.npc_id:
 		_action_in_progress = false
+
+func _on_time_phase_changed(_old_phase: String, new_phase: String) -> void:
+	if new_phase == "night" or new_phase == "dawn":
+		evaluate()
 
 # =============================================================================
 # Helpers

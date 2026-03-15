@@ -49,7 +49,11 @@ func _ready() -> void:
 	var mood_data: Dictionary = NpcTraits.pick_mood(npc.trait_profile)
 	npc.current_mood = mood_data.get("name", "")
 
-	GameEvents.npc_action_completed.connect(_on_action_completed)
+	GameEvents.npc_action_completed.connect(
+		func(n_id: String, action: String, success: bool) -> void:
+			if n_id == npc.npc_id:
+				_on_action_completed(n_id, action, success)
+	)
 	GameEvents.npc_spoke.connect(_on_npc_spoke)
 	LLMClient.request_completed.connect(_on_llm_response)
 	LLMClient.request_failed.connect(_on_llm_failed)

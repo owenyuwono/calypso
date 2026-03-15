@@ -70,6 +70,11 @@ var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
 
+# Click marker (reused single instance)
+var _click_marker: MeshInstance3D
+var _click_marker_material: StandardMaterial3D
+var _click_marker_tween: Tween
+
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
 
@@ -154,6 +159,7 @@ func _ready() -> void:
 	_player_skills.setup(self, _combat, _stats, _skills_comp, _progression, _visuals)
 
 	_setup_dialogue_bubble()
+	_setup_click_marker()
 
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
@@ -164,6 +170,25 @@ func _ready() -> void:
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
+
+func _setup_click_marker() -> void:
+	_click_marker = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.3
+	torus.outer_radius = 0.5
+	_click_marker.mesh = torus
+	_click_marker.top_level = true
+
+	_click_marker_material = StandardMaterial3D.new()
+	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.0)
+	_click_marker_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_click_marker_material.no_depth_test = true
+	_click_marker_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_click_marker.material_override = _click_marker_material
+
+	_click_marker.visible = false
+	add_child(_click_marker)
+
 
 func _setup_dialogue_bubble() -> void:
 	var bubble_scene := preload("res://scenes/ui/dialogue_bubble.tscn")
@@ -547,26 +572,17 @@ func flash_hit() -> void:
 	_visuals.flash_hit()
 
 func _spawn_click_marker(pos: Vector3) -> void:
-	var marker := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.3
-	torus.outer_radius = 0.5
-	marker.mesh = torus
-	marker.rotation.x = 0.0  # Torus is already flat by default
+	# Reuse a single marker instance — kill any in-progress tween first
+	if _click_marker_tween and _click_marker_tween.is_valid():
+		_click_marker_tween.kill()
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.3, 1.0, 0.4, 0.7)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.no_depth_test = true
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	marker.material_override = mat
+	_click_marker.global_position = Vector3(pos.x, pos.y + 0.05, pos.z)
+	_click_marker.scale = Vector3.ONE
+	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.7)
+	_click_marker.visible = true
 
-	marker.position = Vector3(pos.x, pos.y + 0.05, pos.z)
-	# Add to parent (the game world) rather than current_scene to avoid scene boundary issues
-	get_parent().add_child(marker)
-
-	var tween := get_tree().create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(mat, "albedo_color:a", 0.0, 0.6)
-	tween.tween_property(marker, "scale", Vector3(0.3, 0.3, 0.3), 0.6)
-	tween.chain().tween_callback(marker.queue_free)
+	_click_marker_tween = get_tree().create_tween()
+	_click_marker_tween.set_parallel(true)
+	_click_marker_tween.tween_property(_click_marker_material, "albedo_color:a", 0.0, 0.6)
+	_click_marker_tween.tween_property(_click_marker, "scale", Vector3(0.3, 0.3, 0.3), 0.6)
+	_click_marker_tween.chain().tween_callback(func() -> void: _click_marker.visible = false)

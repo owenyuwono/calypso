@@ -9,10 +9,9 @@ const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 var _panel: PanelContainer
 var _drag_handle: PanelContainer
 var _content: RichTextLabel
+var _refresh_timer: Timer
 var _is_open: bool = false
 var _current_npc_id: String = ""
-var _update_timer: float = 0.0
-const UPDATE_INTERVAL: float = 0.5
 
 func _ready() -> void:
 	visible = false
@@ -49,18 +48,16 @@ func _build_ui() -> void:
 	_content.add_theme_font_size_override("italics_font_size", 13)
 	scroll.add_child(_content)
 
+	_refresh_timer = Timer.new()
+	_refresh_timer.wait_time = 0.5
+	_refresh_timer.one_shot = false
+	_refresh_timer.timeout.connect(_refresh)
+	add_child(_refresh_timer)
+
 func _input(event: InputEvent) -> void:
 	if _is_open and event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE:
 		close()
 		get_viewport().set_input_as_handled()
-
-func _process(delta: float) -> void:
-	if not _is_open:
-		return
-	_update_timer += delta
-	if _update_timer >= UPDATE_INTERVAL:
-		_update_timer = 0.0
-		_refresh()
 
 func show_npc(npc_id: String) -> void:
 	_current_npc_id = npc_id
@@ -68,8 +65,10 @@ func show_npc(npc_id: String) -> void:
 	visible = true
 	_center_panel()
 	_refresh()
+	_refresh_timer.start()
 
 func close() -> void:
+	_refresh_timer.stop()
 	_is_open = false
 	visible = false
 	_current_npc_id = ""
