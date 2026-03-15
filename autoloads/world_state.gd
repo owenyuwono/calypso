@@ -75,7 +75,7 @@ func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
 	var items: Array = []
 	var objects: Array = []
 	var locations: Array = []
-	var shop_npcs: Array = []
+	var vendors: Array = []
 	for entry in nearby:
 		if entry.id == npc_id:
 			continue
@@ -83,12 +83,15 @@ func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
 		var entity_type: String = data.get("type", "unknown")
 		match entity_type:
 			"npc", "player":
-				var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1), "state": data.get("state", "idle")}
-				info["name"] = data.get("name", entry.id)
-				info["level"] = data.get("level", 1)
-				info["hp"] = data.get("hp", 0)
-				info["max_hp"] = data.get("max_hp", 0)
-				npcs.append(info)
+				if data.get("vending", false):
+					vendors.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id), "shop_title": data.get("shop_title", "")})
+				else:
+					var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1), "state": data.get("state", "idle")}
+					info["name"] = data.get("name", entry.id)
+					info["level"] = data.get("level", 1)
+					info["hp"] = data.get("hp", 0)
+					info["max_hp"] = data.get("max_hp", 0)
+					npcs.append(info)
 			"monster":
 				var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1)}
 				info["name"] = data.get("name", entry.id)
@@ -100,8 +103,6 @@ func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
 				items.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
 			"object":
 				objects.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
-			"shop_npc":
-				shop_npcs.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id), "shop_type": data.get("shop_type", "")})
 	for loc_id in location_markers:
 		var dist := npc_node.global_position.distance_to(location_markers[loc_id])
 		if dist <= radius:
@@ -112,7 +113,7 @@ func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
 		"items": items,
 		"objects": objects,
 		"locations": locations,
-		"shop_npcs": shop_npcs,
+		"vendors": vendors,
 	}
 
 # --- Alive Check (convenience) ---

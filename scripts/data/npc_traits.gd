@@ -63,6 +63,11 @@ const PROFILES: Dictionary = {
 		"weapon_type": "mace",
 		"starting_proficiencies": {"mace": 2, "constitution": 2, "smithing": 2},
 	},
+	"merchant": {
+		"boldness": 0.3, "sociability": 0.85, "generosity": 0.6, "curiosity": 0.4,
+		"weapon_type": "sword",
+		"starting_proficiencies": {"sword": 2, "constitution": 2, "agility": 1},
+	},
 }
 
 # Label mappings for compact LLM trait summaries
@@ -92,6 +97,7 @@ const BACKSTORIES: Dictionary = {
 	"gentle_healer": "Left the temple healers when they started charging the poor for treatment. Now she gathers herbs in the fields and treats anyone who comes to her door. Sleeps little, eats less, and somehow always has a healing potion ready for emergencies.",
 	"charming_bard": "Former court musician who fled after satirizing a lord's wife in a popular ballad. Now he wanders from town to town, collecting stories and trading songs for meals. Knows everyone's secrets but keeps them — unless they make a good verse.",
 	"earnest_apprentice": "Too clumsy for farming, too restless for scholarship, too honest for politics. Found his calling the first time he held a hammer at the forge. Dreams of forging a legendary weapon someday, but for now mostly makes nails and horseshoes.",
+	"merchant": "Spent twenty years on trade routes before settling here to run a permanent stall. Knows the value of everything and the price of loyalty. Treats every customer like a potential repeat buyer — because they are.",
 }
 
 static func get_backstory(profile_name: String) -> String:
@@ -109,6 +115,7 @@ const VOICE_STYLES: Dictionary = {
 	"gentle_healer": "Warm, nurturing tone. Uses 'dear' and 'oh my' frequently. Lots of concern for others. Never raises her voice.",
 	"charming_bard": "Theatrical, expressive. Dramatic pauses and metaphors. Everything is framed as a story or performance.",
 	"earnest_apprentice": "Earnest, slightly nervous. Uses 'uh' and 'well' as filler words. Gets genuinely excited when talking about metalwork.",
+	"merchant": "Warm but businesslike. Always pivots conversation toward wares. Uses 'friend' and 'good traveler' as address terms. Cheerful when browsing, firm when haggling.",
 }
 
 static func get_voice_style(profile_name: String) -> String:

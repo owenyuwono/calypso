@@ -7,7 +7,8 @@ const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 
 const VALID_GOALS: Array = [
 	"hunt_field", "buy_potions", "sell_loot",
-	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest"
+	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest",
+	"vend", "buy_from_vendor"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -184,6 +185,17 @@ func _check_goal_completion() -> bool:
 			if potion_count == 0 and npc._inventory.gold >= 40:
 				npc.set_goal("buy_potions")
 				return true
+		"vend":
+			# Vending NPCs stay in vend goal — never complete
+			# If VendingComponent stopped (e.g. sold out), restart it
+			var vc: Node = npc.get_node_or_null("VendingComponent")
+			if vc and not vc.is_vending():
+				# Listings may be exhausted — stay on vend goal so _execute_vend rebuilds them
+				pass
+			return false
+		"buy_from_vendor":
+			# Completes in _execute_goal once purchase attempt is done
+			pass
 	return false
 
 # =============================================================================
@@ -212,6 +224,10 @@ func _execute_goal() -> void:
 			_execute_rest()
 		"idle":
 			_execute_idle()
+		"vend":
+			_execute_vend()
+		"buy_from_vendor":
+			_execute_buy_from_vendor()
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
@@ -250,11 +266,16 @@ func _execute_hunt() -> void:
 		_do_action("move_to", zone_center)
 
 func _execute_buy_potions() -> void:
-	if _is_near_entity("item_shop_npc", 4.0):
-		_do_action_with_data("buy_item", "item_shop_npc", {"item_id": "healing_potion", "count": 1})
+	var vendor_id := _find_vendor("healing_potion")
+	if vendor_id.is_empty():
+		npc.last_thought = "No vendor selling potions nearby"
+		_do_action("wait", "")
+		return
+	if _is_near_entity(vendor_id, 4.0):
+		_do_action_with_data("buy_item", vendor_id, {"item_id": "healing_potion", "count": 1})
 	else:
-		npc.last_thought = "Going to item shop for potions"
-		_do_action("move_to", "item_shop_npc")
+		npc.last_thought = "Going to %s for potions" % vendor_id
+		_do_action("move_to", vendor_id)
 
 func _execute_sell_loot() -> void:
 	var material_id := _get_first_material()
@@ -263,12 +284,18 @@ func _execute_sell_loot() -> void:
 		npc.set_goal(default_goal)
 		return
 
-	if _is_near_entity("weapon_shop_npc", 4.0):
+	# Sell to any vending NPC (they accept gold in return for items)
+	var vendor_id := _find_vendor()
+	if vendor_id.is_empty():
+		npc.last_thought = "No vendor to sell loot to"
+		_do_action("wait", "")
+		return
+	if _is_near_entity(vendor_id, 4.0):
 		var count: int = npc._inventory.get_item_count(material_id)
-		_do_action_with_data("sell_item", "weapon_shop_npc", {"item_id": material_id, "count": count})
+		_do_action_with_data("sell_item", vendor_id, {"item_id": material_id, "count": count})
 	else:
-		npc.last_thought = "Going to weapon shop to sell loot"
-		_do_action("move_to", "weapon_shop_npc")
+		npc.last_thought = "Going to vendor to sell loot"
+		_do_action("move_to", vendor_id)
 
 func _execute_buy_equipment(slot: String) -> void:
 	var upgrade_id := _get_best_upgrade(slot)
@@ -276,15 +303,72 @@ func _execute_buy_equipment(slot: String) -> void:
 		npc.set_goal(default_goal)
 		return
 
-	var shop_id: String = "weapon_shop_npc" if slot == "weapon" else "item_shop_npc"
-	if _is_near_entity(shop_id, 4.0):
-		_do_action_with_data("buy_item", shop_id, {"item_id": upgrade_id, "count": 1})
-		# After buying, equip it
-		# The action_completed callback will handle transition
+	var vendor_id := _find_vendor(upgrade_id)
+	if vendor_id.is_empty():
+		npc.last_thought = "No vendor selling %s upgrade" % slot
+		npc.set_goal(default_goal)
+		return
+	if _is_near_entity(vendor_id, 4.0):
+		_do_action_with_data("buy_item", vendor_id, {"item_id": upgrade_id, "count": 1})
+		# After buying, equip it — the action_completed callback will handle transition
 		npc.set_goal(default_goal)
 	else:
-		npc.last_thought = "Going to shop for %s upgrade" % slot
-		_do_action("move_to", shop_id)
+		npc.last_thought = "Going to %s for %s upgrade" % [vendor_id, slot]
+		_do_action("move_to", vendor_id)
+
+func _execute_vend() -> void:
+	var vending_comp: Node = npc.get_node_or_null("VendingComponent")
+	if not vending_comp:
+		# No VendingComponent — just idle
+		_do_action("wait", "")
+		return
+	if vending_comp.is_vending():
+		# Already vending — nothing to do this tick
+		_do_action("wait", "")
+		return
+	# Build listings from non-equipped inventory items at 80% of base value
+	var listings := _build_vend_listings()
+	if listings.is_empty():
+		npc.last_thought = "Nothing to sell"
+		_do_action("wait", "")
+		return
+	var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
+	var shop_title: String = "%s's Shop" % npc_name
+	vending_comp.start_vending(shop_title, listings)
+	npc.last_thought = "Opening shop: %s" % shop_title
+	_do_action("wait", "")
+
+func _execute_buy_from_vendor() -> void:
+	# Fallback: buy healing potions if affordable, otherwise look for weapon upgrades
+	var target_item: String = ""
+	var gold: int = npc._inventory.gold
+	var potion_count: int = npc._inventory.get_item_count("healing_potion")
+	if potion_count < 2 and gold >= 20:
+		target_item = "healing_potion"
+	else:
+		var upgrade_w := _get_best_upgrade("weapon")
+		var upgrade_a := _get_best_upgrade("armor")
+		if not upgrade_w.is_empty():
+			target_item = upgrade_w
+		elif not upgrade_a.is_empty():
+			target_item = upgrade_a
+
+	if target_item.is_empty():
+		npc.set_goal(default_goal)
+		return
+
+	var vendor_id := _find_vendor(target_item)
+	if vendor_id.is_empty():
+		npc.last_thought = "No vendor selling %s" % target_item
+		npc.set_goal(default_goal)
+		return
+
+	if _is_near_entity(vendor_id, 4.0):
+		_do_action_with_data("buy_item", vendor_id, {"item_id": target_item, "count": 1})
+		npc.set_goal(default_goal)
+	else:
+		npc.last_thought = "Going to %s to buy %s" % [vendor_id, target_item]
+		_do_action("move_to", vendor_id)
 
 func _execute_follow_player() -> void:
 	var player_node := WorldState.get_entity("player")
@@ -461,6 +545,51 @@ func _get_total_material_count() -> int:
 			total += inv[item_id]
 	return total
 
+## Returns the entity ID of the nearest vending NPC.
+## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
+func _find_vendor(item_id: String = "") -> String:
+	var all_entries: Array = WorldState.get_nearby_entities(npc.global_position, 200.0)
+	var best_id: String = ""
+	var best_dist: float = INF
+	for entry in all_entries:
+		var eid: String = entry["id"]
+		if eid == npc.npc_id:
+			continue
+		var edata: Dictionary = WorldState.get_entity_data(eid)
+		if not edata.get("vending", false):
+			continue
+		if not item_id.is_empty():
+			var listings: Dictionary = edata.get("listings", {})
+			if not listings.has(item_id):
+				continue
+		var entity_node: Node = WorldState.get_entity(eid)
+		if not entity_node or not is_instance_valid(entity_node):
+			continue
+		var dist: float = npc.global_position.distance_to(entity_node.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best_id = eid
+	return best_id
+
+## Builds a listings dict from the NPC's non-equipped inventory at 80% of base value.
+func _build_vend_listings() -> Dictionary:
+	var equipment: Dictionary = npc._equipment.get_equipment()
+	var equipped_ids: Array = equipment.values()
+	var inv: Dictionary = npc._inventory.get_items()
+	var listings: Dictionary = {}
+	for item_id in inv:
+		if item_id in equipped_ids:
+			continue
+		var item: Dictionary = ItemDatabase.get_item(item_id)
+		if item.is_empty():
+			continue
+		var base_value: int = item.get("value", 0)
+		var price: int = int(base_value * 0.8)
+		if price <= 0:
+			continue
+		listings[item_id] = {"count": inv[item_id], "price": price}
+	return listings
+
 func _get_best_upgrade(slot: String) -> String:
 	var equipment: Dictionary = npc._equipment.get_equipment()
 	var current_id: String = equipment.get(slot, "")
@@ -505,7 +634,7 @@ const FALLBACK_TOPICS: Array = [
 	"how the hunting is going", "life in town", "the monsters around here",
 ]
 
-const SOCIAL_GOALS: Array = ["idle", "patrol", "rest"]
+const SOCIAL_GOALS: Array = ["idle", "patrol", "rest", "vend"]
 
 func _try_social_chat() -> bool:
 	if _social_cooldown > 0.0:

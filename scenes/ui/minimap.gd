@@ -85,9 +85,6 @@ func _update_dots() -> void:
 			"loot_drop":
 				color = Color(1.0, 0.9, 0.2)
 				radius = 2.0
-			"shop_npc":
-				color = Color(0.5, 0.8, 1.0)
-				radius = 3.0
 			_:
 				continue
 

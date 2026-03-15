@@ -16,8 +16,8 @@ Available actions:
 - move_to: Move to a location or entity. Target = location_id or entity_id.
 - attack: Attack a monster. Target = monster entity_id. You will approach and auto-attack.
 - use_item: Use an item from inventory. Target = item_type_id (e.g. "healing_potion").
-- buy_item: Buy from a shop. Target = shop_npc_id. Set action_data: {"item_id": "...", "count": 1}
-- sell_item: Sell to a shop. Target = shop_npc_id. Set action_data: {"item_id": "...", "count": 1}
+- buy_item: Buy from a vendor. Target = vendor_id. Set action_data: {"item_id": "...", "count": 1}
+- sell_item: Sell to a vendor. Target = vendor_id. Set action_data: {"item_id": "...", "count": 1}
 - talk_to: Talk to another adventurer or the player. Target = entity_id. Include dialogue.
 - wait: Do nothing for a moment. Rest and observe.
 
@@ -326,6 +326,10 @@ static func get_activity_description(goal: String) -> String:
 			return "resting to recover stamina"
 		"idle":
 			return "resting in the city"
+		"vend":
+			return "running a shop"
+		"buy_from_vendor":
+			return "shopping at a vendor"
 		_:
 			return "exploring the area"
 
@@ -350,10 +354,12 @@ static func _format_perception(perception: Dictionary) -> String:
 	else:
 		lines.append("Adventurers: none nearby")
 
-	# Shop NPCs
-	var shops: Array = perception.get("shop_npcs", [])
-	for s in shops:
-		lines.append("Shop: %s (%s) - %.1fm away [%s]" % [s.name, s.id, s.distance, s.get("shop_type", "")])
+	# Vendors (entities currently running player shops)
+	var vendors: Array = perception.get("vendors", [])
+	for v in vendors:
+		var title: String = v.get("shop_title", "")
+		var title_part: String = (" [%s]" % title) if not title.is_empty() else ""
+		lines.append("Vendor: %s (%s) - %.1fm away%s" % [v.name, v.id, v.distance, title_part])
 
 	# Locations
 	var locations: Array = perception.get("locations", [])

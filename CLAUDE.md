@@ -9,7 +9,7 @@
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
 - **No automated tests**: Verify manually in editor (panels, combat, minimap, world map, chat)
-- **Input**: Left-click move/attack/interact, E interact, Tab inventory, C status, S skills, P proficiencies, M minimap, W world map, 1-5 hotbar, D debug, Esc close panel
+- **Input**: Left-click move/attack/interact, E interact, Tab inventory, C status, S skills, P proficiencies, M minimap, W world map, V vend setup, 1-5 hotbar, D debug, Esc close panel
 
 ## Entity Component System
 Each entity (player, NPC, monster) owns its state via child Node components:
@@ -19,6 +19,7 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 - `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
 - `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
 - `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
+- `VendingComponent` — vending state, listings, buy/sell. **Must set `.name = "VendingComponent"` before `add_child()`**. API: `start_vending()`, `stop_vending()`, `is_vending()`, `get_listings()`, `get_shop_title()`, `buy_from()`
 
 Components sync state back to `WorldState.entity_data` via `_sync()` (bridge layer — keeps perception/memory reads working).
 
@@ -42,7 +43,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills methods back to Wo
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
 - `AutoAttackComponent` — emits `attack_landed(target_id, damage, target_pos)` and `target_lost()` signals; entities connect handlers for visual feedback (damage numbers, flash, shouts)
-- `NpcLoadouts.LOADOUTS` — static Dictionary of NPC starting data (trait, items, equip, gold, goal)
+- `NpcLoadouts.LOADOUTS` — static Dictionary of NPC starting data (trait, items, equip, gold, goal). Merchant NPCs use `default_goal: "vend"` to auto-start vending on spawn
+- Merchant vending: any entity can vend from inventory via VendingComponent — no fixed shop NPCs
+- Vend sign: `_visuals.show_vend_sign()` / `hide_vend_sign()` — StaticBody3D (layer 6) + opaque panel quad + Label3D + white border quad (hover). Click sign to shop, click NPC body for info/chat
+- Vend sign interaction: player raycast detects sign via `"vend_sign"` group, `_hovered_vend_sign` / `_pending_vend_sign_click` flags route to shop panel
 
 ## Proficiency System (RuneScape-style)
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`

@@ -1,8 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/game_world/game_world.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/npc_base.tscn" id="2_npc"]
-[ext_resource type="PackedScene" path="res://scenes/npcs/shop_npc.tscn" id="3_shop"]
 [ext_resource type="Script" path="res://scenes/monsters/monster_spawner.gd" id="4_spawner"]
 [ext_resource type="Script" path="res://scenes/ui/npc_debug_overlay.gd" id="5_debug_overlay"]
 
@@ -99,27 +98,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -1)
 
 [node name="TownInn" type="Marker3D" parent="LocationMarkers"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 8)
-
-; === SHOP NPCs ===
-[node name="ShopNPCs" type="Node3D" parent="."]
-
-[node name="WeaponShopNPC" parent="ShopNPCs" instance=ExtResource("3_shop")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0, 20)
-shop_id = "weapon_shop_npc"
-shop_name = "Weapon Shop"
-shop_type = "weapon"
-npc_color = Color(0.6, 0.3, 0.15, 1)
-model_path = "res://assets/models/characters/Barbarian.glb"
-shop_items = PackedStringArray("basic_sword", "iron_sword", "basic_shield", "iron_shield")
-
-[node name="ItemShopNPC" parent="ShopNPCs" instance=ExtResource("3_shop")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 0, 30)
-shop_id = "item_shop_npc"
-shop_name = "Item Shop"
-shop_type = "item"
-npc_color = Color(0.2, 0.5, 0.2, 1)
-model_path = "res://assets/models/characters/Rogue.glb"
-shop_items = PackedStringArray("healing_potion")
 
 ; === ADVENTURER NPCs ===
 [node name="NPCs" type="Node3D" parent="."]
@@ -221,6 +199,15 @@ npc_name = "Rook"
 personality = "Earnest blacksmith apprentice. Slightly nervous but enthusiastic. Dreams of forging legendary weapons."
 starting_goal = "idle"
 npc_color = Color(0.5, 0.35, 0.2, 1)
+model_path = "res://assets/models/characters/Barbarian.glb"
+
+[node name="Garrick" parent="NPCs" instance=ExtResource("2_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 1, 20)
+npc_id = "garrick"
+npc_name = "Garrick"
+personality = "Gruff but fair weapon merchant. Knows every blade in his stock. Has a soldier's past."
+starting_goal = "vend"
+npc_color = Color(0.6, 0.3, 0.15, 1)
 model_path = "res://assets/models/characters/Barbarian.glb"
 
 ; === MONSTER SPAWNERS ===
