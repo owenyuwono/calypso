@@ -304,6 +304,144 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 	})
 	return {"role": "user", "content": content}
 
+const WORLD_BLOCK: String = "You are an NPC in Arcadia, a medieval fantasy world. The town has shops, a tavern, and surrounding fields with monsters. Technology is medieval — no modern concepts. Magic exists but is rare."
+
+
+static func build_conversation_system_message(npc_node: Node, partner_ids: Array) -> String:
+	# Block 1: World
+	var blocks: Array = [WORLD_BLOCK]
+
+	var identity: Node = npc_node.get_node_or_null("NpcIdentity")
+	var rel_comp: Node = npc_node.get_node_or_null("RelationshipComponent")
+
+	# Block 2: Character
+	if identity:
+		var char_parts: Array = []
+		char_parts.append(identity.get_personality_prompt())
+		var mood_text: String = identity.get_mood_prompt()
+		if not mood_text.is_empty():
+			char_parts.append(mood_text)
+		var tendency_text: String = identity.get_tendency_prompt()
+		if not tendency_text.is_empty():
+			char_parts.append(tendency_text)
+		var desires_text: String = identity.get_desires_prompt()
+		if not desires_text.is_empty():
+			char_parts.append("Desires:\n" + desires_text)
+
+		# Secrets gated by the most restrictive tier across all partners
+		var min_tier: String = "bonded"
+		if rel_comp and not partner_ids.is_empty():
+			for pid in partner_ids:
+				var t: String = rel_comp.get_tier(pid)
+				if RelationshipComponent.TIER_LADDER.find(t) < RelationshipComponent.TIER_LADDER.find(min_tier):
+					min_tier = t
+		else:
+			min_tier = "stranger"
+		var secrets: Array = identity.get_secrets_for_tier(min_tier)
+		if not secrets.is_empty():
+			var secret_lines: Array = []
+			for s in secrets:
+				secret_lines.append("- " + str(s))
+			char_parts.append("Secrets (do not reveal unless pressed):\n" + "\n".join(secret_lines))
+
+		blocks.append("\n".join(char_parts))
+
+	# Block 3: Context — relationships and opinions
+	if rel_comp and not partner_ids.is_empty():
+		var context_parts: Array = []
+		for partner_id in partner_ids:
+			var tier: String = rel_comp.get_tier(partner_id)
+			var impression: String = rel_comp.get_impression(partner_id)
+			var tension: float = rel_comp.get_tension(partner_id)
+			var partner_node = WorldState.get_entity(partner_id)
+			var partner_name: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else partner_id
+			context_parts.append("%s — tier: %s, impression: %s, tension: %.1f" % [partner_name, tier, impression, tension])
+
+			# Include opinions gated by tier
+			if identity:
+				var ops: Array = identity.get_opinions_for("", tier)
+				for op in ops:
+					var opinion_text: String = op.get("take", "")
+					var op_topic: String = op.get("topic", "")
+					if not opinion_text.is_empty():
+						context_parts.append("Opinion on %s: %s" % [op_topic, opinion_text])
+
+		blocks.append("Relationships:\n" + "\n".join(context_parts))
+
+	# Instruction
+	var npc_name: String = ""
+	if identity:
+		npc_name = identity.npc_name
+	elif "npc_name" in npc_node:
+		npc_name = npc_node.npc_name
+	blocks.append("Respond with 1-2 sentences as %s. You may also: stay silent [SILENCE], change topic [TOPIC:new topic], or leave [LEAVE]. Stay in character. No narration. No modern language. Only reference known memories. Can exaggerate, withhold, or lie per tendencies." % npc_name)
+
+	return "\n\n".join(blocks)
+
+
+static func build_conversation_user_message(npc_node: Node, conversation: ConversationState) -> String:
+	var parts: Array = []
+
+	# Conversation history
+	if not conversation.turns.is_empty():
+		var history_lines: Array = []
+		for turn: Dictionary in conversation.turns:
+			var speaker_id: String = turn.get("speaker_id", "")
+			var action: String = turn.get("action", ConversationState.ACTION_SPEAK)
+			var text: String = turn.get("text", "")
+
+			var speaker_node = WorldState.get_entity(speaker_id)
+			var speaker_name: String = speaker_node.npc_name if speaker_node and "npc_name" in speaker_node else speaker_id
+
+			match action:
+				ConversationState.ACTION_SILENCE:
+					history_lines.append("%s: [silence]" % speaker_name)
+				ConversationState.ACTION_WALK_AWAY:
+					history_lines.append("%s: [left]" % speaker_name)
+				ConversationState.ACTION_TOPIC_CHANGE:
+					var new_topic: String = turn.get("topic", "")
+					if not new_topic.is_empty():
+						history_lines.append("%s: [changed topic to: %s]" % [speaker_name, new_topic])
+					else:
+						history_lines.append("%s: [changed topic]" % speaker_name)
+				ConversationState.ACTION_JOIN:
+					history_lines.append("%s: [joined conversation]" % speaker_name)
+				_:
+					# speak or unknown — show text
+					if not text.is_empty():
+						history_lines.append("%s: %s" % [speaker_name, text])
+		parts.append("Conversation so far:\n" + "\n".join(history_lines))
+
+	# Recent memories
+	var memory_node: Node = npc_node.get_node_or_null("NPCMemory")
+	if memory_node:
+		var mem_text: String = memory_node.get_memories_for_prompt(5)
+		if not mem_text.is_empty():
+			parts.append("Recent memories:\n" + mem_text)
+
+	# Current opinions on conversation topic
+	var identity: Node = npc_node.get_node_or_null("NpcIdentity")
+	var rel_comp: Node = npc_node.get_node_or_null("RelationshipComponent")
+	if identity and not conversation.topic.is_empty():
+		var tier: String = "stranger"
+		if rel_comp and not conversation.participant_ids.is_empty():
+			for pid in conversation.participant_ids:
+				if pid != npc_node.get("entity_id"):
+					tier = rel_comp.get_tier(pid)
+					break
+		var topic_opinions: Array = identity.get_opinions_for(conversation.topic, tier)
+		if not topic_opinions.is_empty():
+			var op_lines: Array = []
+			for op in topic_opinions:
+				var op_text: String = op.get("take", "")
+				if not op_text.is_empty():
+					op_lines.append("- " + op_text)
+			if not op_lines.is_empty():
+				parts.append("Your opinions on \"%s\":\n" % conversation.topic + "\n".join(op_lines))
+
+	return "\n\n".join(parts)
+
+
 static func get_activity_description(goal: String) -> String:
 	match goal:
 		"hunt_field":

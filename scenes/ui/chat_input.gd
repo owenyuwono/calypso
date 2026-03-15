@@ -60,7 +60,19 @@ func is_open() -> bool:
 func _on_text_submitted(text: String) -> void:
 	var trimmed := text.strip_edges()
 	if not trimmed.is_empty():
-		message_sent.emit(trimmed)
+		# If the player is in an active conversation, route into it
+		var handled_by_conversation: bool = false
+		var conv_manager: Node = get_tree().get_first_node_in_group("conversation_manager")
+		if conv_manager:
+			var player_conv_id: String = conv_manager.entity_to_conversation.get("player", "")
+			if not player_conv_id.is_empty():
+				var turn: Dictionary = ConversationState.make_turn(
+					"player", trimmed, ConversationState.ACTION_SPEAK, Time.get_unix_time_from_system()
+				)
+				conv_manager.add_turn(player_conv_id, turn)
+				handled_by_conversation = true
+		if not handled_by_conversation:
+			message_sent.emit(trimmed)
 	close()
 
 func _unhandled_input(event: InputEvent) -> void:

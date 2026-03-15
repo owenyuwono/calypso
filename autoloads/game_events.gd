@@ -36,3 +36,23 @@ signal game_hour_changed(hour: int)
 
 # Stamina
 signal stamina_changed(entity_id: String, stamina: float, max_stamina: float)
+
+# Identity / Mood
+signal mood_changed(entity_id: String, emotion: String, energy: String)
+
+# Memory
+signal memory_added(entity_id: String, fact: String, importance: String)
+
+# Relationships
+signal relationship_tier_changed(entity_id: String, partner_id: String, old_tier: String, new_tier: String)
+
+# Conversation lifecycle
+signal conversation_started(conversation_id: String, participant_ids: Array)
+signal conversation_ended(conversation_id: String)
+signal conversation_participant_joined(conversation_id: String, entity_id: String)
+signal conversation_participant_left(conversation_id: String, entity_id: String)
+signal conversation_turn_added(conversation_id: String, speaker_id: String, dialogue: String, action: String)
+
+# Information / Opinion
+signal fact_learned(entity_id: String, fact_content: String, source: String)
+signal opinion_formed(entity_id: String, topic: String, stance: String)

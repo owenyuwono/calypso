@@ -8,7 +8,8 @@ const LLM_TEMPERATURE: float = 0.7
 const MAX_CONCURRENT_REQUESTS: int = 2
 
 var _active_requests: int = 0
-var _request_queue: Array = []  # Array of {id, body, callback}
+var _sequence: int = 0  # Monotonic counter for FIFO ordering within same priority tier
+var _request_queue: Array = []  # Array of {id, body, priority, seq}
 var _http_pool: Array = []  # Reusable HTTPRequest nodes
 
 signal request_completed(request_id: String, response: Dictionary)
@@ -33,7 +34,14 @@ func get_active_request_count() -> int:
 
 ## Send a chat completion request to Ollama.
 ## Returns a request_id. Listen to request_completed/request_failed signals.
-func send_chat(request_id: String, messages: Array, format: Dictionary = {}) -> String:
+##
+## Priority levels (lower = dispatched first):
+##   1 — player-involved conversations (req_id prefix: conv_player_)
+##   2 — NPC-to-NPC conversations      (req_id prefix: conv_)
+##   3 — NPC decision-making           (default)
+##   4 — memory extraction             (req_id prefix: extract_)
+##   5 — background tasks              (req_id prefix: fuzzy_, opinion_, impression_)
+func send_chat(request_id: String, messages: Array, format: Dictionary = {}, priority: int = 3) -> String:
 	var body := {
 		"model": OLLAMA_MODEL,
 		"messages": messages,
@@ -46,15 +54,27 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}) -> 
 	if not format.is_empty():
 		body["format"] = format
 
+	_sequence += 1
 	_request_queue.append({
 		"id": request_id,
 		"body": body,
+		"priority": priority,
+		"seq": _sequence,
 	})
 	return request_id
 
 func _process_queue() -> void:
 	if _request_queue.is_empty():
 		return
+
+	# Sort by priority ascending (1 = highest), then by seq ascending (lower = earlier).
+	# Godot's sort_custom uses introsort (not stable), so seq is required to
+	# preserve FIFO order within the same priority tier.
+	_request_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a.priority != b.priority:
+			return a.priority < b.priority
+		return a.seq < b.seq
+	)
 
 	for pool_entry in _http_pool:
 		if pool_entry.busy:

@@ -8,7 +8,7 @@ const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const VALID_GOALS: Array = [
 	"hunt_field", "buy_potions", "sell_loot",
 	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest",
-	"vend", "buy_from_vendor"
+	"vend", "buy_from_vendor", "tend_shop"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -89,7 +89,16 @@ func evaluate() -> void:
 			npc.last_thought = "It's getting dark, better head back"
 			_do_action("move_to", "TownSquare")
 			return
-	# Priority 2.5: Social chat with nearby NPCs
+	# Priority 2.5: Schedule override for routine NPCs
+	var identity = npc.get_node_or_null("NpcIdentity")
+	if identity and identity.schedule_type == "routine":
+		var sched_goal: Dictionary = identity.resolve_schedule_goal(int(TimeManager.get_game_hour()))
+		if not sched_goal.is_empty() and sched_goal.get("goal", "") != npc.current_goal:
+			npc.set_goal(sched_goal["goal"])
+			npc.last_thought = "Following my routine"
+			_do_action("move_to", sched_goal.get("location", ""))
+			return
+	# Priority 2.6: Social chat with nearby NPCs
 	if _social.try_social_chat():
 		return
 	# Priority 3: Execute current goal
@@ -234,6 +243,8 @@ func _execute_goal() -> void:
 			_execute_vend()
 		"buy_from_vendor":
 			_execute_buy_from_vendor()
+		"tend_shop":
+			_execute_tend_shop()
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
@@ -376,13 +387,34 @@ func _execute_buy_from_vendor() -> void:
 		npc.last_thought = "Going to %s to buy %s" % [vendor_id, target_item]
 		_do_action("move_to", vendor_id)
 
+var _follow_timer: float = 0.0
+const FOLLOW_TIMEOUT: float = 120.0  # Stop following after 2 minutes
+const FOLLOW_MAX_DISTANCE: float = 30.0  # Stop if player gets too far
+
 func _execute_follow_player() -> void:
 	var player_node := WorldState.get_entity("player")
 	if not player_node:
 		npc.set_goal(default_goal)
+		_follow_timer = 0.0
+		return
+
+	# Timeout — stop following after FOLLOW_TIMEOUT seconds
+	_follow_timer += TICK_INTERVAL
+	if _follow_timer >= FOLLOW_TIMEOUT:
+		npc.set_goal(default_goal)
+		npc.last_thought = "I should get back to my own business"
+		_follow_timer = 0.0
 		return
 
 	var dist := npc.global_position.distance_to(player_node.global_position)
+
+	# Too far — give up following
+	if dist > FOLLOW_MAX_DISTANCE:
+		npc.set_goal(default_goal)
+		npc.last_thought = "Lost sight of the player"
+		_follow_timer = 0.0
+		return
+
 	if dist > 5.0:
 		_do_action("move_to", "player")
 		return
@@ -447,6 +479,24 @@ func _execute_patrol() -> void:
 		spot = PATROL_SPOTS[_patrol_index]
 	npc.last_thought = "Patrolling to %s" % spot
 	_do_action("move_to", spot)
+
+func _execute_tend_shop() -> void:
+	var identity: Node = npc.get_node_or_null("NpcIdentity")
+	if not identity:
+		_do_action("wait", "")
+		return
+
+	var current_hour: int = int(TimeManager.get_game_hour())
+	var sched_goal: Dictionary = identity.resolve_schedule_goal(current_hour)
+	var shop_location: String = sched_goal.get("location", "")
+
+	if shop_location.is_empty() or _is_near_location(shop_location, 3.0):
+		npc.last_thought = "Tending my shop"
+		_do_action("wait", "")
+	else:
+		npc.last_thought = "Heading to shop"
+		_do_action("move_to", shop_location)
+
 
 func _execute_idle() -> void:
 	if _idle_drift_timer < IDLE_DRIFT_INTERVAL:

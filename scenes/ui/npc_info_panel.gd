@@ -174,35 +174,34 @@ func _refresh() -> void:
 		for item_id in inv_items:
 			text += "  %s x%d\n" % [ItemDatabase.get_item_name(item_id), inv_items[item_id]]
 
-	# Key Memories
+	# Memories
 	var memory_node = node.get_node_or_null("NPCMemory")
 	if memory_node:
-		if not memory_node.key_memories.is_empty():
-			text += "\n[color=#ffdd88][b]Key Memories[/b][/color]\n"
-			for km in memory_node.key_memories:
-				var type_color := _memory_type_color(km["type"])
-				text += "  [color=%s]%s[/color]\n" % [type_color, km["text"]]
+		var mem_text: String = memory_node.get_memories_for_prompt(5)
+		if not mem_text.is_empty():
+			text += "\n[color=#ffdd88][b]Memories[/b][/color]\n"
+			for line in mem_text.split("\n"):
+				if not line.strip_edges().is_empty():
+					text += "  [color=#aaa]%s[/color]\n" % line.strip_edges()
 
 		# Relationships
-		if not memory_node.relationships.is_empty():
-			text += "\n[color=#ffdd88][b]Relationships[/b][/color]\n"
-			var sorted_ids: Array = memory_node.relationships.keys()
-			sorted_ids.sort_custom(func(a, b): return memory_node.relationships[b]["affinity"] < memory_node.relationships[a]["affinity"])
-			for partner_id in sorted_ids:
-				var rel: Dictionary = memory_node.relationships[partner_id]
-				var partner_node = WorldState.get_entity(partner_id)
-				var partner_name: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else partner_id
-				var label: String = memory_node.get_relationship_label(partner_id)
-				var label_color := _relationship_color(label)
-				text += "  %s: [color=%s]%s[/color]" % [partner_name, label_color, label]
-				var details: Array = []
-				if rel["shared_combat"] > 0:
-					details.append("%d fights" % rel["shared_combat"])
-				if rel["conversations"] > 0:
-					details.append("%d chats" % rel["conversations"])
-				if not details.is_empty():
-					text += " [color=#888](%s)[/color]" % ", ".join(details)
-				text += "\n"
+		var rel_comp_panel = node.get_node_or_null("RelationshipComponent")
+		if rel_comp_panel:
+			var rel_summary: Dictionary = rel_comp_panel.get_relationships_summary()
+			if not rel_summary.is_empty():
+				text += "\n[color=#ffdd88][b]Relationships[/b][/color]\n"
+				var sorted_ids: Array = rel_summary.keys()
+				sorted_ids.sort_custom(func(a, b): return RelationshipComponent.TIER_LADDER.find(rel_summary[b].get("tier", "stranger")) > RelationshipComponent.TIER_LADDER.find(rel_summary[a].get("tier", "stranger")))
+				for partner_id in sorted_ids:
+					var partner_node = WorldState.get_entity(partner_id)
+					var partner_name: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else partner_id
+					var label: String = rel_comp_panel.get_tier(partner_id)
+					var label_color := _relationship_color(label)
+					text += "  %s: [color=%s]%s[/color]" % [partner_name, label_color, label]
+					var impression: String = rel_comp_panel.get_impression(partner_id)
+					if impression != "No impression":
+						text += " [color=#888][i]%s[/i][/color]" % impression
+					text += "\n"
 
 		# Recent observations
 		var obs: Array = memory_node.get_recent_observations(3)
@@ -239,32 +238,25 @@ func _state_color(state: String) -> String:
 		"dead": return "#880000"
 	return "#ffffff"
 
-func _memory_type_color(type: String) -> String:
-	match type:
-		"first_kill": return "#ffaa44"
-		"death": return "#ff4444"
-		"level_up": return "#44ff44"
-		"notable_conversation": return "#44aaff"
-		"big_purchase": return "#ffdd44"
-	return "#cccccc"
-
 func _relationship_color(label: String) -> String:
 	match label:
-		"close friend": return "#44ff44"
-		"friend": return "#88dd88"
-		"acquaintance": return "#aaaaaa"
 		"stranger": return "#888888"
-		"wary": return "#ffaa44"
-		"distrustful": return "#ff4444"
+		"recognized": return "#bbbbbb"
+		"acquaintance": return "#ffdd66"
+		"friendly": return "#66cc66"
+		"close": return "#6688ff"
+		"bonded": return "#cc66ff"
 	return "#cccccc"
 
 func _mood_color(mood: String) -> String:
 	match mood:
-		"pumped": return "#ff6644"
-		"thoughtful": return "#88aacc"
-		"irritated": return "#cc6644"
-		"relaxed": return "#77bb77"
-		"curious": return "#ccaa44"
-		"cocky": return "#ee8833"
+		"content": return "#66cc66"
+		"excited": return "#ffdd44"
+		"worried": return "#ff9933"
+		"angry": return "#ff4444"
+		"sad": return "#6688ff"
+		"afraid": return "#cc66ff"
 		"tired": return "#888899"
+		"normal": return "#ffffff"
+		"energetic": return "#ffdd44"
 	return "#aaaaaa"

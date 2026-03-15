@@ -24,11 +24,12 @@ const FALLBACK_TOPICS: Array = [
 	"how the hunting is going", "life in town", "the monsters around here",
 ]
 
-const SOCIAL_GOALS: Array = ["idle", "patrol", "rest", "vend"]
+const SOCIAL_GOALS: Array = ["idle", "patrol", "rest", "vend", "tend_shop"]
 
 var _npc: CharacterBody3D
 var _brain: Node
 var _memory: Node
+var _rel_comp: Node  # RelationshipComponent, duck-typed
 
 var _social_cooldown: float = 0.0
 
@@ -36,6 +37,7 @@ func setup(npc: CharacterBody3D, brain: Node, memory: Node) -> void:
 	_npc = npc
 	_brain = brain
 	_memory = memory
+	_rel_comp = npc.get_node_or_null("RelationshipComponent")
 	_social_cooldown = randf_range(10.0, 20.0)
 
 func _process(delta: float) -> void:
@@ -55,7 +57,7 @@ func try_social_chat() -> bool:
 	var perception := WorldState.get_npc_perception(_npc.npc_id, SOCIAL_PROXIMITY)
 	var npcs: Array = perception.get("npcs", [])
 
-	# Build candidate list and sort by affinity (highest first)
+	# Build candidate list and sort by tier (highest first)
 	var candidates: Array = []
 	for n in npcs:
 		var nid: String = n["id"]
@@ -68,11 +70,16 @@ func try_social_chat() -> bool:
 			continue
 		if not _memory.can_continue_conversation(nid):
 			continue
-		var affinity: float = _memory.get_relationship(nid)["affinity"]
-		candidates.append({"id": nid, "affinity": affinity})
+		var tier_index: int = 0
+		if _rel_comp:
+			var tier: String = _rel_comp.get_tier(nid)
+			tier_index = RelationshipComponent.TIER_LADDER.find(tier)
+			if tier_index == -1:
+				tier_index = 0
+		candidates.append({"id": nid, "tier_index": tier_index})
 
-	# Sort by affinity descending — prefer friends
-	candidates.sort_custom(func(a, b): return a["affinity"] > b["affinity"])
+	# Sort by tier_index descending — prefer closer relationships
+	candidates.sort_custom(func(a, b): return a["tier_index"] > b["tier_index"])
 
 	for c in candidates:
 		var facts: Array = _memory.gather_chat_facts(c["id"])

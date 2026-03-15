@@ -11,6 +11,8 @@ const COLOR_COMBAT := Color("ff8866")
 const COLOR_LOOT := Color("ffdd44")
 const COLOR_GOLD := Color("ffcc33")
 const COLOR_SYSTEM := Color("66ddff")
+const COLOR_CONVERSATION_PLAYER := Color("aaddff")
+const COLOR_CONVERSATION_NPC := Color("bbffcc")
 
 var _rich_label: RichTextLabel
 var _message_count: int = 0
@@ -60,6 +62,7 @@ func _ready() -> void:
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.item_looted.connect(_on_item_looted)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
+	GameEvents.conversation_turn_added.connect(_on_conversation_turn_added)
 
 func _process(delta: float) -> void:
 	# Flush expired hit batches
@@ -153,3 +156,17 @@ func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: in
 	var skill_name: String = skill_data.get("name", skill_id)
 	var name := _get_entity_name(entity_id)
 	_add_message("%s reached %s Level %d!" % [name, skill_name, new_level], COLOR_SYSTEM)
+
+func _on_conversation_turn_added(_conversation_id: String, speaker_id: String, dialogue: String, action: String) -> void:
+	# Only display "speak" actions; skip join/walk_away/silence meta-turns
+	if action != ConversationState.ACTION_SPEAK:
+		return
+	if dialogue.is_empty():
+		return
+	var speaker := _get_entity_name(speaker_id)
+	var color: Color
+	if speaker_id == "player":
+		color = COLOR_CONVERSATION_PLAYER
+	else:
+		color = COLOR_CONVERSATION_NPC
+	_add_message("[%s]: %s" % [speaker, dialogue], color)

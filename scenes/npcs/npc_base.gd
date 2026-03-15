@@ -10,10 +10,13 @@ const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
+const NpcIdentity = preload("res://scripts/components/npc_identity.gd")
+const RelationshipComponent = preload("res://scripts/components/relationship_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
+const NpcIdentityDatabase = preload("res://scripts/data/npc_identity_database.gd")
 
 @export var npc_id: String = ""
 @export var npc_name: String = ""
@@ -149,6 +152,23 @@ func _ready() -> void:
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
+
+	var identity := NpcIdentity.new()
+	identity.name = "NpcIdentity"
+	add_child(identity)
+	var id_data: Dictionary = NpcIdentityDatabase.get_identity(npc_id)
+	if not id_data.is_empty():
+		identity.setup(id_data)
+		# Shop NPCs register as "shop_npc" type so player.gd can open the shop panel
+		var shop_type: String = id_data.get("shop_type", "")
+		if not shop_type.is_empty():
+			WorldState.set_entity_data(npc_id, "type", "shop_npc")
+			WorldState.set_entity_data(npc_id, "shop_type", shop_type)
+			WorldState.set_entity_data(npc_id, "shop_items", id_data.get("shop_items", []).duplicate())
+
+	var rel := RelationshipComponent.new()
+	rel.name = "RelationshipComponent"
+	add_child(rel)
 
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
@@ -356,9 +376,9 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		var memory_node = get_node_or_null("NPCMemory")
 		if memory_node:
 			var target_name: String = WorldState.get_entity_data(combat_target).get("name", combat_target)
-			memory_node.add_observation("Killed %s in combat" % combat_target)
-			if memory_node.has_method("add_key_memory") and not memory_node.has_key_memory_type("first_kill"):
-				memory_node.add_key_memory("first_kill", "First kill: defeated a %s" % target_name)
+			memory_node.add_memory("Killed %s in combat" % combat_target, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_LOW)
+			if not memory_node.has_key_memory_type("first_kill"):
+				memory_node.add_memory("First kill: defeated a %s" % target_name, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_HIGH, false, "first_kill")
 		combat_target = ""
 		_auto_attack.cancel()
 		change_state(STATE_IDLE)
@@ -377,9 +397,7 @@ func _die() -> void:
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
-		memory_node.add_observation("I died! Lost %d gold." % lost)
-		if memory_node.has_method("add_key_memory"):
-			memory_node.add_key_memory("death", "Died and lost %d gold" % lost)
+		memory_node.add_memory("Died and lost %d gold" % lost, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_HIGH, false, "death")
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")
@@ -412,7 +430,7 @@ func _respawn() -> void:
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
-		memory_node.add_observation("Respawned in town after dying")
+		memory_node.add_memory("Respawned in town after dying", memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_LOW)
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
