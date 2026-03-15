@@ -114,8 +114,8 @@ func process_skill_hit(delta: float, attack_range: float) -> bool:
 		var nav_agent: Node = _player.nav_agent
 		nav_agent.target_position = target_node.global_position
 		if not nav_agent.is_navigation_finished():
-			var next_pos := nav_agent.get_next_path_position()
-			var dir := (next_pos - _player.global_position)
+			var next_pos: Vector3 = nav_agent.get_next_path_position()
+			var dir: Vector3 = (next_pos - _player.global_position)
 			dir.y = 0.0
 			if dir.length_squared() > 0.01:
 				dir = dir.normalized()

@@ -50,7 +50,7 @@ var _combat: Node
 var _auto_attack: Node
 
 func _ready() -> void:
-	spawn_point = global_position
+	call_deferred("_capture_spawn_point")
 	var stats := MonsterDatabase.get_monster(monster_type)
 	if stats.is_empty():
 		push_warning("MonsterBase: Unknown monster type '%s'" % monster_type)
@@ -215,6 +215,9 @@ func _physics_process(delta: float) -> void:
 		_visuals.play_anim("Walking_A")
 	else:
 		_visuals.play_anim("Idle")
+
+func _capture_spawn_point() -> void:
+	spawn_point = global_position
 
 func _process_idle(delta: float) -> void:
 	_wander_timer -= delta

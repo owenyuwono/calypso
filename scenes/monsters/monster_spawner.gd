@@ -28,5 +28,5 @@ func _spawn_one() -> void:
 		0,
 		randf_range(-spawn_radius, spawn_radius)
 	)
-	monster.position = global_position + offset + Vector3(0, 1, 0)
+	monster.position = offset + Vector3(0, 1, 0)
 	add_child(monster)
