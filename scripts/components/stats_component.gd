@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Component that owns combat stats for an entity.
 ## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
 

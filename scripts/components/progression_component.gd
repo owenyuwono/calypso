@@ -1,7 +1,8 @@
-extends Node
+extends BaseComponent
 ## Component that owns proficiency state and XP/level-up logic for an entity.
 
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
+const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 
 var _stats: Node  # StatsComponent ref
 var _proficiencies: Dictionary = {}  # skill_id -> {level: int, xp: int}
@@ -17,6 +18,12 @@ func setup(stats_component: Node, initial_proficiencies: Dictionary = {}) -> voi
 			if _proficiencies.has(skill_id):
 				_proficiencies[skill_id]["level"] = initial_proficiencies[skill_id]
 	_recalculate_stats()
+
+func grant_combat_xp(monster_type: String, weapon_type: String) -> void:
+	## Grant weapon proficiency XP based on monster type killed.
+	var monster_stats: Dictionary = MonsterDatabase.get_monster(monster_type)
+	var prof_xp: int = monster_stats.get("proficiency_xp", 3)
+	grant_proficiency_xp(weapon_type, prof_xp)
 
 func grant_proficiency_xp(skill_id: String, amount: int) -> void:
 	if not _proficiencies.has(skill_id):
@@ -104,12 +111,6 @@ func _get_active_weapon_proficiency_level() -> int:
 			return get_proficiency_level(weapon_type)
 	# Unarmed defaults to mace
 	return get_proficiency_level("mace")
-
-func _get_entity_id() -> String:
-	var parent := get_parent()
-	if parent and "entity_id" in parent:
-		return parent.entity_id
-	return ""
 
 func _sync() -> void:
 	var entity_id := _get_entity_id()

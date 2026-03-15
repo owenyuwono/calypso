@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Reusable auto-attack loop component shared by player, NPC, and monster.
 ## Handles: target validation, range check, chase navigation, animation-synced
 ## pending hit, attack timer, and damage dealing.

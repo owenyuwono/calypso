@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Self-managing stamina component. Add as child to player or NPC.
 ## Drains during combat/movement, regenerates at rest spots when idle.
 

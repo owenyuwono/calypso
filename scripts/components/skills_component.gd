@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Component that owns skill state for an entity.
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")

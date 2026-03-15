@@ -717,9 +717,7 @@ func _die() -> void:
 	_cursor_manager.reset()
 
 	# Lose 10% gold
-	var gold: int = _inventory.get_gold_amount()
-	var lost := int(gold * DEATH_GOLD_PENALTY_RATIO)
-	_inventory.remove_gold_amount(lost)
+	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")
@@ -843,10 +841,8 @@ func _execute_skill_hit() -> void:
 	var target_data := WorldState.get_entity_data(_attack_target)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
-		var monster_stats := MonsterDatabase.get_monster(monster_type)
-		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
 		var weapon_type: String = _combat.get_equipped_weapon_type()
-		_progression.grant_proficiency_xp(weapon_type, prof_xp)
+		_progression.grant_combat_xp(monster_type, weapon_type)
 	_pending_skill_damage = 0
 	_pending_skill_id = ""
 
@@ -857,10 +853,8 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 	var target_data := WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
-		var monster_stats := MonsterDatabase.get_monster(monster_type)
-		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
 		var weapon_type: String = _combat.get_equipped_weapon_type()
-		_progression.grant_proficiency_xp(weapon_type, prof_xp)
+		_progression.grant_combat_xp(monster_type, weapon_type)
 
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()

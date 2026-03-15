@@ -282,10 +282,8 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 	var target_data := WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
-		var monster_stats := MonsterDatabase.get_monster(monster_type)
-		var prof_xp: int = monster_stats.get("proficiency_xp", 3)
 		var weapon_type: String = _combat.get_equipped_weapon_type()
-		_progression.grant_proficiency_xp(weapon_type, prof_xp)
+		_progression.grant_combat_xp(monster_type, weapon_type)
 	# Occasionally say something in combat
 	if randf() < 0.15:
 		var shouts := ["Take that!", "Ha!", "Got you!", "Come on!", "Not bad!"]
@@ -374,9 +372,7 @@ func _die() -> void:
 	velocity = Vector3.ZERO
 
 	# Lose 10% gold
-	var gold: int = _inventory.get_gold_amount()
-	var lost := int(gold * DEATH_GOLD_PENALTY_RATIO)
-	_inventory.remove_gold_amount(lost)
+	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:

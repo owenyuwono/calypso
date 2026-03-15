@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Component that owns combat logic for an entity.
 ## Depends on: StatsComponent (hp, atk, def), EquipmentComponent (atk/def bonuses, optional).
 
@@ -110,12 +110,6 @@ func heal(amount: int) -> int:
 		if not eid.is_empty():
 			GameEvents.entity_healed.emit(eid, healed, _stats.hp)
 	return healed
-
-func _get_entity_id() -> String:
-	var parent := get_parent()
-	if parent and "entity_id" in parent:
-		return parent.entity_id
-	return ""
 
 func _apply_damage_to(target_id: String, damage: int) -> void:
 	var target_entity = WorldState.get_entity(target_id)

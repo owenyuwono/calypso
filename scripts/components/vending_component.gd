@@ -1,4 +1,4 @@
-extends Node
+extends BaseComponent
 ## Component that owns vending state for an entity (player-run shop).
 ## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
 
@@ -80,12 +80,6 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 		stop_vending()
 
 	return true
-
-func _get_entity_id() -> String:
-	var parent := get_parent()
-	if not parent:
-		return ""
-	return WorldState.get_entity_id_for_node(parent)
 
 func _sync() -> void:
 	var eid: String = _get_entity_id()
