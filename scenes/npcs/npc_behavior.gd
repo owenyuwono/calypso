@@ -20,24 +20,19 @@ const IDLE_DRIFT_CHANCE: float = 0.6
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
 const PATROL_SPOTS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
 
+const POTION_STOCK_TARGET: int = 3
+const POTION_RESTOCK_THRESHOLD: int = 2
+const POTION_BUY_GOLD_MIN: int = 40
+
 var default_goal: String = "idle"
 
 var npc: CharacterBody3D
 var memory: Node
 var executor: Node
 var brain: Node
+var _social: Node  # NpcSocial child node
 
 var _behavior_timer: float = 0.0
-var _social_cooldown: float = 0.0
-const SOCIAL_COOLDOWN_MIN: float = 15.0
-const SOCIAL_COOLDOWN_MAX: float = 45.0
-const SOCIAL_PROXIMITY: float = 12.0
-
-const VEND_PRICE_RATIO: float = 0.8
-const VENDOR_SEARCH_RADIUS: float = 200.0
-const POTION_STOCK_TARGET: int = 3
-const POTION_RESTOCK_THRESHOLD: int = 2
-const POTION_BUY_GOLD_MIN: int = 40
 var _action_in_progress: bool = false
 var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
@@ -48,12 +43,15 @@ func _ready() -> void:
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 	brain = npc.get_node("NPCBrain")
-	_social_cooldown = randf_range(10.0, 20.0)
+
+	_social = preload("res://scenes/npcs/npc_social.gd").new()
+	_social.name = "NpcSocial"
+	add_child(_social)
+	_social.setup(npc, brain, memory)
+
 	GameEvents.npc_action_completed.connect(_on_action_completed)
 
 func _process(delta: float) -> void:
-	if _social_cooldown > 0.0:
-		_social_cooldown -= delta
 	_idle_drift_timer += delta
 	if _action_in_progress:
 		return
@@ -87,7 +85,7 @@ func evaluate() -> void:
 			_do_action("move_to", "TownSquare")
 			return
 	# Priority 2.5: Social chat with nearby NPCs
-	if _try_social_chat():
+	if _social.try_social_chat():
 		return
 	# Priority 3: Execute current goal
 	_execute_goal()
@@ -101,7 +99,6 @@ func _check_survival() -> bool:
 	var max_hp: int = npc._stats.max_hp
 	var hp_pct: float = float(hp) / float(max_hp)
 	var potion_count: int = npc._inventory.get_item_count("healing_potion")
-	var gold: int = npc._inventory.gold
 
 	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
 	var potion_threshold: float = 0.45 - (boldness * 0.25)  # bold: 0.20, cautious: 0.45
@@ -145,13 +142,13 @@ func _check_goal_completion() -> bool:
 				npc.set_goal(default_goal)
 				return true
 		"sell_loot":
-			if _get_first_material().is_empty():
+			if NpcTradeHelper.get_first_material(npc._inventory).is_empty():
 				# Check for weapon/armor upgrade opportunity
-				var upgrade := _get_best_upgrade("weapon")
+				var upgrade := NpcTradeHelper.get_best_upgrade("weapon", npc._equipment, npc._inventory)
 				if not upgrade.is_empty():
 					npc.set_goal("buy_weapon")
 					return true
-				upgrade = _get_best_upgrade("armor")
+				upgrade = NpcTradeHelper.get_best_upgrade("armor", npc._equipment, npc._inventory)
 				if not upgrade.is_empty():
 					npc.set_goal("buy_armor")
 					return true
@@ -175,8 +172,7 @@ func _check_goal_completion() -> bool:
 				var hp: int = npc._stats.hp
 				var max_hp: int = npc._stats.max_hp
 				if float(hp) / float(max_hp) >= 0.7:
-					var potion_count: int = npc._inventory.get_item_count("healing_potion")
-					if potion_count < POTION_RESTOCK_THRESHOLD and npc._inventory.gold >= POTION_BUY_GOLD_MIN:
+					if _should_restock_potions() and _can_afford_potions():
 						npc.set_goal("buy_potions")
 					else:
 						npc.set_goal(default_goal)
@@ -187,8 +183,7 @@ func _check_goal_completion() -> bool:
 				npc.set_goal("sell_loot")
 				return true
 			# Restock potions if out and can afford
-			var potion_count: int = npc._inventory.get_item_count("healing_potion")
-			if potion_count == 0 and npc._inventory.gold >= POTION_BUY_GOLD_MIN:
+			if npc._inventory.get_item_count("healing_potion") == 0 and _can_afford_potions():
 				npc.set_goal("buy_potions")
 				return true
 		"vend":
@@ -272,7 +267,7 @@ func _execute_hunt() -> void:
 		_do_action("move_to", zone_center)
 
 func _execute_buy_potions() -> void:
-	var vendor_id := _find_vendor("healing_potion")
+	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, "healing_potion")
 	if vendor_id.is_empty():
 		npc.last_thought = "No vendor selling potions nearby"
 		_do_action("wait", "")
@@ -284,14 +279,14 @@ func _execute_buy_potions() -> void:
 		_do_action("move_to", vendor_id)
 
 func _execute_sell_loot() -> void:
-	var material_id := _get_first_material()
+	var material_id := NpcTradeHelper.get_first_material(npc._inventory)
 	if material_id.is_empty():
 		# Nothing to sell, transition handled by _check_goal_completion
 		npc.set_goal(default_goal)
 		return
 
 	# Sell to any vending NPC (they accept gold in return for items)
-	var vendor_id := _find_vendor()
+	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position)
 	if vendor_id.is_empty():
 		npc.last_thought = "No vendor to sell loot to"
 		_do_action("wait", "")
@@ -304,12 +299,12 @@ func _execute_sell_loot() -> void:
 		_do_action("move_to", vendor_id)
 
 func _execute_buy_equipment(slot: String) -> void:
-	var upgrade_id := _get_best_upgrade(slot)
+	var upgrade_id := NpcTradeHelper.get_best_upgrade(slot, npc._equipment, npc._inventory)
 	if upgrade_id.is_empty():
 		npc.set_goal(default_goal)
 		return
 
-	var vendor_id := _find_vendor(upgrade_id)
+	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, upgrade_id)
 	if vendor_id.is_empty():
 		npc.last_thought = "No vendor selling %s upgrade" % slot
 		npc.set_goal(default_goal)
@@ -333,7 +328,7 @@ func _execute_vend() -> void:
 		_do_action("wait", "")
 		return
 	# Build listings from non-equipped inventory items at 80% of base value
-	var listings := _build_vend_listings()
+	var listings := NpcTradeHelper.build_vend_listings(npc._inventory, npc._equipment)
 	if listings.is_empty():
 		npc.last_thought = "Nothing to sell"
 		_do_action("wait", "")
@@ -352,8 +347,8 @@ func _execute_buy_from_vendor() -> void:
 	if potion_count < 2 and gold >= 20:
 		target_item = "healing_potion"
 	else:
-		var upgrade_w := _get_best_upgrade("weapon")
-		var upgrade_a := _get_best_upgrade("armor")
+		var upgrade_w := NpcTradeHelper.get_best_upgrade("weapon", npc._equipment, npc._inventory)
+		var upgrade_a := NpcTradeHelper.get_best_upgrade("armor", npc._equipment, npc._inventory)
 		if not upgrade_w.is_empty():
 			target_item = upgrade_w
 		elif not upgrade_a.is_empty():
@@ -363,7 +358,7 @@ func _execute_buy_from_vendor() -> void:
 		npc.set_goal(default_goal)
 		return
 
-	var vendor_id := _find_vendor(target_item)
+	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, target_item)
 	if vendor_id.is_empty():
 		npc.last_thought = "No vendor selling %s" % target_item
 		npc.set_goal(default_goal)
@@ -534,14 +529,6 @@ func _is_near_entity(entity_id: String, range: float) -> bool:
 		return false
 	return npc.global_position.distance_to(entity_node.global_position) < range
 
-func _get_first_material() -> String:
-	var inv: Dictionary = npc._inventory.get_items()
-	for item_id in inv:
-		var item := ItemDatabase.get_item(item_id)
-		if item.get("type", "") == "material":
-			return item_id
-	return ""
-
 func _get_total_material_count() -> int:
 	var inv: Dictionary = npc._inventory.get_items()
 	var total := 0
@@ -551,191 +538,8 @@ func _get_total_material_count() -> int:
 			total += inv[item_id]
 	return total
 
-## Returns the entity ID of the nearest vending NPC.
-## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
-func _find_vendor(item_id: String = "") -> String:
-	var all_entries: Array = WorldState.get_nearby_entities(npc.global_position, VENDOR_SEARCH_RADIUS)
-	var best_id: String = ""
-	var best_dist: float = INF
-	for entry in all_entries:
-		var eid: String = entry["id"]
-		if eid == npc.npc_id:
-			continue
-		var edata: Dictionary = WorldState.get_entity_data(eid)
-		if not edata.get("vending", false):
-			continue
-		if not item_id.is_empty():
-			var listings: Dictionary = edata.get("listings", {})
-			if not listings.has(item_id):
-				continue
-		var entity_node: Node = WorldState.get_entity(eid)
-		if not entity_node or not is_instance_valid(entity_node):
-			continue
-		var dist: float = npc.global_position.distance_to(entity_node.global_position)
-		if dist < best_dist:
-			best_dist = dist
-			best_id = eid
-	return best_id
+func _should_restock_potions() -> bool:
+	return npc._inventory.get_item_count("healing_potion") < POTION_RESTOCK_THRESHOLD
 
-## Builds a listings dict from the NPC's non-equipped inventory at 80% of base value.
-func _build_vend_listings() -> Dictionary:
-	var equipment: Dictionary = npc._equipment.get_equipment()
-	var equipped_ids: Array = equipment.values()
-	var inv: Dictionary = npc._inventory.get_items()
-	var listings: Dictionary = {}
-	for item_id in inv:
-		if item_id in equipped_ids:
-			continue
-		var item: Dictionary = ItemDatabase.get_item(item_id)
-		if item.is_empty():
-			continue
-		var base_value: int = item.get("value", 0)
-		var price: int = int(base_value * VEND_PRICE_RATIO)
-		if price <= 0:
-			continue
-		listings[item_id] = {"count": inv[item_id], "price": price}
-	return listings
-
-func _get_best_upgrade(slot: String) -> String:
-	var equipment: Dictionary = npc._equipment.get_equipment()
-	var current_id: String = equipment.get(slot, "")
-	var current_item := ItemDatabase.get_item(current_id)
-	var gold: int = npc._inventory.gold
-
-	var bonus_key: String = "atk_bonus" if slot == "weapon" else "def_bonus"
-	var current_bonus: int = current_item.get(bonus_key, 0)
-	var item_type: String = slot  # "weapon" or "armor"
-
-	var best_id: String = ""
-	var best_bonus: int = current_bonus
-
-	for item_id in ItemDatabase.ITEMS:
-		var item: Dictionary = ItemDatabase.ITEMS[item_id]
-		if item.get("type", "") != item_type:
-			continue
-		var item_bonus: int = item.get(bonus_key, 0)
-		var cost: int = item.get("value", 0)
-		if item_bonus > best_bonus and cost <= gold and item_id != current_id:
-			best_bonus = item_bonus
-			best_id = item_id
-
-	return best_id
-
-# =============================================================================
-# Social Chat
-# =============================================================================
-
-const CHAT_INTENTS: Array = [
-	{"intent": "ask_question", "cue": "Ask {target_name} a question about"},
-	{"intent": "share_story", "cue": "Tell {target_name} about your experience with"},
-	{"intent": "brag", "cue": "Boast to {target_name} about"},
-	{"intent": "complain", "cue": "Complain to {target_name} about"},
-	{"intent": "warn", "cue": "Warn {target_name} about"},
-	{"intent": "gossip", "cue": "Tell {target_name} what you noticed about"},
-	{"intent": "joke", "cue": "Say something funny to {target_name} about"},
-	{"intent": "ask_advice", "cue": "Ask {target_name} for advice about"},
-]
-
-const FALLBACK_TOPICS: Array = [
-	"how the hunting is going", "life in town", "the monsters around here",
-]
-
-const SOCIAL_GOALS: Array = ["idle", "patrol", "rest", "vend"]
-
-func _try_social_chat() -> bool:
-	if _social_cooldown > 0.0:
-		return false
-	if not brain or brain.is_busy():
-		return false
-	if npc.current_goal not in SOCIAL_GOALS:
-		return false
-
-	var perception := WorldState.get_npc_perception(npc.npc_id, SOCIAL_PROXIMITY)
-	var npcs: Array = perception.get("npcs", [])
-
-	# Build candidate list and sort by affinity (highest first)
-	var candidates: Array = []
-	for n in npcs:
-		var nid: String = n["id"]
-		if nid == "player":
-			continue
-		if not WorldState.is_alive(nid):
-			continue
-		var state: String = n.get("state", "idle")
-		if state in ["combat", "dead", "thinking"]:
-			continue
-		if not memory.can_continue_conversation(nid):
-			continue
-		var affinity: float = memory.get_relationship(nid)["affinity"]
-		candidates.append({"id": nid, "affinity": affinity})
-
-	# Sort by affinity descending — prefer friends
-	candidates.sort_custom(func(a, b): return a["affinity"] > b["affinity"])
-
-	for c in candidates:
-		var facts: Array = memory.gather_chat_facts(c["id"])
-		# Gate: only chat if there's something interesting to say (weight >= 1.5)
-		var interesting := facts.filter(func(f): return f.get("weight", 0.0) >= 1.5)
-		if interesting.is_empty():
-			continue  # nothing worth chatting about
-		# Filter out recently discussed topics
-		var fresh_facts := facts.filter(func(f): return not memory.is_recent_topic(f.get("topic", "")))
-		if fresh_facts.is_empty():
-			fresh_facts = facts  # fallback: allow repeats if everything was used
-		var picked := _pick_weighted_fact(fresh_facts)
-		var subject: String = picked.get("topic", FALLBACK_TOPICS[randi() % FALLBACK_TOPICS.size()])
-		var intent_data: Dictionary = _pick_chat_intent()
-		var target_name: String = WorldState.get_entity_data(c["id"]).get("name", c["id"])
-		var intent_cue: String = intent_data["cue"].format({"target_name": target_name})
-		if brain.initiate_social_chat(c["id"], subject, intent_cue, facts):
-			memory.add_recent_topic(subject)
-			var sociability: float = NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
-			var min_cd: float = SOCIAL_COOLDOWN_MIN + (1.0 - sociability) * 40.0
-			var max_cd: float = SOCIAL_COOLDOWN_MAX + (1.0 - sociability) * 60.0
-			_social_cooldown = randf_range(min_cd, max_cd)
-			return true
-	return false
-
-func _pick_weighted_fact(facts: Array) -> Dictionary:
-	if facts.is_empty():
-		return {}
-	var total: float = 0.0
-	for f in facts:
-		total += f.get("weight", 1.0)
-	var roll: float = randf() * total
-	var cumulative: float = 0.0
-	for f in facts:
-		cumulative += f.get("weight", 1.0)
-		if roll <= cumulative:
-			return f
-	return facts[0]
-
-func _pick_chat_intent() -> Dictionary:
-	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
-	var curiosity: float = NpcTraits.get_trait(npc.trait_profile, "curiosity", 0.5)
-	var sociability: float = NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
-
-	# Build weighted pool based on personality
-	var weights: Dictionary = {
-		"ask_question": 1.0 + curiosity * 2.0,
-		"share_story": 1.0 + sociability * 1.5,
-		"brag": 0.5 + boldness * 2.0,
-		"complain": 1.0 + (1.0 - boldness) * 1.5,
-		"warn": 0.5 + boldness * 1.5,
-		"gossip": 0.5 + curiosity * 1.5,
-		"joke": 0.5 + sociability * 2.0,
-		"ask_advice": 1.0 + (1.0 - boldness) * 1.5,
-	}
-
-	var total_weight: float = 0.0
-	for w in weights.values():
-		total_weight += w
-
-	var roll: float = randf() * total_weight
-	var cumulative: float = 0.0
-	for intent_data in CHAT_INTENTS:
-		cumulative += weights.get(intent_data["intent"], 1.0)
-		if roll <= cumulative:
-			return intent_data
-
-	return CHAT_INTENTS[0]
+func _can_afford_potions() -> bool:
+	return npc._inventory.gold >= POTION_BUY_GOLD_MIN

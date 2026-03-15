@@ -1,0 +1,249 @@
+extends Node
+## Handles all hover/raycast logic: entity highlight, vend sign highlight,
+## tooltip display, cursor updates, and hover ring management.
+## Call setup(player) from player._ready() after adding as child.
+
+const HOVER_RAY_LENGTH: float = 100.0
+const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
+
+var _player: Node3D
+var _cursor_manager: RefCounted
+
+# Hover ring (world-space torus that tracks the locked combat target)
+var _hover_ring: MeshInstance3D
+var _hover_ring_material: StandardMaterial3D
+var _ring_target_id: String = ""
+
+# Tooltip
+var _tooltip_label: Label
+var _tooltip_panel: PanelContainer
+
+# Hover state
+var _hovered_entity_id: String = ""
+var _hover_timer: float = 0.0
+
+# Vend sign state (read by player.gd for click routing)
+var hovered_vend_sign: bool = false
+var hovered_vend_sign_owner_id: String = ""
+var pending_vend_sign_click: bool = false
+
+
+func setup(player: Node3D, cursor_manager: RefCounted) -> void:
+	_player = player
+	_cursor_manager = cursor_manager
+	_setup_tooltip()
+	_setup_hover_ring()
+
+
+## Returns the current hovered entity id (empty string if none).
+func get_hovered_entity_id() -> String:
+	return _hovered_entity_id
+
+
+## Lock/unlock the hover ring onto a target entity.
+func lock_ring(target_id: String, color: Color) -> void:
+	_ring_target_id = target_id
+	_hover_ring_material.albedo_color = color
+	var target_node := WorldState.get_entity(target_id)
+	if target_node and is_instance_valid(target_node):
+		_hover_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
+		_hover_ring.visible = true
+
+
+## Hide and clear the hover ring.
+func clear_ring() -> void:
+	_ring_target_id = ""
+	_hover_ring.visible = false
+
+
+## Returns whether the ring is currently visible.
+func is_ring_visible() -> bool:
+	return _hover_ring.visible
+
+
+func _setup_tooltip() -> void:
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 10
+	add_child(canvas_layer)
+
+	_tooltip_panel = PanelContainer.new()
+	_tooltip_panel.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+	UIHelper.set_corner_radius(style, 4)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	_tooltip_panel.add_theme_stylebox_override("panel", style)
+
+	_tooltip_label = Label.new()
+	_tooltip_label.add_theme_color_override("font_color", Color.WHITE)
+	_tooltip_label.add_theme_font_size_override("font_size", 14)
+	_tooltip_panel.add_child(_tooltip_label)
+
+	canvas_layer.add_child(_tooltip_panel)
+
+
+func _setup_hover_ring() -> void:
+	_hover_ring = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.4
+	torus.outer_radius = 0.6
+	_hover_ring.mesh = torus
+	_hover_ring.top_level = true
+
+	_hover_ring_material = StandardMaterial3D.new()
+	_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+	_hover_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_hover_ring_material.no_depth_test = true
+	_hover_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_hover_ring.material_override = _hover_ring_material
+
+	_hover_ring.visible = false
+	add_child(_hover_ring)
+
+	# Looping pulse tween
+	var tween := get_tree().create_tween().set_loops()
+	tween.tween_property(_hover_ring, "scale", Vector3(1.15, 1.0, 1.15), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_hover_ring, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+
+func _process(delta: float) -> void:
+	if not _player:
+		return
+
+	# Track ring to locked target every frame
+	if _hover_ring.visible and _ring_target_id != "":
+		var entity := WorldState.get_entity(_ring_target_id)
+		if entity and is_instance_valid(entity) and WorldState.is_alive(_ring_target_id):
+			_hover_ring.global_position = entity.global_position + Vector3(0, 0.05, 0)
+		else:
+			_hover_ring.visible = false
+			_ring_target_id = ""
+
+	_hover_timer -= delta
+	if _hover_timer <= 0.0:
+		_hover_timer = 0.1
+		_process_hover()
+	elif _tooltip_panel.visible:
+		# Keep tooltip following mouse between raycast ticks
+		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
+
+
+func _process_hover() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if not camera:
+		return
+
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from := camera.project_ray_origin(mouse_pos)
+	var to := from + camera.project_ray_normal(mouse_pos) * HOVER_RAY_LENGTH
+	var space := _player.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [_player.get_rid()]
+	query.collision_mask |= (1 << 5)
+	var result := space.intersect_ray(query)
+
+	var new_entity_id: String = ""
+	var prev_vend_sign: bool = hovered_vend_sign
+	var prev_vend_sign_owner: String = hovered_vend_sign_owner_id
+	hovered_vend_sign = false
+	hovered_vend_sign_owner_id = ""
+
+	if result:
+		var collider: Node = result.collider
+		if collider.is_in_group("vend_sign"):
+			# Hovered a vend sign — find the owner entity
+			hovered_vend_sign = true
+			var owner_entity: Node3D = collider.get_parent()
+			hovered_vend_sign_owner_id = WorldState.get_entity_id_for_node(owner_entity)
+		elif collider is Node3D:
+			new_entity_id = WorldState.get_entity_id_for_node(collider)
+			if new_entity_id == "player" or new_entity_id == "":
+				new_entity_id = ""
+
+	if new_entity_id != _hovered_entity_id:
+		if _hovered_entity_id != "":
+			var prev_node := WorldState.get_entity(_hovered_entity_id)
+			if prev_node and is_instance_valid(prev_node) and prev_node.has_method("unhighlight"):
+				prev_node.unhighlight()
+		if new_entity_id != "":
+			var new_node := WorldState.get_entity(new_entity_id)
+			if new_node and is_instance_valid(new_node) and new_node.has_method("highlight"):
+				new_node.highlight()
+		_hovered_entity_id = new_entity_id
+
+	# Highlight / unhighlight vend sign border
+	if prev_vend_sign and not hovered_vend_sign and not prev_vend_sign_owner.is_empty():
+		var prev_owner := WorldState.get_entity(prev_vend_sign_owner)
+		if prev_owner and is_instance_valid(prev_owner):
+			var sign_node: Node = prev_owner.get_node_or_null("VendSign")
+			if sign_node:
+				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
+				if border:
+					border.visible = false
+	if hovered_vend_sign and not hovered_vend_sign_owner_id.is_empty():
+		var cur_owner := WorldState.get_entity(hovered_vend_sign_owner_id)
+		if cur_owner and is_instance_valid(cur_owner):
+			var sign_node: Node = cur_owner.get_node_or_null("VendSign")
+			if sign_node:
+				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
+				if border:
+					border.visible = true
+
+	# Vend sign hover — show shop tooltip
+	if hovered_vend_sign and not hovered_vend_sign_owner_id.is_empty():
+		var mouse_pos_for_tooltip := get_viewport().get_mouse_position()
+		var owner_node := WorldState.get_entity(hovered_vend_sign_owner_id)
+		var vending_comp: Node = owner_node.get_node_or_null("VendingComponent") if owner_node and is_instance_valid(owner_node) else null
+		if vending_comp and vending_comp.is_vending():
+			var shop_title: String = vending_comp.get_shop_title()
+			_tooltip_label.text = shop_title if not shop_title.is_empty() else "[Shop]"
+			_tooltip_panel.visible = true
+			_tooltip_panel.position = mouse_pos_for_tooltip + TOOLTIP_OFFSET
+			_cursor_manager.set_cursor("talk")
+		else:
+			_tooltip_panel.visible = false
+			_cursor_manager.set_cursor("default")
+		return  # Skip normal entity tooltip handling
+
+	# Update tooltip, cursor, and hover ring
+	if _hovered_entity_id != "":
+		var data := WorldState.get_entity_data(_hovered_entity_id)
+		var display_name: String = data.get("name", _hovered_entity_id)
+		var entity_type: String = data.get("type", "")
+		if entity_type == "monster":
+			var hp: int = data.get("hp", 0)
+			var max_hp: int = data.get("max_hp", 0)
+			display_name += " (HP: %d/%d)" % [hp, max_hp]
+			_cursor_manager.set_cursor("attack")
+		elif entity_type == "loot_drop":
+			display_name += " [Loot]"
+			_cursor_manager.set_cursor("move")
+		elif entity_type == "npc":
+			var npc_node := WorldState.get_entity(_hovered_entity_id)
+			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
+			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
+				var trait_summary: String = NpcTraits.get_trait_summary(npc_node.trait_profile)
+				if not trait_summary.is_empty():
+					tooltip_lines.append(trait_summary)
+			var goal: String = data.get("goal", "idle")
+			tooltip_lines.append(PromptBuilder.get_activity_description(goal))
+			if npc_node and is_instance_valid(npc_node) and "current_mood" in npc_node:
+				var mood: String = npc_node.current_mood
+				if not mood.is_empty() and mood != "neutral":
+					tooltip_lines.append("Mood: %s" % mood)
+			display_name = "\n".join(tooltip_lines)
+			_cursor_manager.set_cursor("talk")
+		else:
+			_cursor_manager.set_cursor("default")
+		_tooltip_label.text = display_name
+		_tooltip_panel.visible = true
+		_tooltip_panel.position = mouse_pos + TOOLTIP_OFFSET
+	else:
+		_tooltip_panel.visible = false
+		_cursor_manager.set_cursor("default")

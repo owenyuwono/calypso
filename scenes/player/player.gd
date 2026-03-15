@@ -6,12 +6,10 @@ const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const INTERACT_RANGE: float = 4.0
 const HOVER_RAY_LENGTH: float = 100.0
-const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
 const MODEL_SCALE: float = 0.7
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 3.0
-const STAMINA_DRAIN_SKILL: float = 5.0
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
@@ -23,27 +21,14 @@ const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
-const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
-const NpcTraits = preload("res://scripts/data/npc_traits.gd")
-const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
-const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
-const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 
 var entity_id: String = "player"
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
 var _cursor_manager: RefCounted
-var _hover_ring: MeshInstance3D
-var _hover_ring_material: StandardMaterial3D
-
-var _hovered_entity_id: String = ""
-var _ring_target_id: String = ""
-var _tooltip_label: Label
-var _tooltip_panel: PanelContainer
-var _hover_timer: float = 0.0
 
 # Navigation
 var _is_navigating: bool = false
@@ -51,19 +36,11 @@ var _interact_target: String = ""
 
 # Vending
 var _is_vending: bool = false
-var _hovered_vend_sign: bool = false
-var _hovered_vend_sign_owner_id: String = ""
-var _pending_vend_sign_click: bool = false
 
 # Combat
 var _attack_target: String = ""
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
-var _pending_skill_hit: bool = false
-var _pending_skill_damage: int = 0
-var _pending_skill_id: String = ""
-var _pending_skill_anim: String = ""
-var _skill_hit_time: float = 0.0
 
 # Visuals component
 var _visuals: Node
@@ -75,12 +52,20 @@ var _progression: Node
 var _skills_comp: Node
 var _auto_attack: Node
 
+# Child subsystem nodes
+var _hover: Node
+var _player_skills: Node
+
 # UI references (set by main scene setup)
 var shop_panel: Control
 var inventory_panel: Control
 var status_panel: Control
 var chat_input: Control
-var skill_hotbar: Control
+var skill_hotbar: Control:
+	set(value):
+		skill_hotbar = value
+		if _player_skills:
+			_player_skills.set_skill_hotbar(value)
 var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
@@ -155,8 +140,19 @@ func _ready() -> void:
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 
 	_cursor_manager = CursorManager.new()
-	_setup_hover_ring()
-	_setup_tooltip()
+
+	# Hover subsystem
+	_hover = preload("res://scenes/player/player_hover.gd").new()
+	_hover.name = "PlayerHover"
+	add_child(_hover)
+	_hover.setup(self, _cursor_manager)
+
+	# Skills subsystem
+	_player_skills = preload("res://scenes/player/player_skills.gd").new()
+	_player_skills.name = "PlayerSkills"
+	add_child(_player_skills)
+	_player_skills.setup(self, _combat, _stats, _skills_comp, _progression, _visuals)
+
 	_setup_dialogue_bubble()
 
 	_visuals.setup_hp_bar()
@@ -169,58 +165,11 @@ func _ready() -> void:
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
 
-func _setup_tooltip() -> void:
-	var canvas_layer := CanvasLayer.new()
-	canvas_layer.layer = 10
-	add_child(canvas_layer)
-
-	_tooltip_panel = PanelContainer.new()
-	_tooltip_panel.visible = false
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.1, 0.8)
-	UIHelper.set_corner_radius(style, 4)
-	style.content_margin_left = 8
-	style.content_margin_right = 8
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
-	_tooltip_panel.add_theme_stylebox_override("panel", style)
-
-	_tooltip_label = Label.new()
-	_tooltip_label.add_theme_color_override("font_color", Color.WHITE)
-	_tooltip_label.add_theme_font_size_override("font_size", 14)
-	_tooltip_panel.add_child(_tooltip_label)
-
-	canvas_layer.add_child(_tooltip_panel)
-
 func _setup_dialogue_bubble() -> void:
 	var bubble_scene := preload("res://scenes/ui/dialogue_bubble.tscn")
 	_dialogue_bubble = bubble_scene.instantiate()
 	add_child(_dialogue_bubble)
 	_dialogue_bubble.position = Vector3(0, 2.2, 0)
-
-func _setup_hover_ring() -> void:
-	_hover_ring = MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.4
-	torus.outer_radius = 0.6
-	_hover_ring.mesh = torus
-	_hover_ring.top_level = true
-
-	_hover_ring_material = StandardMaterial3D.new()
-	_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
-	_hover_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_hover_ring_material.no_depth_test = true
-	_hover_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_hover_ring.material_override = _hover_ring_material
-
-	_hover_ring.visible = false
-	add_child(_hover_ring)
-
-	# Looping pulse tween
-	var tween := get_tree().create_tween().set_loops()
-	tween.tween_property(_hover_ring, "scale", Vector3(1.15, 1.0, 1.15), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_hover_ring, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func show_chat(text: String) -> void:
 	_show_bubble(text)
@@ -290,34 +239,13 @@ func _physics_process(delta: float) -> void:
 		else:
 			_visuals.play_anim("Idle")
 
-func _process(delta: float) -> void:
-	if _is_dead:
-		return
-
-	# Track ring to locked target every frame
-	if _hover_ring.visible and _ring_target_id != "":
-		var entity := WorldState.get_entity(_ring_target_id)
-		if entity and is_instance_valid(entity) and WorldState.is_alive(_ring_target_id):
-			_hover_ring.global_position = entity.global_position + Vector3(0, 0.05, 0)
-		else:
-			_hover_ring.visible = false
-			_ring_target_id = ""
-
-	_hover_timer -= delta
-	if _hover_timer <= 0.0:
-		_hover_timer = 0.1
-		_process_hover()
-	elif _tooltip_panel.visible:
-		# Keep tooltip following mouse between raycast ticks
-		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
-
 func _process_combat(delta: float) -> bool:
 	var attack_range: float = _stats.attack_range
 	var attack_speed: float = _stats.attack_speed
 
 	# While a skill hit is pending, handle it here — auto-attack is suppressed
-	if _pending_skill_hit:
-		return _process_skill_hit(delta, attack_range)
+	if _player_skills.pending_skill_hit:
+		return _player_skills.process_skill_hit(delta, attack_range)
 
 	# Normal auto-attack: delegate to component
 	var result: Dictionary = _auto_attack.process_attack(
@@ -325,61 +253,11 @@ func _process_combat(delta: float) -> bool:
 	)
 	return result.get("is_moving", false)
 
-## Handles the pending skill hit timing while suppressing auto-attack.
-## Returns true if the player is moving (chasing out-of-range target).
-func _process_skill_hit(delta: float, attack_range: float) -> bool:
-	# Validate target first
-	var target_node := WorldState.get_entity(_attack_target)
-	if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
-		_cancel_attack()
-		return false
-
-	# If out of range, chase the target (without auto-attack accumulating)
-	var dist: float = global_position.distance_to(target_node.global_position)
-	if dist > attack_range:
-		nav_agent.target_position = target_node.global_position
-		if not nav_agent.is_navigation_finished():
-			var next_pos := nav_agent.get_next_path_position()
-			var dir := (next_pos - global_position)
-			dir.y = 0.0
-			if dir.length_squared() > 0.01:
-				dir = dir.normalized()
-				velocity.x = dir.x * SPEED
-				velocity.z = dir.z * SPEED
-				_visuals.face_direction(dir)
-				_visuals.play_anim("Running_A")
-		return true
-
-	# In range — resolve skill hit timing
-	velocity.x = 0.0
-	velocity.z = 0.0
-	var to_target := (target_node.global_position - global_position)
-	to_target.y = 0.0
-	if to_target.length_squared() > 0.01:
-		_visuals.face_direction(to_target.normalized())
-
-	var anim_player: AnimationPlayer = _visuals.get_anim_player()
-	if anim_player and anim_player.current_animation == _pending_skill_anim:
-		if anim_player.current_animation_position >= _skill_hit_time:
-			_pending_skill_hit = false
-			_execute_skill_hit()
-	else:
-		# Fallback countdown when skill animation isn't playing
-		_skill_hit_time -= delta
-		if _skill_hit_time <= 0.0:
-			_pending_skill_hit = false
-			_execute_skill_hit()
-	return false
-
 func _cancel_attack() -> void:
 	_attack_target = ""
 	_auto_attack.cancel()
-	_pending_skill_hit = false
-	_pending_skill_damage = 0
-	_pending_skill_id = ""
-	_pending_skill_anim = ""
-	_ring_target_id = ""
-	_hover_ring.visible = false
+	_player_skills.cancel_pending()
+	_hover.clear_ring()
 
 func _stop_navigation() -> void:
 	_is_navigating = false
@@ -401,8 +279,8 @@ func _on_arrived() -> void:
 		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
 			target_node.pickup("player")
 	elif etype == "npc":
-		if _pending_vend_sign_click:
-			_pending_vend_sign_click = false
+		if _hover.pending_vend_sign_click:
+			_hover.pending_vend_sign_click = false
 			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
 			if vending_comp and vending_comp.is_vending():
 				_open_shop(_interact_target)
@@ -410,120 +288,6 @@ func _on_arrived() -> void:
 			npc_info_panel.show_npc(_interact_target)
 
 	_interact_target = ""
-
-func _process_hover() -> void:
-	var camera := get_viewport().get_camera_3d()
-	if not camera:
-		return
-
-	var mouse_pos := get_viewport().get_mouse_position()
-	var from := camera.project_ray_origin(mouse_pos)
-	var to := from + camera.project_ray_normal(mouse_pos) * HOVER_RAY_LENGTH
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [self.get_rid()]
-	query.collision_mask |= (1 << 5)
-	var result := space.intersect_ray(query)
-
-	var new_entity_id: String = ""
-	var prev_vend_sign: bool = _hovered_vend_sign
-	var prev_vend_sign_owner: String = _hovered_vend_sign_owner_id
-	_hovered_vend_sign = false
-	_hovered_vend_sign_owner_id = ""
-
-	if result:
-		var collider: Node = result.collider
-		if collider.is_in_group("vend_sign"):
-			# Hovered a vend sign — find the owner entity
-			_hovered_vend_sign = true
-			var owner_entity: Node3D = collider.get_parent()
-			_hovered_vend_sign_owner_id = WorldState.get_entity_id_for_node(owner_entity)
-		elif collider is Node3D:
-			new_entity_id = WorldState.get_entity_id_for_node(collider)
-			if new_entity_id == "player" or new_entity_id == "":
-				new_entity_id = ""
-
-	if new_entity_id != _hovered_entity_id:
-		if _hovered_entity_id != "":
-			var prev_node := WorldState.get_entity(_hovered_entity_id)
-			if prev_node and is_instance_valid(prev_node) and prev_node.has_method("unhighlight"):
-				prev_node.unhighlight()
-		if new_entity_id != "":
-			var new_node := WorldState.get_entity(new_entity_id)
-			if new_node and is_instance_valid(new_node) and new_node.has_method("highlight"):
-				new_node.highlight()
-		_hovered_entity_id = new_entity_id
-
-	# Highlight / unhighlight vend sign border
-	if prev_vend_sign and not _hovered_vend_sign and not prev_vend_sign_owner.is_empty():
-		var prev_owner := WorldState.get_entity(prev_vend_sign_owner)
-		if prev_owner and is_instance_valid(prev_owner):
-			var sign_node: Node = prev_owner.get_node_or_null("VendSign")
-			if sign_node:
-				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
-				if border:
-					border.visible = false
-	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty():
-		var cur_owner := WorldState.get_entity(_hovered_vend_sign_owner_id)
-		if cur_owner and is_instance_valid(cur_owner):
-			var sign_node: Node = cur_owner.get_node_or_null("VendSign")
-			if sign_node:
-				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
-				if border:
-					border.visible = true
-
-	# Vend sign hover — show shop tooltip
-	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty():
-		var mouse_pos_for_tooltip := get_viewport().get_mouse_position()
-		var owner_node := WorldState.get_entity(_hovered_vend_sign_owner_id)
-		var vending_comp: Node = owner_node.get_node_or_null("VendingComponent") if owner_node and is_instance_valid(owner_node) else null
-		if vending_comp and vending_comp.is_vending():
-			var shop_title: String = vending_comp.get_shop_title()
-			_tooltip_label.text = shop_title if not shop_title.is_empty() else "[Shop]"
-			_tooltip_panel.visible = true
-			_tooltip_panel.position = mouse_pos_for_tooltip + TOOLTIP_OFFSET
-			_cursor_manager.set_cursor("talk")
-		else:
-			_tooltip_panel.visible = false
-			_cursor_manager.set_cursor("default")
-		return  # Skip normal entity tooltip handling
-
-	# Update tooltip, cursor, and hover ring
-	if _hovered_entity_id != "":
-		var data := WorldState.get_entity_data(_hovered_entity_id)
-		var display_name: String = data.get("name", _hovered_entity_id)
-		var entity_type: String = data.get("type", "")
-		if entity_type == "monster":
-			var hp: int = data.get("hp", 0)
-			var max_hp: int = data.get("max_hp", 0)
-			display_name += " (HP: %d/%d)" % [hp, max_hp]
-			_cursor_manager.set_cursor("attack")
-		elif entity_type == "loot_drop":
-			display_name += " [Loot]"
-			_cursor_manager.set_cursor("move")
-		elif entity_type == "npc":
-			var npc_node := WorldState.get_entity(_hovered_entity_id)
-			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
-			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
-				var trait_summary: String = NpcTraits.get_trait_summary(npc_node.trait_profile)
-				if not trait_summary.is_empty():
-					tooltip_lines.append(trait_summary)
-			var goal: String = data.get("goal", "idle")
-			tooltip_lines.append(PromptBuilder.get_activity_description(goal))
-			if npc_node and is_instance_valid(npc_node) and "current_mood" in npc_node:
-				var mood: String = npc_node.current_mood
-				if not mood.is_empty() and mood != "neutral":
-					tooltip_lines.append("Mood: %s" % mood)
-			display_name = "\n".join(tooltip_lines)
-			_cursor_manager.set_cursor("talk")
-		else:
-			_cursor_manager.set_cursor("default")
-		_tooltip_label.text = display_name
-		_tooltip_panel.visible = true
-		_tooltip_panel.position = mouse_pos + TOOLTIP_OFFSET
-	else:
-		_tooltip_panel.visible = false
-		_cursor_manager.set_cursor("default")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
@@ -541,7 +305,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _is_ui_open():
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
-				_try_use_hotbar_slot(i)
+				_player_skills.try_use_hotbar_slot(i)
 				get_viewport().set_input_as_handled()
 				return
 
@@ -561,11 +325,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _handle_left_click() -> void:
 	# Vend sign click — walk to vendor NPC, then open shop
-	if _hovered_vend_sign and not _hovered_vend_sign_owner_id.is_empty() and _hovered_vend_sign_owner_id != "player":
+	if _hover.hovered_vend_sign and not _hover.hovered_vend_sign_owner_id.is_empty() and _hover.hovered_vend_sign_owner_id != "player":
 		_cancel_attack()
-		_interact_target = _hovered_vend_sign_owner_id
-		_pending_vend_sign_click = true
-		var target_node := WorldState.get_entity(_hovered_vend_sign_owner_id)
+		_interact_target = _hover.hovered_vend_sign_owner_id
+		_hover.pending_vend_sign_click = true
+		var target_node := WorldState.get_entity(_hover.hovered_vend_sign_owner_id)
 		if target_node and is_instance_valid(target_node):
 			var dist := global_position.distance_to(target_node.global_position)
 			if dist <= INTERACT_RANGE:
@@ -574,29 +338,25 @@ func _handle_left_click() -> void:
 			_navigate_to(target_node.global_position)
 		return
 
-	if not _hovered_entity_id.is_empty():
-		var data := WorldState.get_entity_data(_hovered_entity_id)
+	var hovered_entity_id: String = _hover.get_hovered_entity_id()
+	if not hovered_entity_id.is_empty():
+		var data := WorldState.get_entity_data(hovered_entity_id)
 		var etype: String = data.get("type", "")
 
-		if etype == "monster" and WorldState.is_alive(_hovered_entity_id):
+		if etype == "monster" and WorldState.is_alive(hovered_entity_id):
 			# Click monster: walk to + auto-attack, lock ring on target
 			_interact_target = ""
-			_attack_target = _hovered_entity_id
+			_attack_target = hovered_entity_id
 			_auto_attack.cancel()
 			_is_navigating = false
-			_ring_target_id = _hovered_entity_id
-			_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
-			var target_node := WorldState.get_entity(_ring_target_id)
-			if target_node:
-				_hover_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
-				_hover_ring.visible = true
+			_hover.lock_ring(hovered_entity_id, Color(1.0, 0.3, 0.2, 0.6))
 			return
 
 		if etype == "loot_drop":
 			# Click loot: walk to + pick up on arrival
 			_cancel_attack()
-			_interact_target = _hovered_entity_id
-			var target_node := WorldState.get_entity(_hovered_entity_id)
+			_interact_target = hovered_entity_id
+			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
 				var dist := global_position.distance_to(target_node.global_position)
 				if dist <= INTERACT_RANGE:
@@ -608,8 +368,8 @@ func _handle_left_click() -> void:
 		if etype == "npc":
 			# Click NPC: walk to + interact on arrival
 			_cancel_attack()
-			_interact_target = _hovered_entity_id
-			var target_node := WorldState.get_entity(_hovered_entity_id)
+			_interact_target = hovered_entity_id
+			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
 				# Check if already in range
 				var dist := global_position.distance_to(target_node.global_position)
@@ -626,8 +386,6 @@ func _handle_left_click() -> void:
 	if ground_pos != Vector3.INF:
 		_cancel_attack()
 		_interact_target = ""
-		_ring_target_id = ""
-		_hover_ring.visible = false
 		_spawn_click_marker(ground_pos)
 		_navigate_to(ground_pos)
 
@@ -701,11 +459,10 @@ func _is_ui_open() -> bool:
 
 # --- Death / Respawn ---
 
-func _on_entity_died(entity_id: String, _killer_id: String) -> void:
-	if entity_id == _ring_target_id:
-		_ring_target_id = ""
-		_hover_ring.visible = false
-	if entity_id != "player":
+func _on_entity_died(eid: String, _killer_id: String) -> void:
+	if eid == _attack_target:
+		_hover.clear_ring()
+	if eid != "player":
 		return
 	_die()
 
@@ -749,12 +506,12 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
-func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
-	if entity_id == "player":
+func _on_entity_healed(eid: String, _amount: int, _current_hp: int) -> void:
+	if eid == "player":
 		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
-func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
-	if entity_id != "player":
+func _on_proficiency_level_up(eid: String, skill_id: String, new_level: int) -> void:
+	if eid != "player":
 		return
 	# Check if any active skills should be unlocked
 	for active_skill_id in SkillDatabase.SKILLS:
@@ -772,86 +529,10 @@ func _on_vending_stopped(eid: String) -> void:
 	if eid == entity_id:
 		_visuals.hide_vend_sign()
 
-# --- Duck typing delegations ---
-
-func flash_hit() -> void:
-	_visuals.flash_hit()
-
-func _try_use_hotbar_slot(slot: int) -> void:
-	var hotbar: Array = _skills_comp.get_hotbar()
-	if slot < 0 or slot >= hotbar.size():
-		return
-	var skill_id: String = hotbar[slot]
-	if skill_id.is_empty():
-		return
-	if skill_hotbar and skill_hotbar.is_on_cooldown(skill_id):
-		return
-	_use_skill(skill_id)
-
-func _use_skill(skill_id: String) -> void:
-	var skill := SkillDatabase.get_skill(skill_id)
-	if skill.is_empty():
-		return
-	var skill_level: int = _skills_comp.get_skill_level(skill_id)
-	if skill_level <= 0:
-		return
-	var skill_type: String = skill.get("type", "")
-	if skill_type == "melee_attack":
-		if _attack_target.is_empty():
-			return
-		var target_node := WorldState.get_entity(_attack_target)
-		if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
-			return
-		var dist := global_position.distance_to(target_node.global_position)
-		var attack_range: float = _stats.attack_range
-		if dist > attack_range:
-			return
-		var multiplier := SkillDatabase.get_effective_multiplier(skill_id, skill_level)
-		var raw_damage := floori(_combat.get_effective_atk() * multiplier)
-		var anim_name: String = skill.get("animation", "1H_Melee_Attack_Chop")
-		_pending_skill_hit = true
-		_pending_skill_damage = raw_damage
-		_pending_skill_id = skill_id
-		_pending_skill_anim = anim_name
-		_visuals.play_anim(anim_name, true)
-		_skill_hit_time = _visuals.get_hit_delay(anim_name)
-		_auto_attack.cancel()
-		# Drain stamina for skill use
-		var stamina_comp_node = get_node_or_null("StaminaComponent")
-		if stamina_comp_node:
-			stamina_comp_node.drain_flat(STAMINA_DRAIN_SKILL)
-		# Start cooldown
-		var cooldown := SkillDatabase.get_effective_cooldown(skill_id, skill_level)
-		if skill_hotbar:
-			skill_hotbar.start_cooldown(skill_id, cooldown)
-
-func _execute_skill_hit() -> void:
-	if _attack_target.is_empty():
-		return
-	if not WorldState.is_alive(_attack_target):
-		return
-	var target_node := WorldState.get_entity(_attack_target)
-	var target_pos := target_node.global_position if target_node else global_position
-	var actual_damage: int = _combat.deal_damage_amount_to(_attack_target, _pending_skill_damage)
-	_visuals.spawn_damage_number(_attack_target, actual_damage, Color(1, 1, 1), target_pos)
-	_visuals.flash_target(_attack_target)
-	GameEvents.skill_used.emit("player", _pending_skill_id)
-	# Grant skill XP for use-based leveling
-	_skills_comp.grant_skill_xp(_pending_skill_id, 5)
-	# Grant weapon XP for skill hits too
-	var target_data := WorldState.get_entity_data(_attack_target)
-	var monster_type: String = target_data.get("monster_type", "")
-	if not monster_type.is_empty():
-		var weapon_type: String = _combat.get_equipped_weapon_type()
-		_progression.grant_combat_xp(monster_type, weapon_type)
-	_pending_skill_damage = 0
-	_pending_skill_id = ""
-
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
-	# Grant weapon proficiency XP
-	var target_data := WorldState.get_entity_data(target_id)
+	var target_data: Dictionary = WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
 		var weapon_type: String = _combat.get_equipped_weapon_type()
@@ -859,6 +540,11 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
+
+# --- Duck typing delegations ---
+
+func flash_hit() -> void:
+	_visuals.flash_hit()
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	var marker := MeshInstance3D.new()
@@ -876,7 +562,8 @@ func _spawn_click_marker(pos: Vector3) -> void:
 	marker.material_override = mat
 
 	marker.position = Vector3(pos.x, pos.y + 0.05, pos.z)
-	get_tree().current_scene.add_child(marker)
+	# Add to parent (the game world) rather than current_scene to avoid scene boundary issues
+	get_parent().add_child(marker)
 
 	var tween := get_tree().create_tween()
 	tween.set_parallel(true)
