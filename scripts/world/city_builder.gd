@@ -15,7 +15,6 @@ extends RefCounted
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
-const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
 
 # ---------------------------------------------------------------------------
 # Entry point

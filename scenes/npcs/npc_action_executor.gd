@@ -3,6 +3,8 @@ extends Node
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
+const SELL_PRICE_RATIO: float = 0.5
+
 var npc: CharacterBody3D  # NPCBase, duck-typed
 
 func _ready() -> void:
@@ -159,7 +161,7 @@ func _do_sell_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 
 	var item := ItemDatabase.get_item(item_id)
 	# Pay the selling NPC 50% of base value (vendor absorbs the item)
-	var revenue: int = int(item.get("value", 0) * 0.5) * count
+	var revenue: int = int(item.get("value", 0) * SELL_PRICE_RATIO) * count
 	npc._inventory.add_gold_amount(revenue)
 	GameEvents.item_sold.emit(npc.npc_id, item_id, revenue)
 

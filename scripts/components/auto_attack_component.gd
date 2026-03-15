@@ -96,10 +96,6 @@ func cancel() -> void:
 	_hit_time = 0.0
 	_last_nav_target_pos = Vector3.INF
 
-## Returns true if an attack animation is in-flight and the hit has not landed yet.
-func is_pending_hit() -> bool:
-	return _pending_hit
-
 # --- Private ---
 
 func _chase(target_node: Node3D, move_speed: float, speed_multiplier: float) -> void:

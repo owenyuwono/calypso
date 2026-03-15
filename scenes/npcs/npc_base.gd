@@ -60,6 +60,9 @@ const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
 const PERSONAL_SPACE: float = 2.5
 const SEPARATION_FORCE: float = 2.0
+const DEATH_GOLD_PENALTY_RATIO: float = 0.1
+const CONSTITUTION_XP_PER_HIT: int = 3
+const RESPAWN_TIME: float = 5.0
 
 # Visuals component
 var _visuals: Node
@@ -372,7 +375,7 @@ func _die() -> void:
 
 	# Lose 10% gold
 	var gold: int = _inventory.get_gold_amount()
-	var lost := int(gold * 0.1)
+	var lost := int(gold * DEATH_GOLD_PENALTY_RATIO)
 	_inventory.remove_gold_amount(lost)
 
 	var memory_node = get_node_or_null("NPCMemory")
@@ -387,7 +390,7 @@ func _die() -> void:
 
 	_visuals.set_hp_bar_visible(false)
 
-	_respawn_timer = 5.0
+	_respawn_timer = RESPAWN_TIME
 
 func _respawn() -> void:
 	_visuals.reset_anim()
@@ -418,7 +421,7 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _r
 	if target_id == npc_id:
 		flash_hit()
 		_visuals.update_hp_bar(npc_id)
-		_progression.grant_proficiency_xp("constitution", 3)
+		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:

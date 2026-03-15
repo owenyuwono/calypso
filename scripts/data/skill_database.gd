@@ -20,10 +20,6 @@ const SKILLS: Dictionary = {
 static func get_skill(skill_id: String) -> Dictionary:
 	return SKILLS.get(skill_id, {})
 
-static func get_skill_name(skill_id: String) -> String:
-	var skill := get_skill(skill_id)
-	return skill.get("name", skill_id)
-
 static func get_effective_multiplier(skill_id: String, skill_level: int) -> float:
 	var skill := get_skill(skill_id)
 	var base: float = skill.get("damage_multiplier", 1.0)

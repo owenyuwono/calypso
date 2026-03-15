@@ -4,7 +4,6 @@ extends Node
 
 const DRAIN_COMBAT: float = 0.5
 const DRAIN_MOVEMENT: float = 0.15
-const DRAIN_SKILL: float = 5.0
 const REGEN_REST: float = 3.0
 const REST_SPOT_RANGE: float = 4.0
 const VELOCITY_THRESHOLD: float = 0.5
@@ -88,8 +87,3 @@ func drain_flat(amount: float) -> void:
 		_last_threshold = new_threshold
 		GameEvents.stamina_changed.emit(_entity_id, stamina, max_stamina)
 
-func is_exhausted() -> bool:
-	return stamina <= max_stamina * 0.1
-
-func is_resting() -> bool:
-	return _is_resting

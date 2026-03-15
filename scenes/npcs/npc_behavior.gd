@@ -32,6 +32,12 @@ var _social_cooldown: float = 0.0
 const SOCIAL_COOLDOWN_MIN: float = 15.0
 const SOCIAL_COOLDOWN_MAX: float = 45.0
 const SOCIAL_PROXIMITY: float = 12.0
+
+const VEND_PRICE_RATIO: float = 0.8
+const VENDOR_SEARCH_RADIUS: float = 200.0
+const POTION_STOCK_TARGET: int = 3
+const POTION_RESTOCK_THRESHOLD: int = 2
+const POTION_BUY_GOLD_MIN: int = 40
 var _action_in_progress: bool = false
 var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
@@ -135,7 +141,7 @@ func _check_goal_completion() -> bool:
 		"buy_potions":
 			var potion_count: int = npc._inventory.get_item_count("healing_potion")
 			var gold: int = npc._inventory.gold
-			if potion_count >= 3 or gold < 20:
+			if potion_count >= POTION_STOCK_TARGET or gold < 20:
 				npc.set_goal(default_goal)
 				return true
 		"sell_loot":
@@ -170,7 +176,7 @@ func _check_goal_completion() -> bool:
 				var max_hp: int = npc._stats.max_hp
 				if float(hp) / float(max_hp) >= 0.7:
 					var potion_count: int = npc._inventory.get_item_count("healing_potion")
-					if potion_count < 2 and npc._inventory.gold >= 40:
+					if potion_count < POTION_RESTOCK_THRESHOLD and npc._inventory.gold >= POTION_BUY_GOLD_MIN:
 						npc.set_goal("buy_potions")
 					else:
 						npc.set_goal(default_goal)
@@ -182,7 +188,7 @@ func _check_goal_completion() -> bool:
 				return true
 			# Restock potions if out and can afford
 			var potion_count: int = npc._inventory.get_item_count("healing_potion")
-			if potion_count == 0 and npc._inventory.gold >= 40:
+			if potion_count == 0 and npc._inventory.gold >= POTION_BUY_GOLD_MIN:
 				npc.set_goal("buy_potions")
 				return true
 		"vend":
@@ -548,7 +554,7 @@ func _get_total_material_count() -> int:
 ## Returns the entity ID of the nearest vending NPC.
 ## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
 func _find_vendor(item_id: String = "") -> String:
-	var all_entries: Array = WorldState.get_nearby_entities(npc.global_position, 200.0)
+	var all_entries: Array = WorldState.get_nearby_entities(npc.global_position, VENDOR_SEARCH_RADIUS)
 	var best_id: String = ""
 	var best_dist: float = INF
 	for entry in all_entries:
@@ -584,7 +590,7 @@ func _build_vend_listings() -> Dictionary:
 		if item.is_empty():
 			continue
 		var base_value: int = item.get("value", 0)
-		var price: int = int(base_value * 0.8)
+		var price: int = int(base_value * VEND_PRICE_RATIO)
 		if price <= 0:
 			continue
 		listings[item_id] = {"count": inv[item_id], "price": price}
@@ -640,7 +646,6 @@ func _try_social_chat() -> bool:
 	if _social_cooldown > 0.0:
 		return false
 	if not brain or brain.is_busy():
-		print("[CHAT] %s: skip social — brain busy (llm=%s responding=%s hold=%.1f reading=%s)" % [npc.npc_id, brain._waiting_for_llm, brain._responding_to, brain._conversation_hold, not brain._reading_queue.is_empty()])
 		return false
 	if npc.current_goal not in SOCIAL_GOALS:
 		return false
@@ -664,9 +669,6 @@ func _try_social_chat() -> bool:
 		var affinity: float = memory.get_relationship(nid)["affinity"]
 		candidates.append({"id": nid, "affinity": affinity})
 
-	if candidates.is_empty():
-		print("[CHAT] %s: no candidates (saw %d npcs within %.0f)" % [npc.npc_id, npcs.size(), SOCIAL_PROXIMITY])
-
 	# Sort by affinity descending — prefer friends
 	candidates.sort_custom(func(a, b): return a["affinity"] > b["affinity"])
 
@@ -685,14 +687,12 @@ func _try_social_chat() -> bool:
 		var intent_data: Dictionary = _pick_chat_intent()
 		var target_name: String = WorldState.get_entity_data(c["id"]).get("name", c["id"])
 		var intent_cue: String = intent_data["cue"].format({"target_name": target_name})
-		print("[CHAT] %s: initiating chat with %s — %s %s" % [npc.npc_id, c["id"], intent_data["intent"], subject])
 		if brain.initiate_social_chat(c["id"], subject, intent_cue, facts):
 			memory.add_recent_topic(subject)
 			var sociability: float = NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
 			var min_cd: float = SOCIAL_COOLDOWN_MIN + (1.0 - sociability) * 40.0
 			var max_cd: float = SOCIAL_COOLDOWN_MAX + (1.0 - sociability) * 60.0
 			_social_cooldown = randf_range(min_cd, max_cd)
-			print("[CHAT] %s: next social in %.0fs" % [npc.npc_id, _social_cooldown])
 			return true
 	return false
 

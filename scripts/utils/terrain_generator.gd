@@ -128,27 +128,6 @@ static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vecto
 				elif channel == 3:
 					c.a = 1.0 - strength  # lower alpha = more packed earth
 				colors[i] = c
-		elif rtype == "clear_circle":
-			var circle_center: Vector2 = rule["center"]
-			var radius: float = rule["radius"]
-			var channel: int = rule["channel"]
-			for i in vertices.size():
-				var world_x: float = center.x + vertices[i].x
-				var world_z: float = center.z + vertices[i].z
-				var dist: float = Vector2(world_x, world_z).distance_to(circle_center)
-				if dist < radius:
-					# smoothstep falloff: full clear at center, fades to no-clear at edge
-					var clear_strength: float = 1.0 - smoothstep(radius * 0.5, radius, dist)
-					var c := colors[i]
-					if channel == 0:
-						c.r = maxf(c.r - clear_strength, 0.0)
-					elif channel == 1:
-						c.g = maxf(c.g - clear_strength, 0.0)
-					elif channel == 2:
-						c.b = maxf(c.b - clear_strength, 0.0)
-					elif channel == 3:
-						c.a = minf(c.a + clear_strength, 1.0)  # restore alpha = remove packed earth
-					colors[i] = c
 		elif rtype == "rect":
 			var rect_center: Vector2 = rule["center"]
 			var rect_size: Vector2 = rule["size"]

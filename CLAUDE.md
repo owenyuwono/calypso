@@ -13,7 +13,7 @@
 
 ## Entity Component System
 Each entity (player, NPC, monster) owns its state via child Node components:
-- `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `apply_level_up(gains)`, `is_alive()`, `get_stats_dict()`
+- `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `is_alive()`, `get_stats_dict()`
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
 - `EquipmentComponent` — weapon/armor slots. Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_atk_bonus()`, `get_def_bonus()`
 - `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
@@ -25,7 +25,7 @@ Components sync state back to `WorldState.entity_data` via `_sync()` (bridge lay
 
 ## WorldState (slim — registry + spatial only)
 - **Registry** (6): `register_entity`, `unregister_entity`, `get_entity`, `get_entity_data`, `set_entity_data`, `get_entity_id_for_node`
-- **Locations** (4): `register_location`, `get_location`, `has_location`, `get_all_locations`
+- **Locations** (3): `register_location`, `get_location`, `has_location`
 - **Spatial** (2): `get_nearby_entities`, `get_npc_perception`
 - **Convenience** (1): `is_alive(id)` — looks up entity's StatsComponent
 

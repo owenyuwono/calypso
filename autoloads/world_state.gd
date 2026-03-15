@@ -48,9 +48,6 @@ func get_location(id: String) -> Vector3:
 func has_location(id: String) -> bool:
 	return location_markers.has(id)
 
-func get_all_locations() -> Dictionary:
-	return location_markers
-
 # --- Spatial Queries ---
 
 func get_nearby_entities(pos: Vector3, radius: float) -> Array:

@@ -61,8 +61,6 @@ const LOADOUTS: Dictionary = {
 	},
 	"garrick": {
 		"trait_profile": "merchant",
-		"model": "Barbarian",
-		"position": Vector3(-42, 0, 20),
 		"items": {
 			"basic_sword": 5, "iron_sword": 3, "steel_sword": 2,
 			"basic_axe": 3, "iron_axe": 2,
@@ -76,8 +74,6 @@ const LOADOUTS: Dictionary = {
 	},
 	"elara": {
 		"trait_profile": "merchant",
-		"model": "Rogue",
-		"position": Vector3(-52, 0, 30),
 		"items": {"healing_potion": 20},
 		"equip": [],
 		"gold": 300,

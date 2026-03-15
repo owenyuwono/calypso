@@ -196,25 +196,10 @@ func hide_vend_sign() -> void:
 		_vend_sign.queue_free()
 		_vend_sign = null
 
-func highlight_vend_sign() -> void:
-	if _vend_sign:
-		var border: MeshInstance3D = _vend_sign.get_node_or_null("Border")
-		if border:
-			border.visible = true
-
-func unhighlight_vend_sign() -> void:
-	if _vend_sign:
-		var border: MeshInstance3D = _vend_sign.get_node_or_null("Border")
-		if border:
-			border.visible = false
-
 # --- Accessors ---
-
-func get_model() -> Node3D:
-	return _model
-
-func get_overlay() -> StandardMaterial3D:
-	return _overlay_material
 
 func get_anim_player() -> AnimationPlayer:
 	return _anim_player
+
+func get_model() -> Node3D:
+	return _model

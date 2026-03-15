@@ -2,13 +2,16 @@ extends Node
 ## Component that owns combat stats for an entity.
 ## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
 
+const DEFAULT_ATTACK_SPEED: float = 1.0
+const DEFAULT_ATTACK_RANGE: float = 2.0
+
 var hp: int = 0
 var max_hp: int = 0
 var atk: int = 0
 var def: int = 0
 var level: int = 1
-var attack_speed: float = 1.0
-var attack_range: float = 2.0
+var attack_speed: float = DEFAULT_ATTACK_SPEED
+var attack_range: float = DEFAULT_ATTACK_RANGE
 
 func setup(stats: Dictionary) -> void:
 	hp = stats.get("hp", 0)
@@ -18,8 +21,8 @@ func setup(stats: Dictionary) -> void:
 	# level now represents total proficiency level (sum of all skill levels).
 	# Default 13 = 13 proficiency skills each starting at level 1.
 	level = stats.get("level", 13)
-	attack_speed = stats.get("attack_speed", 1.0)
-	attack_range = stats.get("attack_range", 2.0)
+	attack_speed = stats.get("attack_speed", DEFAULT_ATTACK_SPEED)
+	attack_range = stats.get("attack_range", DEFAULT_ATTACK_RANGE)
 
 func is_alive() -> bool:
 	return hp > 0
@@ -36,14 +39,6 @@ func heal(amount: int) -> int:
 
 func restore_full_hp() -> void:
 	hp = max_hp
-	_sync()
-
-func apply_level_up(gains: Dictionary) -> void:
-	max_hp += gains.get("max_hp", 0)
-	hp = max_hp
-	atk += gains.get("atk", 0)
-	def += gains.get("def", 0)
-	level += gains.get("level", 0)
 	_sync()
 
 func get_stats_dict() -> Dictionary:

@@ -8,6 +8,10 @@ const INTERACT_RANGE: float = 4.0
 const HOVER_RAY_LENGTH: float = 100.0
 const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
 const MODEL_SCALE: float = 0.7
+const DEATH_GOLD_PENALTY_RATIO: float = 0.1
+const CONSTITUTION_XP_PER_HIT: int = 3
+const RESPAWN_TIME: float = 3.0
+const STAMINA_DRAIN_SKILL: float = 5.0
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
@@ -84,8 +88,6 @@ var vend_setup_panel: Control
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
 
-# Pending NPC conversation (set when player clicks NPC, cleared after chat sent)
-var _pending_talk_target_id: String = ""
 
 func _exit_tree() -> void:
 	if _cursor_manager:
@@ -221,14 +223,6 @@ func _setup_hover_ring() -> void:
 
 func show_chat(text: String) -> void:
 	_show_bubble(text)
-	# If there's a pending NPC conversation, send the message to them
-	if not _pending_talk_target_id.is_empty():
-		var npc_id := _pending_talk_target_id
-		var npc_node := WorldState.get_entity(npc_id)
-		_pending_talk_target_id = ""
-		if npc_node and is_instance_valid(npc_node):
-			_send_message_to_npc(text, npc_id, npc_node)
-			return
 	# Proximity: auto-target nearest NPC if within range
 	_send_to_nearby_npc(text)
 
@@ -673,15 +667,6 @@ func _command_npc_follow(npc_node: Node3D) -> void:
 	if npc_node.has_method("set_goal"):
 		npc_node.set_goal("follow_player")
 
-func _talk_to_npc(target_npc_id: String, target_node: Node3D) -> void:
-	# Open chat input so player can type what they want to say
-	if chat_input and not chat_input.is_open():
-		_pending_talk_target_id = target_npc_id
-		chat_input.open()
-		return
-	# Fallback if no chat input available
-	_send_message_to_npc("Hello there!", target_npc_id, target_node)
-
 func _send_message_to_npc(text: String, npc_id: String, npc_node: Node3D) -> void:
 	GameEvents.npc_spoke.emit("player", text, npc_id)
 	var brain: Node = npc_node.get_node_or_null("NPCBrain")
@@ -733,14 +718,14 @@ func _die() -> void:
 
 	# Lose 10% gold
 	var gold: int = _inventory.get_gold_amount()
-	var lost := int(gold * 0.1)
+	var lost := int(gold * DEATH_GOLD_PENALTY_RATIO)
 	_inventory.remove_gold_amount(lost)
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")
 	_visuals.fade_out()
 
-	_respawn_timer = 3.0
+	_respawn_timer = RESPAWN_TIME
 
 func _respawn() -> void:
 	_is_dead = false
@@ -763,7 +748,7 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 	if target_id == "player":
 		flash_hit()
 		_visuals.update_hp_bar("player")
-		_progression.grant_proficiency_xp("constitution", 3)
+		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == "player":
@@ -835,7 +820,7 @@ func _use_skill(skill_id: String) -> void:
 		# Drain stamina for skill use
 		var stamina_comp_node = get_node_or_null("StaminaComponent")
 		if stamina_comp_node:
-			stamina_comp_node.drain_flat(5.0)
+			stamina_comp_node.drain_flat(STAMINA_DRAIN_SKILL)
 		# Start cooldown
 		var cooldown := SkillDatabase.get_effective_cooldown(skill_id, skill_level)
 		if skill_hotbar:

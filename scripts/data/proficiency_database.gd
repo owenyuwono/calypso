@@ -11,82 +11,69 @@ const SKILLS: Dictionary = {
 		"name": "Sword",
 		"category": "weapon",
 		"description": "Melee damage with swords. Levels up by fighting with swords.",
-		"max_level": 10,
 	},
 	"axe": {
 		"name": "Axe",
 		"category": "weapon",
 		"description": "Melee damage with axes. Levels up by fighting with axes.",
-		"max_level": 10,
 	},
 	"mace": {
 		"name": "Mace",
 		"category": "weapon",
 		"description": "Melee damage with maces. Levels up by fighting with maces.",
-		"max_level": 10,
 	},
 	"dagger": {
 		"name": "Dagger",
 		"category": "weapon",
 		"description": "Melee damage with daggers. Levels up by fighting with daggers.",
-		"max_level": 10,
 	},
 	"staff": {
 		"name": "Staff",
 		"category": "weapon",
 		"description": "Magical damage with staves. Levels up by fighting with staves.",
-		"max_level": 10,
 	},
 	# Attribute skills
 	"constitution": {
 		"name": "Constitution",
 		"category": "attribute",
 		"description": "Endurance and vitality. Levels up by taking hits in combat.",
-		"max_level": 10,
 	},
 	"agility": {
 		"name": "Agility",
 		"category": "attribute",
 		"description": "Speed and mobility. Levels up by traveling distances.",
-		"max_level": 10,
 	},
 	# Gathering skills — XP per gather action (future)
 	"mining": {
 		"name": "Mining",
 		"category": "gathering",
 		"description": "Extracting ore and minerals from rocks. Levels up by mining.",
-		"max_level": 10,
 	},
 	"woodcutting": {
 		"name": "Woodcutting",
 		"category": "gathering",
 		"description": "Felling trees and harvesting logs. Levels up by chopping wood.",
-		"max_level": 10,
 	},
 	"fishing": {
 		"name": "Fishing",
 		"category": "gathering",
 		"description": "Catching fish from bodies of water. Levels up by fishing.",
-		"max_level": 10,
 	},
 	# Production skills — XP per craft action (future)
 	"smithing": {
 		"name": "Smithing",
 		"category": "production",
 		"description": "Forging weapons and armor from metal. Levels up by smithing.",
-		"max_level": 10,
 	},
 	"cooking": {
 		"name": "Cooking",
 		"category": "production",
 		"description": "Preparing food and consumables. Levels up by cooking.",
-		"max_level": 10,
 	},
 	"crafting": {
 		"name": "Crafting",
 		"category": "production",
 		"description": "Creating items from gathered materials. Levels up by crafting.",
-		"max_level": 10,
 	},
 }
 

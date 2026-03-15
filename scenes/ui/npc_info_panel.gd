@@ -80,8 +80,6 @@ func is_open() -> bool:
 func toggle() -> void:
 	if _is_open:
 		close()
-	else:
-		close()
 
 func _center_panel() -> void:
 	_panel.anchor_left = 0.0

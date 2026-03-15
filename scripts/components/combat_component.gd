@@ -14,9 +14,6 @@ func setup(stats_component: Node, equipment_component: Node = null) -> void:
 func is_alive() -> bool:
 	return _stats.is_alive()
 
-func get_stat(stat_name: String) -> Variant:
-	return _stats.get(stat_name) if stat_name in _stats else 0
-
 func get_effective_atk() -> int:
 	var base: int = _stats.atk
 	if _equipment:
