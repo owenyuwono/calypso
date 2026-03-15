@@ -145,8 +145,7 @@ func _refresh() -> void:
 
 		if current_level > 0:
 			# Show XP progress for use-based leveling
-			var skill_xp_key: String = "skill_xp_%s" % skill_id
-			var xp: int = WorldState.get_entity_data("player").get(skill_xp_key, 0)
+			var xp: int = skills_comp.get_skill_xp(skill_id)
 			var xp_needed: int = current_level * 50
 			if current_level < max_level:
 				var xp_label := Label.new()

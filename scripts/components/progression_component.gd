@@ -3,12 +3,15 @@ extends BaseComponent
 
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
-var _stats: Node  # StatsComponent ref
+var _stats: Node      # StatsComponent ref
+var _equipment: Node  # EquipmentComponent ref (optional — for active weapon type)
 var _proficiencies: Dictionary = {}  # skill_id -> {level: int, xp: int}
 
-func setup(stats_component: Node, initial_proficiencies: Dictionary = {}) -> void:
+func setup(stats_component: Node, initial_proficiencies: Dictionary = {}, equipment_component: Node = null) -> void:
 	_stats = stats_component
+	_equipment = equipment_component
 	if initial_proficiencies.is_empty():
 		_proficiencies = ProficiencyDatabase.get_default_proficiencies()
 	else:
@@ -98,14 +101,9 @@ func _recalculate_stats() -> void:
 
 func _get_active_weapon_proficiency_level() -> int:
 	## Get the proficiency level for the currently equipped weapon type.
-	var parent := get_parent()
-	if not parent:
-		return 1
-	var equipment = parent.get_node_or_null("EquipmentComponent")
-	if equipment:
-		var weapon_id: String = equipment.get_weapon()
+	if _equipment:
+		var weapon_id: String = _equipment.get_weapon()
 		if not weapon_id.is_empty():
-			var ItemDatabase = preload("res://scripts/data/item_database.gd")
 			var item: Dictionary = ItemDatabase.get_item(weapon_id)
 			var weapon_type: String = item.get("weapon_type", "sword")
 			return get_proficiency_level(weapon_type)

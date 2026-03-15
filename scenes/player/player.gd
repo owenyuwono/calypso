@@ -113,15 +113,15 @@ func _ready() -> void:
 	add_child(_equipment)
 	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
 
-	_combat = CombatComponent.new()
-	_combat.name = "CombatComponent"
-	add_child(_combat)
-	_combat.setup(_stats, _equipment)
-
 	_progression = ProgressionComponent.new()
 	_progression.name = "ProgressionComponent"
 	add_child(_progression)
-	_progression.setup(_stats)
+	_progression.setup(_stats, {}, _equipment)
+
+	_combat = CombatComponent.new()
+	_combat.name = "CombatComponent"
+	add_child(_combat)
+	_combat.setup(_stats, _equipment, _progression)
 
 	_skills_comp = SkillsComponent.new()
 	_skills_comp.name = "SkillsComponent"
@@ -152,6 +152,7 @@ func _ready() -> void:
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
+	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 
 	_cursor_manager = CursorManager.new()
 	_setup_hover_ring()
@@ -311,8 +312,8 @@ func _process(delta: float) -> void:
 		_tooltip_panel.position = get_viewport().get_mouse_position() + TOOLTIP_OFFSET
 
 func _process_combat(delta: float) -> bool:
-	var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
-	var attack_speed: float = WorldState.get_entity_data("player").get("attack_speed", 1.0)
+	var attack_range: float = _stats.attack_range
+	var attack_speed: float = _stats.attack_speed
 
 	# While a skill hit is pending, handle it here — auto-attack is suppressed
 	if _pending_skill_hit:
@@ -740,17 +741,17 @@ func _respawn() -> void:
 	_visuals.play_anim("Idle")
 
 	GameEvents.entity_respawned.emit("player")
-	_visuals.update_hp_bar("player")
+	_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
-		_visuals.update_hp_bar("player")
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == "player":
-		_visuals.update_hp_bar("player")
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
 	if entity_id != "player":
@@ -802,7 +803,7 @@ func _use_skill(skill_id: String) -> void:
 		if not target_node or not is_instance_valid(target_node) or not WorldState.is_alive(_attack_target):
 			return
 		var dist := global_position.distance_to(target_node.global_position)
-		var attack_range: float = WorldState.get_entity_data("player").get("attack_range", 2.0)
+		var attack_range: float = _stats.attack_range
 		if dist > attack_range:
 			return
 		var multiplier := SkillDatabase.get_effective_multiplier(skill_id, skill_level)

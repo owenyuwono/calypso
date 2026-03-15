@@ -4,6 +4,7 @@ extends BaseComponent
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
 var _skills: Dictionary = {}  # skill_id -> level (int)
+var _skill_xp: Dictionary = {}  # skill_id -> current xp (int)
 var _hotbar: Array = ["", "", "", "", ""]
 
 func setup(skills: Dictionary, hotbar: Array) -> void:
@@ -35,25 +36,25 @@ func grant_skill_xp(skill_id: String, amount: int) -> void:
 	if current_level >= max_level:
 		return
 
-	# Use entity_data to track skill XP
-	var parent := get_parent()
-	if not parent or not ("entity_id" in parent):
-		return
-	var entity_id: String = parent.entity_id
-	var data := WorldState.get_entity_data(entity_id)
-	var skill_xp_key: String = "skill_xp_%s" % skill_id
-	var xp: int = data.get(skill_xp_key, 0) + amount
+	var xp: int = _skill_xp.get(skill_id, 0) + amount
 	var xp_needed: int = current_level * 50  # Same curve as proficiencies
+
+	var parent := get_parent()
+	var entity_id: String = parent.entity_id if parent and "entity_id" in parent else ""
 
 	while xp >= xp_needed and current_level < max_level:
 		xp -= xp_needed
 		current_level += 1
 		_skills[skill_id] = current_level
-		GameEvents.skill_learned.emit(entity_id, skill_id, current_level)
+		if not entity_id.is_empty():
+			GameEvents.skill_learned.emit(entity_id, skill_id, current_level)
 		xp_needed = current_level * 50
 
-	WorldState.set_entity_data(entity_id, skill_xp_key, xp)
+	_skill_xp[skill_id] = xp
 	_sync()
+
+func get_skill_xp(skill_id: String) -> int:
+	return _skill_xp.get(skill_id, 0)
 
 func set_hotbar_slot(index: int, skill_id: String) -> void:
 	if index < 0 or index >= _hotbar.size():
@@ -77,3 +78,4 @@ func _sync() -> void:
 		return
 	WorldState.set_entity_data(eid, "skills", _skills)
 	WorldState.set_entity_data(eid, "hotbar", _hotbar)
+	WorldState.set_entity_data(eid, "skill_xp", _skill_xp)

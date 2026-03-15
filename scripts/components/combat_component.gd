@@ -6,10 +6,12 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 var _stats: Node       # StatsComponent ref (required)
 var _equipment: Node   # EquipmentComponent ref (optional — monsters don't have equipment)
+var _progression: Node # ProgressionComponent ref (optional — for item penalty calculation)
 
-func setup(stats_component: Node, equipment_component: Node = null) -> void:
+func setup(stats_component: Node, equipment_component: Node = null, progression_component: Node = null) -> void:
 	_stats = stats_component
 	_equipment = equipment_component
+	_progression = progression_component
 
 func is_alive() -> bool:
 	return _stats.is_alive()
@@ -67,14 +69,10 @@ func _get_item_penalty(item_id: String) -> Dictionary:
 	if required_skill.is_empty():
 		return {"stat_mult": 1.0, "speed_mult": 1.0}
 
-	var parent := get_parent()
-	if not parent:
-		return {"stat_mult": 1.0, "speed_mult": 1.0}
-	var progression = parent.get_node_or_null("ProgressionComponent")
-	if not progression:
+	if not _progression:
 		return {"stat_mult": 1.0, "speed_mult": 1.0}
 
-	var prof_level: int = progression.get_proficiency_level(required_skill)
+	var prof_level: int = _progression.get_proficiency_level(required_skill)
 	var level_gap: int = maxi(0, required_level - prof_level)
 	var stat_mult: float = maxf(0.25, 1.0 - level_gap * 0.15)
 	var speed_mult: float = minf(1.75, 1.0 + level_gap * 0.15)

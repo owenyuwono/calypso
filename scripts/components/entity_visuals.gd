@@ -107,8 +107,8 @@ func clear_overlay() -> void:
 func setup_hp_bar(y_offset: float = 1.8) -> void:
 	_hp_bar = ModelHelper.create_hp_bar(get_parent(), y_offset)
 
-func update_hp_bar(entity_id: String) -> void:
-	ModelHelper.update_entity_hp_bar(_hp_bar, entity_id)
+func update_hp_bar(hp: int, max_hp: int) -> void:
+	ModelHelper.update_entity_hp_bar(_hp_bar, hp, max_hp)
 
 func set_hp_bar_visible(vis: bool) -> void:
 	if _hp_bar:
@@ -116,12 +116,13 @@ func set_hp_bar_visible(vis: bool) -> void:
 
 # --- Damage / Combat Visuals ---
 
-func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1), target_pos: Vector3 = Vector3.INF) -> void:
+func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1), target_pos: Vector3 = Vector3.ZERO) -> void:
 	var parent: Node3D = get_parent()
 	ModelHelper.spawn_damage_number(parent, target_id, damage, color, parent.global_position, target_pos)
 
 func flash_target(target_id: String) -> void:
-	ModelHelper.flash_target(target_id)
+	var target_node: Node = WorldState.get_entity(target_id)
+	ModelHelper.flash_target(target_node)
 
 # --- Vend Sign ---
 

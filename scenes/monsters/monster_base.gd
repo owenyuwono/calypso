@@ -346,11 +346,11 @@ func _drop_aggro() -> void:
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
-		_visuals.update_hp_bar(monster_id)
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == monster_id and state != "dead":
-		_visuals.update_hp_bar(monster_id)
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:
@@ -456,7 +456,7 @@ func _respawn() -> void:
 	_auto_attack.cancel()
 
 	GameEvents.entity_respawned.emit(monster_id)
-	_visuals.update_hp_bar(monster_id)
+	_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 	# Reapply night buffs if respawning during night
 	if TimeManager.is_night():
 		_apply_night_buffs()

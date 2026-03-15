@@ -175,14 +175,7 @@ static func apply_toon_to_model(root: Node) -> void:
 
 ## Spawn a floating damage number above a target entity.
 ## caller is needed because static functions can't call get_tree().
-static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO, target_pos: Vector3 = Vector3.INF) -> void:
-	# Use explicit target_pos if provided, otherwise look up from WorldState.
-	# This handles the case where the target is already unregistered (e.g. killing blow).
-	if target_pos == Vector3.INF:
-		var target_node = WorldState.get_entity(target_id)
-		if not target_node:
-			return
-		target_pos = target_node.global_position
+static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO, target_pos: Vector3 = Vector3.ZERO) -> void:
 	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
 	if not dmg_scene:
 		return
@@ -201,8 +194,7 @@ static func spawn_damage_number(caller: Node, target_id: String, damage: int, co
 	dmg.setup(damage, color, direction)
 
 ## Flash-hit the target entity (calls its flash_hit() method if available).
-static func flash_target(target_id: String) -> void:
-	var target_node = WorldState.get_entity(target_id)
+static func flash_target(target_node: Node) -> void:
 	if not target_node or not is_instance_valid(target_node):
 		return
 	if target_node.has_method("flash_hit"):
@@ -256,13 +248,10 @@ static func get_hit_delay(anim_player: AnimationPlayer, anim_name: String) -> fl
 		return anim_player.get_animation(anim_name).length * 0.5
 	return 0.4
 
-## Update an entity's HP bar from WorldState data.
-static func update_entity_hp_bar(hp_bar: Node, entity_id: String) -> void:
+## Update an entity's HP bar with the given hp and max_hp values.
+static func update_entity_hp_bar(hp_bar: Node, hp: int, max_hp: int) -> void:
 	if not hp_bar:
 		return
-	var data := WorldState.get_entity_data(entity_id)
-	var hp: int = data.get("hp", 0)
-	var max_hp: int = data.get("max_hp", 1)
 	if hp_bar.has_method("update_bar"):
 		hp_bar.update_bar(hp, max_hp)
 	hp_bar.visible = hp < max_hp

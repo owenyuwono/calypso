@@ -8,13 +8,16 @@ const REGEN_REST: float = 3.0
 const REST_SPOT_RANGE: float = 4.0
 const VELOCITY_THRESHOLD: float = 0.5
 
-const REST_SPOTS: Array = ["TownWell", "TownInn"]
+var _rest_spots: Array = []
 
 var stamina: float = 100.0
 var max_stamina: float = 100.0
 var _last_threshold: int = 10  # tracks 10% threshold crossings
 var _entity_id: String = ""
 var _is_resting: bool = false
+
+func setup_rest_spots(spots: Array) -> void:
+	_rest_spots = spots
 
 func _ready() -> void:
 	var parent := get_parent()
@@ -62,7 +65,7 @@ func _is_near_rest_spot() -> bool:
 	if not is_instance_valid(parent) or not "global_position" in parent:
 		return false
 	var pos: Vector3 = parent.global_position
-	for spot_id in REST_SPOTS:
+	for spot_id in _rest_spots:
 		if WorldState.has_location(spot_id):
 			var spot_pos := WorldState.get_location(spot_id)
 			if pos.distance_to(spot_pos) < REST_SPOT_RANGE:

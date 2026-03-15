@@ -28,7 +28,7 @@ static func spawn_model(ctx: WorldBuilderContext, path: String, pos: Vector3, ro
 	if pos.y == 0.0 and ctx.terrain_noise:
 		var height_scale := ctx.terrain_height_scale_field
 		# Use city height scale for city area
-		if pos.x >= -70 and pos.x <= 70 and pos.z >= -50 and pos.z <= 50:
+		if ctx.is_in_city(pos):
 			height_scale = ctx.terrain_height_scale_city
 		pos.y = TerrainGenerator.get_height_at(ctx.terrain_noise, pos.x, pos.z, height_scale)
 	instance.position = pos

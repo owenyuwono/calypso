@@ -116,11 +116,6 @@ func _ready() -> void:
 			_inventory.add_item(weapon_id)
 			_equipment.equip(weapon_id)
 
-	_combat = CombatComponent.new()
-	_combat.name = "CombatComponent"
-	add_child(_combat)
-	_combat.setup(_stats, _equipment)
-
 	_progression = ProgressionComponent.new()
 	_progression.name = "ProgressionComponent"
 	add_child(_progression)
@@ -129,7 +124,12 @@ func _ready() -> void:
 	if not trait_profile.is_empty():
 		var profile: Dictionary = NpcTraits.get_profile(trait_profile)
 		initial_profs = profile.get("starting_proficiencies", {})
-	_progression.setup(_stats, initial_profs)
+	_progression.setup(_stats, initial_profs, _equipment)
+
+	_combat = CombatComponent.new()
+	_combat.name = "CombatComponent"
+	add_child(_combat)
+	_combat.setup(_stats, _equipment, _progression)
 
 	_auto_attack = AutoAttackComponent.new()
 	_auto_attack.name = "AutoAttackComponent"
@@ -148,6 +148,7 @@ func _ready() -> void:
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
+	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
@@ -266,8 +267,8 @@ func _process_movement() -> bool:
 	return false
 
 func _process_combat(delta: float) -> bool:
-	var attack_range: float = WorldState.get_entity_data(npc_id).get("attack_range", 2.0)
-	var attack_speed: float = WorldState.get_entity_data(npc_id).get("attack_speed", 1.0)
+	var attack_range: float = _stats.attack_range
+	var attack_speed: float = _stats.attack_speed
 	# NPCs run slightly faster than base speed when chasing
 	var result: Dictionary = _auto_attack.process_attack(
 		delta, combat_target, global_position,
@@ -407,7 +408,7 @@ func _respawn() -> void:
 
 	change_state(STATE_IDLE)
 	GameEvents.entity_respawned.emit(npc_id)
-	_visuals.update_hp_bar(npc_id)
+	_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
@@ -416,12 +417,12 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
-		_visuals.update_hp_bar(npc_id)
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
-		_visuals.update_hp_bar(npc_id)
+		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 
 func _on_vending_started(eid: String, shop_title: String) -> void:
 	if eid == npc_id:
