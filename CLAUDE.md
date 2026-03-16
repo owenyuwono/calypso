@@ -2,9 +2,9 @@
 
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
-- **Autoload singletons**: WorldState (registry + spatial only), LLMClient, GameEvents (signals, LLM)
+- **Autoload singletons**: WorldState (registry only), LLMClient, GameEvents (signals, LLM)
 - **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), world builders (see below)
-- **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
+- **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
@@ -20,6 +20,7 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 - `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
 - `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
 - `VendingComponent` — vending state, listings, buy/sell. **Must set `.name = "VendingComponent"` before `add_child()`**. API: `start_vending()`, `stop_vending()`, `is_vending()`, `get_listings()`, `get_shop_title()`, `buy_from()`
+- `PerceptionComponent` — Area3D-based spatial awareness (radius 25). Tracks nearby entities via `body_entered`/`body_exited` signals on collision layer 9 (bit 8). **Area3D must be parented to entity Node3D, not the component Node.** API: `get_perception(radius)`, `get_nearby(radius)`, `get_nearby_locations(radius)`, `is_tracking(id)`, `get_distance_to(id)`
 
 Components sync state back to `WorldState.entity_data` via `_sync()` (bridge layer — keeps perception/memory reads working).
 
@@ -41,7 +42,9 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - `DragHandle` for draggable panel title bars with close buttons
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
-- `AutoAttackComponent` — emits `attack_landed(target_id, damage, target_pos)` and `target_lost()` signals; entities connect handlers for visual feedback (damage numbers, flash, shouts)
+- `AutoAttackComponent` — emits `attack_landed(target_id, damage, target_pos)` and `target_lost()` signals; entities connect handlers for visual feedback (damage numbers, flash, shouts). `_chase()` is pure movement (untouched); stuck detection lives in `process_attack()` only
+- **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment
+- **Collision layers**: Layer 1 = physics, Layer 6 = vend signs, Layer 9 (bit 8) = entity perception (PerceptionComponent detection)
 - `NpcLoadouts.LOADOUTS` — static Dictionary of NPC starting data (trait, items, equip, gold, goal). Merchant NPCs use `default_goal: "vend"` to auto-start vending on spawn
 - Merchant vending: any entity can vend from inventory via VendingComponent — no fixed shop NPCs
 - Vend sign: `_visuals.show_vend_sign()` / `hide_vend_sign()` — StaticBody3D (layer 6) + opaque panel quad + Label3D + white border quad (hover). Click sign to shop, click NPC body for info/chat

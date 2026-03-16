@@ -53,6 +53,7 @@ var _nav_wait_frames: int = 0
 # Combat
 var combat_target: String = ""
 var _respawn_timer: float = 0.0
+var _combat_tracker: Dictionary = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 
 # Stuck detection
 var _stuck_timer: float = 0.0
@@ -365,6 +366,8 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 	if not monster_type.is_empty():
 		var weapon_type: String = _combat.get_equipped_weapon_type()
 		_progression.grant_combat_xp(monster_type, weapon_type)
+	_combat_tracker["damage_dealt"] += damage
+	_combat_tracker["hits_dealt"] += 1
 	# Occasionally say something in combat
 	if randf() < 0.15:
 		var shouts := ["Take that!", "Ha!", "Got you!", "Come on!", "Not bad!"]
@@ -373,6 +376,7 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 
 func _on_auto_attack_target_lost() -> void:
 	combat_target = ""
+	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 	WorldState.set_entity_data(npc_id, "combat_target", "")
 	change_state(STATE_IDLE)
 
@@ -426,6 +430,7 @@ func set_goal(new_goal: String) -> void:
 
 func enter_combat(target_id: String) -> void:
 	combat_target = target_id
+	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 	WorldState.set_entity_data(npc_id, "combat_target", target_id)
 	_auto_attack.cancel()
 	change_state(STATE_COMBAT)
@@ -454,6 +459,7 @@ func _die() -> void:
 		vc.stop_vending()
 	change_state(STATE_DEAD)
 	combat_target = ""
+	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 	WorldState.set_entity_data(npc_id, "combat_target", "")
 	_auto_attack.cancel()
 	velocity = Vector3.ZERO
@@ -503,6 +509,8 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _r
 		flash_hit()
 		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
+		_combat_tracker["damage_taken"] += damage
+		_combat_tracker["hits_taken"] += 1
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
@@ -526,3 +534,6 @@ func highlight() -> void:
 
 func unhighlight() -> void:
 	_visuals.unhighlight()
+
+func get_combat_tracker() -> Dictionary:
+	return _combat_tracker

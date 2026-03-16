@@ -12,9 +12,6 @@ const VALID_GOALS: Array = [
 ]
 
 const TICK_INTERVAL: float = 1.0
-const IDLE_DRIFT_INTERVAL: float = 8.0
-const IDLE_CLUSTER_RANGE: float = 4.0
-const IDLE_DRIFT_CHANCE: float = 0.6
 
 # Alternate hunt spots to roam when no monsters nearby
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
@@ -34,7 +31,6 @@ var _social: Node  # NpcSocial child node
 
 var _behavior_timer: float = 0.0
 var _action_in_progress: bool = false
-var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
 var _patrol_index: int = 0
 var _perception: Node
@@ -57,7 +53,6 @@ func _ready() -> void:
 	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
 
 func _process(delta: float) -> void:
-	_idle_drift_timer += delta
 	if _action_in_progress:
 		return
 	if npc.current_state != "idle":
@@ -124,6 +119,22 @@ func _check_survival() -> bool:
 	if hp_pct < potion_threshold and potion_count > 0:
 		_do_action("use_item", "healing_potion")
 		return true
+
+	# Mid-combat threat assessment: are we losing this fight?
+	if npc.current_state == "combat":
+		var tracker: Dictionary = npc.get_combat_tracker()
+		if tracker["hits_taken"] >= 3:
+			var losing: bool = tracker["damage_taken"] > tracker["damage_dealt"] * 1.5
+			if losing:
+				var flee_threshold: float = 0.5  # default
+				if boldness < 0.4:
+					flee_threshold = 0.6  # cautious flee earlier
+				elif boldness > 0.7:
+					flee_threshold = 0.35  # bold stay longer
+				if hp_pct < flee_threshold:
+					npc.last_thought = "This fight is going badly, retreating!"
+					npc.set_goal("return_to_town")
+					return true
 
 	# Retreat if HP low and no potions and not in town
 	if hp_pct < retreat_threshold and potion_count == 0 and not _is_in_town():
@@ -260,31 +271,11 @@ func _execute_hunt() -> void:
 			alive_monsters.append(m)
 
 	if alive_monsters.size() > 0:
-		# Generosity-based target selection: generous NPCs avoid already-contested monsters
-		var generosity: float = NpcTraits.get_trait(npc.trait_profile, "generosity", 0.5)
-		var target: Dictionary = alive_monsters[0]
-		if generosity >= 0.4:
-			# Build set of monster IDs already targeted by other NPCs
-			var contested: Dictionary = {}
-			for eid in WorldState.entity_data:
-				if eid == npc.npc_id:
-					continue
-				var edata: Dictionary = WorldState.entity_data[eid]
-				if edata.get("type", "") == "npc":
-					var ct: String = edata.get("combat_target", "")
-					if not ct.is_empty():
-						contested[ct] = true
-			# Prefer uncontested monsters; fall back to any if all contested
-			var preferred: Dictionary = {}
-			for m in alive_monsters:
-				if not contested.has(m["id"]):
-					preferred = m
-					break
-			if not preferred.is_empty():
-				target = preferred
-		npc.last_thought = "Attacking %s" % target.get("name", target["id"])
-		_do_action("attack", target["id"])
-		return
+		var target: Dictionary = _select_hunt_target(alive_monsters)
+		if not target.is_empty():
+			npc.last_thought = "Attacking %s" % target.get("name", target["id"])
+			_do_action("attack", target["id"])
+			return
 
 	# No alive monsters — check for loot drops before roaming
 	# Filter to only loot_drop type entities — item entities don't have pickup()
@@ -534,38 +525,32 @@ func _execute_tend_shop() -> void:
 
 
 func _execute_idle() -> void:
-	if _idle_drift_timer < IDLE_DRIFT_INTERVAL:
-		return
-	_idle_drift_timer = 0.0
-	if randf() > IDLE_DRIFT_CHANCE:
-		return
+	# NPCs with idle goal should find something purposeful to do
+	var inv: Node = npc.get_node_or_null("InventoryComponent")
+	var stats: Node = npc.get_node_or_null("StatsComponent")
 
-	var perception: Dictionary = _perception.get_perception(25.0)
-	var npcs_nearby: Array = perception.get("npcs", [])
+	# Low HP → return to town
+	if stats:
+		var hp_pct: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 1.0
+		if hp_pct < 0.7:
+			npc.set_goal("return_to_town")
+			return
 
-	var nearest_id: String = ""
-	var nearest_dist: float = INF
-	for n in npcs_nearby:
-		var nid: String = n["id"]
-		if nid == "player":
-			continue
-		if not WorldState.is_alive(nid):
-			continue
-		var entity_data := WorldState.get_entity_data(nid)
-		if entity_data.get("type", "") != "npc":
-			continue
-		var dist: float = n["distance"]
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest_id = nid
-
-	if nearest_id.is_empty():
-		return
-	if nearest_dist <= IDLE_CLUSTER_RANGE:
+	# Has materials → sell them
+	if _get_total_material_count() > 0:
+		npc.set_goal("sell_loot")
 		return
 
-	npc.last_thought = "Drifting toward %s" % nearest_id
-	_do_action("move_to", nearest_id)
+	# Needs potions and has gold → buy potions
+	if inv:
+		var potion_count: int = inv.get_items().get("healing_potion", 0)
+		var gold: int = inv.get_gold_amount()
+		if potion_count < 2 and gold >= 20:
+			npc.set_goal("buy_potions")
+			return
+
+	# Fallback → patrol town
+	npc.set_goal("patrol")
 
 # =============================================================================
 # Action Dispatchers
@@ -586,6 +571,103 @@ func _on_action_completed(completed_npc_id: String, _action: String, _success: b
 func _on_time_phase_changed(_old_phase: String, new_phase: String) -> void:
 	if new_phase == "night" or new_phase == "dawn":
 		evaluate()
+
+# =============================================================================
+# Hunt Target Selection
+# =============================================================================
+
+func _is_monster_contested(monster_id: String) -> Dictionary:
+	# Check if any other NPC is fighting this monster
+	for eid in WorldState.entity_data:
+		if eid == npc.npc_id:
+			continue
+		var edata: Dictionary = WorldState.entity_data[eid]
+		if edata.get("type", "") != "npc":
+			continue
+		if edata.get("combat_target", "") != monster_id:
+			continue
+		# Found a fighter — check their status
+		var fighter_hp: int = edata.get("hp", 0)
+		var fighter_max_hp: int = edata.get("max_hp", 1)
+		var fighter_hp_pct: float = float(fighter_hp) / float(fighter_max_hp)
+		var fighter_goal: String = edata.get("goal", "")
+		var fighter_retreating: bool = fighter_goal == "return_to_town" or fighter_hp_pct < 0.3
+		return {"contested": true, "fighter_id": eid, "fighter_hp_pct": fighter_hp_pct, "fighter_retreating": fighter_retreating}
+	return {"contested": false, "fighter_id": "", "fighter_hp_pct": 1.0, "fighter_retreating": false}
+
+func _can_handle_monster(monster_data: Dictionary) -> bool:
+	# Compare NPC stats vs monster stats — can we handle this fight?
+	var combat: Node = npc.get_node_or_null("CombatComponent")
+	if not combat:
+		return true  # no combat component = no way to evaluate, assume yes
+	var npc_atk: int = combat.get_effective_atk()
+	var npc_def: int = combat.get_effective_def()
+	var monster_atk: int = monster_data.get("atk", 5)
+	var monster_def: int = monster_data.get("def", 0)
+	var monster_hp: int = monster_data.get("hp", 10)
+
+	# Can we deal meaningful damage?
+	var our_damage: int = maxi(npc_atk - monster_def, 1)
+	# How much damage will we take?
+	var their_damage: int = maxi(monster_atk - npc_def, 1)
+
+	# If we'd die before killing it (rough estimate), it's too strong
+	var stats: Node = npc.get_node_or_null("StatsComponent")
+	if stats:
+		var our_hp: int = stats.hp
+		var hits_to_kill: int = ceili(float(monster_hp) / float(our_damage))
+		var hits_to_die: int = ceili(float(our_hp) / float(their_damage))
+		if hits_to_die < hits_to_kill:
+			return false  # we'd die first
+	return true
+
+func _select_hunt_target(alive_monsters: Array) -> Dictionary:
+	var generosity: float = NpcTraits.get_trait(npc.trait_profile, "generosity", 0.5)
+	var boldness: float = NpcTraits.get_trait(npc.trait_profile, "boldness", 0.5)
+
+	var uncontested: Array = []
+	var help_targets: Array = []  # contested where fighter is retreating
+	var contested: Array = []
+
+	for m in alive_monsters:
+		var contest_info: Dictionary = _is_monster_contested(m["id"])
+		var monster_data: Dictionary = WorldState.get_entity_data(m["id"])
+
+		# Skip monsters we can't handle (unless bold)
+		if boldness <= 0.7 and not _can_handle_monster(monster_data):
+			continue
+
+		if not contest_info["contested"]:
+			uncontested.append(m)
+		elif contest_info["fighter_retreating"]:
+			help_targets.append(m)
+		else:
+			contested.append(m)
+
+	# Priority 1: Uncontested monsters (always preferred)
+	if uncontested.size() > 0:
+		return uncontested[0]
+
+	# Priority 2: Help retreating ally (generous NPCs only)
+	if help_targets.size() > 0 and generosity >= 0.6:
+		npc.last_thought = "Helping a friend in trouble!"
+		return help_targets[0]
+
+	# Priority 3: Steal contested (selfish + aggressive NPCs only)
+	if contested.size() > 0 and generosity < 0.3 and boldness > 0.5:
+		return contested[0]
+
+	# Priority 4: All-contested fallback — attack nearest anyway
+	if contested.size() > 0:
+		return contested[0]
+	if help_targets.size() > 0:
+		return help_targets[0]
+
+	# Priority 5: Monsters we skipped as too strong — pick weakest
+	if alive_monsters.size() > 0:
+		return alive_monsters[alive_monsters.size() - 1]  # last = weakest (sorted by distance, but better than nothing)
+
+	return {}  # no monsters at all
 
 # =============================================================================
 # Helpers
