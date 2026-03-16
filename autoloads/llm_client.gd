@@ -3,7 +3,7 @@ extends Node
 
 const LLAMA_BASE_URL: String = "http://localhost:8080"
 const LLAMA_MODEL: String = "qwen3.5:4b"
-const LLM_TIMEOUT: float = 30.0
+const LLM_TIMEOUT: float = 60.0
 const LLM_TEMPERATURE: float = 0.7
 const MAX_CONCURRENT_REQUESTS: int = 10
 
@@ -93,11 +93,7 @@ func _dedup_key(request_id: String) -> String:
 	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
 	for prefix in prefixes:
 		if request_id.begins_with(prefix):
-			var after_prefix: String = request_id.substr(prefix.length())
-			# The npc_id is the next token before the next "_" separator (if any)
-			var underscore_pos: int = after_prefix.find("_")
-			var npc_id: String = after_prefix if underscore_pos == -1 else after_prefix.substr(0, underscore_pos)
-			return prefix + npc_id
+			return request_id
 	# Bare npc_id decision request — use as-is
 	return request_id
 
@@ -159,11 +155,9 @@ func _extract_entity_id(request_id: String) -> String:
 	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
 	for prefix in prefixes:
 		if request_id.begins_with(prefix):
-			var after_prefix: String = request_id.substr(prefix.length())
-			var underscore_pos: int = after_prefix.find("_")
-			var entity_id: String = after_prefix if underscore_pos == -1 else after_prefix.substr(0, underscore_pos)
+			var entity_id: String = request_id.substr(prefix.length())
 			# Skip player-involved conversations — player is not in NPC entity registry
-			if entity_id == "player":
+			if entity_id == "player" or entity_id.begins_with("player_"):
 				return ""
 			return entity_id
 	# Bare request_id is the npc_id itself
