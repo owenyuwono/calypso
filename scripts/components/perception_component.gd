@@ -24,7 +24,9 @@ func setup() -> void:
 	col.shape = shape
 	_area.add_child(col)
 
-	add_child(_area)
+	# Add to the entity (Node3D parent), not this component (Node),
+	# so the Area3D inherits the entity's spatial transform.
+	get_parent().add_child(_area)
 
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
@@ -80,13 +82,17 @@ func get_nearby(radius: float = AREA_RADIUS) -> Array:
 		return []
 	var own_pos: Vector3 = parent_node.global_position
 	var result: Array = []
+	var stale: Array = []
 	for eid in _tracked:
 		var node: Node3D = _tracked[eid]
-		if not is_instance_valid(node):
+		if not is_instance_valid(node) or WorldState.get_entity_data(eid).is_empty():
+			stale.append(eid)
 			continue
 		var dist: float = own_pos.distance_to(node.global_position)
 		if dist <= radius:
 			result.append({"id": eid, "node": node, "distance": dist})
+	for eid in stale:
+		_tracked.erase(eid)
 	result.sort_custom(func(a, b): return a.distance < b.distance)
 	return result
 
@@ -108,17 +114,21 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	var locations: Array = []
 	var vendors: Array = []
 
+	var stale: Array = []
 	for eid in _tracked:
 		if eid == own_id:
 			continue
 		var node: Node3D = _tracked[eid]
 		if not is_instance_valid(node):
+			stale.append(eid)
+			continue
+		var data: Dictionary = WorldState.get_entity_data(eid)
+		if data.is_empty():
+			stale.append(eid)
 			continue
 		var dist: float = own_pos.distance_to(node.global_position)
 		if dist > radius:
 			continue
-
-		var data: Dictionary = WorldState.get_entity_data(eid)
 		var entity_type: String = data.get("type", "unknown")
 		match entity_type:
 			"npc", "player":
@@ -162,6 +172,9 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 					"distance": snapped(dist, 0.1),
 					"name": data.get("name", eid),
 				})
+
+	for eid in stale:
+		_tracked.erase(eid)
 
 	npcs.sort_custom(func(a, b): return a.distance < b.distance)
 	monsters.sort_custom(func(a, b): return a.distance < b.distance)
