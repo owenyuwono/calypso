@@ -1,5 +1,6 @@
 extends RefCounted
 ## Builds LLM prompts for adventurer NPCs — combat, economy, and social awareness.
+## Uses compact formats to reduce token usage (~50% reduction for 50-100 NPC throughput).
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
@@ -34,12 +35,11 @@ RULES:
 - If your stamina is low, consider resting at a rest spot (Town Well, Town Inn)
 - You can rest to recover stamina"""
 
-const USER_TEMPLATE := """STATS: Level {level}, HP {hp}/{max_hp}, ATK {atk} (effective {eff_atk}), DEF {def} (effective {eff_def})
-EQUIPMENT: Weapon: {weapon}, Armor: {armor}
-INVENTORY: {inventory_text}
-GOLD: {gold}
-TIME: {time_display} ({phase})
-STAMINA: {stamina_text}
+const USER_TEMPLATE := """{stats}
+{equipment}
+{inventory}
+{time}
+{stamina}
 
 NEARBY:
 {perception}
@@ -68,39 +68,30 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 	var hp: int = stats.hp if stats else 50
 	var max_hp: int = stats.max_hp if stats else 50
 	var atk: int = stats.atk if stats else 10
-	var def: int = stats.def if stats else 5
+	var def_val: int = stats.def if stats else 5
 	var eff_atk: int = combat_comp.get_effective_atk() if combat_comp else atk
-	var eff_def: int = combat_comp.get_effective_def() if combat_comp else def
+	var eff_def: int = combat_comp.get_effective_def() if combat_comp else def_val
 	var gold: int = inv_comp.gold if inv_comp else 0
 
 	var equipment: Dictionary = equip_comp.get_equipment() if equip_comp else {}
 	var weapon_id: String = equipment.get("weapon", "")
 	var armor_id: String = equipment.get("armor", "")
-	var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "(none)"
-	var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "(none)"
 
 	var inv: Dictionary = inv_comp.get_items() if inv_comp else {}
-	var inventory_text := "(empty)"
-	if not inv.is_empty():
-		var parts: Array = []
-		for item_id in inv:
-			var count: int = inv[item_id]
-			var item_name := ItemDatabase.get_item_name(item_id)
-			parts.append("%s x%d" % [item_name, count])
-		inventory_text = ", ".join(parts)
 
 	var perception_text := _format_perception(perception)
 
+	var atk_bonus: int = eff_atk - atk
+	var def_bonus: int = eff_def - def_val
+
 	var content := USER_TEMPLATE.format({
-		"level": level, "hp": hp, "max_hp": max_hp,
-		"atk": atk, "def": def, "eff_atk": eff_atk, "eff_def": eff_def,
-		"weapon": weapon_name, "armor": armor_name,
-		"inventory_text": inventory_text, "gold": gold,
+		"stats": "lv%d hp:%d/%d atk:%d+%d def:%d+%d gold:%d" % [level, hp, max_hp, atk, atk_bonus, def_val, def_bonus, gold],
+		"equipment": _format_equipment_compact(weapon_id, armor_id),
+		"inventory": _format_inventory_compact(inv),
+		"time": _format_time_compact(),
+		"stamina": _format_stamina_compact(npc_node),
 		"perception": perception_text,
 		"memory": memory_summary,
-		"time_display": TimeManager.get_time_display(),
-		"phase": TimeManager.get_phase(),
-		"stamina_text": _get_stamina_text(npc_node),
 	})
 	return {"role": "user", "content": content}
 
@@ -143,10 +134,8 @@ Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
 {goal_instruction}"""
 
-const CHAT_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
-Equipment: {equipment}
-Inventory: {inventory}
-TIME: {time_display} ({phase}). STAMINA: {stamina_text}.
+const CHAT_USER_TEMPLATE := """lv{level} hp:{hp}/{max_hp} gold:{gold} | equip:{equipment} | inv:{inventory}
+time:{time_display}({phase}) stamina:{stamina_text}
 {key_memories}
 {context}
 {relationship_line}{speaker_line}
@@ -170,8 +159,8 @@ Do NOT use JSON. Just speak naturally as {npc_name}.
 Do NOT narrate actions or emotes. No *asterisk actions*. Only output spoken words.
 {goal_instruction}"""
 
-const CHAT_INITIATE_USER_TEMPLATE := """You are level {level} with {hp}/{max_hp} HP and {gold} gold.
-TIME: {time_display} ({phase}). STAMINA: {stamina_text}.
+const CHAT_INITIATE_USER_TEMPLATE := """lv{level} hp:{hp}/{max_hp} gold:{gold}
+time:{time_display}({phase}) stamina:{stamina_text}
 {key_memories}
 {context}
 {relationship_line}You see {target_name}, who is {target_activity}.
@@ -222,7 +211,7 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	if memory_node and memory_node.has_method("get_area_chat_context"):
 		context = memory_node.get_area_chat_context(5)
 
-	var relationship_line := "Your relationship with %s: %s\n" % [target_name, relationship_label] if not relationship_label.is_empty() else ""
+	var relationship_line := "rel:%s=%s\n" % [target_name, relationship_label] if not relationship_label.is_empty() else ""
 
 	var key_memories := ""
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
@@ -270,8 +259,8 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 	var hp: int = 50
 	var max_hp: int = 50
 	var gold: int = 0
-	var equipment_text := "(none)"
-	var inventory_text := "(empty)"
+	var equipment_text := "none"
+	var inventory_text := "empty"
 	if npc_node and is_instance_valid(npc_node):
 		var stats = npc_node.get_node_or_null("StatsComponent")
 		var inv_comp = npc_node.get_node_or_null("InventoryComponent")
@@ -283,27 +272,19 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 		if inv_comp:
 			gold = inv_comp.gold
 			var inv: Dictionary = inv_comp.get_items()
-			if not inv.is_empty():
-				var parts: Array = []
-				for item_id in inv:
-					var count: int = inv[item_id]
-					var item_name := ItemDatabase.get_item_name(item_id)
-					parts.append("%s x%d" % [item_name, count])
-				inventory_text = ", ".join(parts)
+			inventory_text = _format_inventory_compact(inv)
 		if equip_comp:
 			var equipment: Dictionary = equip_comp.get_equipment()
 			var weapon_id: String = equipment.get("weapon", "")
 			var armor_id: String = equipment.get("armor", "")
-			var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "(none)"
-			var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "(none)"
-			equipment_text = "Weapon: %s, Armor: %s" % [weapon_name, armor_name]
+			equipment_text = _format_equipment_compact(weapon_id, armor_id)
 
 	# Build conversation context from area chat log
 	var context := ""
 	if memory_node and memory_node.has_method("get_area_chat_context"):
 		context = memory_node.get_area_chat_context(5)
 
-	var relationship_line := "Your relationship with %s: %s\n" % [speaker_name, relationship_label] if not relationship_label.is_empty() else ""
+	var relationship_line := "rel:%s=%s\n" % [speaker_name, relationship_label] if not relationship_label.is_empty() else ""
 
 	var key_memories := ""
 	if memory_node and memory_node.has_method("get_key_memories_summary"):
@@ -503,38 +484,108 @@ static func get_activity_description(goal: String) -> String:
 static func _format_perception(perception: Dictionary) -> String:
 	var lines: Array = []
 
-	# Monsters
+	# Monsters — compact: Name(type,hp:status,Xm)
 	var monsters: Array = perception.get("monsters", [])
 	if not monsters.is_empty():
 		for m in monsters:
-			lines.append("Monster: %s (%s) - HP %d/%d, %.1fm away" % [m.name, m.id, m.hp, m.max_hp, m.distance])
+			var hp_status := _hp_status(m.hp, m.max_hp)
+			var dist: int = int(round(m.distance))
+			lines.append("%s(%s,hp:%s,%dm)" % [m.name, m.id, hp_status, dist])
 	else:
-		lines.append("Monsters: none nearby")
+		lines.append("monsters:none")
 
-	# NPCs / Players
+	# NPCs / Players — compact: Name(class,hp:status,activity,Xm)
 	var npcs: Array = perception.get("npcs", [])
 	if not npcs.is_empty():
 		for n in npcs:
-			var state_info: String = n.get("state", "idle")
-			lines.append("Adventurer: %s (%s) - Lv.%d, HP %d/%d, %.1fm away, %s" % [
-				n.name, n.id, n.get("level", 1), n.get("hp", 0), n.get("max_hp", 0), n.distance, state_info])
+			var hp_status := _hp_status(n.get("hp", 0), n.get("max_hp", 1))
+			var activity := _state_to_activity(n.get("state", "idle"))
+			var dist: int = int(round(n.distance))
+			lines.append("%s(adventurer,hp:%s,%s,%dm)" % [n.name, hp_status, activity, dist])
 	else:
-		lines.append("Adventurers: none nearby")
+		lines.append("adventurers:none")
 
-	# Vendors (entities currently running player shops)
+	# Vendors — compact: Name(vendor,shop_title,Xm)
 	var vendors: Array = perception.get("vendors", [])
 	for v in vendors:
 		var title: String = v.get("shop_title", "")
-		var title_part: String = (" [%s]" % title) if not title.is_empty() else ""
-		lines.append("Vendor: %s (%s) - %.1fm away%s" % [v.name, v.id, v.distance, title_part])
+		var dist: int = int(round(v.distance))
+		if not title.is_empty():
+			lines.append("%s(vendor,%s,%dm)" % [v.name, title, dist])
+		else:
+			lines.append("%s(vendor,%dm)" % [v.name, dist])
 
-	# Locations
+	# Locations — compact: loc_id(Xm)
 	var locations: Array = perception.get("locations", [])
 	if not locations.is_empty():
+		var loc_parts: Array = []
 		for loc in locations:
-			lines.append("Location: %s - %.1fm away" % [loc.id, loc.distance])
+			var dist: int = int(round(loc.distance))
+			loc_parts.append("%s(%dm)" % [loc.id, dist])
+		lines.append("locs:" + ",".join(loc_parts))
 
 	return "\n".join(lines)
+
+## Returns a compact HP status label from current and max HP values.
+static func _hp_status(hp: int, max_hp: int) -> String:
+	if max_hp <= 0:
+		return "unknown"
+	var pct: float = float(hp) / float(max_hp)
+	if pct >= 0.95:
+		return "full"
+	elif pct >= 0.65:
+		return "high"
+	elif pct >= 0.35:
+		return "mid"
+	elif pct >= 0.15:
+		return "low"
+	else:
+		return "critical"
+
+## Maps NPC state string to compact activity label.
+static func _state_to_activity(state: String) -> String:
+	match state:
+		"combat":
+			return "fighting"
+		"moving":
+			return "moving"
+		"thinking":
+			return "idle"
+		"dead":
+			return "dead"
+		"vend", "vending":
+			return "vending"
+		_:
+			return "idle"
+
+## Returns compact equipment string: equip:weapon_id,armor_id
+static func _format_equipment_compact(weapon_id: String, armor_id: String) -> String:
+	var parts: Array = []
+	if not weapon_id.is_empty():
+		parts.append(weapon_id)
+	if not armor_id.is_empty():
+		parts.append(armor_id)
+	if parts.is_empty():
+		return "equip:none"
+	return "equip:" + ",".join(parts)
+
+## Returns compact inventory string: inv:item_id*count,...
+static func _format_inventory_compact(inv: Dictionary) -> String:
+	if inv.is_empty():
+		return "inv:empty"
+	var parts: Array = []
+	for item_id in inv:
+		var count: int = inv[item_id]
+		parts.append("%s*%d" % [item_id, count])
+	return "inv:" + ",".join(parts)
+
+## Returns compact time string: time:14h(day)
+static func _format_time_compact() -> String:
+	return "time:%s(%s)" % [TimeManager.get_time_display(), TimeManager.get_phase()]
+
+## Returns compact stamina string: stamina:80/100
+static func _format_stamina_compact(npc_node: Node) -> String:
+	return "stamina:" + _get_stamina_text(npc_node)
 
 static func _get_stamina_text(npc_node: Node) -> String:
 	var comp = npc_node.get_node_or_null("StaminaComponent")
