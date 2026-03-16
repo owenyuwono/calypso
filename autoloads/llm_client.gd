@@ -1,7 +1,7 @@
 extends Node
 ## Async HTTP pool for llama-server (OpenAI-compatible) API calls with timeout and rate-limiting.
 
-const LLAMA_BASE_URL: String = "http://localhost:8080"
+const LLAMA_BASE_URL: String = "http://localhost:11434"
 const LLAMA_MODEL: String = "qwen3.5:4b"
 const LLM_TIMEOUT: float = 60.0
 const LLM_TEMPERATURE: float = 0.7
