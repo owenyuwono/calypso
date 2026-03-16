@@ -20,7 +20,7 @@
 Each entity (player, NPC, monster) owns its state via child Node components:
 - `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `is_alive()`, `get_stats_dict()`
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
-- `EquipmentComponent` — 8 slots (head, torso, legs, gloves, feet, back, main_hand, off_hand). Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_atk_bonus()`, `get_def_bonus()`
+- `EquipmentComponent` — 8 slots (head, torso, legs, gloves, feet, back, main_hand, off_hand). Items route to slot via `slot_type` field (fallback: weapon→main_hand, armor→off_hand). Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_slot(name)`, `get_weapon()`, `get_armor()`, `get_atk_bonus()`, `get_def_bonus()`. Bonuses summed across all slots
 - `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `deal_damage_amount_to_with_pierce(target_id, amount, def_ignore)`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
 - `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
 - `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
@@ -54,7 +54,9 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment
 - **Event-driven LLM**: NPCs only consult LLM on significant events (goal_completed, combat_outcome, low_resources, idle_timeout, player/NPC chat), not on timers. Event cooldowns prevent spam. Scripted behavior handles ~95% of decisions
 - **NPC scaling**: `NpcGenerator` creates 50+ procedural NPCs (5 archetypes: warrior/mage/rogue/ranger/merchant, ~200 name pool, tiered loadouts). `game_world.gd` spawns them at world init
-- **Entity LOD**: Distance-based LOD in `npc_base.gd` and `monster_base.gd`. Three levels: 0 (<30m, full processing), 1 (30-60m, skip separation), 2 (>60m, also skip animations). LOD check every 0.5s with staggered timers. Dead/thinking states always process. NPC separation uses cached `_perception` member (not `get_node_or_null` every frame)
+- **Entity LOD**: Distance-based in `npc_base.gd` and `monster_base.gd`. Levels: 0 (<30m, full), 1 (30-60m, skip separation), 2 (>60m, skip animations). 0.5s staggered checks. Dead/thinking always process
+- **Dynamic HP bars**: Show on combat entry or damage, hide on combat exit + full HP. Driven by entity combat state via `update_hp_bar_combat()`
+- **Vicinity chat log**: Combat/speech messages filtered to 30m from player. System/level-up messages always show
 - **Gossip system**: `GossipSystem` propagates facts between NPCs during social chat. Memories have gossip metadata (source: witnessed/told_by/rumor, spread_count, original_source). 15% distortion per retelling, `spread_count >= 4` becomes rumor. Gossip affects relationships
 - **Compact prompts**: `prompt_builder.gd` uses token-efficient formats: `Kael(knight,hp:full,fighting:slime,8m)` for perception, `lv5 hp:80/100 atk:15+4 def:8+3 gold:150` for stats
 - **Collision layers**: Layer 1 = physics, Layer 6 = vend signs, Layer 9 (bit 8) = entity perception (PerceptionComponent detection)
@@ -79,6 +81,9 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **DialogueBubble** (`scenes/ui/dialogue_bubble.gd`): 3D speech bubble via SubViewport + Sprite3D. Queue-based, 4s default duration, word-wrap at 600px
 - **ChatLog** (`scenes/ui/chat_log.gd`): Colored message types (player_speech, npc_speech, combat, loot, gold, system). Combat hit batching (0.3s window). Auto-scroll, max 50 messages
 - **ChatInput** (`scenes/ui/chat_input.gd`): Enter to toggle, LineEdit with placeholder. Signal: `message_sent(text)`
+- **InventoryPanel** (`scenes/ui/inventory_panel.gd`): Grid-based inventory with 8-slot equipment section on top (armor 2×3 left, weapons right) + 5-column item grid below. Equipment slots use placeholder sprites (`assets/textures/ui/equip_slots/`). Tooltips show item name + stat. Vicinity-filtered chat log (30m). Medieval RPG aesthetic (warm amber on dark parchment)
+- **SkillPanel** (`scenes/ui/skill_panel.gd`): Two-level UI — proficiency grid overview (13 buttons with XP fill) → drill-down detail with skills + hotbar assignment. Both S and P keys toggle
+- **Panel toggles**: Top-right button bar: Status [C] | Inv [I] | Skills [S] | Map [W]
 
 ## Proficiency System (RuneScape-style)
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`
@@ -86,7 +91,7 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **Stat derivation**: ATK = 5 + weapon_level * 2, DEF = 3 + constitution_level, Max HP = 40 + constitution_level * 10, player level = sum of all proficiency levels
 - **XP sources**: weapon proficiency XP on combat hits, constitution XP on taking damage. Gathering/production are placeholders (not yet implemented)
 - **Monsters**: `proficiency_xp` field in MonsterDatabase (3–20 per monster type)
-- **Items**: `weapon_type`, `required_skill`, `required_level` fields for equipment proficiency requirements
+- **Items**: `weapon_type`, `slot_type` (main_hand/off_hand), `required_skill`, `required_level` fields for equipment proficiency requirements
 - **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`, `skill_learned(entity_id, skill_id)`, `skill_used(entity_id, skill_id, target_id)`
 
 ## Active Skill System
