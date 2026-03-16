@@ -28,6 +28,9 @@ const SLOT_LABELS: Dictionary = {
 	"gloves": "Gloves", "legs": "Legs", "feet": "Feet", "back": "Back",
 }
 
+const SLOT_ICON_DIR := "res://assets/textures/ui/equip_slots/"
+var _slot_icons: Dictionary = {}  # slot_name -> Texture2D
+
 const TYPE_ORDER := {"weapon": 0, "armor": 1, "consumable": 2, "material": 3}
 const TYPE_COLORS := {
 	"consumable": Color(0.18, 0.4, 0.18),
@@ -68,8 +71,16 @@ var _stats: Node
 
 func _ready() -> void:
 	visible = false
+	_load_slot_icons()
 	_build_ui()
 	GameEvents.item_looted.connect(func(_a, _b, _c): _refresh())
+
+func _load_slot_icons() -> void:
+	for slot_name in SLOT_LABELS:
+		var path: String = SLOT_ICON_DIR + slot_name + ".png"
+		var tex: Texture2D = load(path) as Texture2D
+		if tex:
+			_slot_icons[slot_name] = tex
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
@@ -297,6 +308,7 @@ func _sort_items(inv: Dictionary) -> Array:
 func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(cell_size, cell_size)
+	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.09, 0.07)
 	style.border_color = Color(0.25, 0.22, 0.18)
@@ -304,21 +316,39 @@ func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	style.set_corner_radius_all(5)
 	cell.add_theme_stylebox_override("panel", style)
 
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 1)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cell.add_child(vbox)
+
+	# Slot icon (dimmed)
+	var icon_tex: Texture2D = _slot_icons.get(slot_name)
+	if icon_tex:
+		var icon := TextureRect.new()
+		icon.texture = icon_tex
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(32, 28)
+		icon.modulate = Color(1, 1, 1, 0.3)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(icon)
+
+	# Slot name label below icon
 	var label := Label.new()
 	label.text = SLOT_LABELS.get(slot_name, slot_name)
-	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_font_size_override("font_size", 9)
 	label.add_theme_color_override("font_color", Color(0.45, 0.4, 0.32))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cell.add_child(label)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(label)
 
 	return cell
 
 func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(cell_size, cell_size)
+	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var slot_color: Color = EQUIP_SLOT_COLORS.get(slot_name, EQUIP_SLOT_COLOR_DEFAULT)
 	var style := StyleBoxFlat.new()
@@ -331,17 +361,21 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 	var item_data: Dictionary = ItemDatabase.get_item(item_id)
 	var item_name: String = item_data.get("name", item_id)
 
-	# Slot label tiny at top
-	var slot_label := Label.new()
-	slot_label.text = SLOT_LABELS.get(slot_name, slot_name)
-	slot_label.add_theme_font_size_override("font_size", 9)
-	slot_label.add_theme_color_override("font_color", Color(0.8, 0.75, 0.6, 0.75))
-	slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	slot_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	slot_label.offset_top = 3
-	slot_label.offset_bottom = 16
-	slot_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cell.add_child(slot_label)
+	# Slot icon at top-left (small, semi-transparent)
+	var icon_tex: Texture2D = _slot_icons.get(slot_name)
+	if icon_tex:
+		var icon := TextureRect.new()
+		icon.texture = icon_tex
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(16, 16)
+		icon.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		icon.offset_left = 2
+		icon.offset_top = 2
+		icon.offset_right = 18
+		icon.offset_bottom = 18
+		icon.modulate = Color(1, 1, 1, 0.5)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(icon)
 
 	# 2-char abbreviation of item name, centered
 	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
@@ -365,6 +399,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 func _build_cell(item_id: String, count: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var item_data: Dictionary = ItemDatabase.get_item(item_id)
 	var type_str: String = item_data.get("type", "")
@@ -429,6 +464,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 func _build_empty_cell() -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.09, 0.07)
 	style.border_color = Color(0.22, 0.2, 0.16)
