@@ -35,6 +35,9 @@ var _hunt_spot_index: int = 0
 var _patrol_index: int = 0
 var _perception: Node
 
+var _idle_timer: float = 0.0  # Tracks how long NPC has been idle with no activity
+var _was_in_combat: bool = false  # Detects combat → non-combat transition
+
 func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
@@ -53,14 +56,31 @@ func _ready() -> void:
 	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
 
 func _process(delta: float) -> void:
+	# Detect combat → non-combat transition to emit combat_outcome
+	var in_combat: bool = npc.current_state == "combat"
+	if _was_in_combat and not in_combat and npc.current_state != "dead":
+		_was_in_combat = false
+		var outcome: String = "fled" if npc.current_goal == "return_to_town" else "won"
+		_emit_npc_event("combat_outcome", {"result": outcome})
+	elif in_combat:
+		_was_in_combat = true
+
 	if _action_in_progress:
+		_idle_timer = 0.0
 		return
 	if npc.current_state != "idle":
+		_idle_timer = 0.0
 		return
 	if not npc._stats.is_alive():
 		return
 	if brain and brain.is_busy():
 		return
+
+	# Track idle time and fire idle_timeout event
+	_idle_timer += delta
+	if _idle_timer >= 60.0:
+		_idle_timer = 0.0
+		_emit_npc_event("idle_timeout", {})
 
 	_behavior_timer += delta
 	if _behavior_timer >= TICK_INTERVAL:
@@ -138,6 +158,9 @@ func _check_survival() -> bool:
 
 	# Retreat if HP low and no potions and not in town
 	if hp_pct < retreat_threshold and potion_count == 0 and not _is_in_town():
+		# Notify LLM if critically low — HP < 30%
+		if hp_pct < 0.30:
+			_emit_npc_event("low_resources", {"hp_percent": hp_pct})
 		npc.set_goal("return_to_town")
 		_do_action("move_to", "TownSquare")
 		return true
@@ -166,20 +189,26 @@ func _check_goal_completion() -> bool:
 			var potion_count: int = npc._inventory.get_item_count("healing_potion")
 			var gold: int = npc._inventory.gold
 			if potion_count >= POTION_STOCK_TARGET or gold < 20:
+				var completed: String = npc.current_goal
 				npc.set_goal(default_goal)
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 		"sell_loot":
 			if NpcTradeHelper.get_first_material(npc._inventory).is_empty():
+				var completed: String = npc.current_goal
 				# Check for weapon/armor upgrade opportunity
 				var upgrade := NpcTradeHelper.get_best_upgrade("weapon", npc._equipment, npc._inventory)
 				if not upgrade.is_empty():
 					npc.set_goal("buy_weapon")
+					_emit_npc_event("goal_completed", {"completed_goal": completed})
 					return true
 				upgrade = NpcTradeHelper.get_best_upgrade("armor", npc._equipment, npc._inventory)
 				if not upgrade.is_empty():
 					npc.set_goal("buy_armor")
+					_emit_npc_event("goal_completed", {"completed_goal": completed})
 					return true
 				npc.set_goal(default_goal)
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 		"buy_weapon", "buy_armor":
 			# These complete in _execute_goal when purchase done or can't afford
@@ -187,14 +216,18 @@ func _check_goal_completion() -> bool:
 		"rest":
 			var rest_stamina_comp = npc.get_node_or_null("StaminaComponent")
 			if rest_stamina_comp and rest_stamina_comp.get_stamina_percent() >= 0.8:
+				var completed: String = npc.current_goal
 				npc.set_goal(default_goal)
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 		"return_to_town":
 			if _is_in_town():
+				var completed: String = npc.current_goal
 				# Check if stamina is low — transition to rest goal
 				var rtt_stamina_comp = npc.get_node_or_null("StaminaComponent")
 				if rtt_stamina_comp and rtt_stamina_comp.get_stamina_percent() < 0.5:
 					npc.set_goal("rest")
+					_emit_npc_event("goal_completed", {"completed_goal": completed})
 					return true
 				var hp: int = npc._stats.hp
 				var max_hp: int = npc._stats.max_hp
@@ -203,15 +236,20 @@ func _check_goal_completion() -> bool:
 						npc.set_goal("buy_potions")
 					else:
 						npc.set_goal(default_goal)
+					_emit_npc_event("goal_completed", {"completed_goal": completed})
 					return true
 		"hunt_field":
 			# Sell loot if inventory has enough materials
 			if _get_total_material_count() >= 5:
+				var completed: String = npc.current_goal
 				npc.set_goal("sell_loot")
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 			# Restock potions if out and can afford
 			if npc._inventory.get_item_count("healing_potion") == 0 and _can_afford_potions():
+				var completed: String = npc.current_goal
 				npc.set_goal("buy_potions")
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 		"vend":
 			# Vending NPCs stay in vend goal — never complete
@@ -719,3 +757,9 @@ func _should_restock_potions() -> bool:
 
 func _can_afford_potions() -> bool:
 	return npc._inventory.gold >= POTION_BUY_GOLD_MIN
+
+## Emit a significant NPC event to both the brain and the GameEvents signal bus.
+func _emit_npc_event(event_type: String, context: Dictionary) -> void:
+	if brain:
+		brain.on_significant_event(event_type, context)
+	GameEvents.npc_event_triggered.emit(npc.npc_id, event_type, context)

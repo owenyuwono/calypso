@@ -1,7 +1,6 @@
 extends Node
 ## NPC brain — LLM decision loop for adventurer NPCs with combat awareness.
 
-const NPC_DECISION_INTERVAL: float = 5.0
 const CONVERSATION_HOLD_TIME: float = 10.0
 const CHAT_RANGE: float = 8.0
 const READING_DELAY: float = 3.0  # seconds to "read" before responding to NPC speech
@@ -20,7 +19,6 @@ var memory: Node  # NPCMemory
 var executor: Node  # NPCActionExecutor
 var _identity: Node  # NpcIdentity
 var _relationship: Node  # RelationshipComponent
-var _decision_timer: float = 0.0
 var _enabled: bool = true
 var _waiting_for_llm: bool = false
 var _use_llm: bool = false
@@ -30,6 +28,22 @@ var _pending_chat: Dictionary = {}  # {speaker_id, spoken_text} — buffered pla
 var _conversation_hold: float = 0.0
 var _reading_queue: Dictionary = {}  # {speaker_id, spoken_text, timer} — delayed NPC-NPC response
 var _speech_cooldown: float = 0.0
+
+# Event-driven LLM triggering
+var _event_cooldowns: Dictionary = {}  # {event_type: last_trigger_time}
+var _pending_events: Array = []  # Buffer events while LLM request is in-flight
+
+const EVENT_COOLDOWNS: Dictionary = {
+	"player_chat": 2.0,
+	"npc_chat": 5.0,
+	"goal_completed": 10.0,
+	"significant_discovery": 15.0,
+	"combat_outcome": 10.0,
+	"low_resources": 30.0,
+	"social_trigger": 20.0,
+	"memory_extraction": 10.0,
+	"idle_timeout": 60.0,
+}
 
 var _canned_greetings: Array = [
 	"Hey %s, how's the hunting going?",
@@ -87,20 +101,29 @@ func _process(delta: float) -> void:
 	# Don't make decisions while in combat, dead, or already acting
 	if npc.current_state in ["combat", "dead"]:
 		return
-	if npc.current_state != "idle":
+
+## Called when a significant event happens that warrants LLM thinking.
+func on_significant_event(event_type: String, context: Dictionary = {}) -> void:
+	# Check cooldown
+	var now: float = Time.get_unix_time_from_system()
+	var cooldown: float = EVENT_COOLDOWNS.get(event_type, 10.0)
+	var last_trigger: float = _event_cooldowns.get(event_type, 0.0)
+	if now - last_trigger < cooldown:
 		return
 
-	_decision_timer += delta
-	if _decision_timer >= NPC_DECISION_INTERVAL:
-		_decision_timer = 0.0
-		# Refresh mood each decision cycle
-		if _identity:
-			npc.current_mood = _identity.mood_emotion
-		else:
-			npc.current_mood = "neutral"
-		_make_decision()
+	# If already waiting for LLM, buffer the event
+	if _waiting_for_llm:
+		_pending_events.append({"type": event_type, "context": context})
+		return
 
-func _make_decision() -> void:
+	# Refresh mood before triggering decision
+	if _identity:
+		npc.current_mood = _identity.mood_emotion
+	else:
+		npc.current_mood = "neutral"
+
+	# Update cooldown and trigger LLM decision
+	_event_cooldowns[event_type] = now
 	if _use_llm and LLMClient.is_available():
 		_request_llm_decision()
 	else:
@@ -186,6 +209,12 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 		var pending := _pending_chat
 		_pending_chat = {}
 		request_reactive_response(pending["speaker_id"], pending["spoken_text"], pending.get("overheard", false), pending.get("original_target_id", ""))
+		return
+
+	# Check for buffered significant events
+	if _pending_events.size() > 0:
+		var next_event: Dictionary = _pending_events.pop_front()
+		on_significant_event(next_event.get("type", ""), next_event.get("context", {}))
 
 func _on_llm_failed(req_id: String, error: String) -> void:
 	# Route chat failures separately
@@ -306,7 +335,6 @@ func request_reactive_response(speaker_id: String, spoken_text: String, overhear
 	if _use_llm_chat:
 		npc.change_state("thinking")
 		_waiting_for_llm = true
-		_decision_timer = 0.0
 
 		var speaker_name := _get_display_name(speaker_id)
 		var activity := PromptBuilder.get_activity_description(npc.current_goal)
