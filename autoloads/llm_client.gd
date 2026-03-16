@@ -56,7 +56,7 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}, pri
 		"temperature": LLM_TEMPERATURE,
 	}
 	if not format.is_empty():
-		body["response_format"] = {"type": "json_schema", "json_schema": {"name": "response", "schema": format}}
+		body["response_format"] = {"type": "json_object"}
 
 	_sequence += 1
 	_request_queue.append({
