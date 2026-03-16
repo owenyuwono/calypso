@@ -4,6 +4,7 @@ extends Control
 
 var status_panel: Control
 var inventory_panel: Control
+var equipment_panel: Control
 var skill_panel: Control
 var proficiency_panel: Control
 var chat_input: Control
@@ -17,6 +18,7 @@ var _hbox: HBoxContainer
 const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "inventory", "label": "Inv", "hint": "I"},
+	{"key": "equipment", "label": "Equip", "hint": "Q"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
 	{"key": "map", "label": "Map", "hint": "W"},
 ]
@@ -116,6 +118,7 @@ func _get_panel(key: String) -> Control:
 	match key:
 		"status": return status_panel
 		"inventory": return inventory_panel
+		"equipment": return equipment_panel
 		"skills": return skill_panel
 		"map": return world_map_panel
 	return null

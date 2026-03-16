@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/game_world/game_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
@@ -18,6 +18,7 @@
 [ext_resource type="Script" path="res://scenes/ui/proficiency_panel.gd" id="17_prof_panel"]
 [ext_resource type="Script" path="res://scenes/ui/world_map_panel.gd" id="18_world_map"]
 [ext_resource type="Script" path="res://scenes/ui/vend_setup_panel.gd" id="19_vend_setup"]
+[ext_resource type="Script" path="res://scenes/ui/equipment_panel.gd" id="20_equipment_panel"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -68,6 +69,14 @@ script = ExtResource("18_world_map")
 
 [node name="VendSetupPanel" type="Control" parent="UILayer"]
 script = ExtResource("19_vend_setup")
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="EquipmentPanel" type="Control" parent="UILayer"]
+script = ExtResource("20_equipment_panel")
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2

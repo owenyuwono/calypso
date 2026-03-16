@@ -73,6 +73,7 @@ var skill_hotbar: Control:
 var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
+var equipment_panel: Control
 
 # Click marker (reused single instance)
 var _click_marker: MeshInstance3D
@@ -570,7 +571,7 @@ func stop_vending() -> void:
 		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
-	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel]:
+	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel, equipment_panel]:
 		if panel and panel.is_open():
 			return true
 	return false
