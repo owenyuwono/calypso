@@ -9,7 +9,7 @@
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
 - **No automated tests**: Verify manually in editor (panels, combat, minimap, world map, chat)
-- **Input**: Left-click move/attack/interact, E interact, Tab inventory, C status, S skills, P proficiencies, M minimap, W world map, V vend setup, 1-5 hotbar, D debug, Esc close panel
+- **Input**: Left-click move/attack/interact, E interact, I inventory, C status, S skills, P proficiencies, M minimap, W world map, V vend setup, 1-5 hotbar, D debug, Esc close panel
 
 ## Coding Principles
 - **SOLID**: Single responsibility per script/node. Open for extension (signals, composition). Depend on interfaces (duck typing), not concrete types
