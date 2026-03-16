@@ -11,6 +11,7 @@ var _active_requests: int = 0
 var _sequence: int = 0  # Monotonic counter for FIFO ordering within same priority tier
 var _request_queue: Array = []  # Array of {id, body, priority, seq}
 var _http_pool: Array = []  # Reusable HTTPRequest nodes
+var _queue_dirty: bool = false  # True when queue has unsorted additions
 
 signal request_completed(request_id: String, response: Dictionary)
 signal request_failed(request_id: String, error: String)
@@ -55,7 +56,7 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}, pri
 		"temperature": LLM_TEMPERATURE,
 	}
 	if not format.is_empty():
-		body["response_format"] = {"type": "json_object"}
+		body["response_format"] = {"type": "json_schema", "json_schema": {"name": "response", "schema": format}}
 
 	_sequence += 1
 	_request_queue.append({
@@ -64,6 +65,7 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}, pri
 		"priority": priority,
 		"seq": _sequence,
 	})
+	_queue_dirty = true
 	return request_id
 
 ## Returns true if a queued request shares the same type prefix + entity id
@@ -106,11 +108,14 @@ func _process_queue() -> void:
 	# Sort by priority ascending (1 = highest), then by seq ascending (lower = earlier).
 	# Godot's sort_custom uses introsort (not stable), so seq is required to
 	# preserve FIFO order within the same priority tier.
-	_request_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		if a.priority != b.priority:
-			return a.priority < b.priority
-		return a.seq < b.seq
-	)
+	# Only re-sort when new entries were added since the last sort.
+	if _queue_dirty:
+		_request_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if a.priority != b.priority:
+				return a.priority < b.priority
+			return a.seq < b.seq
+		)
+		_queue_dirty = false
 
 	for pool_entry in _http_pool:
 		if pool_entry.busy:
@@ -140,9 +145,11 @@ func _is_stale(request_id: String) -> bool:
 	var entity_id := _extract_entity_id(request_id)
 	if entity_id.is_empty():
 		return false
-	if not WorldState.get_entity(entity_id):
+	var entity_node: Node = WorldState.get_entity(entity_id)
+	if not entity_node:
 		return true
-	if not WorldState.is_alive(entity_id):
+	var stats: Node = entity_node.get_node_or_null("StatsComponent")
+	if stats and not stats.is_alive():
 		return true
 	return false
 

@@ -72,7 +72,7 @@ const NAME_POOL: Array = [
 	"Ansel", "Ardan", "Arlan", "Arlen", "Arvin", "Asher", "Ashton", "Aspen",
 	"Avery", "Axel", "Ayla", "Azra", "Bael", "Barek", "Beren", "Blaine",
 	"Blake", "Bram", "Brant", "Bren", "Briar", "Brice", "Brin", "Brix",
-	"Brock", "Cade", "Cael", "Calder", "Calla", "Calyx", "Caren", "Carys",
+	"Brock", "Cade", "Calder", "Calla", "Calyx", "Caren", "Carys",
 	"Cass", "Cassia", "Cedar", "Celn", "Cera", "Cerin", "Ceth", "Cian",
 	"Cira", "Circe", "Ciro", "Cith", "Clair", "Clover", "Corin", "Cress",
 	"Crispin", "Crow", "Cullen", "Cyan", "Dael", "Dain", "Dale", "Damek",

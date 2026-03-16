@@ -51,7 +51,7 @@ static func get_shareable_facts(memory: Node, sociability: float, partner_id: St
 ## Build a gossip-received memory entry when an NPC hears a fact.
 static func receive_gossip(fact: String, importance: float, source_npc: String, spread_count: int, original_source: String) -> Dictionary:
 	var new_count: int = spread_count + 1
-	var new_source: String = "told_by" if new_count < RUMOR_HOP_THRESHOLD else "rumor"
+	var new_source: String = "heard_from:%s" % source_npc if new_count < RUMOR_HOP_THRESHOLD else "rumor"
 	var distorted_fact: String = _maybe_distort(fact)
 	return {
 		"fact": distorted_fact,

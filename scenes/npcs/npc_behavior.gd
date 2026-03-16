@@ -615,11 +615,18 @@ func _on_time_phase_changed(_old_phase: String, new_phase: String) -> void:
 # =============================================================================
 
 func _is_monster_contested(monster_id: String) -> Dictionary:
-	# Check if any other NPC is fighting this monster
-	for eid in WorldState.entity_data:
+	# Only check NPCs visible in our own perception — avoids scanning all entity_data.
+	# Any NPC far enough away to be invisible won't contest for practical purposes.
+	if not _perception:
+		_perception = npc.get_node_or_null("PerceptionComponent")
+	if not _perception:
+		return {"contested": false, "fighter_id": "", "fighter_hp_pct": 1.0, "fighter_retreating": false}
+	var nearby_npcs: Array = _perception.get_nearby()
+	for entry in nearby_npcs:
+		var eid: String = entry.id
 		if eid == npc.npc_id:
 			continue
-		var edata: Dictionary = WorldState.entity_data[eid]
+		var edata: Dictionary = WorldState.get_entity_data(eid)
 		if edata.get("type", "") != "npc":
 			continue
 		if edata.get("combat_target", "") != monster_id:

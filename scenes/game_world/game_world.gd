@@ -300,8 +300,8 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 
 	var brain: Node = npc.get_node_or_null("NPCBrain")
 	if brain:
-		brain.set_use_llm(false)
-		brain.set_use_llm_chat(false)
+		brain.set_use_llm(true)
+		brain.set_use_llm_chat(true)
 
 func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
 	# Merchants stay in the city. Others split 50/50 between city and field.

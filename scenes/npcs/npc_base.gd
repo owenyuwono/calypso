@@ -249,27 +249,31 @@ func _setup_perception_circle() -> void:
 	_perception_circle.mesh = im
 	_perception_circle.material_override = mat
 	_perception_circle.position = Vector3(0, 0.05, 0)
-	_perception_circle.visible = true
+	_perception_circle.visible = false
 	add_child(_perception_circle)
 
 
 func _get_separation_velocity() -> Vector3:
 	var sep := Vector3.ZERO
-	for eid in WorldState.entities:
-		if eid == npc_id:
+	var perception_comp: Node = get_node_or_null("PerceptionComponent")
+	if not perception_comp:
+		return sep
+	# Use Area3D-based spatial cache — only checks entities already within 25m.
+	# Pass PERSONAL_SPACE as the radius so we skip sorting outside our range.
+	var nearby: Array = perception_comp.get_nearby(PERSONAL_SPACE)
+	for entry in nearby:
+		var other: Node3D = entry.node
+		if not is_instance_valid(other):
 			continue
-		var data: Dictionary = WorldState.get_entity_data(eid)
+		var data: Dictionary = WorldState.get_entity_data(entry.id)
 		if data.get("type", "") != "npc":
 			continue
-		if not WorldState.is_alive(eid):
-			continue
-		var other: Node3D = WorldState.get_entity(eid)
-		if not other or not is_instance_valid(other):
+		if not WorldState.is_alive(entry.id):
 			continue
 		var diff := global_position - other.global_position
 		diff.y = 0.0
 		var dist := diff.length()
-		if dist < 0.01 or dist >= PERSONAL_SPACE:
+		if dist < 0.01:
 			continue
 		# Closer = stronger push (inverse linear)
 		var strength: float = SEPARATION_FORCE * (1.0 - dist / PERSONAL_SPACE)
