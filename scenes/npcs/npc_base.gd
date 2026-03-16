@@ -458,6 +458,12 @@ func change_state(new_state: String) -> void:
 	var tint: Color = STATE_COLORS.get(new_state, Color(0, 0, 0, 0))
 	_visuals.set_state_tint(tint)
 
+	# Show HP bar on combat entry, hide on exit if full HP
+	if new_state == STATE_COMBAT:
+		_visuals.set_hp_bar_visible(true)
+	elif old_state == STATE_COMBAT:
+		_visuals.set_hp_bar_visible(_stats.hp < _stats.max_hp)
+
 
 func _on_any_npc_spoke(speaker_id: String, dialogue: String, _target_id: String) -> void:
 	if speaker_id == npc_id and dialogue_bubble:
@@ -557,7 +563,7 @@ func _respawn() -> void:
 
 	change_state(STATE_IDLE)
 	GameEvents.entity_respawned.emit(npc_id)
-	_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+	_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, false)
 
 	var memory_node = get_node_or_null("NPCMemory")
 	if memory_node:
@@ -566,14 +572,14 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
-		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, current_state == STATE_COMBAT)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 		_combat_tracker["damage_taken"] += damage
 		_combat_tracker["hits_taken"] += 1
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
-		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, current_state == STATE_COMBAT)
 
 func _on_vending_started(eid: String, shop_title: String) -> void:
 	if eid == npc_id:

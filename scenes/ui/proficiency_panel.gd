@@ -69,11 +69,12 @@ func _build_ui() -> void:
 	scroll.add_child(_skill_list)
 
 
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_proficiencies"):
-		if get_viewport().gui_get_focus_owner() is LineEdit:
-			return
-		toggle()
+## P key now opens the unified skill panel instead — see skill_panel.gd
+#func _input(event: InputEvent) -> void:
+#	if event.is_action_pressed("toggle_proficiencies"):
+#		if get_viewport().gui_get_focus_owner() is LineEdit:
+#			return
+#		toggle()
 
 
 func toggle() -> void:

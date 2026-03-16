@@ -4,6 +4,12 @@ extends Control
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const MAX_MESSAGES := 50
+const LOG_VICINITY: float = 30.0
+
+var _player: Node3D = null
+
+func set_player(player: Node3D) -> void:
+	_player = player
 
 const COLOR_PLAYER_SPEECH := Color("ffffff")
 const COLOR_NPC_SPEECH := Color("88ee88")
@@ -88,9 +94,21 @@ func _get_entity_name(entity_id: String) -> String:
 		return n
 	return entity_id.capitalize()
 
+func _is_in_vicinity(entity_id: String) -> bool:
+	if not _player or not is_instance_valid(_player):
+		return true
+	if entity_id == "player":
+		return true
+	var entity: Node3D = WorldState.get_entity(entity_id)
+	if not entity or not is_instance_valid(entity):
+		return false
+	return entity.global_position.distance_to(_player.global_position) <= LOG_VICINITY
+
 # --- Signal handlers ---
 
 func _on_npc_spoke(npc_id: String, dialogue: String, target_id: String) -> void:
+	if not _is_in_vicinity(npc_id):
+		return
 	var speaker := _get_entity_name(npc_id)
 	var color := COLOR_NPC_SPEECH
 	if npc_id == "player":
@@ -102,6 +120,8 @@ func _on_npc_spoke(npc_id: String, dialogue: String, target_id: String) -> void:
 		_add_message("%s: %s" % [speaker, dialogue], color)
 
 func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _remaining_hp: int) -> void:
+	if not _is_in_vicinity(attacker_id) and not _is_in_vicinity(target_id):
+		return
 	var key := "%s->%s" % [attacker_id, target_id]
 	if _pending_hits.has(key):
 		_pending_hits[key].damage += damage
@@ -123,6 +143,8 @@ func _flush_hit(key: String) -> void:
 	_add_message(msg, COLOR_COMBAT)
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
+	if not _is_in_vicinity(entity_id) and not _is_in_vicinity(killer_id):
+		return
 	# Flush pending hits involving this entity first
 	var to_flush: Array = []
 	for key in _pending_hits:
@@ -136,6 +158,8 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	_add_message("%s was defeated by %s" % [victim, killer], COLOR_COMBAT)
 
 func _on_entity_healed(entity_id: String, amount: int, _current_hp: int) -> void:
+	if not _is_in_vicinity(entity_id):
+		return
 	var name := _get_entity_name(entity_id)
 	_add_message("%s recovered %d HP" % [name, amount], COLOR_SYSTEM)
 
@@ -158,6 +182,8 @@ func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: in
 	_add_message("%s reached %s Level %d!" % [name, skill_name, new_level], COLOR_SYSTEM)
 
 func _on_conversation_turn_added(_conversation_id: String, speaker_id: String, dialogue: String, action: String) -> void:
+	if not _is_in_vicinity(speaker_id):
+		return
 	# Only display "speak" actions; skip join/walk_away/silence meta-turns
 	if action != ConversationState.ACTION_SPEAK:
 		return

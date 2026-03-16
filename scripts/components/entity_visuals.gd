@@ -110,6 +110,12 @@ func setup_hp_bar(y_offset: float = 1.8) -> void:
 func update_hp_bar(hp: int, max_hp: int) -> void:
 	ModelHelper.update_entity_hp_bar(_hp_bar, hp, max_hp)
 
+func update_hp_bar_combat(hp: int, max_hp: int, in_combat: bool) -> void:
+	if _hp_bar:
+		if _hp_bar.has_method("update_bar"):
+			_hp_bar.update_bar(hp, max_hp)
+		_hp_bar.visible = in_combat or hp < max_hp
+
 func set_hp_bar_visible(vis: bool) -> void:
 	if _hp_bar:
 		_hp_bar.visible = vis

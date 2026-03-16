@@ -249,10 +249,10 @@ static func get_hit_delay(anim_player: AnimationPlayer, anim_name: String) -> fl
 	return 0.4
 
 ## Update an entity's HP bar with the given hp and max_hp values.
+## Visibility is managed by the entity's combat state via update_hp_bar_combat().
 static func update_entity_hp_bar(hp_bar: Node, hp: int, max_hp: int) -> void:
 	if not hp_bar:
 		return
 	if hp_bar.has_method("update_bar"):
 		hp_bar.update_bar(hp, max_hp)
-	hp_bar.visible = hp < max_hp
 

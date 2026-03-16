@@ -115,7 +115,7 @@ func _get_panel(key: String) -> Control:
 	match key:
 		"status": return status_panel
 		"skills": return skill_panel
-		"proficiencies": return proficiency_panel
+		"proficiencies": return skill_panel
 		"map": return world_map_panel
 	return null
 

@@ -319,6 +319,7 @@ func _check_aggro() -> void:
 		if etype in ["player", "npc"] and WorldState.is_alive(entry.id):
 			aggro_target = entry.id
 			state = "aggro"
+			_visuals.set_hp_bar_visible(true)
 			return
 
 func _process_aggro(delta: float) -> bool:
@@ -383,14 +384,15 @@ func _drop_aggro() -> void:
 	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area
 	nav_agent.target_position = spawn_point
+	_visuals.set_hp_bar_visible(_stats.hp < _stats.max_hp)
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
-		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == monster_id and state != "dead":
-		_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:
@@ -464,7 +466,7 @@ func _respawn() -> void:
 	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))
 	_visuals.apply_tint(tint_color)
 
-	_visuals.set_hp_bar_visible(true)
+	_visuals.set_hp_bar_visible(false)
 	if name_label:
 		name_label.visible = true
 
@@ -496,7 +498,7 @@ func _respawn() -> void:
 	_auto_attack.cancel()
 
 	GameEvents.entity_respawned.emit(monster_id)
-	_visuals.update_hp_bar(_stats.hp, _stats.max_hp)
+	_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, false)
 	# Reapply night buffs if respawning during night
 	if TimeManager.is_night():
 		_apply_night_buffs()
