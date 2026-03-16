@@ -3,7 +3,7 @@
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
 - **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals, LLM)
-- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), GossipSystem (fact propagation), world builders (see below)
+- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
@@ -16,7 +16,7 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 - `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `is_alive()`, `get_stats_dict()`
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
 - `EquipmentComponent` — weapon/armor slots. Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_atk_bonus()`, `get_def_bonus()`
-- `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
+- `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `deal_damage_amount_to_with_pierce(target_id, amount, def_ignore)`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
 - `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
 - `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
 - `VendingComponent` — vending state, listings, buy/sell. **Must set `.name = "VendingComponent"` before `add_child()`**. API: `start_vending()`, `stop_vending()`, `is_vending()`, `get_listings()`, `get_shop_title()`, `buy_from()`
@@ -62,7 +62,18 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **XP sources**: weapon proficiency XP on combat hits, constitution XP on taking damage. Gathering/production are placeholders (not yet implemented)
 - **Monsters**: `proficiency_xp` field in MonsterDatabase (3–20 per monster type)
 - **Items**: `weapon_type`, `required_skill`, `required_level` fields for equipment proficiency requirements
-- **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`
+- **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`, `skill_learned(entity_id, skill_id)`, `skill_used(entity_id, skill_id, target_id)`
+
+## Active Skill System
+- **SkillDatabase** (`scripts/data/skill_database.gd`): Static class defining 16 skills across 5 weapon types. Each skill has `required_proficiency` (weapon + level), `damage_multiplier`, `cooldown`, `max_level` (5), `animation`, `color`
+- **Weapon skills**: Sword (Bash, Cleave, Rend), Axe (Chop, Whirlwind, Execute), Mace (Crush, Shatter, Quake), Dagger (Stab, Lacerate, Backstab), Staff (Arcane Bolt, Flame Burst, Drain)
+- **Skill types**: `melee_attack` (single-target), `aoe_melee` (AoE via PerceptionComponent), `armor_pierce` (ignores % DEF), `bleed` (initial hit + damage-over-time ticks)
+- **SkillEffectResolver** (`scripts/skills/skill_effect_resolver.gd`): Stateless static class. `resolve_skill_hit()` dispatches by type, returns `Array[{target_id, damage}]`. `process_bleeds()` ticks active bleeds each frame
+- **Player skills** (`player_skills.gd`): Requires `setup(player, combat, stats, skills_comp, progression, visuals, perception)`. `use_skill(skill_id)` → validate → animate → resolve via SkillEffectResolver. Tracks `_active_bleeds` dict, ticked in `_process()`
+- **NPC skills** (`scenes/npcs/npc_skills.gd`): AI-driven skill selection. `try_use_skill(target_id)` picks best skill (AoE if ≥2 nearby enemies, else highest multiplier). 4.0s global cooldown. 5 XP per skill hit
+- **Skill unlocking**: Proficiency-driven. Skills auto-unlock when entity's proficiency level meets `required_proficiency`. `npc_base.late_init_skills()` re-applies after trait_profile set
+- **Skill leveling**: Use-based, 5 XP per hit, independent from proficiency XP. `get_effective_multiplier()` and `get_effective_cooldown()` scale with skill level
+- **Bleed tracking**: `_active_bleeds` Dictionary lives in player_skills/npc_skills (not CombatComponent). Tracks `damage_per_tick`, `ticks_remaining`, `tick_timer`, `tick_interval` per target
 
 ## Terrain & Texturing
 - **Shader**: `terrain_blend.gdshader` — vertex-color-based blending, no anti-tiling/rotation (straight tiling only)

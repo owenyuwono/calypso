@@ -268,6 +268,9 @@ func _setup_adventurer_npcs() -> void:
 			behavior.default_goal = goal
 		npc.set_goal(goal)
 
+		# Re-init proficiencies + skills (trait_profile was empty during _ready)
+		npc.late_init_skills()
+
 func _spawn_generated_npcs() -> void:
 	var loadouts: Array = NpcGenerator.generate_npcs(GENERATED_NPC_COUNT)
 	for loadout in loadouts:

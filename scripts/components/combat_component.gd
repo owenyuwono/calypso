@@ -101,6 +101,19 @@ func deal_damage_amount_to(target_id: String, amount: int) -> int:
 	_apply_damage_to(target_id, damage)
 	return damage
 
+func deal_damage_amount_to_with_pierce(target_id: String, amount: int, def_ignore: float) -> int:
+	## Armor-piercing skill damage: raw amount - (target_effective_def * (1 - def_ignore)), min 1.
+	## def_ignore is 0.0 to 1.0 (e.g., 0.75 means ignore 75% of DEF).
+	var target_entity = WorldState.get_entity(target_id)
+	if not target_entity or not is_instance_valid(target_entity):
+		return 0
+	var target_combat = target_entity.get_node_or_null("CombatComponent")
+	var def: int = target_combat.get_effective_def() if target_combat else 0
+	var reduced_def: int = floori(def * (1.0 - def_ignore))
+	var damage: int = maxi(amount - reduced_def, 1)
+	_apply_damage_to(target_id, damage)
+	return damage
+
 func heal(amount: int) -> int:
 	var healed: int = _stats.heal(amount)
 	if healed > 0:

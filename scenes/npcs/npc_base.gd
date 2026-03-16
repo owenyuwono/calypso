@@ -620,6 +620,31 @@ func initialize_from_loadout(loadout: Dictionary) -> void:
 		if behavior:
 			behavior.default_goal = goal
 
+	# Re-init proficiencies and skills (trait_profile is set after _ready)
+	late_init_skills()
+
+## Re-initialize proficiency levels and unlock skills based on current trait_profile.
+## Must be called AFTER trait_profile is set (which happens after _ready()).
+func late_init_skills() -> void:
+	if trait_profile.is_empty():
+		return
+	# Re-apply starting proficiencies from trait profile
+	var profile: Dictionary = NpcTraits.get_profile(trait_profile)
+	var initial_profs: Dictionary = profile.get("starting_proficiencies", {})
+	if not initial_profs.is_empty():
+		_progression.setup(_stats, initial_profs, _equipment)
+	# Unlock skills matching proficiency levels
+	var skills_node: Node = get_node_or_null("SkillsComponent")
+	if not skills_node:
+		return
+	for skill_id in SkillDatabase.SKILLS:
+		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
+		if skill_data.has("required_proficiency"):
+			var req: Dictionary = skill_data.required_proficiency
+			var prof_level: int = _progression.get_proficiency_level(req.skill)
+			if prof_level >= req.get("level", 1) and not skills_node.has_skill(skill_id):
+				skills_node.unlock_skill(skill_id)
+
 # --- Duck typing delegations ---
 
 func flash_hit() -> void:

@@ -131,7 +131,10 @@ func _refresh() -> void:
 		var preview_level := maxi(1, current_level)
 		var mult := SkillDatabase.get_effective_multiplier(skill_id, preview_level)
 		var cd := SkillDatabase.get_effective_cooldown(skill_id, preview_level)
-		var stats_text := "DMG: %d%% | CD: %.1fs" % [roundi(mult * 100), cd]
+		var stats_text: String = "DMG: %d%% | CD: %.1fs" % [roundi(mult * 100), cd]
+		var type_info: String = _get_type_info(skill)
+		if not type_info.is_empty():
+			stats_text += "\n" + type_info
 		if not meets_req:
 			var req_skill_data := ProficiencyDatabase.get_skill(req_skill)
 			var req_skill_name: String = req_skill_data.get("name", req_skill)
@@ -179,6 +182,21 @@ func _refresh() -> void:
 					slot_btn.add_theme_stylebox_override("normal", active_style)
 				slot_btn.pressed.connect(_assign_hotbar.bind(slot_i, skill_id))
 				hotbar_row.add_child(slot_btn)
+
+func _get_type_info(skill: Dictionary) -> String:
+	var skill_type: String = skill.get("type", "")
+	if skill_type == "aoe_melee":
+		var radius: float = skill.get("aoe_radius", 0.0)
+		var center: String = skill.get("aoe_center", "target")
+		return "AoE | Radius: %.1f | Center: %s" % [radius, center]
+	elif skill_type == "bleed":
+		var ticks: int = skill.get("bleed_ticks", 0)
+		var duration: float = skill.get("bleed_duration", 0.0)
+		return "Bleed | %d ticks over %.1fs" % [ticks, duration]
+	elif skill_type == "armor_pierce":
+		var ignore_pct: float = skill.get("def_ignore_percent", 0.0)
+		return "Pierce | Ignores %d%% DEF" % [roundi(ignore_pct * 100)]
+	return ""
 
 func _assign_hotbar(slot: int, skill_id: String) -> void:
 	if _player:
