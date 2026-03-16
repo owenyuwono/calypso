@@ -163,7 +163,14 @@ func get_memories_for_prompt(limit: int = 10) -> String:
 	var lines: Array = []
 	for mem in top:
 		var text: String = mem["fuzzy_text"] if mem["fuzzy"] and not mem["fuzzy_text"].is_empty() else mem["fact"]
-		lines.append("[%s] %s" % [mem["importance"], text])
+		var source: String = mem.get("source", SOURCE_WITNESSED)
+		var told_by: String = mem.get("told_by", "")
+		var prefix: String = ""
+		if source == "told_by" and not told_by.is_empty():
+			prefix = "You heard from %s that " % told_by
+		elif source == "rumor":
+			prefix = "There's a rumor that "
+		lines.append("[%s] %s%s" % [mem["importance"], prefix, text])
 	return "\n".join(lines)
 
 func get_facts_about(topic: String) -> Array:
@@ -186,6 +193,27 @@ func mark_fact_shared(memory_id: String, target_id: String) -> void:
 			if not (target_id in mem["shared_with"]):
 				mem["shared_with"].append(target_id)
 			return
+
+## Add a gossip-received memory entry (from GossipSystem.receive_gossip()).
+## gossip_entry must have: fact, importance (float), source, told_by, spread_count, original_source
+func add_gossip_memory(gossip_entry: Dictionary) -> void:
+	var fact: String = gossip_entry.get("fact", "")
+	if fact.is_empty():
+		return
+	# Map float importance back to string label
+	var importance_float: float = gossip_entry.get("importance", 1.0)
+	var importance_label: String = IMPORTANCE_LOW
+	if importance_float >= 2.5:
+		importance_label = IMPORTANCE_HIGH
+	elif importance_float >= 1.5:
+		importance_label = IMPORTANCE_MEDIUM
+	var source_str: String = gossip_entry.get("source", SOURCE_WITNESSED)
+	var told_by: String = gossip_entry.get("told_by", "")
+	var mem: Dictionary = add_memory(fact, source_str, importance_label)
+	# Patch gossip metadata onto the created entry (add_memory may deduplicate)
+	mem["told_by"] = told_by
+	mem["spread_count"] = gossip_entry.get("spread_count", 1)
+	mem["original_source"] = gossip_entry.get("original_source", "")
 
 # =============================================================================
 # Deprecated memory stubs — Wave 2 migration

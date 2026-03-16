@@ -13,6 +13,8 @@ const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 const ResponseParser = preload("res://scripts/llm/response_parser.gd")
 const ActionSchema = preload("res://scripts/llm/action_schema.gd")
 const NpcTraitHelpers = preload("res://scripts/utils/npc_trait_helpers.gd")
+const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const GossipSystem = preload("res://scripts/npcs/gossip_system.gd")
 
 var npc: CharacterBody3D  # NPCBase, duck-typed
 var memory: Node  # NPCMemory
@@ -442,6 +444,10 @@ func _handle_chat_response(response: Dictionary) -> void:
 	_conversation_hold = CONVERSATION_HOLD_TIME
 	_speech_cooldown = randf_range(POST_SPEECH_COOLDOWN_MIN, POST_SPEECH_COOLDOWN_MAX)
 
+	# Share gossip with the conversation partner (NPC-to-NPC only)
+	if speaker_id != "player":
+		_share_gossip_with(speaker_id)
+
 	# Only apply goal changes when the player is speaking (NPC-NPC chat stays behavior-driven)
 	if speaker_id == "player" and not parsed.goal.is_empty():
 		npc.set_goal(parsed.goal)
@@ -621,3 +627,52 @@ func _on_tier_changed(entity_id: String, partner_id: String, old_tier: String, n
 	if entity_id != npc.npc_id:
 		return
 	_request_impression_update(partner_id)
+
+# ---------------------------------------------------------------------------
+# Gossip propagation
+# ---------------------------------------------------------------------------
+
+## Propagate shareable memories to a partner NPC after a conversation.
+func _share_gossip_with(partner_id: String) -> void:
+	var sociability: float = _get_sociability()
+	var shareable: Array = GossipSystem.get_shareable_facts(memory, sociability, partner_id)
+	if shareable.is_empty():
+		return
+
+	var partner_node: Node = WorldState.get_entity(partner_id)
+	if not partner_node or not is_instance_valid(partner_node):
+		return
+
+	var partner_memory: Node = partner_node.get_node_or_null("NPCMemory")
+	var partner_rel: Node = partner_node.get_node_or_null("RelationshipComponent")
+
+	for fact_entry in shareable:
+		var gossip: Dictionary = GossipSystem.receive_gossip(
+			fact_entry.get("fact", ""),
+			GossipSystem._importance_to_float(fact_entry.get("importance", "low")),
+			npc.npc_id,
+			fact_entry.get("spread_count", 0),
+			fact_entry.get("original_source", npc.npc_id)
+		)
+		if partner_memory:
+			partner_memory.add_gossip_memory(gossip)
+			print("[GOSSIP] %s → %s: '%s'" % [npc.npc_id, partner_id, gossip.get("fact", "")])
+		# Apply relationship effect on the partner toward the original source
+		var rel_effect: Dictionary = GossipSystem.get_relationship_effect(
+			gossip.get("fact", ""),
+			gossip.get("original_source", "")
+		)
+		if rel_effect.delta != 0.0 and partner_rel:
+			var target_entity: String = rel_effect.entity_id
+			if not target_entity.is_empty():
+				if rel_effect.delta > 0.0:
+					# Positive gossip: record a helped event toward the subject
+					partner_rel.record_event(target_entity, "helped", TimeManager.get_day())
+				else:
+					# Negative gossip: raise tension toward the subject
+					var current_tension: float = partner_rel.get_tension(target_entity)
+					partner_rel.set_tension(target_entity, current_tension + 0.1)
+
+## Return this NPC's sociability trait value (0.0–1.0).
+func _get_sociability() -> float:
+	return NpcTraits.get_trait(npc.trait_profile, "sociability", 0.5)
