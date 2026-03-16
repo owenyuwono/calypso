@@ -15,8 +15,7 @@ var _hbox: HBoxContainer
 
 const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
-	{"key": "skills", "label": "Skills", "hint": "S"},
-	{"key": "proficiencies", "label": "Prof", "hint": "P"},
+	{"key": "skills", "label": "Skills", "hint": "S/P"},
 	{"key": "map", "label": "Map", "hint": "W"},
 ]
 
@@ -115,7 +114,6 @@ func _get_panel(key: String) -> Control:
 	match key:
 		"status": return status_panel
 		"skills": return skill_panel
-		"proficiencies": return skill_panel
 		"map": return world_map_panel
 	return null
 
