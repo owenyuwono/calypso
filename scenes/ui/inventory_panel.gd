@@ -63,6 +63,13 @@ var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _is_open: bool = false
 
+var _desc_panel: PanelContainer
+var _desc_vbox: VBoxContainer
+var _context_menu: PanelContainer
+var _context_vbox: VBoxContainer
+var _context_item_id: String = ""
+var _context_slot_name: String = ""
+
 var _player: Node
 var _inventory: Node
 var _equipment: Node
@@ -192,6 +199,50 @@ func _build_ui() -> void:
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tooltip)
 
+	_build_desc_panel()
+	_build_context_menu()
+
+func _build_desc_panel() -> void:
+	_desc_panel = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
+	style.border_color = Color(0.55, 0.45, 0.25)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	_desc_panel.add_theme_stylebox_override("panel", style)
+	_desc_panel.custom_minimum_size = Vector2(280, 0)
+	_desc_panel.visible = false
+	_desc_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_desc_panel)
+
+	_desc_vbox = VBoxContainer.new()
+	_desc_vbox.add_theme_constant_override("separation", 4)
+	_desc_panel.add_child(_desc_vbox)
+
+func _build_context_menu() -> void:
+	_context_menu = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
+	style.border_color = Color(0.55, 0.45, 0.25)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	_context_menu.add_theme_stylebox_override("panel", style)
+	_context_menu.visible = false
+	_context_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_context_menu)
+
+	_context_vbox = VBoxContainer.new()
+	_context_vbox.add_theme_constant_override("separation", 2)
+	_context_menu.add_child(_context_vbox)
+
 func set_player(p: Node) -> void:
 	_player = p
 	if _player:
@@ -215,11 +266,16 @@ func _toggle() -> void:
 		_refresh()
 	else:
 		_tooltip.visible = false
+		_hide_desc()
+		_hide_context_menu()
 
 func is_open() -> bool:
 	return _is_open
 
 func _refresh() -> void:
+	_hide_desc()
+	_hide_context_menu()
+
 	if not _is_open or not _player:
 		return
 
@@ -504,28 +560,204 @@ func _on_cell_unhover() -> void:
 	_tooltip.visible = false
 
 func _on_equip_cell_input(event: InputEvent, slot_name: String) -> void:
-	if not (event is InputEventMouseButton):
+	if not (event is InputEventMouseButton) or not event.pressed:
 		return
 	var mb := event as InputEventMouseButton
-	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+	var item_id: String = _equipment.get_slot(slot_name)
+	if item_id.is_empty():
 		return
-	_unequip(slot_name)
+	if mb.button_index == MOUSE_BUTTON_LEFT:
+		_show_desc(item_id)
+	elif mb.button_index == MOUSE_BUTTON_RIGHT:
+		_show_context_menu("", slot_name, mb.global_position)
 
 func _on_cell_input(event: InputEvent, item_id: String) -> void:
-	if not (event is InputEventMouseButton):
+	if not (event is InputEventMouseButton) or not event.pressed:
 		return
 	var mb := event as InputEventMouseButton
-	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+	if mb.button_index == MOUSE_BUTTON_LEFT:
+		_show_desc(item_id)
+	elif mb.button_index == MOUSE_BUTTON_RIGHT:
+		_show_context_menu(item_id, "", mb.global_position)
+
+func _show_desc(item_id: String) -> void:
+	_hide_context_menu()
+	for child in _desc_vbox.get_children():
+		child.queue_free()
+
+	var item: Dictionary = ItemDatabase.get_item(item_id)
+	if item.is_empty():
+		_desc_panel.visible = false
 		return
-	var item_data: Dictionary = ItemDatabase.get_item(item_id)
-	var type_str: String = item_data.get("type", "")
-	match type_str:
-		"consumable":
-			_use_item(item_id, item_data)
-		"weapon":
-			_equip_to_slot(item_id, "main_hand")
-		"armor":
-			_equip_to_slot(item_id, "off_hand")
+
+	var type_str: String = item.get("type", "")
+	var type_color: Color = TYPE_COLORS.get(type_str, Color(0.5, 0.5, 0.5))
+
+	# Item name (large, colored)
+	var name_label := Label.new()
+	name_label.text = item.get("name", item_id)
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_color_override("font_color", type_color.lightened(0.4))
+	_desc_vbox.add_child(name_label)
+
+	# Type label
+	var type_label := Label.new()
+	type_label.text = type_str.capitalize()
+	type_label.add_theme_font_size_override("font_size", 11)
+	type_label.add_theme_color_override("font_color", Color(0.6, 0.55, 0.45))
+	_desc_vbox.add_child(type_label)
+
+	_desc_vbox.add_child(HSeparator.new())
+
+	# Stats
+	if item.has("atk_bonus"):
+		_add_desc_stat("ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
+	if item.has("def_bonus"):
+		_add_desc_stat("DEF", "+%d" % item["def_bonus"], Color(0.3, 0.6, 0.9))
+	if item.has("heal"):
+		_add_desc_stat("Heal", "%d HP" % item["heal"], Color(0.3, 0.8, 0.3))
+	if item.has("value"):
+		_add_desc_stat("Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
+
+	# Weapon type
+	if item.has("weapon_type"):
+		_add_desc_stat("Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
+
+	# Proficiency requirement
+	if item.has("required_skill") and item.has("required_level"):
+		var req_text: String = "%s Lv. %d" % [item["required_skill"].capitalize(), item["required_level"]]
+		_add_desc_stat("Requires", req_text, Color(0.7, 0.6, 0.4))
+
+	# Attack speed (daggers)
+	if item.has("attack_speed"):
+		_add_desc_stat("Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
+
+	# Close button
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.add_theme_font_size_override("font_size", 11)
+	close_btn.pressed.connect(_hide_desc)
+	_desc_vbox.add_child(close_btn)
+
+	# Position near center of panel
+	_desc_panel.position = Vector2(60, 180)
+	_desc_panel.visible = true
+
+func _add_desc_stat(label_text: String, value_text: String, color: Color) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_desc_vbox.add_child(row)
+	var lbl := Label.new()
+	lbl.text = label_text + ":"
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
+	lbl.custom_minimum_size.x = 60
+	row.add_child(lbl)
+	var val := Label.new()
+	val.text = value_text
+	val.add_theme_font_size_override("font_size", 12)
+	val.add_theme_color_override("font_color", color)
+	row.add_child(val)
+
+func _hide_desc() -> void:
+	_desc_panel.visible = false
+
+func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2) -> void:
+	_hide_desc()
+	_context_item_id = item_id
+	_context_slot_name = slot_name
+
+	for child in _context_vbox.get_children():
+		child.queue_free()
+
+	if not slot_name.is_empty():
+		# Equipment slot right-click — just Unequip
+		_add_context_button("Unequip", _ctx_unequip)
+	else:
+		# Inventory item right-click
+		var item: Dictionary = ItemDatabase.get_item(item_id)
+		var type_str: String = item.get("type", "")
+		if type_str == "consumable" and item.has("heal"):
+			_add_context_button("Use", _ctx_use)
+		elif type_str in ["weapon", "armor"]:
+			_add_context_button("Equip", _ctx_equip)
+		_add_context_button("Discard", _ctx_discard)
+
+	# Position near mouse, relative to this Control
+	var local_pos: Vector2 = global_pos - global_position
+	_context_menu.position = local_pos
+	_context_menu.visible = true
+
+func _add_context_button(text: String, callback: Callable) -> void:
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.custom_minimum_size = Vector2(80, 26)
+	btn.pressed.connect(callback)
+	_context_vbox.add_child(btn)
+
+func _hide_context_menu() -> void:
+	_context_menu.visible = false
+	_context_item_id = ""
+	_context_slot_name = ""
+
+func _ctx_use() -> void:
+	if not _context_item_id.is_empty():
+		var item_data: Dictionary = ItemDatabase.get_item(_context_item_id)
+		_use_item(_context_item_id, item_data)
+	_hide_context_menu()
+
+func _ctx_equip() -> void:
+	if not _context_item_id.is_empty():
+		var item_data: Dictionary = ItemDatabase.get_item(_context_item_id)
+		var type_str: String = item_data.get("type", "")
+		if type_str == "weapon":
+			_equip_to_slot(_context_item_id, "main_hand")
+		elif type_str == "armor":
+			_equip_to_slot(_context_item_id, "off_hand")
+	_hide_context_menu()
+
+func _ctx_unequip() -> void:
+	if not _context_slot_name.is_empty():
+		_unequip(_context_slot_name)
+	_hide_context_menu()
+
+func _ctx_discard() -> void:
+	if _context_item_id.is_empty() or not _inventory:
+		_hide_context_menu()
+		return
+	if not _inventory.has_item(_context_item_id):
+		_hide_context_menu()
+		return
+	var discard_id: String = _context_item_id
+	_inventory.remove_item(discard_id)
+	# Spawn loot drop at player position
+	if _player:
+		var loot_script := preload("res://scenes/objects/loot_drop.gd")
+		var loot := Area3D.new()
+		loot.set_script(loot_script)
+		loot.item_id = discard_id
+		loot.item_count = 1
+		loot.gold_amount = 0
+		var offset := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+		loot.position = _player.global_position + offset
+		get_tree().current_scene.call_deferred("add_child", loot)
+	_hide_context_menu()
+	_refresh()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _is_open:
+		return
+	if not (event is InputEventMouseButton) or not event.pressed:
+		return
+	var mb := event as InputEventMouseButton
+	if _context_menu.visible:
+		_hide_context_menu()
+	if _desc_panel.visible:
+		var local: Vector2 = mb.global_position - _desc_panel.global_position
+		var rect: Vector2 = _desc_panel.size
+		if local.x < 0 or local.y < 0 or local.x > rect.x or local.y > rect.y:
+			_hide_desc()
 
 func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if not _inventory or not _inventory.has_item(item_id):
