@@ -2,8 +2,8 @@
 
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
-- **Autoload singletons**: WorldState (registry only), LLMClient, GameEvents (signals, LLM)
-- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), world builders (see below)
+- **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals, LLM)
+- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), GossipSystem (fact propagation), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
@@ -44,8 +44,13 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
 - `AutoAttackComponent` — emits `attack_landed(target_id, damage, target_pos)` and `target_lost()` signals; entities connect handlers for visual feedback (damage numbers, flash, shouts). `_chase()` is pure movement (untouched); stuck detection lives in `process_attack()` only
 - **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment
+- **Event-driven LLM**: NPCs only consult LLM on significant events (goal_completed, combat_outcome, low_resources, idle_timeout, player/NPC chat), not on timers. Event cooldowns prevent spam. Scripted behavior handles ~95% of decisions
+- **NPC scaling**: `NpcGenerator` creates 50+ procedural NPCs (5 archetypes: warrior/mage/rogue/ranger/merchant, ~200 name pool, tiered loadouts). `game_world.gd` spawns them at world init. Animation LOD skips updates > 50m from camera
+- **Gossip system**: `GossipSystem` propagates facts between NPCs during social chat. Memories have gossip metadata (source: witnessed/told_by/rumor, spread_count, original_source). 15% distortion per retelling, `spread_count >= 4` becomes rumor. Gossip affects relationships
+- **Compact prompts**: `prompt_builder.gd` uses token-efficient formats: `Kael(knight,hp:full,fighting:slime,8m)` for perception, `lv5 hp:80/100 atk:15+4 def:8+3 gold:150` for stats
 - **Collision layers**: Layer 1 = physics, Layer 6 = vend signs, Layer 9 (bit 8) = entity perception (PerceptionComponent detection)
-- `NpcLoadouts.LOADOUTS` — static Dictionary of NPC starting data (trait, items, equip, gold, goal). Merchant NPCs use `default_goal: "vend"` to auto-start vending on spawn
+- `NpcLoadouts.LOADOUTS` — static Dictionary of hardcoded NPC starting data (7 named adventurers + 2 shop NPCs). Merchant NPCs use `default_goal: "vend"` to auto-start vending on spawn
+- `NpcGenerator.generate_npcs(count)` — procedural NPC creation for scaling. Returns array of loadout dicts matching NpcLoadouts format. `npc_base.gd:initialize_from_loadout()` applies generated data
 - Merchant vending: any entity can vend from inventory via VendingComponent — no fixed shop NPCs
 - Vend sign: `_visuals.show_vend_sign()` / `hide_vend_sign()` — StaticBody3D (layer 6) + opaque panel quad + Label3D + white border quad (hover). Click sign to shop, click NPC body for info/chat
 - Vend sign interaction: player raycast detects sign via `"vend_sign"` group, `_hovered_vend_sign` / `_pending_vend_sign_click` flags route to shop panel
