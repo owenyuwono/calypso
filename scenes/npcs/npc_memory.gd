@@ -269,8 +269,8 @@ func gather_chat_facts(target_id: String) -> Array:
 	var gold: int = npc_node._inventory.gold
 	var level: int = npc_node._stats.level
 	var equipment: Dictionary = npc_node._equipment.get_equipment()
-	var weapon_id: String = equipment.get("weapon", "")
-	var armor_id: String = equipment.get("armor", "")
+	var weapon_id: String = equipment.get("main_hand", "")
+	var armor_id: String = equipment.get("off_hand", "")
 	var potion_count: int = npc_node._inventory.get_item_count("healing_potion")
 
 	if hp_pct < 0.5:

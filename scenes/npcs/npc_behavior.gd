@@ -725,12 +725,12 @@ func _auto_equip() -> void:
 		var item := ItemDatabase.get_item(item_id)
 		var item_type: String = item.get("type", "")
 		if item_type == "weapon":
-			var current_id: String = equipment.get("weapon", "")
+			var current_id: String = equipment.get("main_hand", "")
 			var current := ItemDatabase.get_item(current_id)
 			if item.get("atk_bonus", 0) > current.get("atk_bonus", 0):
 				npc._equipment.equip(item_id)
 		elif item_type == "armor":
-			var current_id: String = equipment.get("armor", "")
+			var current_id: String = equipment.get("off_hand", "")
 			var current := ItemDatabase.get_item(current_id)
 			if item.get("def_bonus", 0) > current.get("def_bonus", 0):
 				npc._equipment.equip(item_id)

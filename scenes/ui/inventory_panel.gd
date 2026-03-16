@@ -1,6 +1,7 @@
 extends Control
 ## Player inventory panel toggled with Tab.
-## Grid-based layout: equipment row, gold display, 5-column item grid with hover tooltips.
+## Layout (top to bottom): drag handle, attack type + gold row,
+## 4x2 equipment grid, separator, 5-column inventory grid with scroll.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
@@ -8,6 +9,17 @@ const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 const GRID_COLUMNS := 5
 const MIN_SLOTS := 20
 const CELL_SIZE := 64
+const EQUIP_CELL_SIZE := 56
+
+const EQUIP_LAYOUT: Array = [
+	["head", "torso", "main_hand", "off_hand"],
+	["gloves", "legs", "feet", "back"],
+]
+
+const SLOT_LABELS: Dictionary = {
+	"head": "Head", "torso": "Torso", "main_hand": "Main", "off_hand": "Off",
+	"gloves": "Gloves", "legs": "Legs", "feet": "Feet", "back": "Back",
+}
 
 const TYPE_ORDER := {"weapon": 0, "armor": 1, "consumable": 2, "material": 3}
 const TYPE_COLORS := {
@@ -17,11 +29,25 @@ const TYPE_COLORS := {
 	"material":   Color(0.5, 0.4, 0.25),
 }
 
+const EQUIP_SLOT_COLORS: Dictionary = {
+	"main_hand": Color(0.4, 0.4, 0.5),
+	"off_hand":  Color(0.2, 0.3, 0.5),
+}
+const EQUIP_SLOT_COLOR_DEFAULT := Color(0.25, 0.3, 0.45)
+
+const WEAPON_COLORS: Dictionary = {
+	"sword":  Color(0.9, 0.85, 0.3),
+	"axe":    Color(0.8, 0.4, 0.2),
+	"mace":   Color(0.6, 0.6, 0.7),
+	"dagger": Color(0.4, 0.8, 0.4),
+	"staff":  Color(0.5, 0.4, 0.9),
+}
+
 var _panel: PanelContainer
+var _equip_grid: GridContainer
 var _grid: GridContainer
+var _attack_type_label: Label
 var _gold_label: Label
-var _weapon_cell_label: Label
-var _armor_cell_label: Label
 var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _is_open: bool = false
@@ -39,7 +65,7 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(380, 480)
+	_panel.custom_minimum_size = Vector2(380, 580)
 	var style := UIHelper.create_panel_style()
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
@@ -54,33 +80,39 @@ func _build_ui() -> void:
 	drag_handle.close_pressed.connect(_toggle)
 	vbox.add_child(drag_handle)
 
-	# Gold display
+	# Attack type + gold row
+	var info_row := HBoxContainer.new()
+	info_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(info_row)
+
+	_attack_type_label = Label.new()
+	_attack_type_label.add_theme_font_size_override("font_size", 14)
+	_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
+	_attack_type_label.text = "Unarmed"
+	_attack_type_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_row.add_child(_attack_type_label)
+
 	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 16)
+	_gold_label.add_theme_font_size_override("font_size", 14)
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	_gold_label.text = "Gold: 0"
-	vbox.add_child(_gold_label)
+	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	info_row.add_child(_gold_label)
 
-	# Equipment row
-	var equip_row := HBoxContainer.new()
-	equip_row.add_theme_constant_override("separation", 8)
-	vbox.add_child(equip_row)
-
-	var weapon_panel := _build_equip_slot("Weapon")
-	equip_row.add_child(weapon_panel)
-	_weapon_cell_label = weapon_panel.get_node("MarginContainer/VBoxContainer/ValueLabel")
-
-	var armor_panel := _build_equip_slot("Armor")
-	equip_row.add_child(armor_panel)
-	_armor_cell_label = armor_panel.get_node("MarginContainer/VBoxContainer/ValueLabel")
+	# Equipment grid (4 columns x 2 rows)
+	_equip_grid = GridContainer.new()
+	_equip_grid.columns = 4
+	_equip_grid.add_theme_constant_override("h_separation", 6)
+	_equip_grid.add_theme_constant_override("v_separation", 6)
+	vbox.add_child(_equip_grid)
 
 	# Separator
 	vbox.add_child(HSeparator.new())
 
-	# Scroll + grid
+	# Scroll + inventory grid
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 300)
+	scroll.custom_minimum_size = Vector2(0, 280)
 	vbox.add_child(scroll)
 
 	_grid = GridContainer.new()
@@ -109,45 +141,6 @@ func _build_ui() -> void:
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tooltip)
-
-func _build_equip_slot(slot_label: String) -> PanelContainer:
-	var slot_panel := PanelContainer.new()
-	slot_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var slot_style := StyleBoxFlat.new()
-	slot_style.bg_color = Color(0.12, 0.12, 0.18)
-	slot_style.border_color = Color(0.35, 0.35, 0.45)
-	slot_style.set_border_width_all(1)
-	slot_style.set_corner_radius_all(4)
-	slot_panel.add_theme_stylebox_override("panel", slot_style)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 6)
-	margin.add_theme_constant_override("margin_right", 6)
-	margin.add_theme_constant_override("margin_top", 4)
-	margin.add_theme_constant_override("margin_bottom", 4)
-	slot_panel.add_child(margin)
-	margin.name = "MarginContainer"
-
-	var inner_vbox := VBoxContainer.new()
-	margin.add_child(inner_vbox)
-	inner_vbox.name = "VBoxContainer"
-
-	var header := Label.new()
-	header.name = "HeaderLabel"
-	header.text = slot_label
-	header.add_theme_font_size_override("font_size", 11)
-	header.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
-	inner_vbox.add_child(header)
-
-	var value := Label.new()
-	value.name = "ValueLabel"
-	value.text = "(none)"
-	value.add_theme_font_size_override("font_size", 13)
-	value.add_theme_color_override("font_color", UIHelper.COLOR_EQUIPMENT)
-	value.clip_text = true
-	inner_vbox.add_child(value)
-
-	return slot_panel
 
 func set_player(p: Node) -> void:
 	_player = p
@@ -180,29 +173,48 @@ func _refresh() -> void:
 	if not _is_open or not _player:
 		return
 
-	# Clear grid
-	for child in _grid.get_children():
-		child.queue_free()
-
 	if not _inventory or not _equipment:
 		return
+
+	# Attack type label
+	if _combat:
+		var weapon_type: String = _combat.get_equipped_weapon_type()
+		var weapon_id: String = _equipment.get_slot("main_hand")
+		if weapon_id.is_empty():
+			_attack_type_label.text = "Unarmed"
+			_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
+		else:
+			var wtype_cap: String = weapon_type.substr(0, 1).to_upper() + weapon_type.substr(1)
+			_attack_type_label.text = wtype_cap
+			var wcolor: Color = WEAPON_COLORS.get(weapon_type, UIHelper.COLOR_DISABLED)
+			_attack_type_label.add_theme_color_override("font_color", wcolor)
+	else:
+		_attack_type_label.text = "Unarmed"
+		_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
 
 	# Gold
 	var gold: int = _inventory.get_gold_amount()
 	_gold_label.text = "Gold: %d" % gold
 
-	# Equipment row
-	var equipment: Dictionary = _equipment.get_equipment()
-	var weapon_id: String = equipment.get("weapon", "")
-	var armor_id: String = equipment.get("armor", "")
-	_weapon_cell_label.text = ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "(none)"
-	_armor_cell_label.text = ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "(none)"
+	# Rebuild equipment grid
+	for child in _equip_grid.get_children():
+		child.queue_free()
 
-	# Build sorted item list
+	for row in EQUIP_LAYOUT:
+		for slot_name in row:
+			var item_id: String = _equipment.get_slot(slot_name)
+			if item_id.is_empty():
+				_equip_grid.add_child(_build_equip_cell_empty(slot_name))
+			else:
+				_equip_grid.add_child(_build_equip_cell_filled(slot_name, item_id))
+
+	# Rebuild inventory grid
+	for child in _grid.get_children():
+		child.queue_free()
+
 	var inv: Dictionary = _inventory.get_items()
 	var sorted_items: Array = _sort_items(inv)
 
-	# Populate grid cells
 	var slot_count: int = max(MIN_SLOTS, sorted_items.size())
 	for i in range(slot_count):
 		if i < sorted_items.size():
@@ -227,11 +239,77 @@ func _sort_items(inv: Dictionary) -> Array:
 			return a[2] < b[2]
 		return a[3] < b[3]
 	)
-	# Strip sort keys, return [item_id, count] pairs
 	var result: Array = []
 	for entry in entries:
 		result.append([entry[0], entry[1]])
 	return result
+
+func _build_equip_cell_empty(slot_name: String) -> Control:
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(EQUIP_CELL_SIZE, EQUIP_CELL_SIZE)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.08, 0.12)
+	style.border_color = Color(0.25, 0.25, 0.3)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	cell.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.text = SLOT_LABELS.get(slot_name, slot_name)
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.45))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cell.add_child(label)
+
+	return cell
+
+func _build_equip_cell_filled(slot_name: String, item_id: String) -> Control:
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(EQUIP_CELL_SIZE, EQUIP_CELL_SIZE)
+
+	var slot_color: Color = EQUIP_SLOT_COLORS.get(slot_name, EQUIP_SLOT_COLOR_DEFAULT)
+	var style := StyleBoxFlat.new()
+	style.bg_color = slot_color
+	style.border_color = Color(0.5, 0.5, 0.6)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	cell.add_theme_stylebox_override("panel", style)
+
+	var item_data: Dictionary = ItemDatabase.get_item(item_id)
+	var item_name: String = item_data.get("name", item_id)
+
+	# Slot label tiny at top
+	var slot_label := Label.new()
+	slot_label.text = SLOT_LABELS.get(slot_name, slot_name)
+	slot_label.add_theme_font_size_override("font_size", 9)
+	slot_label.add_theme_color_override("font_color", Color(0.8, 0.85, 1.0, 0.75))
+	slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slot_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	slot_label.offset_top = 3
+	slot_label.offset_bottom = 16
+	slot_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(slot_label)
+
+	# First letter of item name, centered
+	var letter := Label.new()
+	letter.text = item_name.substr(0, 1).to_upper()
+	letter.add_theme_font_size_override("font_size", 20)
+	letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	letter.set_anchors_preset(Control.PRESET_FULL_RECT)
+	letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(letter)
+
+	cell.mouse_filter = Control.MOUSE_FILTER_STOP
+	cell.mouse_entered.connect(_on_equip_cell_hover.bind(item_name, cell))
+	cell.mouse_exited.connect(_on_cell_unhover)
+	cell.gui_input.connect(_on_equip_cell_input.bind(slot_name))
+
+	return cell
 
 func _build_cell(item_id: String, count: int) -> Control:
 	var cell := PanelContainer.new()
@@ -294,6 +372,12 @@ func _build_empty_cell() -> Control:
 	cell.add_theme_stylebox_override("panel", style)
 	return cell
 
+func _on_equip_cell_hover(item_name: String, cell: Control) -> void:
+	_tooltip_label.text = item_name
+	var cell_pos: Vector2 = cell.global_position - _panel.global_position
+	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
+	_tooltip.visible = true
+
 func _on_cell_hover(item_id: String, cell: Control) -> void:
 	var item_data: Dictionary = ItemDatabase.get_item(item_id)
 	_tooltip_label.text = item_data.get("name", item_id)
@@ -303,6 +387,14 @@ func _on_cell_hover(item_id: String, cell: Control) -> void:
 
 func _on_cell_unhover() -> void:
 	_tooltip.visible = false
+
+func _on_equip_cell_input(event: InputEvent, slot_name: String) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	_unequip(slot_name)
 
 func _on_cell_input(event: InputEvent, item_id: String) -> void:
 	if not (event is InputEventMouseButton):
@@ -315,8 +407,10 @@ func _on_cell_input(event: InputEvent, item_id: String) -> void:
 	match type_str:
 		"consumable":
 			_use_item(item_id, item_data)
-		"weapon", "armor":
-			_equip_item(item_id)
+		"weapon":
+			_equip_to_slot(item_id, "main_hand")
+		"armor":
+			_equip_to_slot(item_id, "off_hand")
 
 func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if not _inventory or not _inventory.has_item(item_id):
@@ -327,8 +421,14 @@ func _use_item(item_id: String, item_data: Dictionary) -> void:
 	_inventory.remove_item(item_id)
 	_refresh()
 
-func _equip_item(item_id: String) -> void:
+func _equip_to_slot(item_id: String, _slot_hint: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.equip(item_id):
+		_refresh()
+
+func _unequip(slot_name: String) -> void:
+	if not _equipment:
+		return
+	if _equipment.unequip(slot_name):
 		_refresh()

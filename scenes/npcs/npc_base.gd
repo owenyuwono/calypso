@@ -129,7 +129,10 @@ func _ready() -> void:
 	_equipment = EquipmentComponent.new()
 	_equipment.name = "EquipmentComponent"
 	add_child(_equipment)
-	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
+	_equipment.setup({
+		"head": "", "torso": "", "legs": "", "gloves": "",
+		"feet": "", "back": "", "main_hand": "", "off_hand": "",
+	}, _inventory)
 
 	# Equip starting weapon from trait profile
 	if not trait_profile.is_empty():
@@ -292,7 +295,7 @@ func _register_with_world() -> void:
 	stats["state"] = STATE_IDLE
 	stats["goal"] = current_goal
 	stats["inventory"] = {}
-	stats["equipment"] = {"weapon": "", "armor": ""}
+	stats["equipment"] = {"head": "", "torso": "", "legs": "", "gloves": "", "feet": "", "back": "", "main_hand": "", "off_hand": ""}
 	WorldState.register_entity(npc_id, self, stats)
 
 func _update_lod() -> void:

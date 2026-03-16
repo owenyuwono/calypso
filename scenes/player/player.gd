@@ -73,7 +73,6 @@ var skill_hotbar: Control:
 var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
-var equipment_panel: Control
 
 # Click marker (reused single instance)
 var _click_marker: MeshInstance3D
@@ -113,7 +112,10 @@ func _ready() -> void:
 	_equipment = EquipmentComponent.new()
 	_equipment.name = "EquipmentComponent"
 	add_child(_equipment)
-	_equipment.setup({"weapon": "", "armor": ""}, _inventory)
+	_equipment.setup({
+		"head": "", "torso": "", "legs": "", "gloves": "",
+		"feet": "", "back": "", "main_hand": "", "off_hand": "",
+	}, _inventory)
 
 	_progression = ProgressionComponent.new()
 	_progression.name = "ProgressionComponent"
@@ -141,7 +143,7 @@ func _ready() -> void:
 	stats["type"] = "player"
 	stats["name"] = "Player"
 	stats["inventory"] = {}
-	stats["equipment"] = {"weapon": "", "armor": ""}
+	stats["equipment"] = {"head": "", "torso": "", "legs": "", "gloves": "", "feet": "", "back": "", "main_hand": "", "off_hand": ""}
 	stats["skills"] = {}
 	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
@@ -571,7 +573,7 @@ func stop_vending() -> void:
 		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
-	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel, equipment_panel]:
+	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel]:
 		if panel and panel.is_open():
 			return true
 	return false

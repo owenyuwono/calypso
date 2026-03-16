@@ -56,15 +56,10 @@ func _ready() -> void:
 	if player and chat_log:
 		chat_log.set_player(player)
 
-	var equipment_panel := $UILayer/EquipmentPanel
-	if player and equipment_panel:
-		equipment_panel.set_player(player)
-
 	var panel_toggles := $UILayer/PanelToggles
 	if panel_toggles:
 		panel_toggles.status_panel = status_panel
 		panel_toggles.inventory_panel = inventory_panel
-		panel_toggles.equipment_panel = equipment_panel
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.chat_input = chat_input

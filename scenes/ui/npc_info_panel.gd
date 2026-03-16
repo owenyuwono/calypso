@@ -162,8 +162,8 @@ func _refresh() -> void:
 		combat.get_effective_atk() if combat else (stats.atk if stats else 0),
 		combat.get_effective_def() if combat else (stats.def if stats else 0)]
 	var equipment: Dictionary = equip.get_equipment() if equip else {}
-	var weapon_id: String = equipment.get("weapon", "")
-	var armor_id: String = equipment.get("armor", "")
+	var weapon_id: String = equipment.get("main_hand", "")
+	var armor_id: String = equipment.get("off_hand", "")
 	text += "Weapon: %s\n" % (ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "[color=#666]None[/color]")
 	text += "Armor: %s\n" % (ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "[color=#666]None[/color]")
 

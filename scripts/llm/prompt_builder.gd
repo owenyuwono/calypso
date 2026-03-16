@@ -74,8 +74,8 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 	var gold: int = inv_comp.gold if inv_comp else 0
 
 	var equipment: Dictionary = equip_comp.get_equipment() if equip_comp else {}
-	var weapon_id: String = equipment.get("weapon", "")
-	var armor_id: String = equipment.get("armor", "")
+	var weapon_id: String = equipment.get("main_hand", "")
+	var armor_id: String = equipment.get("off_hand", "")
 
 	var inv: Dictionary = inv_comp.get_items() if inv_comp else {}
 
@@ -275,8 +275,8 @@ static func build_chat_user_message(npc_name: String, npc_id: String, speaker_na
 			inventory_text = _format_inventory_compact(inv)
 		if equip_comp:
 			var equipment: Dictionary = equip_comp.get_equipment()
-			var weapon_id: String = equipment.get("weapon", "")
-			var armor_id: String = equipment.get("armor", "")
+			var weapon_id: String = equipment.get("main_hand", "")
+			var armor_id: String = equipment.get("off_hand", "")
 			equipment_text = _format_equipment_compact(weapon_id, armor_id)
 
 	# Build conversation context from area chat log

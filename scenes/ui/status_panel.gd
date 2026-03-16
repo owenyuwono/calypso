@@ -264,8 +264,8 @@ func _refresh() -> void:
 	_range_value.text = "%.1f" % attack_range
 
 	# Equipment
-	var weapon_id: String = equipment.get("weapon", "")
-	var armor_id: String = equipment.get("armor", "")
+	var weapon_id: String = equipment.get("main_hand", "")
+	var armor_id: String = equipment.get("off_hand", "")
 	var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "None"
 	var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "None"
 	_weapon_name_label.text = weapon_name
@@ -301,12 +301,12 @@ func _refresh() -> void:
 
 func _unequip_weapon() -> void:
 	if _player:
-		_player.get_node("EquipmentComponent").unequip("weapon")
+		_player.get_node("EquipmentComponent").unequip("main_hand")
 	_refresh()
 
 func _unequip_armor() -> void:
 	if _player:
-		_player.get_node("EquipmentComponent").unequip("armor")
+		_player.get_node("EquipmentComponent").unequip("off_hand")
 	_refresh()
 
 func is_open() -> bool:
