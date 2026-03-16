@@ -1,8 +1,8 @@
 extends Node
-## Async HTTP pool for llama-server (OpenAI-compatible) API calls with timeout and rate-limiting.
+## Async HTTP pool for Ollama API calls with timeout and rate-limiting.
 
-const LLAMA_BASE_URL: String = "http://localhost:11434"
-const LLAMA_MODEL: String = "qwen3.5:4b"
+const OLLAMA_BASE_URL: String = "http://localhost:11434"
+const OLLAMA_MODEL: String = "qwen3.5:4b"
 const LLM_TIMEOUT: float = 60.0
 const LLM_TEMPERATURE: float = 0.7
 const MAX_CONCURRENT_REQUESTS: int = 10
@@ -51,12 +51,16 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}, pri
 		return request_id
 
 	var body := {
-		"model": LLAMA_MODEL,
+		"model": OLLAMA_MODEL,
 		"messages": messages,
-		"temperature": LLM_TEMPERATURE,
+		"stream": false,
+		"think": false,
+		"options": {
+			"temperature": LLM_TEMPERATURE,
+		},
 	}
 	if not format.is_empty():
-		body["response_format"] = {"type": "json_object"}
+		body["format"] = format
 
 	_sequence += 1
 	_request_queue.append({
@@ -170,7 +174,7 @@ func _send_request(pool_entry: Dictionary, req_id: String, body: Dictionary) -> 
 
 	var http: HTTPRequest = pool_entry.node
 	var json_body := JSON.stringify(body)
-	var url := LLAMA_BASE_URL + "/v1/chat/completions"
+	var url := OLLAMA_BASE_URL + "/api/chat"
 	var headers := ["Content-Type: application/json"]
 	print("[LLM] Sending request '%s' to %s (model: %s)" % [req_id, url, body.get("model", "?")])
 
@@ -208,28 +212,19 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		_finish_request(pool_entry, req_id, {}, "Response is not a JSON object")
 		return
 
-	var openai_response: Dictionary = json.data
-
-	# Translate OpenAI format → Ollama-compatible shape that callers expect:
-	# {message: {content: "..."}}
-	var content: String = _extract_content(openai_response)
+	var ollama_response: Dictionary = json.data
+	var content: String = _extract_content(ollama_response)
 	if content.is_empty():
-		_finish_request(pool_entry, req_id, {}, "No content in response choices")
+		_finish_request(pool_entry, req_id, {}, "No content in response")
 		return
 
 	var response: Dictionary = {"message": {"content": content}}
 	print("[LLM] Request '%s' completed successfully" % req_id)
 	_finish_request(pool_entry, req_id, response, "")
 
-## Extract the text content from an OpenAI-compatible chat completion response.
-func _extract_content(openai_response: Dictionary) -> String:
-	var choices = openai_response.get("choices", [])
-	if not choices is Array or choices.is_empty():
-		return ""
-	var first_choice = choices[0]
-	if not first_choice is Dictionary:
-		return ""
-	var message = first_choice.get("message", {})
+## Extract the text content from an Ollama chat response.
+func _extract_content(ollama_response: Dictionary) -> String:
+	var message = ollama_response.get("message", {})
 	if not message is Dictionary:
 		return ""
 	return str(message.get("content", ""))
