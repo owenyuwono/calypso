@@ -22,6 +22,13 @@ const WANDER_INTERVAL_MAX: float = 5.0
 const NIGHT_AGGRO_MULTIPLIER: float = 1.3
 const NIGHT_ATK_MULTIPLIER: float = 1.15
 
+const LOD_FULL_DIST: float = 30.0
+const LOD_REDUCED_DIST: float = 60.0
+const LOD_CHECK_INTERVAL: float = 0.5
+
+var _lod_level: int = 0
+var _lod_timer: float = 0.0
+
 # States
 var state: String = "idle"  # idle, wandering, aggro, attacking, dead
 var spawn_point: Vector3
@@ -125,6 +132,7 @@ func _ready() -> void:
 
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
 	_aggro_check_timer = randf() * 0.3  # Stagger initial timer
+	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
 	# Create HP bar
 	_visuals.setup_hp_bar(2.0)
@@ -185,12 +193,31 @@ func _create_slime_mesh(stats: Dictionary) -> void:
 	tween.tween_property(model, "scale", Vector3(1.1, 0.9, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(model, "scale", Vector3(0.9, 1.1, 0.9), 0.5).set_trans(Tween.TRANS_SINE)
 
+func _update_lod() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if not cam:
+		_lod_level = 0
+		return
+	var dist := global_position.distance_to(cam.global_position)
+	if dist < LOD_FULL_DIST:
+		_lod_level = 0
+	elif dist < LOD_REDUCED_DIST:
+		_lod_level = 1
+	else:
+		_lod_level = 2
+
 func _physics_process(delta: float) -> void:
 	if state == "dead":
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
 			_respawn()
 		return
+
+	# LOD check (staggered)
+	_lod_timer -= delta
+	if _lod_timer <= 0.0:
+		_lod_timer = LOD_CHECK_INTERVAL
+		_update_lod()
 
 	# Tick aggro check timer
 	_aggro_check_timer -= delta
@@ -215,15 +242,16 @@ func _physics_process(delta: float) -> void:
 	else:
 		move_and_slide()
 
-	# Update animation
-	if state == "attacking":
-		pass  # Attack handles its own anims
-	elif state == "dead":
-		pass
-	elif is_moving:
-		_visuals.play_anim("Walking_A")
-	else:
-		_visuals.play_anim("Idle")
+	# Update animation (skip at high LOD)
+	if _lod_level < 2:
+		if state == "attacking":
+			pass  # Attack handles its own anims
+		elif state == "dead":
+			pass
+		elif is_moving:
+			_visuals.play_anim("Walking_A")
+		else:
+			_visuals.play_anim("Idle")
 
 func _capture_spawn_point() -> void:
 	spawn_point = global_position

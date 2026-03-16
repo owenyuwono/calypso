@@ -62,6 +62,9 @@ func _update_dots() -> void:
 		var node: Node3D = WorldState.entities[id]
 		if not node or not is_instance_valid(node):
 			continue
+		# Early distance cull — skip entities beyond minimap display radius
+		if node.global_position.distance_to(_player_pos) > MAP_RADIUS:
+			continue
 		var data: Dictionary = WorldState.get_entity_data(id)
 		var entity_type: String = data.get("type", "unknown")
 

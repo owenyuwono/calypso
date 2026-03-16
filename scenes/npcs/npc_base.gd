@@ -66,7 +66,7 @@ var _last_nav_pos: Vector3 = Vector3.ZERO
 @onready var dialogue_bubble: Node3D = $DialogueBubble
 @onready var name_label: Label3D = $NameLabel
 
-const MOVE_SPEED: float = 3.6
+const MOVE_SPEED: float = 7.2
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
 const PERSONAL_SPACE: float = 2.5
@@ -84,12 +84,16 @@ var _combat: Node
 var _progression: Node
 var _auto_attack: Node
 var _npc_skills: Node = null
+var _perception: Node
 
 # Debug
 var _perception_circle: MeshInstance3D
 const PERCEPTION_RADIUS: float = 15.0
-const LOD_ANIM_DISTANCE: float = 50.0
-var _lod_anim_active: bool = true
+const LOD_FULL_DIST: float = 30.0
+const LOD_REDUCED_DIST: float = 60.0
+const LOD_CHECK_INTERVAL: float = 0.5
+var _lod_level: int = 0
+var _lod_timer: float = 0.0
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -205,6 +209,7 @@ func _ready() -> void:
 	perception_comp.name = "PerceptionComponent"
 	add_child(perception_comp)
 	perception_comp.setup()
+	_perception = perception_comp
 
 	_npc_skills = preload("res://scenes/npcs/npc_skills.gd").new()
 	add_child(_npc_skills)
@@ -213,6 +218,7 @@ func _ready() -> void:
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
+	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
 	if name_label:
 		name_label.text = npc_name
@@ -255,12 +261,9 @@ func _setup_perception_circle() -> void:
 
 func _get_separation_velocity() -> Vector3:
 	var sep := Vector3.ZERO
-	var perception_comp: Node = get_node_or_null("PerceptionComponent")
-	if not perception_comp:
+	if not _perception:
 		return sep
-	# Use Area3D-based spatial cache — only checks entities already within 25m.
-	# Pass PERSONAL_SPACE as the radius so we skip sorting outside our range.
-	var nearby: Array = perception_comp.get_nearby(PERSONAL_SPACE)
+	var nearby: Array = _perception.get_nearby(PERSONAL_SPACE)
 	for entry in nearby:
 		var other: Node3D = entry.node
 		if not is_instance_valid(other):
@@ -292,21 +295,18 @@ func _register_with_world() -> void:
 	stats["equipment"] = {"weapon": "", "armor": ""}
 	WorldState.register_entity(npc_id, self, stats)
 
-func _process(_delta: float) -> void:
-	_update_lod()
-
 func _update_lod() -> void:
-	var camera: Camera3D = get_viewport().get_camera_3d()
-	if camera == null:
+	var cam := get_viewport().get_camera_3d()
+	if not cam:
+		_lod_level = 0
 		return
-	var dist: float = global_position.distance_to(camera.global_position)
-	var should_animate: bool = dist < LOD_ANIM_DISTANCE
-	if should_animate != _lod_anim_active:
-		_lod_anim_active = should_animate
-		if _visuals:
-			var anim_player: AnimationPlayer = _visuals.get_anim_player()
-			if anim_player:
-				anim_player.active = _lod_anim_active
+	var dist := global_position.distance_to(cam.global_position)
+	if dist < LOD_FULL_DIST:
+		_lod_level = 0
+	elif dist < LOD_REDUCED_DIST:
+		_lod_level = 1
+	else:
+		_lod_level = 2
 
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
@@ -314,6 +314,12 @@ func _physics_process(delta: float) -> void:
 		if _respawn_timer <= 0.0:
 			_respawn()
 		return
+
+	# LOD check (staggered)
+	_lod_timer -= delta
+	if _lod_timer <= 0.0:
+		_lod_timer = LOD_CHECK_INTERVAL
+		_update_lod()
 
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -327,23 +333,24 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
-	# Apply separation force to avoid NPC overlap (not in combat)
-	if current_state != STATE_COMBAT:
+	# Apply separation force to avoid NPC overlap (not in combat, close range only)
+	if current_state != STATE_COMBAT and _lod_level == 0:
 		var sep := _get_separation_velocity()
 		velocity.x += sep.x
 		velocity.z += sep.z
 
 	move_and_slide()
 
-	# Update animation based on movement
-	if current_state == STATE_COMBAT:
-		pass  # Combat handles its own anims
-	elif current_state == STATE_DEAD:
-		pass
-	elif is_moving:
-		_visuals.play_anim("Walking_A")
-	else:
-		_visuals.play_anim("Idle")
+	# Update animation based on movement (skip at high LOD)
+	if _lod_level < 2:
+		if current_state == STATE_COMBAT:
+			pass  # Combat handles its own anims
+		elif current_state == STATE_DEAD:
+			pass
+		elif is_moving:
+			_visuals.play_anim("Walking_A")
+		else:
+			_visuals.play_anim("Idle")
 
 func _process_movement(delta: float) -> bool:
 	if not _nav_started:
