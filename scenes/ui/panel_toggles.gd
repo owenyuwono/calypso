@@ -15,7 +15,7 @@ var _hbox: HBoxContainer
 
 const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
-	{"key": "skills", "label": "Skills", "hint": "S/P"},
+	{"key": "skills", "label": "Skills", "hint": "S"},
 	{"key": "map", "label": "Map", "hint": "W"},
 ]
 
