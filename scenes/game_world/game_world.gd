@@ -3,6 +3,35 @@ extends Node3D
 ## Environment decoration is handled by static builder utilities in scripts/world/.
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
+const NpcScene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
+
+const GENERATED_NPC_COUNT: int = 50
+
+# Maps NpcGenerator archetype IDs to NpcTraits profile strings.
+const ARCHETYPE_TO_PROFILE: Dictionary = {
+	"warrior":  "bold_warrior",
+	"mage":     "cautious_mage",
+	"rogue":    "sly_rogue",
+	"ranger":   "stoic_knight",
+	"merchant": "merchant",
+}
+
+# Character model paths by model name token.
+const MODEL_PATHS: Dictionary = {
+	"Knight":    "res://assets/models/characters/Knight.glb",
+	"Barbarian": "res://assets/models/characters/Barbarian.glb",
+	"Mage":      "res://assets/models/characters/Mage.glb",
+	"Rogue":     "res://assets/models/characters/Rogue.glb",
+}
+
+# Distinct npc_color per archetype so NPCs are visually distinguishable in bulk.
+const ARCHETYPE_COLORS: Dictionary = {
+	"warrior":  Color(0.2, 0.3, 0.7, 1.0),
+	"mage":     Color(0.5, 0.1, 0.6, 1.0),
+	"rogue":    Color(0.1, 0.5, 0.4, 1.0),
+	"ranger":   Color(0.2, 0.5, 0.2, 1.0),
+	"merchant": Color(0.7, 0.5, 0.1, 1.0),
+}
 
 var _conversation_manager: Node
 
@@ -51,6 +80,7 @@ func _on_navmesh_baked() -> void:
 	if poly_count == 0:
 		push_warning("[NavMesh] WARNING: Navmesh is EMPTY!")
 	_setup_adventurer_npcs()
+	_spawn_generated_npcs()
 
 func _build_terrain(ctx: WorldBuilderContext) -> void:
 	# Shared noise for all terrain patches and height queries
@@ -237,3 +267,50 @@ func _setup_adventurer_npcs() -> void:
 		if behavior:
 			behavior.default_goal = goal
 		npc.set_goal(goal)
+
+func _spawn_generated_npcs() -> void:
+	var loadouts: Array = NpcGenerator.generate_npcs(GENERATED_NPC_COUNT)
+	for loadout in loadouts:
+		_spawn_generated_npc(loadout)
+
+func _spawn_generated_npc(loadout: Dictionary) -> void:
+	var npc_name: String = loadout.get("name", "Adventurer")
+	var npc_id: String = "gen_" + npc_name.to_lower()
+	var archetype: String = loadout.get("archetype", "warrior")
+	var model_token: String = loadout.get("model", "Knight")
+
+	var npc: CharacterBody3D = NpcScene.instantiate()
+	# Set export vars before add_child so _ready() uses them for visuals/components.
+	# trait_profile is intentionally left empty here (as with hardcoded NPCs) so _ready()
+	# does not pre-equip a weapon — initialize_from_loadout applies the real loadout after.
+	npc.npc_id = npc_id
+	npc.npc_name = npc_name
+	npc.model_path = MODEL_PATHS.get(model_token, "res://assets/models/characters/Knight.glb")
+	npc.model_scale = 0.7
+	npc.npc_color = ARCHETYPE_COLORS.get(archetype, Color(0.5, 0.5, 0.5, 1.0))
+	npc.starting_goal = loadout.get("default_goal", "idle")
+	npc.personality = ""
+
+	$NPCs.add_child(npc)
+	# Set trait_profile after _ready() so npc_behavior reads it correctly at runtime.
+	npc.trait_profile = ARCHETYPE_TO_PROFILE.get(archetype, "bold_warrior")
+	npc.global_position = _pick_generated_npc_spawn_pos(loadout.get("default_goal", "idle"))
+
+	npc.initialize_from_loadout(loadout)
+
+	var brain: Node = npc.get_node_or_null("NPCBrain")
+	if brain:
+		brain.set_use_llm(false)
+		brain.set_use_llm_chat(false)
+
+func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
+	# Merchants stay in the city. Others split 50/50 between city and field.
+	var in_city: bool = (goal == "vend") or (randf() < 0.5)
+	if in_city:
+		var x: float = randf_range(-60.0, 60.0)
+		var z: float = randf_range(-40.0, 40.0)
+		return Vector3(x, 1.0, z)
+	else:
+		var x: float = randf_range(80.0, 140.0)
+		var z: float = randf_range(-30.0, 30.0)
+		return Vector3(x, 1.0, z)

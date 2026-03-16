@@ -18,6 +18,8 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const NpcIdentityDatabase = preload("res://scripts/data/npc_identity_database.gd")
+const SkillsComponent = preload("res://scripts/components/skills_component.gd")
+const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
 @export var npc_id: String = ""
 @export var npc_name: String = ""
@@ -81,10 +83,13 @@ var _equipment: Node
 var _combat: Node
 var _progression: Node
 var _auto_attack: Node
+var _npc_skills: Node = null
 
 # Debug
 var _perception_circle: MeshInstance3D
 const PERCEPTION_RADIUS: float = 15.0
+const LOD_ANIM_DISTANCE: float = 50.0
+var _lod_anim_active: bool = true
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -155,6 +160,20 @@ func _ready() -> void:
 
 	_register_with_world()
 
+	var skills_comp: Node = SkillsComponent.new()
+	skills_comp.name = "SkillsComponent"
+	add_child(skills_comp)
+	skills_comp.setup({}, ["", "", "", "", ""])
+
+	# Auto-unlock skills that match current proficiency levels
+	for skill_id in SkillDatabase.SKILLS:
+		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
+		if skill_data.has("required_proficiency"):
+			var req: Dictionary = skill_data.required_proficiency
+			var prof_level: int = _progression.get_proficiency_level(req.skill)
+			if prof_level >= req.get("level", 1):
+				skills_comp.unlock_skill(skill_id)
+
 	var _vending_comp := VendingComponent.new()
 	_vending_comp.name = "VendingComponent"
 	add_child(_vending_comp)
@@ -187,6 +206,10 @@ func _ready() -> void:
 	add_child(perception_comp)
 	perception_comp.setup()
 
+	_npc_skills = preload("res://scenes/npcs/npc_skills.gd").new()
+	add_child(_npc_skills)
+	_npc_skills.setup(self, _combat, skills_comp, perception_comp, _visuals, _auto_attack)
+
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
@@ -200,6 +223,7 @@ func _ready() -> void:
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
+	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
@@ -263,6 +287,22 @@ func _register_with_world() -> void:
 	stats["inventory"] = {}
 	stats["equipment"] = {"weapon": "", "armor": ""}
 	WorldState.register_entity(npc_id, self, stats)
+
+func _process(_delta: float) -> void:
+	_update_lod()
+
+func _update_lod() -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var dist: float = global_position.distance_to(camera.global_position)
+	var should_animate: bool = dist < LOD_ANIM_DISTANCE
+	if should_animate != _lod_anim_active:
+		_lod_anim_active = should_animate
+		if _visuals:
+			var anim_player: AnimationPlayer = _visuals.get_anim_player()
+			if anim_player:
+				anim_player.active = _lod_anim_active
 
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
@@ -348,6 +388,14 @@ func _process_movement(delta: float) -> bool:
 	return false
 
 func _process_combat(delta: float) -> bool:
+	# Try to use a skill before falling through to auto-attack
+	if _npc_skills and not _npc_skills.is_skill_active():
+		_npc_skills.try_use_skill(combat_target)
+
+	# While a skill hit is pending, hold position and let npc_skills resolve it
+	if _npc_skills and _npc_skills.is_skill_active():
+		return false
+
 	var attack_range: float = _stats.attack_range
 	var attack_speed: float = _stats.attack_speed
 	# NPCs run slightly faster than base speed when chasing
@@ -523,6 +571,50 @@ func _on_vending_started(eid: String, shop_title: String) -> void:
 func _on_vending_stopped(eid: String) -> void:
 	if eid == npc_id:
 		_visuals.hide_vend_sign()
+
+func _on_proficiency_level_up(leveled_entity_id: String, prof_id: String, new_level: int) -> void:
+	if leveled_entity_id != entity_id:
+		return
+	var skills_node: Node = get_node_or_null("SkillsComponent")
+	if not skills_node:
+		return
+	for skill_id in SkillDatabase.SKILLS:
+		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
+		if not skill_data.has("required_proficiency"):
+			continue
+		var req: Dictionary = skill_data.required_proficiency
+		if req.get("skill", "") == prof_id and new_level >= req.get("level", 1):
+			if not skills_node.has_skill(skill_id):
+				skills_node.unlock_skill(skill_id)
+
+# --- Generated NPC initialization ---
+
+## Apply a generated loadout dict after _ready() has run.
+## Loadout format matches NpcGenerator output:
+##   items: {item_id: count}, equip: [item_id, ...], gold: int, default_goal: String
+func initialize_from_loadout(loadout: Dictionary) -> void:
+	# Items
+	var items: Dictionary = loadout.get("items", {})
+	for item_id in items:
+		_inventory.add_item(item_id, items[item_id])
+
+	# Equipment
+	var equip: Array = loadout.get("equip", [])
+	for item_id in equip:
+		_equipment.equip(item_id)
+
+	# Gold
+	var gold: int = loadout.get("gold", -1)
+	if gold >= 0:
+		_inventory.set_gold_amount(gold)
+
+	# Goal
+	var goal: String = loadout.get("default_goal", "")
+	if not goal.is_empty():
+		set_goal(goal)
+		var behavior: Node = get_node_or_null("NPCBehavior")
+		if behavior:
+			behavior.default_goal = goal
 
 # --- Duck typing delegations ---
 
