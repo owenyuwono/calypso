@@ -30,6 +30,7 @@ const MAX_RECENT_TOPICS: int = 3
 
 var _npc_id: String = ""
 var _memory_counter: int = 0
+var _perception: Node
 
 func _ready() -> void:
 	_npc_id = get_parent().npc_id
@@ -309,7 +310,9 @@ func gather_chat_facts(target_id: String) -> Array:
 		facts.append({"topic": "nighttime", "fact": "It is nighttime and the field is more dangerous", "weight": 1.5})
 
 	# Nearby monsters
-	var perception := WorldState.get_npc_perception(_npc_id)
+	if not _perception:
+		_perception = get_parent().get_node_or_null("PerceptionComponent")
+	var perception: Dictionary = _perception.get_perception() if _perception else {}
 	var monsters: Array = perception.get("monsters", [])
 	if not monsters.is_empty():
 		var mname: String = monsters[0].get("name", "a monster")

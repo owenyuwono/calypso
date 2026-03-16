@@ -6,6 +6,7 @@ const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
+const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
@@ -48,6 +49,7 @@ var _visuals: Node
 var _stats: Node
 var _combat: Node
 var _auto_attack: Node
+var _perception: Node
 
 func _ready() -> void:
 	call_deferred("_capture_spawn_point")
@@ -60,6 +62,7 @@ func _ready() -> void:
 	if monster_id.is_empty():
 		monster_id = "%s_%d" % [monster_type, get_instance_id()]
 	entity_id = monster_id
+	collision_layer |= (1 << 8)
 
 	_base_aggro_range = stats.get("aggro_range", 6.0)
 	_aggro_range = _base_aggro_range
@@ -93,6 +96,12 @@ func _ready() -> void:
 	_auto_attack.setup(_visuals, _combat, nav_agent)
 	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
 	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
+
+	var perception_comp := PerceptionComponent.new()
+	perception_comp.name = "PerceptionComponent"
+	add_child(perception_comp)
+	perception_comp.setup()
+	_perception = perception_comp
 
 	if name_label:
 		name_label.text = stats.get("name", monster_type)
@@ -273,7 +282,7 @@ func _process_wander_movement() -> bool:
 	return true
 
 func _check_aggro() -> void:
-	var nearby := WorldState.get_nearby_entities(global_position, _aggro_range)
+	var nearby: Array = _perception.get_nearby(_aggro_range)
 	for entry in nearby:
 		if entry.id == monster_id:
 			continue
@@ -496,7 +505,7 @@ func _remove_night_buffs() -> void:
 
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
 	var loot_scene := preload("res://scenes/objects/loot_drop.gd")
-	var loot := StaticBody3D.new()
+	var loot := Area3D.new()
 	loot.set_script(loot_scene)
 	loot.item_id = item_id
 	loot.item_count = item_count

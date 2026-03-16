@@ -56,8 +56,7 @@ static func build_system_message(npc_name: String, personality: String, goal: St
 	})
 	return {"role": "system", "content": content}
 
-static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: Node) -> Dictionary:
-	var perception := WorldState.get_npc_perception(npc_id)
+static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: Node, perception: Dictionary) -> Dictionary:
 	var memory_summary: String = memory_node.get_summary() if memory_node else ""
 
 	var stats = npc_node.get_node_or_null("StatsComponent")

@@ -37,13 +37,13 @@ var _action_in_progress: bool = false
 var _idle_drift_timer: float = 0.0
 var _hunt_spot_index: int = 0
 var _patrol_index: int = 0
+var _perception: Node
 
 func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 	brain = npc.get_node("NPCBrain")
-
 	_social = preload("res://scenes/npcs/npc_social.gd").new()
 	_social.name = "NpcSocial"
 	add_child(_social)
@@ -73,6 +73,8 @@ func _process(delta: float) -> void:
 		evaluate()
 
 func evaluate() -> void:
+	if not _perception:
+		_perception = npc.get_node_or_null("PerceptionComponent")
 	# Priority 0: Auto-equip any unequipped gear in inventory
 	_auto_equip()
 	# Priority 1: Survival checks
@@ -248,7 +250,7 @@ func _execute_goal() -> void:
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
-	var perception := WorldState.get_npc_perception(npc.npc_id)
+	var perception: Dictionary = _perception.get_perception()
 	var monsters: Array = perception.get("monsters", [])
 
 	# Filter to alive monsters only
@@ -258,10 +260,43 @@ func _execute_hunt() -> void:
 			alive_monsters.append(m)
 
 	if alive_monsters.size() > 0:
-		# Attack nearest alive monster
+		# Generosity-based target selection: generous NPCs avoid already-contested monsters
+		var generosity: float = NpcTraits.get_trait(npc.trait_profile, "generosity", 0.5)
 		var target: Dictionary = alive_monsters[0]
+		if generosity >= 0.4:
+			# Build set of monster IDs already targeted by other NPCs
+			var contested: Dictionary = {}
+			for eid in WorldState.entity_data:
+				if eid == npc.npc_id:
+					continue
+				var edata: Dictionary = WorldState.entity_data[eid]
+				if edata.get("type", "") == "npc":
+					var ct: String = edata.get("combat_target", "")
+					if not ct.is_empty():
+						contested[ct] = true
+			# Prefer uncontested monsters; fall back to any if all contested
+			var preferred: Dictionary = {}
+			for m in alive_monsters:
+				if not contested.has(m["id"]):
+					preferred = m
+					break
+			if not preferred.is_empty():
+				target = preferred
 		npc.last_thought = "Attacking %s" % target.get("name", target["id"])
 		_do_action("attack", target["id"])
+		return
+
+	# No alive monsters — check for loot drops before roaming
+	# Filter to only loot_drop type entities — item entities don't have pickup()
+	var loot_drops: Array = []
+	for item in perception.get("items", []):
+		var item_data: Dictionary = WorldState.get_entity_data(item["id"])
+		if item_data.get("type", "") == "loot_drop":
+			loot_drops.append(item)
+	if loot_drops.size() > 0:
+		var loot: Dictionary = loot_drops[0]
+		npc.last_thought = "Picking up %s" % loot.get("name", loot["id"])
+		_do_action("pickup_loot", loot["id"])
 		return
 
 	# No monsters nearby — move to hunt zone
@@ -420,7 +455,7 @@ func _execute_follow_player() -> void:
 		return
 
 	# Check if player is fighting and help
-	var perception := WorldState.get_npc_perception(npc.npc_id)
+	var perception: Dictionary = _perception.get_perception()
 	var monsters: Array = perception.get("monsters", [])
 	for m in monsters:
 		if WorldState.is_alive(m["id"]) and m["distance"] < 8.0:
@@ -505,7 +540,7 @@ func _execute_idle() -> void:
 	if randf() > IDLE_DRIFT_CHANCE:
 		return
 
-	var perception := WorldState.get_npc_perception(npc.npc_id, 25.0)
+	var perception: Dictionary = _perception.get_perception(25.0)
 	var npcs_nearby: Array = perception.get("npcs", [])
 
 	var nearest_id: String = ""

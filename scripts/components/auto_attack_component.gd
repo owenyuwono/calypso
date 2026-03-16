@@ -101,22 +101,34 @@ func cancel() -> void:
 func _chase(target_node: Node3D, move_speed: float, speed_multiplier: float) -> void:
 	# Only update nav target if target moved significantly (avoids nav spam)
 	var target_pos: Vector3 = target_node.global_position
+	var updated_target := false
 	if _last_nav_target_pos.distance_to(target_pos) > 1.0:
 		_last_nav_target_pos = target_pos
 		_nav_agent.target_position = target_pos
+		updated_target = true
 
-	if not _nav_agent.is_navigation_finished():
-		var next_pos: Vector3 = _nav_agent.get_next_path_position()
-		var parent: Node3D = get_parent() as Node3D
-		if parent:
-			var dir: Vector3 = (next_pos - parent.global_position)
-			dir.y = 0.0
-			if dir.length_squared() > 0.01:
-				dir = dir.normalized()
-				parent.velocity.x = dir.x * move_speed * speed_multiplier
-				parent.velocity.z = dir.z * move_speed * speed_multiplier
-				_visuals.face_direction(dir)
-				_visuals.play_anim("Running_A")
+	# If navigation is already finished but target is out of attack range,
+	# the target is unreachable (e.g. off-navmesh). Disengage.
+	# Skip this check on the frame we just set a new target — NavigationServer
+	# hasn't computed the path yet, so is_navigation_finished() is stale.
+	if not updated_target and _nav_agent.is_navigation_finished():
+		target_lost.emit()
+		return
+
+	if _nav_agent.is_navigation_finished():
+		return  # Just set target, wait for nav server to compute path
+
+	var next_pos: Vector3 = _nav_agent.get_next_path_position()
+	var parent: Node3D = get_parent() as Node3D
+	if parent:
+		var dir: Vector3 = (next_pos - parent.global_position)
+		dir.y = 0.0
+		if dir.length_squared() > 0.01:
+			dir = dir.normalized()
+			parent.velocity.x = dir.x * move_speed * speed_multiplier
+			parent.velocity.z = dir.z * move_speed * speed_multiplier
+			_visuals.face_direction(dir)
+			_visuals.play_anim("Running_A")
 
 func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Re-validate target hasn't died between animation start and hit point

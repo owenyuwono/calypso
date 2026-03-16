@@ -11,6 +11,7 @@ const ProgressionComponent = preload("res://scripts/components/progression_compo
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const NpcIdentity = preload("res://scripts/components/npc_identity.gd")
+const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const RelationshipComponent = preload("res://scripts/components/relationship_component.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
@@ -53,6 +54,10 @@ var _nav_wait_frames: int = 0
 var combat_target: String = ""
 var _respawn_timer: float = 0.0
 
+# Stuck detection
+var _stuck_timer: float = 0.0
+var _last_nav_pos: Vector3 = Vector3.ZERO
+
 # Navigation & UI
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var dialogue_bubble: Node3D = $DialogueBubble
@@ -76,6 +81,10 @@ var _combat: Node
 var _progression: Node
 var _auto_attack: Node
 
+# Debug
+var _perception_circle: MeshInstance3D
+const PERCEPTION_RADIUS: float = 15.0
+
 # State overlay colors
 const STATE_COLORS: Dictionary = {
 	"idle": Color(0, 0, 0, 0),
@@ -90,6 +99,8 @@ const STATE_COLORS: Dictionary = {
 func _ready() -> void:
 	entity_id = npc_id
 	current_goal = starting_goal
+
+	collision_layer |= (1 << 8)
 
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
@@ -170,6 +181,11 @@ func _ready() -> void:
 	rel.name = "RelationshipComponent"
 	add_child(rel)
 
+	var perception_comp := PerceptionComponent.new()
+	perception_comp.name = "PerceptionComponent"
+	add_child(perception_comp)
+	perception_comp.setup()
+
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
@@ -186,6 +202,31 @@ func _ready() -> void:
 
 	_visuals.setup_hp_bar()
 	_visuals.set_hp_bar_visible(false)
+
+	_setup_perception_circle()
+
+func _setup_perception_circle() -> void:
+	var im := ImmediateMesh.new()
+	var segments: int = 64
+	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for i in segments + 1:
+		var angle: float = TAU * float(i) / float(segments)
+		im.surface_add_vertex(Vector3(cos(angle) * PERCEPTION_RADIUS, 0, sin(angle) * PERCEPTION_RADIUS))
+	im.surface_end()
+
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.6, 0.85, 1.0, 0.35)
+
+	_perception_circle = MeshInstance3D.new()
+	_perception_circle.mesh = im
+	_perception_circle.material_override = mat
+	_perception_circle.position = Vector3(0, 0.05, 0)
+	_perception_circle.visible = true
+	add_child(_perception_circle)
+
 
 func _get_separation_velocity() -> Vector3:
 	var sep := Vector3.ZERO
@@ -234,7 +275,7 @@ func _physics_process(delta: float) -> void:
 
 	var is_moving := false
 	if current_state == STATE_MOVING:
-		is_moving = _process_movement()
+		is_moving = _process_movement(delta)
 	elif current_state == STATE_COMBAT:
 		is_moving = _process_combat(delta)
 	else:
@@ -259,10 +300,12 @@ func _physics_process(delta: float) -> void:
 	else:
 		_visuals.play_anim("Idle")
 
-func _process_movement() -> bool:
+func _process_movement(delta: float) -> bool:
 	if not _nav_started:
 		if not nav_agent.is_navigation_finished():
 			_nav_started = true
+			_stuck_timer = 0.0
+			_last_nav_pos = global_position
 		else:
 			_nav_wait_frames += 1
 			if _nav_wait_frames > 60:
@@ -271,9 +314,26 @@ func _process_movement() -> bool:
 			return false
 
 	if nav_agent.is_navigation_finished():
+		if _suppress_nav_complete:
+			_suppress_nav_complete = false
+			return false  # let the coroutine in npc_action_executor handle it
 		change_state(STATE_IDLE)
 		GameEvents.npc_action_completed.emit(npc_id, "move_to", true)
 		return false
+
+	# Stuck detection: if barely moved in 2 seconds, abort navigation
+	_stuck_timer += delta
+	if _stuck_timer >= 2.0:
+		var moved: float = global_position.distance_to(_last_nav_pos)
+		if moved < 0.1:
+			if _suppress_nav_complete:
+				_suppress_nav_complete = false
+				return false  # let the coroutine in npc_action_executor handle it
+			change_state(STATE_IDLE)
+			GameEvents.npc_action_completed.emit(npc_id, "move_to", false)
+			return false
+		_stuck_timer = 0.0
+		_last_nav_pos = global_position
 
 	var next_pos: Vector3 = nav_agent.get_next_path_position()
 	var dir: Vector3 = (next_pos - global_position)
@@ -313,6 +373,7 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 
 func _on_auto_attack_target_lost() -> void:
 	combat_target = ""
+	WorldState.set_entity_data(npc_id, "combat_target", "")
 	change_state(STATE_IDLE)
 
 func _on_navigation_finished() -> void:
@@ -345,6 +406,8 @@ func navigate_to(target_pos: Vector3) -> void:
 	change_state(STATE_MOVING)
 	_nav_started = false
 	_nav_wait_frames = 0
+	_stuck_timer = 0.0
+	_last_nav_pos = global_position
 	nav_agent.target_position = target_pos
 
 func navigate_to_entity(target_id: String) -> void:
@@ -363,6 +426,7 @@ func set_goal(new_goal: String) -> void:
 
 func enter_combat(target_id: String) -> void:
 	combat_target = target_id
+	WorldState.set_entity_data(npc_id, "combat_target", target_id)
 	_auto_attack.cancel()
 	change_state(STATE_COMBAT)
 
@@ -380,6 +444,7 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 			if not memory_node.has_key_memory_type("first_kill"):
 				memory_node.add_memory("First kill: defeated a %s" % target_name, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_HIGH, false, "first_kill")
 		combat_target = ""
+		WorldState.set_entity_data(npc_id, "combat_target", "")
 		_auto_attack.cancel()
 		change_state(STATE_IDLE)
 
@@ -389,6 +454,7 @@ func _die() -> void:
 		vc.stop_vending()
 	change_state(STATE_DEAD)
 	combat_target = ""
+	WorldState.set_entity_data(npc_id, "combat_target", "")
 	_auto_attack.cancel()
 	velocity = Vector3.ZERO
 

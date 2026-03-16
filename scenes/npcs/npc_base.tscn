@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/npcs/npc_base.gd" id="1_script"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_action_executor.gd" id="2_executor"]
@@ -11,9 +11,6 @@
 radius = 0.3
 height = 1.5
 
-[sub_resource type="SphereShape3D" id="perception_shape"]
-radius = 15.0
-
 [node name="NPCBase" type="CharacterBody3D"]
 script = ExtResource("1_script")
 
@@ -24,11 +21,6 @@ shape = SubResource("CapsuleShape3D_1")
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
 target_desired_distance = 1.0
 path_desired_distance = 1.0
-
-[node name="PerceptionArea" type="Area3D" parent="."]
-
-[node name="PerceptionCollision" type="CollisionShape3D" parent="PerceptionArea"]
-shape = SubResource("perception_shape")
 
 [node name="NPCActionExecutor" type="Node" parent="."]
 script = ExtResource("2_executor")

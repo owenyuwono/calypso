@@ -23,13 +23,12 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 
 Components sync state back to `WorldState.entity_data` via `_sync()` (bridge layer — keeps perception/memory reads working).
 
-## WorldState (slim — registry + spatial only)
+## WorldState (slim — registry only)
 - **Registry** (6): `register_entity`, `unregister_entity`, `get_entity`, `get_entity_data`, `set_entity_data`, `get_entity_id_for_node`
 - **Locations** (3): `register_location`, `get_location`, `has_location`
-- **Spatial** (2): `get_nearby_entities`, `get_npc_perception`
 - **Convenience** (1): `is_alive(id)` — looks up entity's StatsComponent
 
-Do NOT add inventory/gold/equipment/combat/progression/skills methods back to WorldState. Access components directly via the entity node.
+Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods back to WorldState. Use `PerceptionComponent` for spatial queries. Access components directly via the entity node.
 
 ## Key Patterns
 - `UIHelper.create_panel_style()` for all panel backgrounds

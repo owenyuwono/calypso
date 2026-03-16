@@ -1,5 +1,5 @@
 extends Node
-## Global entity registry, spatial queries, and alive checks.
+## Global entity registry and alive checks.
 
 # Entity registry: id -> Node3D reference
 var entities: Dictionary = {}
@@ -47,71 +47,6 @@ func get_location(id: String) -> Vector3:
 
 func has_location(id: String) -> bool:
 	return location_markers.has(id)
-
-# --- Spatial Queries ---
-
-func get_nearby_entities(pos: Vector3, radius: float) -> Array:
-	var result: Array = []
-	var radius_sq := radius * radius
-	for id in entities:
-		var node: Node3D = entities[id]
-		if node and is_instance_valid(node):
-			var dist_sq := node.global_position.distance_squared_to(pos)
-			if dist_sq <= radius_sq:
-				result.append({"id": id, "node": node, "distance": sqrt(dist_sq)})
-	result.sort_custom(func(a, b): return a.distance < b.distance)
-	return result
-
-func get_npc_perception(npc_id: String, radius: float = 15.0) -> Dictionary:
-	var npc_node: Node3D = get_entity(npc_id)
-	if not npc_node:
-		return {}
-	var nearby := get_nearby_entities(npc_node.global_position, radius)
-	var npcs: Array = []
-	var monsters: Array = []
-	var items: Array = []
-	var objects: Array = []
-	var locations: Array = []
-	var vendors: Array = []
-	for entry in nearby:
-		if entry.id == npc_id:
-			continue
-		var data := get_entity_data(entry.id)
-		var entity_type: String = data.get("type", "unknown")
-		match entity_type:
-			"npc", "player":
-				if data.get("vending", false):
-					vendors.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id), "shop_title": data.get("shop_title", "")})
-				else:
-					var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1), "state": data.get("state", "idle")}
-					info["name"] = data.get("name", entry.id)
-					info["level"] = data.get("level", 1)
-					info["hp"] = data.get("hp", 0)
-					info["max_hp"] = data.get("max_hp", 0)
-					npcs.append(info)
-			"monster":
-				var info := {"id": entry.id, "distance": snapped(entry.distance, 0.1)}
-				info["name"] = data.get("name", entry.id)
-				info["hp"] = data.get("hp", 0)
-				info["max_hp"] = data.get("max_hp", 0)
-				info["level"] = data.get("level", 1)
-				monsters.append(info)
-			"item":
-				items.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
-			"object":
-				objects.append({"id": entry.id, "distance": snapped(entry.distance, 0.1), "name": data.get("name", entry.id)})
-	for loc_id in location_markers:
-		var dist := npc_node.global_position.distance_to(location_markers[loc_id])
-		if dist <= radius:
-			locations.append({"id": loc_id, "distance": snapped(dist, 0.1)})
-	return {
-		"npcs": npcs,
-		"monsters": monsters,
-		"items": items,
-		"objects": objects,
-		"locations": locations,
-		"vendors": vendors,
-	}
 
 # --- Alive Check (convenience) ---
 

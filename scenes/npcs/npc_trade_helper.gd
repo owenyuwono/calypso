@@ -10,12 +10,13 @@ const VEND_PRICE_RATIO: float = 0.8
 ## Returns the entity ID of the nearest vending NPC.
 ## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
 static func find_vendor(npc_id: String, npc_position: Vector3, item_id: String = "") -> String:
-	var all_entries: Array = WorldState.get_nearby_entities(npc_position, VENDOR_SEARCH_RADIUS)
 	var best_id: String = ""
 	var best_dist: float = INF
-	for entry in all_entries:
-		var eid: String = entry["id"]
+	for eid in WorldState.entities:
 		if eid == npc_id:
+			continue
+		var entity_node: Node3D = WorldState.entities[eid]
+		if not is_instance_valid(entity_node):
 			continue
 		var edata: Dictionary = WorldState.get_entity_data(eid)
 		if not edata.get("vending", false):
@@ -24,10 +25,9 @@ static func find_vendor(npc_id: String, npc_position: Vector3, item_id: String =
 			var listings: Dictionary = edata.get("listings", {})
 			if not listings.has(item_id):
 				continue
-		var entity_node: Node = WorldState.get_entity(eid)
-		if not entity_node or not is_instance_valid(entity_node):
-			continue
 		var dist: float = npc_position.distance_to(entity_node.global_position)
+		if dist > VENDOR_SEARCH_RADIUS:
+			continue
 		if dist < best_dist:
 			best_dist = dist
 			best_id = eid

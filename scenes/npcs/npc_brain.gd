@@ -110,9 +110,11 @@ func _request_llm_decision() -> void:
 	npc.change_state("thinking")
 	_waiting_for_llm = true
 
+	var perception_comp: Node = get_parent().get_node("PerceptionComponent")
+	var perception: Dictionary = perception_comp.get_perception()
 	var messages: Array = [
 		PromptBuilder.build_system_message(npc.npc_name, npc.personality, npc.current_goal),
-		PromptBuilder.build_user_message(npc.npc_id, npc, memory),
+		PromptBuilder.build_user_message(npc.npc_id, npc, memory, perception),
 	]
 
 	var schema := ActionSchema.get_schema()

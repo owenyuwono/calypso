@@ -184,7 +184,8 @@ func update_nearby_listeners(conversation_id: String) -> void:
 	if not first_entity or not is_instance_valid(first_entity):
 		return
 
-	var nearby: Array = WorldState.get_nearby_entities(first_entity.global_position, EARSHOT_RANGE)
+	var perception_comp: Node = first_entity.get_node_or_null("PerceptionComponent")
+	var nearby: Array = perception_comp.get_nearby(EARSHOT_RANGE) if perception_comp else []
 	var listeners: Array[String] = []
 	for entry in nearby:
 		var eid: String = entry.get("id", "")

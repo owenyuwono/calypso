@@ -20,6 +20,7 @@ const ProgressionComponent = preload("res://scripts/components/progression_compo
 const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
+const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
@@ -33,6 +34,8 @@ var _cursor_manager: RefCounted
 # Navigation
 var _is_navigating: bool = false
 var _interact_target: String = ""
+var _stuck_timer: float = 0.0
+var _last_nav_pos: Vector3 = Vector3.ZERO
 
 # Vending
 var _is_vending: bool = false
@@ -51,6 +54,7 @@ var _combat: Node
 var _progression: Node
 var _skills_comp: Node
 var _auto_attack: Node
+var _perception: Node
 
 # Child subsystem nodes
 var _hover: Node
@@ -89,6 +93,8 @@ func _exit_tree() -> void:
 		_cursor_manager.cleanup()
 
 func _ready() -> void:
+	collision_layer |= (1 << 8)
+
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model("res://assets/models/characters/Knight.glb", MODEL_SCALE, Color(0.2, 0.4, 0.7))
@@ -148,6 +154,12 @@ func _ready() -> void:
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
+
+	var perception_comp := PerceptionComponent.new()
+	perception_comp.name = "PerceptionComponent"
+	add_child(perception_comp)
+	perception_comp.setup()
+	_perception = perception_comp
 
 	_cursor_manager = CursorManager.new()
 
@@ -209,7 +221,7 @@ func show_chat(text: String) -> void:
 	_send_to_nearby_npc(text)
 
 func _send_to_nearby_npc(text: String) -> void:
-	var nearby := WorldState.get_nearby_entities(global_position, INTERACT_RANGE)
+	var nearby: Array = _perception.get_nearby(INTERACT_RANGE)
 	for entry in nearby:
 		if entry.id == "player":
 			continue
@@ -247,6 +259,15 @@ func _physics_process(delta: float) -> void:
 		velocity.z = dir.z * SPEED
 		_visuals.face_direction(dir)
 		is_moving = true
+		# Stuck detection: if we haven't moved 0.1 units in 1.5 seconds, abort navigation
+		if global_position.distance_to(_last_nav_pos) > 0.1:
+			_last_nav_pos = global_position
+			_stuck_timer = 0.0
+		else:
+			_stuck_timer += delta
+			if _stuck_timer >= 1.5:
+				_stuck_timer = 0.0
+				_stop_navigation()
 	else:
 		if _is_navigating:
 			_is_navigating = false
@@ -338,6 +359,8 @@ func _stop_navigation() -> void:
 func _navigate_to(pos: Vector3) -> void:
 	nav_agent.target_position = pos
 	_is_navigating = true
+	_last_nav_pos = global_position
+	_stuck_timer = 0.0
 
 func _on_arrived() -> void:
 	if _interact_target.is_empty():
@@ -492,7 +515,7 @@ func _raycast_ground() -> Vector3:
 	return Vector3.INF
 
 func _interact_with_nearest() -> void:
-	var nearby := WorldState.get_nearby_entities(global_position, INTERACT_RANGE)
+	var nearby: Array = _perception.get_nearby(INTERACT_RANGE)
 	for entry in nearby:
 		if entry.id == "player":
 			continue

@@ -1,4 +1,4 @@
-extends StaticBody3D
+extends Area3D
 ## A clickable loot drop that spawns when a monster dies.
 ## Player clicks to walk to it and pick up the loot.
 
@@ -20,6 +20,8 @@ func _ready() -> void:
 	if loot_id.is_empty():
 		loot_id = "loot_%d" % get_instance_id()
 	entity_id = loot_id
+
+	collision_layer |= (1 << 8)
 
 	_build_visual()
 	_build_label()

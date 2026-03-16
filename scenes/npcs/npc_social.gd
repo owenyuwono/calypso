@@ -30,6 +30,7 @@ var _npc: CharacterBody3D
 var _brain: Node
 var _memory: Node
 var _rel_comp: Node  # RelationshipComponent, duck-typed
+var _perception: Node
 
 var _social_cooldown: float = 0.0
 
@@ -54,7 +55,11 @@ func try_social_chat() -> bool:
 	if _npc.current_goal not in SOCIAL_GOALS:
 		return false
 
-	var perception := WorldState.get_npc_perception(_npc.npc_id, SOCIAL_PROXIMITY)
+	if not _perception:
+		_perception = _npc.get_node_or_null("PerceptionComponent")
+	if not _perception:
+		return false
+	var perception: Dictionary = _perception.get_perception(SOCIAL_PROXIMITY)
 	var npcs: Array = perception.get("npcs", [])
 
 	# Build candidate list and sort by tier (highest first)

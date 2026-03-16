@@ -29,6 +29,8 @@ func execute(action: String, target: String, dialogue: String = "", action_data:
 			_do_talk_to(target, dialogue)
 		"wait":
 			_do_wait()
+		"pickup_loot":
+			_do_pickup_loot(target)
 		_:
 			push_warning("NPCActionExecutor: Unknown action '%s'" % action)
 			npc.change_state("failed")
@@ -47,9 +49,31 @@ func _approach_entity(entity_node: Node3D, max_dist: float = 3.0) -> bool:
 		return true
 	npc._suppress_nav_complete = true
 	npc.navigate_to(entity_node.global_position)
-	await npc.nav_agent.navigation_finished
+	var timeout := get_tree().create_timer(8.0)
+	await signal_race([npc.nav_agent.navigation_finished, timeout.timeout])
 	dist = npc.global_position.distance_to(entity_node.global_position)
 	return dist <= max_dist
+
+## Wait for whichever signal fires first. Returns the index of the signal that fired.
+func signal_race(signals: Array) -> int:
+	var fired_index: int = -1
+	var done: bool = false
+	var callbacks: Array = []
+	for i in signals.size():
+		var idx := i
+		var cb := func() -> void:
+			if not done:
+				done = true
+				fired_index = idx
+		callbacks.append(cb)
+		signals[i].connect(cb, CONNECT_ONE_SHOT)
+	while not done:
+		await get_tree().process_frame
+	# Disconnect any remaining listeners
+	for i in signals.size():
+		if signals[i].is_connected(callbacks[i]):
+			signals[i].disconnect(callbacks[i])
+	return fired_index
 
 func _do_attack(target_id: String) -> void:
 	var target_node := WorldState.get_entity(target_id)
@@ -198,6 +222,26 @@ func _do_talk_to(target_id: String, dialogue: String) -> void:
 func _do_wait() -> void:
 	npc.change_state("idle")
 	GameEvents.npc_action_completed.emit(npc.npc_id, "wait", true)
+
+func _do_pickup_loot(loot_id: String) -> void:
+	var loot_node := WorldState.get_entity(loot_id)
+	if not loot_node or not is_instance_valid(loot_node):
+		_fail("pickup_loot", "Loot '%s' not found" % loot_id)
+		return
+
+	var close_enough: bool = await _approach_entity(loot_node)
+	if not close_enough:
+		_fail("pickup_loot", "Loot '%s' unreachable" % loot_id)
+		return
+
+	# Guard: another NPC may have picked it up while we were walking
+	if not is_instance_valid(loot_node):
+		_fail("pickup_loot", "Loot '%s' already taken" % loot_id)
+		return
+
+	loot_node.pickup(npc.npc_id)
+	GameEvents.npc_action_completed.emit(npc.npc_id, "pickup_loot", true)
+	npc.change_state("idle")
 
 func _fail(action: String, reason: String) -> void:
 	push_warning("NPC %s action '%s' failed: %s" % [npc.npc_id, action, reason])

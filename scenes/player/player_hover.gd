@@ -146,6 +146,7 @@ func _process_hover() -> void:
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.exclude = [_player.get_rid()]
 	query.collision_mask |= (1 << 5)
+	query.collide_with_areas = true
 	var result := space.intersect_ray(query)
 
 	var new_entity_id: String = ""
@@ -162,8 +163,16 @@ func _process_hover() -> void:
 			var owner_entity: Node3D = collider.get_parent()
 			hovered_vend_sign_owner_id = WorldState.get_entity_id_for_node(owner_entity)
 		elif collider is Node3D:
-			new_entity_id = WorldState.get_entity_id_for_node(collider)
-			if new_entity_id == "player" or new_entity_id == "":
+			# Walk up the parent chain to find the registered entity —
+			# raycast may hit a child node (e.g. PerceptionArea) rather than the root.
+			var check_node: Node = collider
+			while check_node and check_node is Node3D:
+				new_entity_id = WorldState.get_entity_id_for_node(check_node)
+				if new_entity_id != "" and new_entity_id != "player":
+					break
+				new_entity_id = ""
+				check_node = check_node.get_parent()
+			if new_entity_id == "player":
 				new_entity_id = ""
 
 	if new_entity_id != _hovered_entity_id:
