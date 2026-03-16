@@ -1,11 +1,11 @@
 extends Node
-## Async HTTP pool for Ollama API calls with timeout and rate-limiting.
+## Async HTTP pool for llama-server (OpenAI-compatible) API calls with timeout and rate-limiting.
 
-const OLLAMA_BASE_URL: String = "http://localhost:11434"
-const OLLAMA_MODEL: String = "qwen3.5:4b"
+const LLAMA_BASE_URL: String = "http://localhost:8080"
+const LLAMA_MODEL: String = "qwen3.5:4b"
 const LLM_TIMEOUT: float = 30.0
 const LLM_TEMPERATURE: float = 0.7
-const MAX_CONCURRENT_REQUESTS: int = 2
+const MAX_CONCURRENT_REQUESTS: int = 10
 
 var _active_requests: int = 0
 var _sequence: int = 0  # Monotonic counter for FIFO ordering within same priority tier
@@ -32,7 +32,7 @@ func is_available() -> bool:
 func get_active_request_count() -> int:
 	return _active_requests
 
-## Send a chat completion request to Ollama.
+## Send a chat completion request to llama-server (OpenAI-compatible endpoint).
 ## Returns a request_id. Listen to request_completed/request_failed signals.
 ##
 ## Priority levels (lower = dispatched first):
@@ -42,17 +42,20 @@ func get_active_request_count() -> int:
 ##   4 — memory extraction             (req_id prefix: extract_)
 ##   5 — background tasks              (req_id prefix: fuzzy_, opinion_, impression_)
 func send_chat(request_id: String, messages: Array, format: Dictionary = {}, priority: int = 3) -> String:
+	# Deduplication: drop new request if same type+entity already queued.
+	# A "duplicate" shares the same request_id prefix (the part up to and including
+	# the npc_id), identified by splitting on "_" and matching the first two tokens.
+	if _is_duplicate_queued(request_id):
+		print("[LLM] Dropping duplicate queued request '%s'" % request_id)
+		return request_id
+
 	var body := {
-		"model": OLLAMA_MODEL,
+		"model": LLAMA_MODEL,
 		"messages": messages,
-		"stream": false,
-		"think": false,
-		"options": {
-			"temperature": LLM_TEMPERATURE,
-		},
+		"temperature": LLM_TEMPERATURE,
 	}
 	if not format.is_empty():
-		body["format"] = format
+		body["response_format"] = {"type": "json_object"}
 
 	_sequence += 1
 	_request_queue.append({
@@ -61,6 +64,39 @@ func send_chat(request_id: String, messages: Array, format: Dictionary = {}, pri
 		"priority": priority,
 		"seq": _sequence,
 	})
+	return request_id
+
+## Returns true if a queued request shares the same type prefix + entity id
+## as the incoming request_id, making it a duplicate.
+##
+## Duplicate logic by request_id pattern:
+##   chat_{npc_id}        → dedup key = "chat_{npc_id}"
+##   extract_{npc_id}_*   → dedup key = "extract_{npc_id}"
+##   conv_{npc_id}_*      → dedup key = "conv_{npc_id}"
+##   fuzzy_{npc_id}_*     → dedup key = "fuzzy_{npc_id}"
+##   opinion_{npc_id}_*   → dedup key = "opinion_{npc_id}"
+##   impression_{npc_id}_ → dedup key = "impression_{npc_id}"
+##   {npc_id}             → dedup key = "{npc_id}" (bare decision request)
+func _is_duplicate_queued(request_id: String) -> bool:
+	var dedup_key := _dedup_key(request_id)
+	for queued in _request_queue:
+		var queued_id: String = queued.id
+		if _dedup_key(queued_id) == dedup_key:
+			return true
+	return false
+
+## Extracts the deduplication key from a request_id.
+## Returns "prefix_npcid" for prefixed ids or the full id for bare npc_id requests.
+func _dedup_key(request_id: String) -> String:
+	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
+	for prefix in prefixes:
+		if request_id.begins_with(prefix):
+			var after_prefix: String = request_id.substr(prefix.length())
+			# The npc_id is the next token before the next "_" separator (if any)
+			var underscore_pos: int = after_prefix.find("_")
+			var npc_id: String = after_prefix if underscore_pos == -1 else after_prefix.substr(0, underscore_pos)
+			return prefix + npc_id
+	# Bare npc_id decision request — use as-is
 	return request_id
 
 func _process_queue() -> void:
@@ -82,8 +118,49 @@ func _process_queue() -> void:
 		if _request_queue.is_empty():
 			break
 
-		var queued: Dictionary = _request_queue.pop_front()
+		# Pop and skip stale entries until we find a live one or exhaust the queue.
+		var queued: Dictionary = {}
+		while not _request_queue.is_empty():
+			var candidate: Dictionary = _request_queue.pop_front()
+			if _is_stale(candidate.id):
+				print("[LLM] Dropping stale request '%s' (entity gone or dead)" % candidate.id)
+				continue
+			queued = candidate
+			break
+
+		if queued.is_empty():
+			break
+
 		_send_request(pool_entry, queued.id, queued.body)
+
+## Returns true if the request is for a specific NPC that no longer exists or is dead.
+## Bare npc_id and prefixed "prefix_npcid" requests are checked.
+## Requests without a recognisable entity (e.g. player requests) are never stale.
+func _is_stale(request_id: String) -> bool:
+	var entity_id := _extract_entity_id(request_id)
+	if entity_id.is_empty():
+		return false
+	if not WorldState.get_entity(entity_id):
+		return true
+	if not WorldState.is_alive(entity_id):
+		return true
+	return false
+
+## Extracts the entity (NPC) id embedded in a request_id.
+## Returns "" if the entity cannot be determined (e.g. player conversations).
+func _extract_entity_id(request_id: String) -> String:
+	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
+	for prefix in prefixes:
+		if request_id.begins_with(prefix):
+			var after_prefix: String = request_id.substr(prefix.length())
+			var underscore_pos: int = after_prefix.find("_")
+			var entity_id: String = after_prefix if underscore_pos == -1 else after_prefix.substr(0, underscore_pos)
+			# Skip player-involved conversations — player is not in NPC entity registry
+			if entity_id == "player":
+				return ""
+			return entity_id
+	# Bare request_id is the npc_id itself
+	return request_id
 
 func _send_request(pool_entry: Dictionary, req_id: String, body: Dictionary) -> void:
 	pool_entry.busy = true
@@ -92,7 +169,7 @@ func _send_request(pool_entry: Dictionary, req_id: String, body: Dictionary) -> 
 
 	var http: HTTPRequest = pool_entry.node
 	var json_body := JSON.stringify(body)
-	var url := OLLAMA_BASE_URL + "/api/chat"
+	var url := LLAMA_BASE_URL + "/v1/chat/completions"
 	var headers := ["Content-Type: application/json"]
 	print("[LLM] Sending request '%s' to %s (model: %s)" % [req_id, url, body.get("model", "?")])
 
@@ -126,9 +203,35 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		_finish_request(pool_entry, req_id, {}, "Failed to parse JSON response")
 		return
 
-	var response: Dictionary = json.data if json.data is Dictionary else {}
+	if not json.data is Dictionary:
+		_finish_request(pool_entry, req_id, {}, "Response is not a JSON object")
+		return
+
+	var openai_response: Dictionary = json.data
+
+	# Translate OpenAI format → Ollama-compatible shape that callers expect:
+	# {message: {content: "..."}}
+	var content: String = _extract_content(openai_response)
+	if content.is_empty():
+		_finish_request(pool_entry, req_id, {}, "No content in response choices")
+		return
+
+	var response: Dictionary = {"message": {"content": content}}
 	print("[LLM] Request '%s' completed successfully" % req_id)
 	_finish_request(pool_entry, req_id, response, "")
+
+## Extract the text content from an OpenAI-compatible chat completion response.
+func _extract_content(openai_response: Dictionary) -> String:
+	var choices = openai_response.get("choices", [])
+	if not choices is Array or choices.is_empty():
+		return ""
+	var first_choice = choices[0]
+	if not first_choice is Dictionary:
+		return ""
+	var message = first_choice.get("message", {})
+	if not message is Dictionary:
+		return ""
+	return str(message.get("content", ""))
 
 func _finish_request(pool_entry: Dictionary, req_id: String, response: Dictionary, error: String) -> void:
 	pool_entry.busy = false
