@@ -5,7 +5,7 @@ extends Node3D
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const NpcScene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
 
-const GENERATED_NPC_COUNT: int = 50
+const GENERATED_NPC_COUNT: int = 25
 
 # Maps NpcGenerator archetype IDs to NpcTraits profile strings.
 const ARCHETYPE_TO_PROFILE: Dictionary = {

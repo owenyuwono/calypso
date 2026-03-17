@@ -94,6 +94,9 @@ const LOD_REDUCED_DIST: float = 60.0
 const LOD_CHECK_INTERVAL: float = 0.5
 var _lod_level: int = 0
 var _lod_timer: float = 0.0
+var _sep_cache := Vector3.ZERO
+var _sep_timer: float = 0.0
+const SEP_INTERVAL: float = 0.2
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -304,6 +307,7 @@ func _update_lod() -> void:
 	if not cam:
 		_lod_level = 0
 		return
+	var old_lod := _lod_level
 	var dist := global_position.distance_to(cam.global_position)
 	if dist < LOD_FULL_DIST:
 		_lod_level = 0
@@ -311,6 +315,17 @@ func _update_lod() -> void:
 		_lod_level = 1
 	else:
 		_lod_level = 2
+	if _lod_level >= 2 and old_lod < 2:
+		set_physics_process(false)
+	elif _lod_level < 2 and old_lod >= 2:
+		set_physics_process(true)
+
+func _process(delta: float) -> void:
+	# LOD check runs in _process so it stays active when _physics_process is disabled
+	_lod_timer -= delta
+	if _lod_timer <= 0.0:
+		_lod_timer = LOD_CHECK_INTERVAL
+		_update_lod()
 
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
@@ -318,12 +333,6 @@ func _physics_process(delta: float) -> void:
 		if _respawn_timer <= 0.0:
 			_respawn()
 		return
-
-	# LOD check (staggered)
-	_lod_timer -= delta
-	if _lod_timer <= 0.0:
-		_lod_timer = LOD_CHECK_INTERVAL
-		_update_lod()
 
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -339,9 +348,12 @@ func _physics_process(delta: float) -> void:
 
 	# Apply separation force to avoid NPC overlap (not in combat, close range only)
 	if current_state != STATE_COMBAT and _lod_level == 0:
-		var sep := _get_separation_velocity()
-		velocity.x += sep.x
-		velocity.z += sep.z
+		_sep_timer -= delta
+		if _sep_timer <= 0.0:
+			_sep_timer = SEP_INTERVAL
+			_sep_cache = _get_separation_velocity()
+		velocity.x += _sep_cache.x
+		velocity.z += _sep_cache.z
 
 	move_and_slide()
 
