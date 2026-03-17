@@ -342,6 +342,14 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
+	# Don't move while vending
+	var _vc: Node = get_node_or_null("VendingComponent")
+	if _vc and _vc.is_vending():
+		velocity = Vector3.ZERO
+		move_and_slide()
+		_visuals.play_anim("Idle")
+		return
+
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
@@ -595,7 +603,9 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		if current_state != STATE_DEAD:
 			_stagger_timer = 0.3
 		# Fight back if not already in combat
-		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
+		var vc: Node = get_node_or_null("VendingComponent")
+		var is_vending: bool = vc != null and vc.is_vending()
+		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "" and not is_vending:
 			enter_combat(attacker_id)
 
 func _on_entity_healed(_entity_id: String, _amount: int, _current_hp: int) -> void:

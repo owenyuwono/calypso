@@ -12,6 +12,7 @@ var _open_shop_btn: Button
 var _close_shop_btn: Button
 var _is_open: bool = false
 var _player: Node
+var _inventory_auto_opened: bool = false
 
 func _ready() -> void:
 	visible = false
@@ -121,8 +122,56 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
-		UIHelper.center_panel(_panel)
+		_open_with_inventory()
 		_refresh()
+	else:
+		_close_inventory_if_auto_opened()
+
+func _open_with_inventory() -> void:
+	var inv_panel: Control = _player.inventory_panel if _player else null
+	if inv_panel and not inv_panel.is_open():
+		inv_panel.toggle()
+		_inventory_auto_opened = true
+	else:
+		_inventory_auto_opened = false
+	_position_panels_side_by_side(inv_panel)
+
+func _position_panels_side_by_side(inv_panel: Control) -> void:
+	const GAP := 8
+	var vp_size := get_viewport_rect().size
+	var vend_w: float = _panel.custom_minimum_size.x
+	var inv_w: float = 0.0
+	var inv_inner: PanelContainer = null
+	if inv_panel:
+		# inventory_panel is a Control wrapper; the inner PanelContainer holds the size
+		inv_inner = inv_panel.get_node_or_null("PanelContainer") as PanelContainer
+		if not inv_inner:
+			# fallback: find first PanelContainer child
+			for child in inv_panel.get_children():
+				if child is PanelContainer:
+					inv_inner = child
+					break
+		if inv_inner:
+			inv_w = inv_inner.custom_minimum_size.x
+		else:
+			inv_w = inv_panel.custom_minimum_size.x
+	var total_w: float = inv_w + GAP + vend_w if inv_w > 0.0 else vend_w
+	var left_x: float = (vp_size.x - total_w) * 0.5
+	var center_y: float = (vp_size.y - _panel.custom_minimum_size.y) * 0.5
+	if inv_panel and inv_w > 0.0:
+		if inv_inner:
+			inv_inner.position = Vector2(left_x, center_y)
+		else:
+			inv_panel.position = Vector2(left_x, center_y)
+	_panel.position = Vector2(left_x + inv_w + GAP, center_y)
+
+func _close_inventory_if_auto_opened() -> void:
+	if not _inventory_auto_opened:
+		return
+	_inventory_auto_opened = false
+	var inv_panel: Control = _player.inventory_panel if _player else null
+	if inv_panel and inv_panel.is_open():
+		inv_panel.toggle()
 
 func _on_visibility_changed() -> void:
 	if visible:
