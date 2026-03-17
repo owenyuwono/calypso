@@ -101,7 +101,7 @@ func _load_slot_icons() -> void:
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(400, 580)
-	var style := UIHelper.create_panel_style(Color(0.08, 0.07, 0.06, 0.96), Color(0.55, 0.45, 0.25))
+	var style := UIHelper.create_panel_style()
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
 

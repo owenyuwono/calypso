@@ -124,12 +124,25 @@ func _build_grid() -> void:
 		if prof_ids.is_empty():
 			continue
 
+		var header_row := HBoxContainer.new()
+		header_row.add_theme_constant_override("separation", 6)
+		_content.add_child(header_row)
+
+		var sep_left := HSeparator.new()
+		sep_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sep_left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header_row.add_child(sep_left)
+
 		var header := Label.new()
-		header.text = "-- %s --" % CATEGORY_LABELS.get(category, category)
-		header.add_theme_font_size_override("font_size", 12)
-		header.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65))
-		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_content.add_child(header)
+		header.text = CATEGORY_LABELS.get(category, category)
+		header.add_theme_font_size_override("font_size", 10)
+		header.add_theme_color_override("font_color", Color(0.45, 0.45, 0.55))
+		header_row.add_child(header)
+
+		var sep_right := HSeparator.new()
+		sep_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sep_right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header_row.add_child(sep_right)
 
 		var grid := GridContainer.new()
 		grid.columns = 3
@@ -169,15 +182,18 @@ func _build_prof_button(prof_id: String) -> Control:
 
 	var is_equipped: bool = _combat != null and prof_id == _combat.get_equipped_weapon_type()
 
+	# Compute width from content: icon(24) + separation(4) + text + padding(12)
+	var font: Font = ThemeDB.fallback_font
+	var text_width: float = font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+	var btn_width: float = 8 + 24 + 4 + text_width + 8
+
 	var container := Control.new()
-	container.custom_minimum_size = Vector2(120, 36)
-	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.custom_minimum_size = Vector2(btn_width, 36)
 	container.mouse_filter = Control.MOUSE_FILTER_STOP
 	container.gui_input.connect(_on_prof_button_input.bind(prof_id))
 
 	var progress := ProgressBar.new()
-	progress.custom_minimum_size = Vector2(120, 36)
-	progress.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress.custom_minimum_size = Vector2(btn_width, 36)
 	progress.max_value = 1.0
 	progress.value = ratio
 	progress.show_percentage = false
@@ -203,7 +219,8 @@ func _build_prof_button(prof_id: String) -> Control:
 	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hbox.add_theme_constant_override("separation", 4)
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.alignment = BoxContainer.ALIGNMENT_BEGIN
+	hbox.offset_left = 8
 
 	var icon := TextureRect.new()
 	icon.texture = load("res://assets/textures/ui/proficiencies/" + prof_id + ".png")
@@ -256,10 +273,19 @@ func _build_detail(prof_id: String) -> void:
 	var is_max: bool = level >= ProficiencyDatabase.MAX_LEVEL
 	var display_name: String = prof_def.get("name", prof_id)
 
-	# Proficiency name + level
+	# Proficiency name + icon + level
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
 	_content.add_child(title_row)
+
+	var title_icon := TextureRect.new()
+	title_icon.texture = load("res://assets/textures/ui/proficiencies/" + prof_id + ".png")
+	title_icon.custom_minimum_size = Vector2(32, 32)
+	title_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_icon.texture_filter = TEXTURE_FILTER_LINEAR
+	title_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title_row.add_child(title_icon)
 
 	var name_label := Label.new()
 	name_label.text = display_name + " Proficiency"

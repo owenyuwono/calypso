@@ -28,14 +28,22 @@ static func set_border_width(style: StyleBoxFlat, width: int) -> void:
 	style.border_width_top = width
 	style.border_width_bottom = width
 
-static func create_panel_style(bg_color: Color = Color(0.1, 0.1, 0.15, 0.95), border_color: Color = Color(0.4, 0.35, 0.2)) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = border_color
-	set_border_width(style, 2)
-	set_corner_radius(style, 4)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
+static var _panel_texture: Texture2D = null
+
+static func create_panel_style(_bg_color: Color = Color.BLACK, _border_color: Color = Color.BLACK) -> StyleBoxTexture:
+	if _panel_texture == null:
+		_panel_texture = load("res://assets/textures/ui/panel/frame.png")
+	var style := StyleBoxTexture.new()
+	style.texture = _panel_texture
+	var margin: float = 6.0
+	style.texture_margin_left = margin
+	style.texture_margin_right = margin
+	style.texture_margin_top = margin
+	style.texture_margin_bottom = margin
+	style.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	style.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
 	return style

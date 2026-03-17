@@ -1,8 +1,6 @@
 extends Control
 ## Player status/character screen toggled with C key.
 
-const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 const _STAT_ICONS: Dictionary = {
@@ -25,11 +23,6 @@ var _def_value: Label
 var _def_bonus: Label
 var _speed_value: Label
 var _range_value: Label
-var _weapon_name_label: Label
-var _armor_name_label: Label
-var _unequip_weapon_btn: Button
-var _unequip_armor_btn: Button
-var _prof_grid: GridContainer
 var _gold_label: Label
 
 func _ready() -> void:
@@ -116,43 +109,6 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Equipment section header
-	var equip_header := Label.new()
-	equip_header.text = "Equipment"
-	equip_header.add_theme_font_size_override("font_size", 14)
-	equip_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
-	vbox.add_child(equip_header)
-
-	# Weapon row
-	var weapon_row := _create_equipment_row("Weapon")
-	_weapon_name_label = weapon_row.name_label
-	_unequip_weapon_btn = weapon_row.button
-	_unequip_weapon_btn.pressed.connect(_unequip_weapon)
-	vbox.add_child(weapon_row.container)
-
-	# Armor row
-	var armor_row := _create_equipment_row("Armor")
-	_armor_name_label = armor_row.name_label
-	_unequip_armor_btn = armor_row.button
-	_unequip_armor_btn.pressed.connect(_unequip_armor)
-	vbox.add_child(armor_row.container)
-
-	vbox.add_child(HSeparator.new())
-
-	# Proficiency levels section header
-	var prof_header := Label.new()
-	prof_header.text = "Proficiencies"
-	prof_header.add_theme_font_size_override("font_size", 14)
-	prof_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
-	vbox.add_child(prof_header)
-
-	# 2-column grid: skill name + level
-	_prof_grid = GridContainer.new()
-	_prof_grid.columns = 4  # name1 level1 name2 level2
-	_prof_grid.add_theme_constant_override("h_separation", 6)
-	_prof_grid.add_theme_constant_override("v_separation", 1)
-	vbox.add_child(_prof_grid)
-
 	# Gold
 	var gold_row := HBoxContainer.new()
 	vbox.add_child(gold_row)
@@ -211,28 +167,6 @@ func _create_stat_row(stat_name: String) -> Dictionary:
 
 	return {"container": hbox, "value": value_lbl, "bonus": bonus_lbl}
 
-func _create_equipment_row(slot_name: String) -> Dictionary:
-	var hbox := HBoxContainer.new()
-
-	var name_lbl := Label.new()
-	name_lbl.text = slot_name
-	name_lbl.add_theme_font_size_override("font_size", 14)
-	name_lbl.custom_minimum_size.x = 60
-	hbox.add_child(name_lbl)
-
-	var item_lbl := Label.new()
-	item_lbl.add_theme_font_size_override("font_size", 14)
-	item_lbl.add_theme_color_override("font_color", UIHelper.COLOR_EQUIPMENT)
-	item_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(item_lbl)
-
-	var btn := Button.new()
-	btn.text = "Unequip"
-	btn.visible = false
-	hbox.add_child(btn)
-
-	return {"container": hbox, "name_label": item_lbl, "button": btn}
-
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_status"):
 		if get_viewport().gui_get_focus_owner() is LineEdit:
@@ -266,9 +200,7 @@ func _refresh() -> void:
 	var base_def: int = stats.def
 	var attack_speed: float = stats.attack_speed
 	var attack_range: float = stats.attack_range
-	var progression = _player.get_node("ProgressionComponent")
 	var gold: int = inv.gold
-	var equipment: Dictionary = equip.get_equipment()
 
 	_name_label.text = "Player"
 	_level_label.text = "Total Lv. %d" % level
@@ -290,51 +222,7 @@ func _refresh() -> void:
 	_speed_value.text = "%.1fs" % attack_speed
 	_range_value.text = "%.1f" % attack_range
 
-	# Equipment
-	var weapon_id: String = equipment.get("main_hand", "")
-	var armor_id: String = equipment.get("off_hand", "")
-	var weapon_name := ItemDatabase.get_item_name(weapon_id) if not weapon_id.is_empty() else "None"
-	var armor_name := ItemDatabase.get_item_name(armor_id) if not armor_id.is_empty() else "None"
-	_weapon_name_label.text = weapon_name
-	_unequip_weapon_btn.visible = not weapon_id.is_empty()
-	_armor_name_label.text = armor_name
-	_unequip_armor_btn.visible = not armor_id.is_empty()
-
-	# Proficiency levels grid
-	for child in _prof_grid.get_children():
-		child.queue_free()
-	if progression:
-		var skills := ProficiencyDatabase.get_all_skills()
-		# Show only weapon + attribute categories in compact 2-col layout
-		for skill_id in skills:
-			var skill_def: Dictionary = skills[skill_id]
-			var cat: String = skill_def.get("category", "")
-			if cat != "weapon" and cat != "attribute":
-				continue
-			var lvl: int = progression.get_proficiency_level(skill_id)
-			var name_lbl := Label.new()
-			name_lbl.text = skill_def.get("name", skill_id)
-			name_lbl.add_theme_font_size_override("font_size", 12)
-			name_lbl.custom_minimum_size.x = 70
-			_prof_grid.add_child(name_lbl)
-			var lvl_lbl := Label.new()
-			lvl_lbl.text = str(lvl)
-			lvl_lbl.add_theme_font_size_override("font_size", 12)
-			lvl_lbl.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if lvl >= ProficiencyDatabase.MAX_LEVEL else Color(0.7, 0.9, 0.7))
-			lvl_lbl.custom_minimum_size.x = 20
-			_prof_grid.add_child(lvl_lbl)
-
 	_gold_label.text = str(gold)
-
-func _unequip_weapon() -> void:
-	if _player:
-		_player.get_node("EquipmentComponent").unequip("main_hand")
-	_refresh()
-
-func _unequip_armor() -> void:
-	if _player:
-		_player.get_node("EquipmentComponent").unequip("off_hand")
-	_refresh()
 
 func is_open() -> bool:
 	return _is_open
