@@ -48,6 +48,8 @@ func _ready() -> void:
 	add_child(_social)
 	_social.setup(npc, brain, memory)
 
+	LLMClient.request_completed.connect(_on_shop_title_response)
+
 	GameEvents.npc_action_completed.connect(
 		func(n_id: String, action: String, success: bool) -> void:
 			if n_id == npc.npc_id:
@@ -397,50 +399,69 @@ func _execute_buy_equipment(slot: String) -> void:
 		npc.last_thought = "Going to %s for %s upgrade" % [vendor_id, slot]
 		_do_action("move_to", vendor_id)
 
+var _cached_shop_title: String = ""
+var _shop_title_pending: bool = false
+
 func _execute_vend() -> void:
 	var vending_comp: Node = npc.get_node_or_null("VendingComponent")
 	if not vending_comp:
-		# No VendingComponent — just idle
 		_do_action("wait", "")
 		return
 	if vending_comp.is_vending():
-		# Already vending — nothing to do this tick
 		_do_action("wait", "")
 		return
-	# Build listings from non-equipped inventory items at 80% of base value
 	var listings := NpcTradeHelper.build_vend_listings(npc._inventory, npc._equipment)
 	if listings.is_empty():
 		npc.last_thought = "Nothing to sell"
 		_do_action("wait", "")
 		return
+	if _cached_shop_title != "":
+		vending_comp.start_vending(_cached_shop_title, listings)
+		npc.last_thought = "Opening shop: %s" % _cached_shop_title
+		_do_action("wait", "")
+		return
+	# First time vending — request creative name from LLM
 	var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
-	var shop_title: String = _make_shop_title(npc_name, listings)
-	vending_comp.start_vending(shop_title, listings)
-	npc.last_thought = "Opening shop: %s" % shop_title
-	_do_action("wait", "")
-
-func _make_shop_title(npc_name: String, listings: Dictionary) -> String:
-	var has_weapons := false
-	var has_armor := false
-	var has_consumables := false
+	var fallback: String = "%s's Shop" % npc_name
+	if _shop_title_pending:
+		# Still waiting for LLM — use fallback
+		vending_comp.start_vending(fallback, listings)
+		npc.last_thought = "Opening shop: %s" % fallback
+		_do_action("wait", "")
+		return
+	# Build item list for prompt
+	var item_names: Array = []
 	for item_id in listings:
 		var item_data: Dictionary = ItemDatabase.ITEMS.get(item_id, {})
-		match item_data.get("type", ""):
-			"weapon":
-				has_weapons = true
-			"armor":
-				has_armor = true
-			"consumable":
-				has_consumables = true
-	if has_weapons and not has_consumables:
-		return "%s's Arms" % npc_name
-	if has_consumables and not has_weapons:
-		return "%s's Remedies" % npc_name
-	if has_armor and not has_weapons and not has_consumables:
-		return "%s's Armory" % npc_name
-	if has_weapons and has_consumables:
-		return "%s's Supplies" % npc_name
-	return "%s's Wares" % npc_name
+		item_names.append(item_data.get("name", item_id))
+	var personality: String = WorldState.get_entity_data(npc.npc_id).get("personality", "")
+	var prompt_text: String = "You are %s, a shopkeeper in a medieval fantasy town. %s\nYou sell: %s\nInvent a short, creative shop name (2-4 words max). Reply with ONLY the shop name, nothing else." % [npc_name, personality, ", ".join(item_names)]
+	var messages: Array = [{"role": "user", "content": prompt_text}]
+	var req_id: String = "shop_title_%s" % npc.npc_id
+	_shop_title_pending = true
+	LLMClient.send_chat(req_id, messages, {}, 5)
+	# Use fallback while waiting
+	vending_comp.start_vending(fallback, listings)
+	npc.last_thought = "Opening shop: %s" % fallback
+	_do_action("wait", "")
+
+func _on_shop_title_response(req_id: String, response: Dictionary) -> void:
+	if not req_id.begins_with("shop_title_"):
+		return
+	var target_npc_id: String = req_id.substr(11)
+	if target_npc_id != npc.npc_id:
+		return
+	_shop_title_pending = false
+	var content: String = response.get("message", {}).get("content", "").strip_edges()
+	if content.is_empty() or content.length() > 40:
+		return
+	# Clean up quotes
+	content = content.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+	_cached_shop_title = content
+	# Update the vend sign if currently vending
+	var vending_comp: Node = npc.get_node_or_null("VendingComponent")
+	if vending_comp and vending_comp.is_vending():
+		npc._visuals.show_vend_sign(_cached_shop_title)
 
 func _execute_buy_from_vendor() -> void:
 	# Fallback: buy healing potions if affordable, otherwise look for weapon upgrades
