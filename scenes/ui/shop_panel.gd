@@ -27,15 +27,29 @@ func _build_ui() -> void:
 	var main_vbox := VBoxContainer.new()
 	_panel.add_child(main_vbox)
 
-	# Gold label shown on the right of the drag handle
+	# Gold display shown on the right of the drag handle (icon + amount)
+	var gold_row := HBoxContainer.new()
+	gold_row.add_theme_constant_override("separation", 3)
+	main_vbox.add_child(gold_row)
+
+	var gold_icon := TextureRect.new()
+	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
+	gold_icon.custom_minimum_size = Vector2(16, 16)
+	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold_row.add_child(gold_icon)
+
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 16)
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	main_vbox.add_child(_gold_label)
+	gold_row.add_child(_gold_label)
 
-	# Draggable title bar with gold label on the right
+	# Draggable title bar with gold display on the right
 	_drag_handle = DragHandle.new()
-	_drag_handle.setup(_panel, "Shop", _gold_label)
+	_drag_handle.setup(_panel, "Shop", gold_row)
 	_drag_handle.close_pressed.connect(close_shop)
 	main_vbox.add_child(_drag_handle)
 	main_vbox.move_child(_drag_handle, 0)
@@ -100,7 +114,7 @@ func _refresh() -> void:
 		return
 
 	var gold: int = inv_comp.get_gold_amount()
-	_gold_label.text = "Gold: %d" % gold
+	_gold_label.text = "%d" % gold
 
 	if not _vendor:
 		return

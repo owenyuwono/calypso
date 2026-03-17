@@ -5,6 +5,12 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
+const _STAT_ICONS: Dictionary = {
+	"HP": "res://assets/textures/ui/stats/stat_hp.png",
+	"ATK": "res://assets/textures/ui/stats/stat_atk.png",
+	"DEF": "res://assets/textures/ui/stats/stat_def.png",
+}
+
 var _panel: PanelContainer
 var _is_open: bool = false
 var _player: Node
@@ -151,6 +157,16 @@ func _build_ui() -> void:
 	var gold_row := HBoxContainer.new()
 	vbox.add_child(gold_row)
 
+	var gold_icon := TextureRect.new()
+	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
+	gold_icon.custom_minimum_size = Vector2(16, 16)
+	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold_row.add_child(gold_icon)
+
 	var gold_name := Label.new()
 	gold_name.text = "Gold"
 	gold_name.add_theme_font_size_override("font_size", 14)
@@ -165,6 +181,17 @@ func _build_ui() -> void:
 
 func _create_stat_row(stat_name: String) -> Dictionary:
 	var hbox := HBoxContainer.new()
+
+	if _STAT_ICONS.has(stat_name):
+		var icon := TextureRect.new()
+		icon.texture = load(_STAT_ICONS[stat_name])
+		icon.custom_minimum_size = Vector2(16, 16)
+		icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon.texture_filter = TEXTURE_FILTER_NEAREST
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hbox.add_child(icon)
 
 	var name_lbl := Label.new()
 	name_lbl.text = stat_name

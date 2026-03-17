@@ -81,9 +81,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **DialogueBubble** (`scenes/ui/dialogue_bubble.gd`): 3D speech bubble via SubViewport + Sprite3D. Queue-based, 4s default duration, word-wrap at 600px
 - **ChatLog** (`scenes/ui/chat_log.gd`): Colored message types (player_speech, npc_speech, combat, loot, gold, system). Combat hit batching (0.3s window). Auto-scroll, max 50 messages
 - **ChatInput** (`scenes/ui/chat_input.gd`): Enter to toggle, LineEdit with placeholder. Signal: `message_sent(text)`
-- **InventoryPanel** (`scenes/ui/inventory_panel.gd`): Grid-based inventory with 8-slot equipment section on top (armor 2×3 left, weapons right) + 5-column item grid below. Equipment slots use placeholder sprites (`assets/textures/ui/equip_slots/`). Hover shows tooltip (name + stat). Left-click opens item description panel (name, type, stats, requirements). Right-click shows context menu: Use/Equip + Discard (drops loot at player feet). Medieval RPG aesthetic (warm amber on dark parchment)
+- **InventoryPanel** (`scenes/ui/inventory_panel.gd`): Grid-based inventory with 8-slot equipment section on top (armor 2×3 left, weapons right) + 5-column item grid below. Equipment slots use generated icons (`assets/textures/ui/equip_slots/`). Stat icons (HP/ATK/DEF/Gold) from `assets/textures/ui/stats/`. Hover shows tooltip (name + stat). Left-click opens item description panel (name, type, stats, requirements). Right-click shows context menu: Use/Equip + Discard (drops loot at player feet). Medieval RPG aesthetic (warm amber on dark parchment)
 - **SkillPanel** (`scenes/ui/skill_panel.gd`): Two-level UI — proficiency grid overview (13 buttons with XP fill) → drill-down detail with skills + hotbar assignment. Both S and P keys toggle
-- **Panel toggles**: Top-right button bar: Status [C] | Inv [I] | Skills [S] | Map [W]
+- **Panel toggles**: Top-right button bar with icons (`assets/textures/ui/buttons/`): Status [C] | Inv [I] | Skills [S] | Map [W]
+- **Icon pipeline**: `scripts/tools/generate_icon.py` — generates icons via Gemini API (Nano Banana 2 Flash, model `gemini-3.1-flash-image-preview`), auto-removes backgrounds. Full icon spec in `docs/UI.md`. Stat icons at `assets/textures/ui/stats/`, equip slot icons at `assets/textures/ui/equip_slots/`, button icons at `assets/textures/ui/buttons/`
 
 ## Proficiency System (RuneScape-style)
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`

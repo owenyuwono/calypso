@@ -79,6 +79,10 @@ func _ready() -> void:
 		btn.add_theme_stylebox_override("disabled", disabled_style)
 		btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.4, 0.4))
 
+		btn.icon = load("res://assets/textures/ui/buttons/btn_" + def["key"] + ".png")
+		btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.texture_filter = TEXTURE_FILTER_NEAREST
+
 		var key: String = def["key"]
 		btn.pressed.connect(_on_button_pressed.bind(key))
 		_hbox.add_child(btn)

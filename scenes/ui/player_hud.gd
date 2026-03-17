@@ -72,22 +72,50 @@ func _build_ui() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_row.add_child(spacer)
 
+	var gold_row := HBoxContainer.new()
+	gold_row.add_theme_constant_override("separation", 3)
+	top_row.add_child(gold_row)
+
+	var gold_icon := TextureRect.new()
+	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
+	gold_icon.custom_minimum_size = Vector2(16, 16)
+	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold_row.add_child(gold_icon)
+
 	_gold_label = Label.new()
-	_gold_label.text = "100 G"
+	_gold_label.text = "100"
 	_gold_label.add_theme_font_size_override("font_size", 16)
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	top_row.add_child(_gold_label)
+	gold_row.add_child(_gold_label)
 
 	# HP bar
 	var hp_row := HBoxContainer.new()
 	vbox.add_child(hp_row)
 
+	var hp_header := HBoxContainer.new()
+	hp_header.custom_minimum_size = Vector2(32, 0)
+	hp_header.add_theme_constant_override("separation", 2)
+	hp_row.add_child(hp_header)
+
+	var hp_icon := TextureRect.new()
+	hp_icon.texture = load("res://assets/textures/ui/stats/stat_hp.png")
+	hp_icon.custom_minimum_size = Vector2(16, 16)
+	hp_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	hp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hp_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hp_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	hp_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_header.add_child(hp_icon)
+
 	var hp_title := Label.new()
 	hp_title.text = "HP"
 	hp_title.add_theme_font_size_override("font_size", 13)
 	hp_title.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
-	hp_title.custom_minimum_size = Vector2(32, 0)
-	hp_row.add_child(hp_title)
+	hp_header.add_child(hp_title)
 
 	_hp_bar = _create_styled_bar(
 		Color(0.85, 0.15, 0.15), Color(0.3, 0.05, 0.05),
@@ -259,7 +287,7 @@ func _refresh_all() -> void:
 		_xp_bar.value = 0
 		_xp_label.text = "---"
 
-	_gold_label.text = "%s G" % _format_number(gold)
+	_gold_label.text = "%s" % _format_number(gold)
 
 	_refresh_stamina()
 	_refresh_time()

@@ -53,12 +53,21 @@ const WEAPON_COLORS: Dictionary = {
 	"staff":  Color(0.5, 0.4, 0.9),
 }
 
+const STAT_ICON_DIR := "res://assets/textures/ui/stats/"
+const STAT_ICON_MAP: Dictionary = {
+	"ATK":   "stat_atk.png",
+	"DEF":   "stat_def.png",
+	"Heal":  "stat_hp.png",
+	"Value": "gold_coin.png",
+}
+
 var _panel: PanelContainer
 var _equip_armor_grid: GridContainer
 var _equip_weapon_vbox: VBoxContainer
 var _grid: GridContainer
 var _attack_type_label: Label
 var _gold_label: Label
+var _gold_icon: TextureRect
 var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _is_open: bool = false
@@ -118,12 +127,28 @@ func _build_ui() -> void:
 	_attack_type_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.add_child(_attack_type_label)
 
+	var gold_hbox := HBoxContainer.new()
+	gold_hbox.add_theme_constant_override("separation", 4)
+	gold_hbox.alignment = BoxContainer.ALIGNMENT_END
+	info_row.add_child(gold_hbox)
+
+	_gold_icon = TextureRect.new()
+	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
+	_gold_icon.texture = gold_coin_tex
+	_gold_icon.custom_minimum_size = Vector2(16, 16)
+	_gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	_gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	_gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold_hbox.add_child(_gold_icon)
+
 	_gold_label = Label.new()
 	_gold_label.add_theme_font_size_override("font_size", 14)
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	_gold_label.text = "● 0"
+	_gold_label.text = "0"
 	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	info_row.add_child(_gold_label)
+	gold_hbox.add_child(_gold_label)
 
 	# EQUIPMENT section header
 	var equip_header := Label.new()
@@ -312,7 +337,7 @@ func _refresh() -> void:
 
 	# Gold
 	var gold: int = _inventory.get_gold_amount()
-	_gold_label.text = "● %d" % gold
+	_gold_label.text = "%d" % gold
 
 	# Rebuild armor grid (left)
 	for child in _equip_armor_grid.get_children():
@@ -657,8 +682,21 @@ func _show_desc(item_id: String) -> void:
 
 func _add_desc_stat(label_text: String, value_text: String, color: Color) -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 4)
 	_desc_vbox.add_child(row)
+
+	var icon_file: String = STAT_ICON_MAP.get(label_text, "")
+	if not icon_file.is_empty():
+		var icon := TextureRect.new()
+		icon.texture = load(STAT_ICON_DIR + icon_file) as Texture2D
+		icon.custom_minimum_size = Vector2(16, 16)
+		icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = TEXTURE_FILTER_NEAREST
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+
 	var lbl := Label.new()
 	lbl.text = label_text + ":"
 	lbl.add_theme_font_size_override("font_size", 12)
