@@ -46,7 +46,7 @@ def remove_background_file(path: str, tolerance: int = 40):
     print(f"Removed background: {path}")
 
 
-def generate_icon(prompt: str, output_path: str, size: str = "16x16"):
+def generate_icon(prompt: str, output_path: str, size: str = "16x16", bg_remove: bool = True):
     w, h = (int(x) for x in size.lower().split("x"))
 
     payload = {
@@ -85,11 +85,12 @@ def generate_icon(prompt: str, output_path: str, size: str = "16x16"):
         print(f"No image in response. Full response:\n{json.dumps(data, indent=2)}", file=sys.stderr)
         sys.exit(1)
 
-    # Decode, resize, remove background, save
+    # Decode, resize, optionally remove background, save
     img = Image.open(BytesIO(base64.b64decode(image_data)))
     img = img.convert("RGBA")
     img = img.resize((w, h), Image.LANCZOS)
-    img = remove_background(img)
+    if bg_remove:
+        img = remove_background(img)
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +103,10 @@ if __name__ == "__main__":
         print(__doc__)
         sys.exit(1)
 
-    prompt = sys.argv[1]
-    output = sys.argv[2]
-    size = sys.argv[3] if len(sys.argv) > 3 else "16x16"
-    generate_icon(prompt, output, size)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    prompt = args[0]
+    output = args[1]
+    size = args[2] if len(args) > 2 else "16x16"
+    bg_remove = "--no-bg-remove" not in flags
+    generate_icon(prompt, output, size, bg_remove=bg_remove)
