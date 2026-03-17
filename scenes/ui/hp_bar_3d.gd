@@ -77,6 +77,12 @@ func set_entity_name(entity_name: String) -> void:
 	if _name_label:
 		_name_label.text = entity_name
 
+func set_bar_visible(vis: bool) -> void:
+	if _bar_bg:
+		_bar_bg.visible = vis
+	if _bar_fill:
+		_bar_fill.visible = vis
+
 func update_bar(current: int, max_val: int) -> void:
 	if max_val <= 0:
 		return

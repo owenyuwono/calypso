@@ -122,6 +122,12 @@ func set_hp_bar_visible(vis: bool) -> void:
 	if _hp_bar:
 		_hp_bar.visible = vis
 
+func hide_hp_bar_keep_name() -> void:
+	if _hp_bar:
+		_hp_bar.visible = true
+		if _hp_bar.has_method("set_bar_visible"):
+			_hp_bar.set_bar_visible(false)
+
 # --- Damage / Combat Visuals ---
 
 func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1), target_pos: Vector3 = Vector3.ZERO) -> void:

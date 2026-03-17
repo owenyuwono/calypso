@@ -328,7 +328,6 @@ func _check_aggro() -> void:
 		if etype in ["player", "npc"] and WorldState.is_alive(entry.id):
 			aggro_target = entry.id
 			state = "aggro"
-			_visuals.set_hp_bar_visible(true)
 			return
 
 func _process_aggro(delta: float) -> bool:
@@ -395,10 +394,12 @@ func _drop_aggro() -> void:
 	nav_agent.target_position = spawn_point
 	_visuals.set_hp_bar_visible(_stats.hp < _stats.max_hp)
 
-func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
+func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
 		_stagger_timer = 0.3
-		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
+		if attacker_id == "player":
+			_visuals.set_hp_bar_visible(true)
+			_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == monster_id and state != "dead":

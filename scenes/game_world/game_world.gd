@@ -325,24 +325,19 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 		brain.set_use_llm_chat(true)
 
 func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
-	# Merchants stay in the city. Others split evenly between city, east field, and west field.
+	# Merchants stay in the city. Others split 50/50 between city and east field.
 	if goal == "vend":
 		var x: float = randf_range(-60.0, 60.0)
 		var z: float = randf_range(-40.0, 40.0)
 		return Vector3(x, 1.0, z)
 	var roll: float = randf()
-	if roll < 0.34:
+	if roll < 0.5:
 		# City
 		var x: float = randf_range(-60.0, 60.0)
 		var z: float = randf_range(-40.0, 40.0)
 		return Vector3(x, 1.0, z)
-	elif roll < 0.67:
+	else:
 		# East field
 		var x: float = randf_range(80.0, 140.0)
-		var z: float = randf_range(-30.0, 30.0)
-		return Vector3(x, 1.0, z)
-	else:
-		# West field
-		var x: float = randf_range(-140.0, -80.0)
 		var z: float = randf_range(-30.0, 30.0)
 		return Vector3(x, 1.0, z)
