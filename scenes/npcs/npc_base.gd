@@ -55,6 +55,7 @@ var _nav_wait_frames: int = 0
 # Combat
 var combat_target: String = ""
 var _respawn_timer: float = 0.0
+var _stagger_timer: float = 0.0
 var _combat_tracker: Dictionary = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 
 # Stuck detection
@@ -334,6 +335,13 @@ func _physics_process(delta: float) -> void:
 			_respawn()
 		return
 
+	# Hit stagger — freeze briefly on taking damage
+	if _stagger_timer > 0.0:
+		_stagger_timer -= delta
+		velocity = Vector3.ZERO
+		move_and_slide()
+		return
+
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
@@ -592,6 +600,8 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 		_combat_tracker["damage_taken"] += damage
 		_combat_tracker["hits_taken"] += 1
+		if current_state != STATE_DEAD:
+			_stagger_timer = 0.3
 		# Fight back if not already in combat
 		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
 			enter_combat(attacker_id)

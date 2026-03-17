@@ -44,6 +44,7 @@ var _is_vending: bool = false
 var _attack_target: String = ""
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
+var _stagger_timer: float = 0.0
 
 # Visuals component
 var _visuals: Node
@@ -252,6 +253,12 @@ func _physics_process(delta: float) -> void:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
 			_respawn()
+		return
+
+	if _stagger_timer > 0.0:
+		_stagger_timer -= delta
+		velocity = Vector3.ZERO
+		move_and_slide()
 		return
 
 	var is_moving := false
@@ -624,6 +631,7 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
+		_stagger_timer = 0.3
 		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, not _attack_target.is_empty())
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 

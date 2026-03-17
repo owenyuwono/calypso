@@ -39,6 +39,7 @@ var _nav_started: bool = false
 var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
+var _stagger_timer: float = 0.0
 
 # Cached stats
 var _base_aggro_range: float = 6.0
@@ -213,6 +214,12 @@ func _physics_process(delta: float) -> void:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
 			_respawn()
+		return
+
+	if _stagger_timer > 0.0:
+		_stagger_timer -= delta
+		velocity = Vector3.ZERO
+		move_and_slide()
 		return
 
 	# LOD check (staggered)
@@ -390,6 +397,7 @@ func _drop_aggro() -> void:
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
+		_stagger_timer = 0.3
 		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
