@@ -94,7 +94,7 @@ func _is_duplicate_queued(request_id: String) -> bool:
 ## Extracts the deduplication key from a request_id.
 ## Returns "prefix_npcid" for prefixed ids or the full id for bare npc_id requests.
 func _dedup_key(request_id: String) -> String:
-	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
+	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_", "shop_title_"]
 	for prefix in prefixes:
 		if request_id.begins_with(prefix):
 			return request_id
@@ -156,7 +156,7 @@ func _is_stale(request_id: String) -> bool:
 ## Extracts the entity (NPC) id embedded in a request_id.
 ## Returns "" if the entity cannot be determined (e.g. player conversations).
 func _extract_entity_id(request_id: String) -> String:
-	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_"]
+	var prefixes: Array = ["conv_player_", "chat_", "extract_", "conv_", "fuzzy_", "opinion_", "impression_", "shop_title_"]
 	for prefix in prefixes:
 		if request_id.begins_with(prefix):
 			var entity_id: String = request_id.substr(prefix.length())
