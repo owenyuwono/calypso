@@ -191,8 +191,7 @@ func _ready() -> void:
 	_setup_dialogue_bubble()
 	_setup_click_marker()
 
-	_visuals.setup_hp_bar()
-	_visuals.set_hp_bar_visible(false)
+	# Player HP is shown in HUD, no 3D bar needed
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
@@ -370,7 +369,6 @@ func _cancel_attack() -> void:
 	_auto_attack.cancel()
 	_player_skills.cancel_pending()
 	_hover.clear_ring()
-	_visuals.set_hp_bar_visible(_stats.hp < _stats.max_hp)
 
 func _stop_navigation() -> void:
 	_is_navigating = false
@@ -477,7 +475,6 @@ func _handle_left_click() -> void:
 			_auto_attack.cancel()
 			_is_navigating = false
 			_hover.lock_ring(hovered_entity_id, Color(1.0, 0.3, 0.2, 0.6))
-			_visuals.set_hp_bar_visible(true)
 			return
 
 		if etype == "loot_drop":
@@ -626,18 +623,15 @@ func _respawn() -> void:
 	_visuals.play_anim("Idle")
 
 	GameEvents.entity_respawned.emit("player")
-	_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, false)
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
 		_stagger_timer = 0.3
-		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, not _attack_target.is_empty())
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 
 func _on_entity_healed(eid: String, _amount: int, _current_hp: int) -> void:
-	if eid == "player":
-		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, not _attack_target.is_empty())
+	pass
 
 func _on_proficiency_level_up(eid: String, skill_id: String, new_level: int) -> void:
 	if eid != "player":

@@ -392,7 +392,7 @@ func _drop_aggro() -> void:
 	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area
 	nav_agent.target_position = spawn_point
-	_visuals.set_hp_bar_visible(_stats.hp < _stats.max_hp)
+	_visuals.set_hp_bar_visible(false)
 
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
@@ -402,8 +402,7 @@ func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _r
 			_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
-	if entity_id == monster_id and state != "dead":
-		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
+	pass
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:
