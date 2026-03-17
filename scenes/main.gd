@@ -1,7 +1,11 @@
 extends Node3D
 ## Main scene — wires up UI panel references to the player.
 
+var _fps_label: Label
+
 func _ready() -> void:
+	_setup_fps_counter()
+
 	var player := $Player
 	var shop_panel := $UILayer/ShopPanel
 	var inventory_panel := $UILayer/InventoryPanel
@@ -64,4 +68,18 @@ func _ready() -> void:
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.chat_input = chat_input
 		panel_toggles.world_map_panel = $UILayer/WorldMapPanel
+
+func _setup_fps_counter() -> void:
+	_fps_label = Label.new()
+	_fps_label.add_theme_font_size_override("font_size", 14)
+	_fps_label.add_theme_color_override("font_color", Color(1, 1, 0.3))
+	_fps_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	_fps_label.add_theme_constant_override("shadow_offset_x", 1)
+	_fps_label.add_theme_constant_override("shadow_offset_y", 1)
+	_fps_label.position = Vector2(10, 10)
+	$UILayer.add_child(_fps_label)
+
+func _process(_delta: float) -> void:
+	if _fps_label:
+		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 

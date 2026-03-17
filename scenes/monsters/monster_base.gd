@@ -110,8 +110,10 @@ func _ready() -> void:
 	perception_comp.setup()
 	_perception = perception_comp
 
+	var display_name: String = stats.get("name", monster_type)
 	if name_label:
-		name_label.text = stats.get("name", monster_type)
+		name_label.text = display_name
+		name_label.visible = false
 
 	nav_agent.target_desired_distance = 1.0
 	nav_agent.path_desired_distance = 1.0
@@ -119,7 +121,7 @@ func _ready() -> void:
 	# Register with WorldState
 	WorldState.register_entity(monster_id, self, {
 		"type": "monster",
-		"name": stats.get("name", monster_type),
+		"name": display_name,
 		"monster_type": monster_type,
 		"hp": stats.get("hp", 0),
 		"max_hp": stats.get("hp", 0),
@@ -135,7 +137,7 @@ func _ready() -> void:
 	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
 	# Create HP bar
-	_visuals.setup_hp_bar(2.0)
+	_visuals.setup_hp_bar(2.0, display_name)
 
 	# Connect signals
 	GameEvents.entity_died.connect(_on_entity_died)
@@ -468,7 +470,7 @@ func _respawn() -> void:
 
 	_visuals.set_hp_bar_visible(false)
 	if name_label:
-		name_label.visible = true
+		name_label.visible = false
 
 	_visuals.play_anim("Idle")
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)

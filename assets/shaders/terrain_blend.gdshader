@@ -13,13 +13,13 @@ uniform float blend_sharpness : hint_range(0.0, 10.0) = 3.0;
 
 // Toon shading parameters (matched to toon.gdshader)
 uniform float shadow_threshold : hint_range(0.0, 1.0) = 0.3;
-uniform float shadow_softness : hint_range(0.0, 0.5) = 0.15;
-uniform float shadow_strength : hint_range(0.0, 1.0) = 0.55;
-uniform vec3 shadow_tint : source_color = vec3(0.6, 0.55, 0.7);
+uniform float shadow_softness : hint_range(0.0, 0.5) = 0.2;
+uniform float shadow_strength : hint_range(0.0, 1.0) = 0.5;
+uniform vec3 shadow_tint : source_color = vec3(0.75, 0.65, 0.5);
 
 // Rim lighting
-uniform float rim_power : hint_range(1.0, 10.0) = 3.0;
-uniform float rim_intensity : hint_range(0.0, 1.0) = 0.4;
+uniform float rim_power : hint_range(1.0, 10.0) = 2.5;
+uniform float rim_intensity : hint_range(0.0, 1.0) = 0.5;
 
 // Fallback colors when no textures assigned
 uniform vec4 color_grass : source_color = vec4(0.28, 0.48, 0.18, 1.0);
@@ -96,6 +96,6 @@ void light() {
 	rim *= light_band * rim_intensity;
 	vec3 rim_color = LIGHT_COLOR * rim;
 
-	vec3 ambient = ALBEDO * 0.08;
+	vec3 ambient = ALBEDO * 0.15;
 	DIFFUSE_LIGHT += diffuse * LIGHT_COLOR + rim_color + ambient;
 }

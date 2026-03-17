@@ -225,6 +225,7 @@ func _ready() -> void:
 
 	if name_label:
 		name_label.text = npc_name
+		name_label.visible = false
 
 	GameEvents.npc_spoke.connect(_on_any_npc_spoke)
 	GameEvents.entity_died.connect(_on_entity_died)
@@ -234,7 +235,7 @@ func _ready() -> void:
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
-	_visuals.setup_hp_bar()
+	_visuals.setup_hp_bar(1.8, npc_name)
 	_visuals.set_hp_bar_visible(false)
 
 	_setup_perception_circle()

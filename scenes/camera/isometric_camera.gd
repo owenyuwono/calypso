@@ -12,6 +12,23 @@ var _target: Node3D
 func _ready() -> void:
 	_target = get_node(target_path)
 	_offset = global_position - _target.global_position
+	#_setup_outline_effect()  # TODO: fix fullscreen quad approach for Forward+
+
+
+func _setup_outline_effect() -> void:
+	var quad := MeshInstance3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(2, 2)
+	quad.mesh = mesh
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://assets/shaders/outline.gdshader")
+	mat.set_shader_parameter("outline_thickness", 1.0)
+	mat.set_shader_parameter("depth_threshold", 2.5)
+	mat.set_shader_parameter("normal_threshold", 1.2)
+	mat.set_shader_parameter("outline_color", Color(0.08, 0.06, 0.1, 0.6))
+	quad.material_override = mat
+	quad.extra_cull_margin = 16384.0
+	add_child(quad)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
