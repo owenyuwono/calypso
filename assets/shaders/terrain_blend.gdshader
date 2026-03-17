@@ -13,8 +13,8 @@ uniform float blend_sharpness : hint_range(0.0, 10.0) = 3.0;
 
 // Toon shading parameters (matched to toon.gdshader)
 uniform float shadow_threshold : hint_range(0.0, 1.0) = 0.3;
-uniform float shadow_softness : hint_range(0.0, 0.5) = 0.2;
-uniform float shadow_strength : hint_range(0.0, 1.0) = 0.5;
+uniform float shadow_softness : hint_range(0.0, 0.5) = 0.02;
+uniform float shadow_strength : hint_range(0.0, 1.0) = 0.7;
 uniform vec3 shadow_tint : source_color = vec3(0.75, 0.65, 0.5);
 
 uniform sampler2D texture_cobble : source_color, filter_linear_mipmap, repeat_enable;

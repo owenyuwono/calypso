@@ -21,7 +21,8 @@ void fragment() {
 	float d_left = texture(depth_texture, SCREEN_UV + vec2(-texel.x, 0.0)).r;
 	float d_right = texture(depth_texture, SCREEN_UV + vec2(texel.x, 0.0)).r;
 	float depth_edge = abs(d_top - d_bottom) + abs(d_left - d_right);
-	depth_edge = step(depth_threshold * 0.0001, depth_edge);
+	float threshold = depth_threshold * 0.0001;
+	depth_edge = smoothstep(threshold * 0.5, threshold * 1.5, depth_edge);
 
 	float edge = depth_edge;
 	ALBEDO = mix(screen_col, outline_color.rgb, edge * outline_color.a);
