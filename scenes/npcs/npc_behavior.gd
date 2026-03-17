@@ -410,26 +410,24 @@ func _execute_vend() -> void:
 	if vending_comp.is_vending():
 		_do_action("wait", "")
 		return
+	if _shop_title_pending:
+		# Waiting for LLM to name the shop — don't open yet
+		npc.last_thought = "Thinking of a shop name..."
+		_do_action("wait", "")
+		return
 	var listings := NpcTradeHelper.build_vend_listings(npc._inventory, npc._equipment)
 	if listings.is_empty():
 		npc.last_thought = "Nothing to sell"
 		_do_action("wait", "")
 		return
 	if _cached_shop_title != "":
+		# Already have a name — open immediately
 		vending_comp.start_vending(_cached_shop_title, listings)
 		npc.last_thought = "Opening shop: %s" % _cached_shop_title
 		_do_action("wait", "")
 		return
-	# First time vending — request creative name from LLM
+	# First time — request creative name from LLM, don't open yet
 	var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
-	var fallback: String = "%s's Shop" % npc_name
-	if _shop_title_pending:
-		# Still waiting for LLM — use fallback
-		vending_comp.start_vending(fallback, listings)
-		npc.last_thought = "Opening shop: %s" % fallback
-		_do_action("wait", "")
-		return
-	# Build item list for prompt
 	var item_names: Array = []
 	for item_id in listings:
 		var item_data: Dictionary = ItemDatabase.ITEMS.get(item_id, {})
@@ -439,10 +437,8 @@ func _execute_vend() -> void:
 	var messages: Array = [{"role": "user", "content": prompt_text}]
 	var req_id: String = "shop_title_%s" % npc.npc_id
 	_shop_title_pending = true
+	npc.last_thought = "Thinking of a shop name..."
 	LLMClient.send_chat(req_id, messages, {}, 5)
-	# Use fallback while waiting
-	vending_comp.start_vending(fallback, listings)
-	npc.last_thought = "Opening shop: %s" % fallback
 	_do_action("wait", "")
 
 func _on_shop_title_response(req_id: String, response: Dictionary) -> void:
@@ -453,15 +449,13 @@ func _on_shop_title_response(req_id: String, response: Dictionary) -> void:
 		return
 	_shop_title_pending = false
 	var content: String = response.get("message", {}).get("content", "").strip_edges()
-	if content.is_empty() or content.length() > 40:
-		return
 	# Clean up quotes
 	content = content.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+	if content.is_empty() or content.length() > 40:
+		# Fallback if LLM gave bad output
+		var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
+		content = "%s's Shop" % npc_name
 	_cached_shop_title = content
-	# Update the vend sign if currently vending
-	var vending_comp: Node = npc.get_node_or_null("VendingComponent")
-	if vending_comp and vending_comp.is_vending():
-		npc._visuals.show_vend_sign(_cached_shop_title)
 
 func _execute_buy_from_vendor() -> void:
 	# Fallback: buy healing potions if affordable, otherwise look for weapon upgrades
