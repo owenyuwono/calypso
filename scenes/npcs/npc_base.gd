@@ -585,13 +585,16 @@ func _respawn() -> void:
 	if memory_node:
 		memory_node.add_memory("Respawned in town after dying", memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_LOW)
 
-func _on_entity_damaged(target_id: String, _attacker_id: String, damage: int, _remaining_hp: int) -> void:
+func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
 		_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, current_state == STATE_COMBAT)
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
 		_combat_tracker["damage_taken"] += damage
 		_combat_tracker["hits_taken"] += 1
+		# Fight back if not already in combat
+		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
+			enter_combat(attacker_id)
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	if entity_id == npc_id:
