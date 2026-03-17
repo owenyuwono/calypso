@@ -27,7 +27,7 @@ func _ready() -> void:
 	anchor_top = 0.0
 	anchor_right = 1.0
 	anchor_bottom = 0.0
-	offset_left = -280
+	offset_left = -170
 	offset_top = 220
 	offset_right = -10
 	offset_bottom = 260
@@ -39,9 +39,9 @@ func _ready() -> void:
 
 	for def in BUTTON_DEFS:
 		var btn := Button.new()
-		btn.text = "%s [%s]" % [def["label"], def["hint"]]
-		btn.custom_minimum_size = Vector2(58, 32)
-		btn.add_theme_font_size_override("font_size", 11)
+		btn.text = ""
+		btn.tooltip_text = "%s (%s)" % [def["label"], def["hint"]]
+		btn.custom_minimum_size = Vector2(36, 36)
 
 		# Normal style
 		var normal_style := StyleBoxFlat.new()
@@ -80,7 +80,7 @@ func _ready() -> void:
 		btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.4, 0.4))
 
 		btn.icon = load("res://assets/textures/ui/buttons/btn_" + def["key"] + ".png")
-		btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		btn.texture_filter = TEXTURE_FILTER_NEAREST
 
 		var key: String = def["key"]

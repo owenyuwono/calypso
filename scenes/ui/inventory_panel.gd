@@ -409,32 +409,21 @@ func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	style.set_corner_radius_all(5)
 	cell.add_theme_stylebox_override("panel", style)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 1)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cell.add_child(vbox)
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cell.add_child(center)
 
-	# Slot icon (dimmed)
+	# Slot icon (dimmed, centered)
 	var icon_tex: Texture2D = _slot_icons.get(slot_name)
 	if icon_tex:
 		var icon := TextureRect.new()
 		icon.texture = icon_tex
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.custom_minimum_size = Vector2(32, 28)
+		icon.custom_minimum_size = Vector2(cell_size - 12, cell_size - 12)
 		icon.modulate = Color(1, 1, 1, 0.3)
-		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vbox.add_child(icon)
-
-	# Slot name label below icon
-	var label := Label.new()
-	label.text = SLOT_LABELS.get(slot_name, slot_name)
-	label.add_theme_font_size_override("font_size", 9)
-	label.add_theme_color_override("font_color", Color(0.45, 0.4, 0.32))
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(label)
+		center.add_child(icon)
 
 	return cell
 
