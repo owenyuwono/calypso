@@ -77,6 +77,7 @@ func _setup_fps_counter() -> void:
 	_fps_label.add_theme_constant_override("shadow_offset_x", 1)
 	_fps_label.add_theme_constant_override("shadow_offset_y", 1)
 	_fps_label.position = Vector2(10, 10)
+	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	$UILayer.add_child(_fps_label)
 
 func _process(_delta: float) -> void:

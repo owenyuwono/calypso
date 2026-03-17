@@ -145,7 +145,7 @@ func _process_hover() -> void:
 	var space := _player.get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.exclude = [_player.get_rid()]
-	query.collision_mask |= (1 << 5)
+	query.collision_mask = 0xFFFFFFFF
 	query.collide_with_areas = true
 	var result := space.intersect_ray(query)
 
