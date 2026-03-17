@@ -414,10 +414,33 @@ func _execute_vend() -> void:
 		_do_action("wait", "")
 		return
 	var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
-	var shop_title: String = "%s's Shop" % npc_name
+	var shop_title: String = _make_shop_title(npc_name, listings)
 	vending_comp.start_vending(shop_title, listings)
 	npc.last_thought = "Opening shop: %s" % shop_title
 	_do_action("wait", "")
+
+func _make_shop_title(npc_name: String, listings: Dictionary) -> String:
+	var has_weapons := false
+	var has_armor := false
+	var has_consumables := false
+	for item_id in listings:
+		var item_data: Dictionary = ItemDatabase.ITEMS.get(item_id, {})
+		match item_data.get("type", ""):
+			"weapon":
+				has_weapons = true
+			"armor":
+				has_armor = true
+			"consumable":
+				has_consumables = true
+	if has_weapons and not has_consumables:
+		return "%s's Arms" % npc_name
+	if has_consumables and not has_weapons:
+		return "%s's Remedies" % npc_name
+	if has_armor and not has_weapons and not has_consumables:
+		return "%s's Armory" % npc_name
+	if has_weapons and has_consumables:
+		return "%s's Supplies" % npc_name
+	return "%s's Wares" % npc_name
 
 func _execute_buy_from_vendor() -> void:
 	# Fallback: buy healing potions if affordable, otherwise look for weapon upgrades

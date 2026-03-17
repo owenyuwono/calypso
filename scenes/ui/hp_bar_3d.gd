@@ -34,7 +34,7 @@ func _build_bar() -> void:
 	_name_label.outline_size = 8
 	_name_label.modulate = Color(1.0, 1.0, 0.85)
 	_name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_name_label.pixel_size = 0.002
+	_name_label.pixel_size = 0.005
 	_name_label.no_depth_test = true
 	_name_label.position.y = BAR_HEIGHT / 2.0 + 0.08
 	_name_label.text = ""
