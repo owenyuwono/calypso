@@ -93,10 +93,10 @@ func apply_tint(color: Color) -> void:
 		_overlay_material.albedo_color = color
 
 func fade_out() -> Tween:
-	return ModelHelper.fade_out(_mesh_instances, get_parent())
+	return ModelHelper.fade_out(_mesh_instances, get_parent(), _overlay_material)
 
 func restore_materials() -> void:
-	ModelHelper.restore_materials(_mesh_instances)
+	ModelHelper.restore_materials(_mesh_instances, _overlay_material)
 
 func clear_overlay() -> void:
 	if _overlay_material:

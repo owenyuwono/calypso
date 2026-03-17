@@ -22,11 +22,10 @@ void fragment() {
 		base_color *= texture(albedo_texture, UV);
 	}
 	ALBEDO = base_color.rgb;
-	ALPHA = base_color.a * alpha_multiplier;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 
-	if (ALPHA < 0.01) {
+	if (base_color.a < 0.01) {
 		discard;
 	}
 }

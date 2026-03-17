@@ -81,5 +81,14 @@ func _setup_fps_counter() -> void:
 
 func _process(_delta: float) -> void:
 	if _fps_label:
-		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+		var fps: int = Engine.get_frames_per_second()
+		var tris: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
+		_fps_label.text = "FPS: %d | Tris: %s" % [fps, _format_number(tris)]
+
+static func _format_number(n: int) -> String:
+	if n >= 1000000:
+		return "%.1fM" % (n / 1000000.0)
+	if n >= 1000:
+		return "%.1fK" % (n / 1000.0)
+	return str(n)
 

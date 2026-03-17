@@ -14,6 +14,7 @@ static func _get_toon_shader() -> Shader:
 		_toon_shader = load("res://assets/shaders/toon.gdshader") as Shader
 	return _toon_shader
 
+
 static func load_model(path: String) -> PackedScene:
 	if _scene_cache.has(path):
 		return _scene_cache[path]
@@ -88,18 +89,16 @@ static func clear_overlay(overlay: StandardMaterial3D) -> void:
 	overlay.albedo_color = Color(0, 0, 0, 0)
 	overlay.emission_enabled = false
 
-static func fade_out(meshes: Array[MeshInstance3D], node: Node) -> Tween:
+static func fade_out(meshes: Array[MeshInstance3D], node: Node, overlay: StandardMaterial3D = null) -> Tween:
 	var tween := node.create_tween()
-	tween.set_parallel(true)
-	for mesh in meshes:
-		var surf_count: int = mesh.mesh.get_surface_count() if mesh.mesh else 0
-		for i in surf_count:
-			var override_mat := mesh.get_surface_override_material(i)
-			if override_mat and override_mat is ShaderMaterial and override_mat.has_meta("is_toon"):
-				# Toon material: tween alpha_multiplier directly
-				tween.tween_property(override_mat, "shader_parameter/alpha_multiplier", 0.3, 0.5)
-			else:
-				# StandardMaterial3D: duplicate + tween albedo alpha
+	if overlay:
+		# Darken via overlay — keeps entity opaque for screen-space effects
+		tween.tween_property(overlay, "albedo_color", Color(0, 0, 0, 0.7), 0.5)
+	else:
+		tween.set_parallel(true)
+		for mesh in meshes:
+			var surf_count: int = mesh.mesh.get_surface_count() if mesh.mesh else 0
+			for i in surf_count:
 				var orig_mat: Material = mesh.mesh.surface_get_material(i)
 				if orig_mat:
 					var dup := orig_mat.duplicate() as StandardMaterial3D
@@ -109,14 +108,15 @@ static func fade_out(meshes: Array[MeshInstance3D], node: Node) -> Tween:
 						tween.tween_property(dup, "albedo_color:a", 0.3, 0.5)
 	return tween
 
-static func restore_materials(meshes: Array[MeshInstance3D]) -> void:
+static func restore_materials(meshes: Array[MeshInstance3D], overlay: StandardMaterial3D = null) -> void:
+	if overlay:
+		overlay.albedo_color = Color(0, 0, 0, 0)
 	for mesh in meshes:
 		var surf_count: int = mesh.mesh.get_surface_count() if mesh.mesh else 0
 		for i in surf_count:
 			var override_mat := mesh.get_surface_override_material(i)
 			if override_mat and override_mat is ShaderMaterial and override_mat.has_meta("is_toon"):
-				# Toon material: reset alpha, keep the override
-				override_mat.set_shader_parameter("alpha_multiplier", 1.0)
+				pass # Toon materials stay as overrides
 			else:
 				mesh.set_surface_override_material(i, null)
 
