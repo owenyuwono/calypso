@@ -93,7 +93,79 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		},
 	]
 
+	var west_biomes := [
+		# Dense Forest — NW of west field, thick trees
+		{
+			"bounds": [-152, 12, 22, 20], "noise_threshold": -0.1,
+			"recipes": [
+				{"type": "tree", "count": 19, "min_spacing": 2.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 11, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
+				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+			]
+		},
+		# Open Meadow — center-south of west field, wildflowers and grass
+		{
+			"center": Vector2(-103, -15), "radius": 18.0, "noise_threshold": -0.2,
+			"recipes": [
+				{"type": "foliage", "count": 21, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+				{"type": "foliage", "count": 11, "min_spacing": 2.5, "files": flower_files, "colors": [flower_yellow, flower_orange, flower_pink, flower_white], "scale": 0.25},
+			]
+		},
+		# Rocky Clearing — SW of west field, rocks and stumps
+		{
+			"bounds": [-147, -32, 30, 22], "noise_threshold": -0.2,
+			"recipes": [
+				{"type": "rock_cluster", "count": 8, "min_spacing": 4.0, "files": [], "colors": []},
+				{"type": "stump", "count": 3, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},
+				{"type": "fallen", "count": 2, "min_spacing": 4.0, "files": ["SM_FirFallen1.FBX", "SM_FirFallen2.FBX"], "colors": [], "scale": 0.25},
+				{"type": "foliage", "count": 5, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+			]
+		},
+		# Transitional NE — sparse mix near north edge
+		{
+			"bounds": [-140, 22, 30, 18], "noise_threshold": 0.0,
+			"recipes": [
+				{"type": "tree", "count": 8, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
+			]
+		},
+		# Transitional SW — sparse mix near west gate entrance
+		{
+			"bounds": [-90, -20, 17, 20], "noise_threshold": 0.0,
+			"recipes": [
+				{"type": "tree", "count": 7, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
+				{"type": "stump", "count": 1, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},
+			]
+		},
+		# Path-edge scatter — sparse along main west path
+		{
+			"bounds": [-150, -5, 77, 10], "noise_threshold": 0.2,
+			"recipes": [
+				{"type": "tree", "count": 3, "min_spacing": 4.0, "files": sapling_files, "colors": [leaf_green], "scale": 0.25},
+				{"type": "foliage", "count": 7, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": fern_files, "colors": [fern_color], "scale": 0.25},
+			]
+		},
+		# City-Field border transition (x:-80..-70) — dense bushes and saplings
+		{
+			"bounds": [-80, -40, 10, 80], "noise_threshold": -0.3,
+			"recipes": [
+				{"type": "tree", "count": 8, "min_spacing": 2.5, "files": sapling_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "foliage", "count": 12, "min_spacing": 1.5, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
+				{"type": "foliage", "count": 8, "min_spacing": 1.5, "files": grass_files, "colors": [grass_color], "scale": 0.25},
+				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": fern_files, "colors": [fern_color], "scale": 0.25},
+			]
+		},
+	]
+
 	var total := 0
 	for biome in biomes:
+		total += BiomeScatter.scatter_biome(ctx, biome, rng)
+	for biome in west_biomes:
 		total += BiomeScatter.scatter_biome(ctx, biome, rng)
 	print("[Field] Biome scatter placed %d objects" % total)

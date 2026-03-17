@@ -13,6 +13,7 @@ const COLOR_BORDER := Color(0.4, 0.35, 0.2)
 # Zone rectangles in world XZ (Rect2 uses x,y = world x,z)
 const ZONE_TOWN := Rect2(-70, -50, 140, 100)
 const ZONE_FIELD := Rect2(70, -40, 80, 80)
+const ZONE_WEST_FIELD := Rect2(-150, -40, 80, 80)
 
 const COLOR_ZONE_TOWN := Color(0.2, 0.3, 0.2, 0.15)
 const COLOR_ZONE_FIELD := Color(0.3, 0.3, 0.15, 0.15)
@@ -55,6 +56,8 @@ func _update_dots() -> void:
 	# Determine zone
 	if _player_pos.x >= 70:
 		_zone_label_text = "Field"
+	elif _player_pos.x <= -70:
+		_zone_label_text = "West Field"
 	else:
 		_zone_label_text = "City"
 
@@ -121,6 +124,7 @@ func _draw() -> void:
 	# Zone hint rectangles
 	_draw_zone_rect(ZONE_TOWN, COLOR_ZONE_TOWN)
 	_draw_zone_rect(ZONE_FIELD, COLOR_ZONE_FIELD)
+	_draw_zone_rect(ZONE_WEST_FIELD, COLOR_ZONE_FIELD)
 
 	# Draw non-player dots first, player last
 	for dot in _dots:

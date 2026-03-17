@@ -11,8 +11,9 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	_place_wall_segment(ctx, Vector3(-70, 0, -50), Vector3(70, 0, -50), wall_height, wall_thickness, wall_mat)
 	# South wall: z=50
 	_place_wall_segment(ctx, Vector3(-70, 0, 50), Vector3(70, 0, 50), wall_height, wall_thickness, wall_mat)
-	# West wall: x=-70
-	_place_wall_segment(ctx, Vector3(-70, 0, -50), Vector3(-70, 0, 50), wall_height, wall_thickness, wall_mat)
+	# West wall with gate gap: x=-70, z:-50..-5 and z:5..50
+	_place_wall_segment(ctx, Vector3(-70, 0, -50), Vector3(-70, 0, -5), wall_height, wall_thickness, wall_mat)
+	_place_wall_segment(ctx, Vector3(-70, 0, 5), Vector3(-70, 0, 50), wall_height, wall_thickness, wall_mat)
 	# East wall with gate gap: x=70, z:-50..-5 and z:5..50
 	_place_wall_segment(ctx, Vector3(70, 0, -50), Vector3(70, 0, -5), wall_height, wall_thickness, wall_mat)
 	_place_wall_segment(ctx, Vector3(70, 0, 5), Vector3(70, 0, 50), wall_height, wall_thickness, wall_mat)
@@ -21,11 +22,11 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	for corner in [Vector3(-70, 0, -50), Vector3(70, 0, -50), Vector3(70, 0, 50), Vector3(-70, 0, 50)]:
 		_build_tower(ctx, corner, 5.5, 3.0, wall_mat)
 
-	# Gate towers — placed outside the gap so they don't block passage
+	# East gate towers — placed outside the gap so they don't block passage
 	_build_tower(ctx, Vector3(70, 0, -7), 6.0, 3.0, wall_mat)
 	_build_tower(ctx, Vector3(70, 0, 7), 6.0, 3.0, wall_mat)
 
-	# Gatehouse archway — visual only (no collision), placed above walking height
+	# East gatehouse archway — visual only (no collision), placed above walking height
 	var arch := MeshInstance3D.new()
 	var arch_mesh := BoxMesh.new()
 	arch_mesh.size = Vector3(wall_thickness, 1.5, 10.0)
@@ -34,11 +35,30 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	arch.set_surface_override_material(0, wall_mat)
 	ctx.world_root.add_child(arch)  # Add to scene root, not nav region
 
-	# Gate torches
+	# East gate torches
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(69, 0, -4))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(69, 0, 4))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(71, 0, -4))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(71, 0, 4))
+
+	# West gate towers — placed outside the gap so they don't block passage
+	_build_tower(ctx, Vector3(-70, 0, -7), 6.0, 3.0, wall_mat)
+	_build_tower(ctx, Vector3(-70, 0, 7), 6.0, 3.0, wall_mat)
+
+	# West gatehouse archway — visual only (no collision), placed above walking height
+	var west_arch := MeshInstance3D.new()
+	var west_arch_mesh := BoxMesh.new()
+	west_arch_mesh.size = Vector3(wall_thickness, 1.5, 10.0)
+	west_arch.mesh = west_arch_mesh
+	west_arch.position = Vector3(-70, wall_height + 0.75, 0)
+	west_arch.set_surface_override_material(0, wall_mat)
+	ctx.world_root.add_child(west_arch)  # Add to scene root, not nav region
+
+	# West gate torches
+	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-69, 0, -4))
+	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-69, 0, 4))
+	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-71, 0, -4))
+	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-71, 0, 4))
 
 static func _place_wall_segment(ctx: WorldBuilderContext, start: Vector3, end: Vector3, height: float, thickness: float, mat: Material) -> void:
 	var dir := end - start
@@ -322,10 +342,9 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(20, 0, 49))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(40, 0, 49))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(55, 0, 49))
-	# West wall interior (x≈-69)
+	# West wall interior (x≈-69), north and south of gate gap
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, -35))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, -20))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, -5))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 10))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 25))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 40))

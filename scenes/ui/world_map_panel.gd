@@ -8,7 +8,7 @@ const MAP_W := 500.0
 const MAP_H := 400.0
 
 # World extents for mapping
-const WORLD_MIN_X := -70.0
+const WORLD_MIN_X := -150.0
 const WORLD_MAX_X := 150.0
 const WORLD_MIN_Z := -50.0
 const WORLD_MAX_Z := 50.0
@@ -27,8 +27,10 @@ const DISTRICT_LABELS: Array = [
 	{"name": "Park", "pos": Vector2(45, -30)},
 	{"name": "Craft", "pos": Vector2(0, 30)},
 	{"name": "Garrison", "pos": Vector2(45, 30)},
-	{"name": "Gate", "pos": Vector2(65, 0)},
+	{"name": "East Gate", "pos": Vector2(65, 0)},
 	{"name": "Field", "pos": Vector2(110, 0)},
+	{"name": "West Gate", "pos": Vector2(-65, 0)},
+	{"name": "West Field", "pos": Vector2(-110, 0)},
 ]
 
 var _panel: PanelContainer
@@ -134,10 +136,15 @@ func _on_draw_area_draw(draw_area: Control) -> void:
 	var city_br := _world_to_map(Vector2(70, 50))
 	draw_area.draw_rect(Rect2(city_tl, city_br - city_tl), COLOR_CITY)
 
-	# Field zone rect (x:70..150, z:-40..40)
+	# East field zone rect (x:70..150, z:-40..40)
 	var field_tl := _world_to_map(Vector2(70, -40))
 	var field_br := _world_to_map(Vector2(150, 40))
 	draw_area.draw_rect(Rect2(field_tl, field_br - field_tl), COLOR_FIELD)
+
+	# West field zone rect (x:-150..-70, z:-40..40)
+	var wfield_tl := _world_to_map(Vector2(-150, -40))
+	var wfield_br := _world_to_map(Vector2(-70, 40))
+	draw_area.draw_rect(Rect2(wfield_tl, wfield_br - wfield_tl), COLOR_FIELD)
 
 	# City wall outline
 	var wall_top_left := _world_to_map(Vector2(-70, -50))
@@ -147,9 +154,13 @@ func _on_draw_area_draw(draw_area: Control) -> void:
 	var gate_top := _world_to_map(Vector2(70, -5))
 	var gate_bot := _world_to_map(Vector2(70, 5))
 
+	var wgate_top := _world_to_map(Vector2(-70, -5))
+	var wgate_bot := _world_to_map(Vector2(-70, 5))
+
 	draw_area.draw_line(wall_top_left, wall_top_right, COLOR_WALL, 2.0)  # North
 	draw_area.draw_line(wall_bot_left, wall_bot_right, COLOR_WALL, 2.0)  # South
-	draw_area.draw_line(wall_top_left, wall_bot_left, COLOR_WALL, 2.0)   # West
+	draw_area.draw_line(wall_top_left, wgate_top, COLOR_WALL, 2.0)       # West top
+	draw_area.draw_line(wgate_bot, wall_bot_left, COLOR_WALL, 2.0)       # West bottom
 	draw_area.draw_line(wall_top_right, gate_top, COLOR_WALL, 2.0)       # East top
 	draw_area.draw_line(gate_bot, wall_bot_right, COLOR_WALL, 2.0)       # East bottom
 

@@ -109,17 +109,22 @@ func _build_terrain(ctx: WorldBuilderContext) -> void:
 		Vector3(110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
 		terrain_noise, ctx.terrain_height_scale_field, _field_terrain_rules()
 	)
+	var field_west := TerrainGenerator.generate_terrain(
+		Vector3(-110, 0, 0), Vector2(80, 80), Vector2i(40, 40),
+		terrain_noise, ctx.terrain_height_scale_field, _west_field_terrain_rules()
+	)
 
 	# Per-zone texture sets: [grass, dirt/ch0, stone/ch1, tile_town/ch2, bricks/ch3]
 	var zone_textures := [
 		[tex_bricks_city, tex_dirt, tex_stone, tex_tile_city, tex_bricks_city],  # city
-		[tex_grass_city, tex_dirt, tex_stone, null, null],                       # field
+		[tex_grass_city, tex_dirt, tex_stone, null, null],                       # east field
+		[tex_grass_city, tex_dirt, tex_stone, null, null],                       # west field
 	]
 	var tex_keys := ["texture_grass", "texture_dirt", "texture_stone", "texture_cobble", "texture_packed_earth"]
 
 	# Apply shader material to each terrain mesh
-	for i in 2:
-		var terrain_data = [city, field][i]
+	for i in 3:
+		var terrain_data = [city, field, field_west][i]
 		var textures = zone_textures[i]
 		var mat := ShaderMaterial.new()
 		mat.shader = terrain_shader
@@ -235,6 +240,19 @@ func _field_terrain_rules() -> Array:
 		{"type": "circle", "center": Vector2(140, -25), "radius": 5.0, "channel": 1, "falloff": 1.5, "noise_perturb": 0.25},
 	]
 
+func _west_field_terrain_rules() -> Array:
+	return [
+		# Flatten west field terrain at gate boundary so heights match city terrain
+		{"type": "flatten", "center": Vector2(-75, 0), "radius": 8.0},
+		{"type": "line", "start": Vector2(-70, 0), "end": Vector2(-100, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-100, 0), "end": Vector2(-145, 0), "width": 1.5, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-100, 0), "end": Vector2(-110, 25), "width": 1.0, "channel": 0, "falloff": 0.5},
+		{"type": "line", "start": Vector2(-100, 0), "end": Vector2(-120, -20), "width": 1.0, "channel": 0, "falloff": 0.5},
+		# Rocky clearing — exposed stone
+		{"type": "circle", "center": Vector2(-130, -20), "radius": 8.0, "channel": 1, "falloff": 2.0, "noise_perturb": 0.25},
+		{"type": "circle", "center": Vector2(-140, -25), "radius": 5.0, "channel": 1, "falloff": 1.5, "noise_perturb": 0.25},
+	]
+
 func _setup_adventurer_npcs() -> void:
 	for npc_id in NpcLoadouts.LOADOUTS:
 		var loadout: Dictionary = NpcLoadouts.LOADOUTS[npc_id]
@@ -307,13 +325,24 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 		brain.set_use_llm_chat(true)
 
 func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
-	# Merchants stay in the city. Others split 50/50 between city and field.
-	var in_city: bool = (goal == "vend") or (randf() < 0.5)
-	if in_city:
+	# Merchants stay in the city. Others split evenly between city, east field, and west field.
+	if goal == "vend":
 		var x: float = randf_range(-60.0, 60.0)
 		var z: float = randf_range(-40.0, 40.0)
 		return Vector3(x, 1.0, z)
-	else:
+	var roll: float = randf()
+	if roll < 0.34:
+		# City
+		var x: float = randf_range(-60.0, 60.0)
+		var z: float = randf_range(-40.0, 40.0)
+		return Vector3(x, 1.0, z)
+	elif roll < 0.67:
+		# East field
 		var x: float = randf_range(80.0, 140.0)
+		var z: float = randf_range(-30.0, 30.0)
+		return Vector3(x, 1.0, z)
+	else:
+		# West field
+		var x: float = randf_range(-140.0, -80.0)
 		var z: float = randf_range(-30.0, 30.0)
 		return Vector3(x, 1.0, z)
