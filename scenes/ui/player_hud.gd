@@ -5,17 +5,9 @@ var _hp_bar: ProgressBar
 var _hp_label: Label
 var _sta_bar: ProgressBar
 var _sta_label: Label
-var _xp_bar: ProgressBar
-var _xp_label: Label
-var _xp_title: Label
-var _level_label: Label
-var _gold_label: Label
 var _player: Node
-var _recent_skill_id: String = ""  # Most recently gained proficiency skill
 var _time_label: Label
-var _day_label: Label
 
-const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
 
 func _ready() -> void:
@@ -23,13 +15,8 @@ func _ready() -> void:
 	# Event-driven updates instead of _process polling
 	GameEvents.entity_damaged.connect(func(id, _a, _b, _c): _refresh_if_player(id))
 	GameEvents.entity_healed.connect(func(id, _a, _b): _refresh_if_player(id))
-	GameEvents.proficiency_xp_gained.connect(_on_proficiency_xp_gained)
-	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_respawned.connect(func(id): _refresh_if_player(id))
-	GameEvents.item_purchased.connect(func(id, _a, _b): _refresh_if_player(id))
-	GameEvents.item_sold.connect(func(id, _a, _b): _refresh_if_player(id))
-	GameEvents.item_looted.connect(func(id, _a, _b): _refresh_if_player(id))
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 	GameEvents.game_hour_changed.connect(_on_game_hour_changed)
 	# Initial refresh
@@ -43,54 +30,8 @@ func _build_ui() -> void:
 	add_child(panel)
 
 	var vbox := VBoxContainer.new()
-	vbox.custom_minimum_size = Vector2(220, 0)
+	vbox.custom_minimum_size = Vector2(180, 0)
 	panel.add_child(vbox)
-
-	# Player name header
-	var name_label := Label.new()
-	name_label.text = "Player"
-	name_label.add_theme_font_size_override("font_size", 16)
-	name_label.add_theme_color_override("font_color", Color(1, 0.95, 0.85))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_label)
-
-	var sep := HSeparator.new()
-	sep.add_theme_constant_override("separation", 6)
-	vbox.add_child(sep)
-
-	# Level + Gold row
-	var top_row := HBoxContainer.new()
-	vbox.add_child(top_row)
-
-	_level_label = Label.new()
-	_level_label.text = "Total Lv: 13/130"
-	_level_label.add_theme_font_size_override("font_size", 18)
-	_level_label.add_theme_color_override("font_color", Color(1, 1, 0.8))
-	top_row.add_child(_level_label)
-
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(spacer)
-
-	var gold_row := HBoxContainer.new()
-	gold_row.add_theme_constant_override("separation", 3)
-	top_row.add_child(gold_row)
-
-	var gold_icon := TextureRect.new()
-	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
-	gold_icon.custom_minimum_size = Vector2(16, 16)
-	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gold_row.add_child(gold_icon)
-
-	_gold_label = Label.new()
-	_gold_label.text = "100"
-	_gold_label.add_theme_font_size_override("font_size", 16)
-	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	gold_row.add_child(_gold_label)
 
 	# HP bar
 	var hp_row := HBoxContainer.new()
@@ -154,63 +95,25 @@ func _build_ui() -> void:
 	_sta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	sta_row.add_child(_sta_label)
 
-	# XP bar
-	var xp_row := HBoxContainer.new()
-	vbox.add_child(xp_row)
-
-	_xp_title = Label.new()
-	_xp_title.text = "---"
-	_xp_title.add_theme_font_size_override("font_size", 11)
-	_xp_title.add_theme_color_override("font_color", Color(0.4, 0.6, 1.0))
-	_xp_title.custom_minimum_size = Vector2(32, 0)
-	xp_row.add_child(_xp_title)
-
-	_xp_bar = _create_styled_bar(
-		Color(0.2, 0.5, 0.9), Color(0.05, 0.1, 0.2),
-		Color(0.5, 0.7, 1.0), Color(0, 0, 0.1), 14
-	)
-	xp_row.add_child(_xp_bar)
-
-	_xp_label = Label.new()
-	_xp_label.text = "0/100"
-	_xp_label.add_theme_font_size_override("font_size", 12)
-	_xp_label.custom_minimum_size = Vector2(60, 0)
-	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	xp_row.add_child(_xp_label)
-
 	# Time panel — separate panel to the left of the minimap
 	_build_time_panel()
 
 func _build_time_panel() -> void:
-	# Minimap is 184px wide, 10px from right edge.
-	# Place this panel to the left of the minimap using absolute positioning.
+	# Single-line time display to the left of the minimap
 	var viewport_w := get_viewport().get_visible_rect().size.x
-	var minimap_left := viewport_w - 184.0 - 10.0  # minimap left edge
-	var panel_w := 86.0
-	var gap := 6.0
+	var minimap_left := viewport_w - 184.0 - 10.0
 
 	var time_panel := PanelContainer.new()
 	time_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
-	time_panel.position = Vector2(minimap_left - panel_w - gap, 10)
+	time_panel.position = Vector2(minimap_left - 160.0, 10)
 	add_child(time_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.custom_minimum_size = Vector2(72, 0)
-	time_panel.add_child(vbox)
-
 	_time_label = Label.new()
-	_time_label.text = "08:00"
-	_time_label.add_theme_font_size_override("font_size", 18)
-	_time_label.add_theme_color_override("font_color", Color(0.95, 0.9, 0.75))
+	_time_label.text = "08:00 - Day 1 (day)"
+	_time_label.add_theme_font_size_override("font_size", 12)
+	_time_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
 	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(_time_label)
-
-	_day_label = Label.new()
-	_day_label.text = "Day 1 - day"
-	_day_label.add_theme_font_size_override("font_size", 11)
-	_day_label.add_theme_color_override("font_color", Color(0.7, 0.65, 0.5))
-	_day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(_day_label)
+	time_panel.add_child(_time_label)
 
 func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color, bar_height: int) -> ProgressBar:
 	var bar := ProgressBar.new()
@@ -234,17 +137,6 @@ func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, 
 
 	return bar
 
-func _format_number(n: int) -> String:
-	var s := str(absi(n))
-	var result := ""
-	for i in range(s.length()):
-		if i > 0 and (s.length() - i) % 3 == 0:
-			result += ","
-		result += s[i]
-	if n < 0:
-		return "-" + result
-	return result
-
 func set_player(p: Node) -> void:
 	_player = p
 	_refresh_all()
@@ -252,42 +144,13 @@ func set_player(p: Node) -> void:
 func _refresh_all() -> void:
 	if not _player:
 		return
-	var stats = _player.get_node("StatsComponent")
-	var inv = _player.get_node("InventoryComponent")
-	if not stats or not inv:
+	var stats = _player.get_node_or_null("StatsComponent")
+	if not stats:
 		return
 
-	var hp: int = stats.hp
-	var max_hp: int = stats.max_hp
-	var gold: int = inv.gold
-
-	_hp_bar.max_value = max_hp
-	_hp_bar.value = hp
-	_hp_label.text = "%d/%d" % [hp, max_hp]
-
-	var progression = _player.get_node_or_null("ProgressionComponent")
-	var total_level: int = stats.level
-	if progression and progression.has_method("get_total_level"):
-		total_level = progression.get_total_level()
-	_level_label.text = "Total Lv: %d/130" % total_level
-
-	if _recent_skill_id != "" and progression and progression.has_method("get_proficiency_xp"):
-		var prof_data: Dictionary = progression.get_proficiency_xp(_recent_skill_id)
-		var skill_xp: int = prof_data.get("xp", 0)
-		var xp_to_next: int = prof_data.get("xp_to_next", 1)
-		var skill_data := ProficiencyDatabase.get_skill(_recent_skill_id)
-		var skill_name: String = skill_data.get("name", _recent_skill_id)
-		_xp_title.text = skill_name
-		_xp_bar.max_value = xp_to_next
-		_xp_bar.value = skill_xp
-		_xp_label.text = "%d/%d" % [skill_xp, xp_to_next]
-	else:
-		_xp_title.text = "---"
-		_xp_bar.max_value = 1
-		_xp_bar.value = 0
-		_xp_label.text = "---"
-
-	_gold_label.text = "%s" % _format_number(gold)
+	_hp_bar.max_value = stats.max_hp
+	_hp_bar.value = stats.hp
+	_hp_label.text = "%d/%d" % [stats.hp, stats.max_hp]
 
 	_refresh_stamina()
 	_refresh_time()
@@ -299,12 +162,6 @@ func _refresh_if_player(entity_id: String) -> void:
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == "player" or killer_id == "player":
 		_refresh_all()
-
-func _on_proficiency_xp_gained(entity_id: String, skill_id: String, _amount: int, _new_xp: int) -> void:
-	if entity_id != "player":
-		return
-	_recent_skill_id = skill_id
-	_refresh_all()
 
 func _on_stamina_changed(entity_id: String, _stamina: float, _max_stamina: float) -> void:
 	if entity_id == "player":
@@ -327,30 +184,5 @@ func _refresh_stamina() -> void:
 	_sta_label.text = "%d/%d" % [int(sta), int(max_sta)]
 
 func _refresh_time() -> void:
-	_time_label.text = TimeManager.get_time_display()
-	_day_label.text = "Day %d - %s" % [TimeManager.get_day(), TimeManager.get_phase()]
+	_time_label.text = "%s - Day %d (%s)" % [TimeManager.get_time_display(), TimeManager.get_day(), TimeManager.get_phase()]
 
-func _on_proficiency_level_up(entity_id: String, skill_id: String, new_level: int) -> void:
-	if entity_id != "player":
-		return
-	_refresh_all()
-	# Spawn a floating "<Skill> Lv <N>!" text with outline and scale animation
-	var skill_data := ProficiencyDatabase.get_skill(skill_id)
-	var skill_name: String = skill_data.get("name", skill_id)
-	var label := Label.new()
-	label.text = "%s Lv %d!" % [skill_name, new_level]
-	label.add_theme_font_size_override("font_size", 32)
-	label.add_theme_color_override("font_color", Color(1, 1, 0.3))
-	label.add_theme_constant_override("outline_size", 3)
-	label.add_theme_color_override("font_outline_color", Color(0.8, 0.4, 0.0))
-	label.position = Vector2(120, 80)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.pivot_offset = label.size * 0.5
-	label.scale = Vector2(0.3, 0.3)
-	add_child(label)
-
-	var tween := create_tween()
-	tween.tween_property(label, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(label, "position:y", 40, 0.8).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.3)
-	tween.tween_callback(label.queue_free)
