@@ -70,8 +70,8 @@ var _last_nav_pos: Vector3 = Vector3.ZERO
 const MOVE_SPEED: float = 7.2
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
-const PERSONAL_SPACE: float = 2.5
-const SEPARATION_FORCE: float = 2.0
+const PERSONAL_SPACE: float = 3.5
+const SEPARATION_FORCE: float = 3.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 5.0
@@ -277,7 +277,9 @@ func _get_separation_velocity() -> Vector3:
 		if not is_instance_valid(other):
 			continue
 		var data: Dictionary = WorldState.get_entity_data(entry.id)
-		if data.get("type", "") != "npc":
+		var entity_type: String = data.get("type", "")
+		# Separate from other alive NPCs and the player
+		if entity_type != "npc" and entity_type != "player":
 			continue
 		if not WorldState.is_alive(entry.id):
 			continue

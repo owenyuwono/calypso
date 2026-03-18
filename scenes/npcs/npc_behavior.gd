@@ -37,6 +37,7 @@ var _perception: Node
 
 var _idle_timer: float = 0.0  # Tracks how long NPC has been idle with no activity
 var _was_in_combat: bool = false  # Detects combat → non-combat transition
+var _wander_timer: float = 0.0  # Countdown until next idle wander step
 
 func _ready() -> void:
 	npc = get_parent()
@@ -83,6 +84,12 @@ func _process(delta: float) -> void:
 	if _idle_timer >= 60.0:
 		_idle_timer = 0.0
 		_emit_npc_event("idle_timeout", {})
+
+	# Idle wander: tick independently so goal evaluation doesn't suppress it
+	_wander_timer -= delta
+	if _wander_timer <= 0.0:
+		_wander_timer = randf_range(5.0, 15.0)
+		_do_idle_wander()
 
 	_behavior_timer += delta
 	if _behavior_timer >= TICK_INTERVAL:
@@ -627,6 +634,20 @@ func _execute_idle() -> void:
 
 	# Fallback → patrol town
 	npc.set_goal("patrol")
+
+func _do_idle_wander() -> void:
+	# Pick a random point 5-8 m away and walk there.
+	# Called when the wander timer expires while the NPC is idle and doing nothing.
+	var vc: Node = npc.get_node_or_null("VendingComponent")
+	if vc and vc.is_vending():
+		return
+	var offset: Vector2 = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
+	var radius: float = randf_range(5.0, 8.0)
+	var wander_pos: Vector3 = npc.global_position + Vector3(offset.x * radius, 0.0, offset.y * radius)
+	# Clamp to world bounds (city x:-70..70, field x:70..150, z:-45..45)
+	wander_pos.x = clampf(wander_pos.x, -65.0, 145.0)
+	wander_pos.z = clampf(wander_pos.z, -45.0, 45.0)
+	npc.navigate_to(wander_pos)
 
 # =============================================================================
 # Action Dispatchers
