@@ -15,9 +15,9 @@ const TICK_INTERVAL: float = 1.0
 
 # Alternate hunt spots to roam when no monsters nearby
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
-const PATROL_SPOTS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
-const TOWN_DESTINATIONS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens"]
-const REST_SPOTS: Array = ["TownWell", "TownInn", "MarketDistrict", "NobleQuarter", "ParkGardens"]
+const PATROL_SPOTS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
+const TOWN_DESTINATIONS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
+const REST_SPOTS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens"]
 
 const POTION_STOCK_TARGET: int = 3
 const POTION_RESTOCK_THRESHOLD: int = 2
