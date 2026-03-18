@@ -569,7 +569,7 @@ func _execute_rest() -> void:
 	if nearest_spot.is_empty():
 		_do_action("wait", "")
 		return
-	if nearest_dist > 4.0:
+	if nearest_dist > 15.0:
 		npc.last_thought = "Going to %s to rest" % nearest_spot
 		_do_action("move_to", nearest_spot)
 	else:
@@ -578,7 +578,7 @@ func _execute_rest() -> void:
 
 func _execute_patrol() -> void:
 	var spot: String = PATROL_SPOTS[_patrol_index]
-	if _is_near_location(spot, 3.0):
+	if _is_near_location(spot, 15.0):
 		_patrol_index = (_patrol_index + 1) % PATROL_SPOTS.size()
 		spot = PATROL_SPOTS[_patrol_index]
 	npc.last_thought = "Patrolling to %s" % spot
