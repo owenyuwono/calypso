@@ -70,8 +70,8 @@ var _last_nav_pos: Vector3 = Vector3.ZERO
 const MOVE_SPEED: float = 7.2
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
-const PERSONAL_SPACE: float = 2.5
-const SEPARATION_FORCE: float = 2.0
+const PERSONAL_SPACE: float = 3.5
+const SEPARATION_FORCE: float = 3.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 5.0
@@ -98,6 +98,7 @@ var _lod_timer: float = 0.0
 var _sep_cache := Vector3.ZERO
 var _sep_timer: float = 0.0
 const SEP_INTERVAL: float = 0.2
+var _safe_velocity: Vector3 = Vector3.ZERO
 
 # State overlay colors
 const STATE_COLORS: Dictionary = {
@@ -223,8 +224,14 @@ func _ready() -> void:
 	_npc_skills.setup(self, _combat, skills_comp, perception_comp, _visuals, _auto_attack)
 
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
+	nav_agent.velocity_computed.connect(_on_velocity_computed)
 	nav_agent.target_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
+	nav_agent.avoidance_enabled = true
+	nav_agent.radius = 0.5
+	nav_agent.neighbor_distance = 5.0
+	nav_agent.max_neighbors = 5
+	nav_agent.time_horizon_agents = 1.0
 	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
 	if name_label:
@@ -277,7 +284,8 @@ func _get_separation_velocity() -> Vector3:
 		if not is_instance_valid(other):
 			continue
 		var data: Dictionary = WorldState.get_entity_data(entry.id)
-		if data.get("type", "") != "npc":
+		var entity_type: String = data.get("type", "")
+		if entity_type != "npc" and entity_type != "player":
 			continue
 		if not WorldState.is_alive(entry.id):
 			continue
@@ -328,6 +336,10 @@ func _process(delta: float) -> void:
 		_lod_timer = LOD_CHECK_INTERVAL
 		_update_lod()
 
+func _on_velocity_computed(safe_velocity: Vector3) -> void:
+	_safe_velocity = safe_velocity
+	_pending_avoidance = false
+
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
 		_respawn_timer -= delta
@@ -354,15 +366,21 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 
 	var is_moving := false
+	var desired_xz := Vector3.ZERO
+
 	if current_state == STATE_MOVING:
 		is_moving = _process_movement(delta)
+		if is_moving:
+			desired_xz = Vector3(velocity.x, 0.0, velocity.z)
 	elif current_state == STATE_COMBAT:
 		is_moving = _process_combat(delta)
+		if is_moving:
+			desired_xz = Vector3(velocity.x, 0.0, velocity.z)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
-	# Apply separation force to avoid NPC overlap (not in combat, close range only)
+	# Apply separation force to avoid overlap (not in combat, close range only)
 	if current_state != STATE_COMBAT and _lod_level == 0:
 		_sep_timer -= delta
 		if _sep_timer <= 0.0:
@@ -370,6 +388,13 @@ func _physics_process(delta: float) -> void:
 			_sep_cache = _get_separation_velocity()
 		velocity.x += _sep_cache.x
 		velocity.z += _sep_cache.z
+
+	# Route through NavigationAgent3D avoidance when actively moving
+	if is_moving and desired_xz.length_squared() > 0.01:
+		nav_agent.velocity = desired_xz
+		# Apply the last computed safe velocity (updated asynchronously via signal)
+		velocity.x = _safe_velocity.x
+		velocity.z = _safe_velocity.z
 
 	move_and_slide()
 
