@@ -41,7 +41,7 @@ Components sync state back to `WorldState.entity_data` via `_sync()` (bridge lay
 Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods back to WorldState. Use `PerceptionComponent` for spatial queries. Access components directly via the entity node.
 
 ## Key Patterns
-- `UIHelper.create_panel_style()` for all panel backgrounds
+- `UIHelper.create_panel_style()` for all panel backgrounds — returns `StyleBoxTexture` with 9-patch dark textured background + gold border (`assets/textures/ui/panel/frame.png`)
 - `UIHelper.center_panel()` to center a PanelContainer on screen
 - `UIHelper.set_corner_radius()` / `set_border_width()` for StyleBoxFlat shortcuts
 - `EntityVisuals` composition node for all entity visual state (model, overlay, animations, HP bar)
@@ -52,9 +52,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
 - **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment
+- **NPC navigation**: NavigationAgent3D with avoidance enabled (radius 0.5, neighbor_distance 5.0, max_neighbors 5). Uses `velocity_computed` signal for avoidance-adjusted movement. Personal space 3.5m with separation force 3.5 (applied to other NPCs and player). Area-based arrival: patrol/rest destinations use 15m arrival radius (NPCs don't pile up at exact center points). Location navigation adds ±4m random offset. Patrol/retreat/rest destinations spread across districts (MarketDistrict, NobleQuarter, ParkGardens, CityGate) — TownSquare removed to prevent fountain convergence
 - **Event-driven LLM**: NPCs only consult LLM on significant events (goal_completed, combat_outcome, low_resources, idle_timeout, player/NPC chat), not on timers. Event cooldowns prevent spam. Scripted behavior handles ~95% of decisions
 - **NPC scaling**: `NpcGenerator` creates 50+ procedural NPCs (5 archetypes: warrior/mage/rogue/ranger/merchant, ~200 name pool, tiered loadouts). `game_world.gd` spawns them at world init
-- **Entity LOD**: Distance-based in `npc_base.gd` and `monster_base.gd`. Levels: 0 (<30m, full), 1 (30-60m, skip separation), 2 (>60m, skip animations). 0.5s staggered checks. Dead/thinking always process
+- **Entity LOD**: Distance-based in `npc_base.gd` and `monster_base.gd`. Levels: 0 (<30m, full + separation), 1 (30-60m, skip separation), 2 (>60m, skip animations). 0.5s staggered checks. Dead/thinking always process
 - **Dynamic HP bars**: Show on combat entry or damage, hide on combat exit + full HP. Driven by entity combat state via `update_hp_bar_combat()`
 - **Vicinity chat log**: Combat/speech messages filtered to 30m from player. System/level-up messages always show
 - **Gossip system**: `GossipSystem` propagates facts between NPCs during social chat. Memories have gossip metadata (source: witnessed/told_by/rumor, spread_count, original_source). 15% distortion per retelling, `spread_count >= 4` becomes rumor. Gossip affects relationships
@@ -82,9 +83,12 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **ChatLog** (`scenes/ui/chat_log.gd`): Colored message types (player_speech, npc_speech, combat, loot, gold, system). Combat hit batching (0.3s window). Auto-scroll, max 50 messages
 - **ChatInput** (`scenes/ui/chat_input.gd`): Enter to toggle, LineEdit with placeholder. Signal: `message_sent(text)`
 - **InventoryPanel** (`scenes/ui/inventory_panel.gd`): Grid-based inventory with 8-slot equipment section on top (armor 2×3 left, weapons right) + 5-column item grid below. Equipment slots use generated icons (`assets/textures/ui/equip_slots/`). Stat icons (HP/ATK/DEF/Gold) from `assets/textures/ui/stats/`. Hover shows tooltip (name + stat). Left-click opens item description panel (name, type, stats, requirements). Right-click shows context menu: Use/Equip + Discard (drops loot at player feet). Medieval RPG aesthetic (warm amber on dark parchment)
-- **SkillPanel** (`scenes/ui/skill_panel.gd`): Two-level UI — proficiency grid overview (13 buttons with XP fill) → drill-down detail with skills + hotbar assignment. Both S and P keys toggle
-- **Panel toggles**: Top-right button bar with icons (`assets/textures/ui/buttons/`): Status [C] | Inv [I] | Skills [S] | Map [W]
-- **Icon pipeline**: `scripts/tools/generate_icon.py` — generates icons via Gemini API (Nano Banana 2 Flash, model `gemini-3.1-flash-image-preview`), auto-removes backgrounds. Full icon spec in `docs/UI.md`. Stat icons at `assets/textures/ui/stats/`, equip slot icons at `assets/textures/ui/equip_slots/`, button icons at `assets/textures/ui/buttons/`
+- **SkillPanel** (`scenes/ui/skill_panel.gd`): Two-level UI — proficiency grid overview (13 buttons with icons + XP fill, left-aligned, content-sized) → drill-down detail with icon + skills + hotbar assignment. Both S and P keys toggle. Category dividers: `——— Weapon ———` style with full-width separators
+- **StatusPanel** (`scenes/ui/status_panel.gd`): Character stats panel (C key) — name, level, HP/ATK/DEF/Speed/Range stats with icons
+- **PlayerHUD** (`scenes/ui/player_hud.gd`): Top-left compact panel showing HP + stamina bars only. Time panel (single line) positioned left of minimap
+- **Panel toggles**: Top-right button bar aligned with minimap (`offset_left = -194`): Status [C] | Inv [I] | Skills [S] | Map [W]
+- **Icon pipeline**: `scripts/tools/generate_icon.py` — generates icons via Gemini API (gemini-3.1-flash-image-preview), auto-removes backgrounds. Green-screen keying for transparent icons. Full icon spec in `docs/UI.md`
+- **Proficiency icon pipeline**: Generate on green screen → crop 35px border → key out green + despill → composite on category base (`subjects/v1/red|green|yellow|grey.png`) → final icons at `assets/textures/ui/proficiencies/`. Bases generated programmatically (PIL: gradient + vignette + themed texture overlay + bevel, 512x512, rounded corners)
 
 ## Proficiency System (RuneScape-style)
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`
