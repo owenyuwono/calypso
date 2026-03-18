@@ -338,7 +338,6 @@ func _process(delta: float) -> void:
 
 func _on_velocity_computed(safe_velocity: Vector3) -> void:
 	_safe_velocity = safe_velocity
-	_pending_avoidance = false
 
 func _physics_process(delta: float) -> void:
 	if current_state == STATE_DEAD:
