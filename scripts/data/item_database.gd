@@ -40,6 +40,11 @@ const ITEMS: Dictionary = {
 	"steel_shield":   {"name": "Steel Shield",   "type": "armor", "slot_type": "off_hand", "value": 400,  "def_bonus": 9,  "required_skill": "constitution", "required_level": 5},
 	"mithril_shield": {"name": "Mithril Shield", "type": "armor", "slot_type": "off_hand", "value": 800,  "def_bonus": 12, "required_skill": "constitution", "required_level": 7},
 	"dragon_shield":  {"name": "Dragon Shield",  "type": "armor", "slot_type": "off_hand", "value": 1500, "def_bonus": 15, "required_skill": "constitution", "required_level": 9},
+	# Wood (woodcutting drops)
+	"log":          {"name": "Log",          "type": "material", "value": 5},
+	"oak_log":      {"name": "Oak Log",      "type": "material", "value": 15},
+	"ancient_log":  {"name": "Ancient Log",  "type": "material", "value": 40},
+	"branch":       {"name": "Branch",       "type": "material", "value": 2},
 	# Monster drops (sell only)
 	"jelly": {"name": "Jelly", "type": "material", "value": 8},
 	"fur": {"name": "Fur", "type": "material", "value": 15},

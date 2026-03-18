@@ -248,6 +248,11 @@ func _process_hover() -> void:
 					tooltip_lines.append("Mood: %s" % mood)
 			display_name = "\n".join(tooltip_lines)
 			_cursor_manager.set_cursor("talk")
+		elif entity_type == "tree":
+			var tier: String = data.get("tree_tier", "")
+			if not tier.is_empty():
+				display_name += " (%s)" % tier.capitalize()
+			_cursor_manager.set_cursor("default")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name

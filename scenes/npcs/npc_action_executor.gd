@@ -31,6 +31,8 @@ func execute(action: String, target: String, dialogue: String = "", action_data:
 			_do_wait()
 		"pickup_loot":
 			_do_pickup_loot(target)
+		"chop_tree":
+			_do_chop_tree(target)
 		_:
 			push_warning("NPCActionExecutor: Unknown action '%s'" % action)
 			npc.change_state("failed")
@@ -53,6 +55,26 @@ func _approach_entity(entity_node: Node3D, max_dist: float = 3.0) -> bool:
 	await signal_race([npc.nav_agent.navigation_finished, timeout.timeout])
 	dist = npc.global_position.distance_to(entity_node.global_position)
 	return dist <= max_dist
+
+## Navigate to a specific position near an entity. Used when the entity center is a NavMesh obstacle.
+func _approach_position(entity_node: Node3D, nav_pos: Vector3, max_dist: float = 3.0) -> bool:
+	var dist: float = npc.global_position.distance_to(entity_node.global_position)
+	if dist <= max_dist:
+		return true
+	npc._suppress_nav_complete = true
+	npc.navigate_to(nav_pos)
+	var timeout := get_tree().create_timer(8.0)
+	await signal_race([npc.nav_agent.navigation_finished, timeout.timeout])
+	dist = npc.global_position.distance_to(entity_node.global_position)
+	return dist <= max_dist
+
+## Get a position offset from target, approaching from the source direction.
+func _get_approach_pos(source: Vector3, target: Vector3, standoff: float) -> Vector3:
+	var offset: Vector3 = source - target
+	offset.y = 0.0
+	if offset.length_squared() < 0.01:
+		offset = Vector3(1.0, 0.0, 0.0)
+	return target + offset.normalized() * standoff
 
 ## Wait for whichever signal fires first. Returns the index of the signal that fired.
 func signal_race(signals: Array) -> int:
@@ -242,6 +264,110 @@ func _do_pickup_loot(loot_id: String) -> void:
 	loot_node.pickup(npc.npc_id)
 	GameEvents.npc_action_completed.emit(npc.npc_id, "pickup_loot", true)
 	npc.change_state("idle")
+
+const CHOP_INTERVAL: float = 2.0
+const CHOP_RANGE: float = 3.0
+
+func _do_chop_tree(tree_id: String) -> void:
+	var tree_node: Node3D = WorldState.get_entity(tree_id)
+	if not tree_node or not is_instance_valid(tree_node):
+		_fail("chop_tree", "Tree '%s' not found" % tree_id)
+		return
+
+	# Check tree is still harvestable
+	var tree_data: Dictionary = WorldState.get_entity_data(tree_id)
+	if not tree_data.get("harvestable", false):
+		_fail("chop_tree", "Tree '%s' is depleted" % tree_id)
+		return
+
+	# Navigate to tree (offset from center to avoid NavMesh obstacle)
+	var approach_pos: Vector3 = _get_approach_pos(npc.global_position, tree_node.global_position, 2.5)
+	var close_enough: bool = await _approach_position(tree_node, approach_pos, CHOP_RANGE)
+	if not close_enough:
+		_fail("chop_tree", "Tree '%s' unreachable" % tree_id)
+		return
+
+	# Verify still valid after approach
+	if not is_instance_valid(tree_node):
+		_fail("chop_tree", "Tree '%s' freed during approach" % tree_id)
+		return
+
+	# Check if NPC meets level requirements for this tree
+	var harvestable: Node = tree_node.get_node_or_null("HarvestableComponent")
+	if harvestable and not harvestable.can_harvest(npc.npc_id):
+		npc.set_goal("idle")
+		GameEvents.npc_action_completed.emit(npc.npc_id, "chop_tree", false)
+		return
+
+	npc.change_state("interacting")
+
+	# Chop loop
+	while true:
+		# Stop if interrupted by combat, death, or external goal change
+		if npc.current_state == "combat" or npc.current_state == "dead" or npc.current_goal != "chop_wood":
+			break
+
+		# Stop if tree no longer harvestable (may have been depleted by another NPC)
+		if not harvestable or harvestable.is_depleted():
+			# Tree depleted by another NPC — mark done and let behavior re-evaluate
+			npc.set_goal("idle")
+			break
+
+		# Re-check close enough (tree doesn't move, but just in case)
+		if not is_instance_valid(tree_node):
+			break
+		var dist: float = npc.global_position.distance_to(tree_node.global_position)
+		if dist > CHOP_RANGE:
+			# Drifted away — re-approach with offset to avoid NavMesh obstacle
+			npc._suppress_nav_complete = true
+			var reapproach_pos: Vector3 = _get_approach_pos(npc.global_position, tree_node.global_position, 2.5)
+			npc.navigate_to(reapproach_pos)
+			var timeout_timer := get_tree().create_timer(5.0)
+			await signal_race([npc.nav_agent.navigation_finished, timeout_timer.timeout])
+			npc.change_state("interacting")
+
+		# Play chop animation
+		var anim_name: String = "1H_Melee_Attack_Chop"
+		npc._visuals.play_anim(anim_name)
+
+		# Wait for hit delay before applying chop
+		var hit_delay: float = npc._visuals.get_hit_delay(anim_name)
+		if hit_delay > 0.0:
+			await get_tree().create_timer(hit_delay).timeout
+
+		# Check again after delay — combat, death, or goal change may have happened
+		if npc.current_state == "combat" or npc.current_state == "dead" or npc.current_goal != "chop_wood":
+			break
+		if not is_instance_valid(tree_node) or not harvestable or harvestable.is_depleted():
+			npc.set_goal("idle")
+			break
+
+		# Shake tree for feedback
+		tree_node.last_chopper_pos = npc.global_position
+		if tree_node.has_method("shake"):
+			tree_node.shake()
+
+		# Apply chop and get result
+		var result: Dictionary = harvestable.process_chop(npc.npc_id)
+
+		# Grant woodcutting XP
+		npc._progression.grant_proficiency_xp("woodcutting", result.get("xp", 0))
+
+		# Tree depleted — spawn loot and mark goal complete
+		if result.get("depleted", false):
+			if is_instance_valid(tree_node):
+				tree_node.spawn_loot(result.get("item_id", ""), result.get("bonus_item", ""))
+			npc.set_goal("idle")
+			break
+
+		# Wait remainder of chop interval
+		var wait_time: float = CHOP_INTERVAL - hit_delay
+		if wait_time > 0.0:
+			await get_tree().create_timer(wait_time).timeout
+
+	GameEvents.npc_action_completed.emit(npc.npc_id, "chop_tree", true)
+	if npc.current_state == "interacting":
+		npc.change_state("idle")
 
 func _fail(action: String, reason: String) -> void:
 	push_warning("NPC %s action '%s' failed: %s" % [npc.npc_id, action, reason])
