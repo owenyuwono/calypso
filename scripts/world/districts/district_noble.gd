@@ -10,6 +10,12 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_manor(nav_region, noise, hs)
 	_build_statue(nav_region, noise, hs)
 	_build_cluster_c(nav_region, noise, hs)
+	_build_magistrate_court(nav_region, noise, hs)
+	_build_noble_house_1(nav_region, noise, hs)
+	_build_noble_house_2(nav_region, noise, hs)
+	_build_shrine(nav_region, noise, hs)
+	_build_clerk_office(nav_region, noise, hs)
+	_build_archive_tower(nav_region, noise, hs)
 
 
 static func _build_temple(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -106,3 +112,129 @@ static func _build_cluster_c(nav_region: Node3D, noise: FastNoiseLite, hs: float
 	BuildingHelper.create_building(nav_region,
 		Vector3(18, BuildingHelper.snap_y(noise, 18, -40, hs), -40),
 		Vector3(3.5, 3, 3), Color(0.6, 0.58, 0.55), "peaked", Color(0.35, 0.28, 0.22), 0.5, false, true)
+
+
+static func _build_magistrate_court(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var court_pos := Vector3(-15, BuildingHelper.snap_y(noise, -15, -25, hs), -25)
+	BuildingHelper.create_building(nav_region, court_pos,
+		Vector3(5, 4, 5), Color(0.55, 0.52, 0.48), "flat", Color(0.32, 0.28, 0.24),
+		0.5, false, true, 0.0, "court")
+
+	# Decorated pillars flanking the entrance
+	var pillar_mat := StandardMaterial3D.new()
+	pillar_mat.albedo_color = Color(0.58, 0.55, 0.50)
+	for side: int in [-1, 1]:
+		var pillar := MeshInstance3D.new()
+		var pillar_mesh := CylinderMesh.new()
+		pillar_mesh.top_radius = 0.18
+		pillar_mesh.bottom_radius = 0.22
+		pillar_mesh.height = 3.5
+		pillar.mesh = pillar_mesh
+		pillar.position = Vector3(court_pos.x + side * 1.5, court_pos.y + 1.75, court_pos.z + 2.8)
+		pillar.set_surface_override_material(0, pillar_mat)
+		nav_region.add_child(pillar)
+
+		# Pillar capital (decorative top cap)
+		var cap := MeshInstance3D.new()
+		var cap_mesh := BoxMesh.new()
+		cap_mesh.size = Vector3(0.45, 0.2, 0.45)
+		cap.mesh = cap_mesh
+		cap.position = Vector3(court_pos.x + side * 1.5, court_pos.y + 3.6, court_pos.z + 2.8)
+		cap.set_surface_override_material(0, pillar_mat)
+		nav_region.add_child(cap)
+
+
+static func _build_noble_house_1(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var pos := Vector3(-15, BuildingHelper.snap_y(noise, -15, -35, hs), -35)
+	BuildingHelper.create_building(nav_region, pos,
+		Vector3(5, 3.5, 4.5), Color(0.62, 0.58, 0.52), "peaked", Color(0.38, 0.30, 0.25),
+		0.5, false, true, 0.0, "noble_house")
+
+	# Torches flanking the door
+	var torch_mat := StandardMaterial3D.new()
+	torch_mat.albedo_color = Color(0.35, 0.28, 0.20)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.55, 0.1)
+	for side: int in [-1, 1]:
+		var torch := MeshInstance3D.new()
+		var torch_mesh := CylinderMesh.new()
+		torch_mesh.top_radius = 0.06
+		torch_mesh.bottom_radius = 0.08
+		torch_mesh.height = 0.7
+		torch.mesh = torch_mesh
+		torch.position = Vector3(pos.x + side * 0.7, pos.y + 1.0, pos.z + 2.35)
+		torch.set_surface_override_material(0, torch_mat)
+		nav_region.add_child(torch)
+
+		var flame := MeshInstance3D.new()
+		var flame_mesh := SphereMesh.new()
+		flame_mesh.radius = 0.1
+		flame_mesh.height = 0.2
+		flame.mesh = flame_mesh
+		flame.position = Vector3(pos.x + side * 0.7, pos.y + 1.42, pos.z + 2.35)
+		flame.set_surface_override_material(0, flame_mat)
+		nav_region.add_child(flame)
+
+
+static func _build_noble_house_2(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var pos := Vector3(20, BuildingHelper.snap_y(noise, 20, -20, hs), -20)
+	BuildingHelper.create_building(nav_region, pos,
+		Vector3(4.5, 3.5, 4), Color(0.60, 0.56, 0.50), "peaked", Color(0.36, 0.28, 0.22),
+		0.5, false, true, 0.0, "noble_house")
+
+	# Torches flanking the door
+	var torch_mat := StandardMaterial3D.new()
+	torch_mat.albedo_color = Color(0.35, 0.28, 0.20)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.55, 0.1)
+	for side: int in [-1, 1]:
+		var torch := MeshInstance3D.new()
+		var torch_mesh := CylinderMesh.new()
+		torch_mesh.top_radius = 0.06
+		torch_mesh.bottom_radius = 0.08
+		torch_mesh.height = 0.7
+		torch.mesh = torch_mesh
+		torch.position = Vector3(pos.x + side * 0.65, pos.y + 1.0, pos.z + 2.1)
+		torch.set_surface_override_material(0, torch_mat)
+		nav_region.add_child(torch)
+
+		var flame := MeshInstance3D.new()
+		var flame_mesh := SphereMesh.new()
+		flame_mesh.radius = 0.1
+		flame_mesh.height = 0.2
+		flame.mesh = flame_mesh
+		flame.position = Vector3(pos.x + side * 0.65, pos.y + 1.42, pos.z + 2.1)
+		flame.set_surface_override_material(0, flame_mat)
+		nav_region.add_child(flame)
+
+
+static func _build_shrine(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(-5, BuildingHelper.snap_y(noise, -5, -43, hs), -43),
+		Vector3(3, 3, 3), Color(0.65, 0.62, 0.58), "peaked", Color(0.40, 0.35, 0.30),
+		0.5, false, true, 0.0, "shrine")
+
+
+static func _build_clerk_office(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(10, BuildingHelper.snap_y(noise, 10, -18, hs), -18),
+		Vector3(3.5, 3, 3), Color(0.56, 0.52, 0.46), "peaked", Color(0.34, 0.28, 0.22),
+		0.5, false, true, 0.0, "office")
+
+
+static func _build_archive_tower(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var tower_pos := Vector3(22, BuildingHelper.snap_y(noise, 22, -45, hs), -45)
+	BuildingHelper.create_building(nav_region, tower_pos,
+		Vector3(3, 5, 3), Color(0.48, 0.45, 0.42), "flat", Color(0.30, 0.28, 0.25),
+		0.5, false, true, 0.0, "tower")
+
+	# Banner hanging from the front face
+	var banner := MeshInstance3D.new()
+	var banner_mesh := BoxMesh.new()
+	banner_mesh.size = Vector3(0.8, 1.5, 0.05)
+	banner.mesh = banner_mesh
+	banner.position = Vector3(tower_pos.x, tower_pos.y + 3.5, tower_pos.z + 1.6)
+	var banner_mat := StandardMaterial3D.new()
+	banner_mat.albedo_color = Color(0.55, 0.15, 0.15)
+	banner.set_surface_override_material(0, banner_mat)
+	nav_region.add_child(banner)

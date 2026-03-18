@@ -11,6 +11,8 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_forge_props(nav_region, noise, hs)
 	_build_stables(nav_region, noise, hs)
 	_build_cluster_d(nav_region, noise, hs)
+	_build_new_buildings(nav_region, noise, hs)
+	_build_new_props(nav_region, noise, hs)
 
 
 static func _build_forge(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -133,3 +135,74 @@ static func _build_cluster_d(nav_region: Node3D, noise: FastNoiseLite, hs: float
 	BuildingHelper.create_building(nav_region,
 		Vector3(20, BuildingHelper.snap_y(noise, 20, 38, hs), 38),
 		Vector3(3, 2.5, 3), Color(0.45, 0.38, 0.3), "flat", Color(0.35, 0.3, 0.25), 0.3, false, false)
+
+
+static func _build_new_buildings(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Lumberyard
+	BuildingHelper.create_building(nav_region,
+		Vector3(15, BuildingHelper.snap_y(noise, 15, 20, hs), 20),
+		Vector3(5, 3, 4), Color(0.50, 0.42, 0.30), "flat", Color(0.38, 0.32, 0.24), 0.3, false, true, 0.0, "workshop")
+
+	# Kiln House
+	BuildingHelper.create_building(nav_region,
+		Vector3(8, BuildingHelper.snap_y(noise, 8, 38, hs), 38),
+		Vector3(3.5, 3, 3.5), Color(0.52, 0.40, 0.32), "flat", Color(0.40, 0.30, 0.22), 0.3, false, true, 0.0, "kiln")
+
+	# Carpenter Shop
+	BuildingHelper.create_building(nav_region,
+		Vector3(5, BuildingHelper.snap_y(noise, 5, 18, hs), 18),
+		Vector3(4, 3, 3.5), Color(0.48, 0.42, 0.32), "peaked", Color(0.36, 0.28, 0.20), 0.3, false, true, 0.0, "workshop")
+
+	# Rope Maker
+	BuildingHelper.create_building(nav_region,
+		Vector3(-10, BuildingHelper.snap_y(noise, -10, 42, hs), 42),
+		Vector3(3, 2.5, 3), Color(0.46, 0.40, 0.30), "flat", Color(0.34, 0.28, 0.22), 0.3, false, true, 0.0, "workshop")
+
+	# Dye Works
+	BuildingHelper.create_building(nav_region,
+		Vector3(-15, BuildingHelper.snap_y(noise, -15, 40, hs), 40),
+		Vector3(4, 3, 3.5), Color(0.44, 0.42, 0.50), "flat", Color(0.32, 0.30, 0.38), 0.3, false, true, 0.0, "workshop")
+
+	# Tool Shed
+	BuildingHelper.create_building(nav_region,
+		Vector3(20, BuildingHelper.snap_y(noise, 20, 30, hs), 30),
+		Vector3(3, 2.5, 3), Color(0.45, 0.38, 0.30), "flat", Color(0.35, 0.30, 0.25), 0.3, false, true, 0.0, "shed")
+
+
+static func _build_new_props(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Lumber log piles near Lumberyard
+	var lumber_mat := StandardMaterial3D.new()
+	lumber_mat.albedo_color = Color(0.5, 0.35, 0.2)
+	for i: int in 3:
+		var log := MeshInstance3D.new()
+		var log_mesh := BoxMesh.new()
+		log_mesh.size = Vector3(2.0, 0.3, 0.3)
+		log.mesh = log_mesh
+		log.position = Vector3(17, BuildingHelper.snap_y(noise, 17, 22, hs) + 0.15 + i * 0.3, 22 + i * 0.15)
+		log.rotation.y = 0.1 * i
+		log.set_surface_override_material(0, lumber_mat)
+		nav_region.add_child(log)
+
+	# Barrel near Kiln House
+	var barrel_mat := StandardMaterial3D.new()
+	barrel_mat.albedo_color = Color(0.35, 0.25, 0.15)
+	var barrel := MeshInstance3D.new()
+	var barrel_mesh := CylinderMesh.new()
+	barrel_mesh.top_radius = 0.25
+	barrel_mesh.bottom_radius = 0.25
+	barrel_mesh.height = 0.6
+	barrel.mesh = barrel_mesh
+	barrel.position = Vector3(10, BuildingHelper.snap_y(noise, 10, 37, hs) + 0.3, 37)
+	barrel.set_surface_override_material(0, barrel_mat)
+	nav_region.add_child(barrel)
+
+	# Crate near Carpenter Shop
+	var crate_mat := StandardMaterial3D.new()
+	crate_mat.albedo_color = Color(0.45, 0.32, 0.18)
+	var crate := MeshInstance3D.new()
+	var crate_mesh := BoxMesh.new()
+	crate_mesh.size = Vector3(0.6, 0.6, 0.6)
+	crate.mesh = crate_mesh
+	crate.position = Vector3(7, BuildingHelper.snap_y(noise, 7, 17, hs) + 0.3, 17)
+	crate.set_surface_override_material(0, crate_mat)
+	nav_region.add_child(crate)

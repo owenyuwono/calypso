@@ -9,6 +9,7 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_cluster_b(nav_region, noise, hs)
 	_build_inn(nav_region, noise, hs)
 	_build_well(nav_region, noise, hs)
+	_build_new_houses(nav_region, noise, hs)
 
 
 static func _build_houses(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -75,6 +76,40 @@ static func _build_inn(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> v
 	inn_roof_mat.albedo_color = Color(0.4, 0.18, 0.1)
 	inn_roof.set_surface_override_material(0, inn_roof_mat)
 	nav_region.add_child(inn_roof)
+
+
+static func _build_new_houses(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Houses 8-12: southern residential expansion
+	var house_configs: Array = [
+		{"pos": Vector3(-28, 0, -30), "size": Vector3(4, 3, 4),     "color": Color(0.58, 0.50, 0.40), "roof": Color(0.40, 0.24, 0.16), "type": "house"},
+		{"pos": Vector3(-58, 0, -42), "size": Vector3(4, 3, 3.5),   "color": Color(0.55, 0.48, 0.38), "roof": Color(0.38, 0.22, 0.14), "type": "house"},
+		{"pos": Vector3(-32, 0, -35), "size": Vector3(3.5, 3, 3.5), "color": Color(0.60, 0.52, 0.42), "roof": Color(0.42, 0.25, 0.15), "type": "house"},
+		{"pos": Vector3(-40, 0, -28), "size": Vector3(4, 3, 4),     "color": Color(0.56, 0.50, 0.38), "roof": Color(0.36, 0.20, 0.12), "type": "house"},
+		{"pos": Vector3(-55, 0, -30), "size": Vector3(4, 3, 3.5),   "color": Color(0.62, 0.55, 0.45), "roof": Color(0.44, 0.26, 0.16), "type": "house"},
+	]
+	for cfg: Dictionary in house_configs:
+		var p: Vector3 = cfg["pos"]
+		BuildingHelper.create_building(nav_region,
+			Vector3(p.x, BuildingHelper.snap_y(noise, p.x, p.z, hs), p.z),
+			cfg["size"], cfg["color"], "peaked", cfg["roof"], 0.5, false, true, 0.0, cfg["type"])
+
+	# Midwife Hut
+	var mh: Vector3 = Vector3(-28, 0, -45)
+	BuildingHelper.create_building(nav_region,
+		Vector3(mh.x, BuildingHelper.snap_y(noise, mh.x, mh.z, hs), mh.z),
+		Vector3(3, 2.5, 3), Color(0.52, 0.55, 0.48), "peaked", Color(0.25, 0.35, 0.20), 0.5, false, true, 0.0, "artisan_hut")
+
+	# Woodcarver
+	var wc: Vector3 = Vector3(-65, 0, -42)
+	BuildingHelper.create_building(nav_region,
+		Vector3(wc.x, BuildingHelper.snap_y(noise, wc.x, wc.z, hs), wc.z),
+		Vector3(3.5, 3, 3), Color(0.50, 0.42, 0.32), "peaked", Color(0.38, 0.28, 0.18), 0.5, false, true, 0.0, "artisan_hut")
+
+	# Wash House
+	var wh: Vector3 = Vector3(-48, 0, -35)
+	BuildingHelper.create_building(nav_region,
+		Vector3(wh.x, BuildingHelper.snap_y(noise, wh.x, wh.z, hs), wh.z),
+		Vector3(4, 2.5, 3.5), Color(0.55, 0.52, 0.48), "flat", Color(0.38, 0.35, 0.30), 0.5, false, true, 0.0, "utility")
 
 
 static func _build_well(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:

@@ -125,9 +125,12 @@ Static utility classes for procedural world construction (one-shot builders, no 
 - `WorldBuilderContext` — shared mutable context (terrain_noise, caches, exclusion zones, nav_region)
 - `AssetSpawner` — model spawning, material caching, tree/foliage model helpers
 - `BiomeScatter` — exclusion zones, scatter algorithm, rock clusters
-- `TownBuilder` — city walls, city biome definitions + props
-- `CityBuilder` — district building placement
+- `TownBuilder` — city walls (4 gates: north/south/east/west), city biome definitions + props
+- `BuildingHelper` — `create_building()` with optional `building_type: String` metadata for future mesh replacement. Also `create_bench()`, `create_fountain()`
+- `CityBuilder` — district building placement, delegates to 8 district scripts
 - `FieldBuilder` — field biome definitions
+- **District scripts** (`scripts/world/districts/`): `district_plaza`, `district_market`, `district_residential`, `district_noble`, `district_park`, `district_craft`, `district_garrison`, `district_gate` (east + north + south gates)
+- **City walls**: 4 gates at x=±70 (east/west, gap z:-5..5) and z=±50 (north/south, gap x:-5..5). Gate towers height 6.0, width 3.0. Archways above each gate. ~97 buildings total across 8 districts
 
 ## Project Structure Notes
 - **Stale directories**: `content/`, `features/`, `inference/` are old branch copies — NOT the active project. The active project root is `/home/owenyuwono/Work/Ventures/arcadia/`

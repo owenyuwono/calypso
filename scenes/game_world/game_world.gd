@@ -225,6 +225,88 @@ func _city_terrain_rules() -> Array:
 		{"type": "flatten", "center": Vector2(49, -4), "radius": 3.0},
 		{"type": "flatten", "center": Vector2(55, -4), "radius": 3.0},
 		{"type": "flatten", "center": Vector2(40, -38), "radius": 3.0},
+
+		# Gate approach roads — cobblestone (channel 2)
+		{"type": "line", "start": Vector2(0, -45), "end": Vector2(0, -55), "width": 3.0, "channel": 2},
+		{"type": "line", "start": Vector2(0, 45), "end": Vector2(0, 55), "width": 3.0, "channel": 2},
+
+		# Flatten building sites — Central Plaza
+		{"type": "flatten_rect", "center": Vector2(-12, -7), "size": Vector2(7, 5)},    # Town Hall
+		{"type": "flatten_rect", "center": Vector2(15, 7), "size": Vector2(4, 3.5)},    # Chapel
+		{"type": "flatten_rect", "center": Vector2(-12, 7), "size": Vector2(3.5, 3)},   # Money Changer
+		{"type": "flatten_rect", "center": Vector2(15, -5), "size": Vector2(2.5, 2)},   # Notice Board
+
+		# Flatten building sites — Market
+		{"type": "flatten_rect", "center": Vector2(-50, 20), "size": Vector2(4, 3.5)},  # Spice Shop
+		{"type": "flatten_rect", "center": Vector2(-38, 25), "size": Vector2(4, 4)},    # Cloth Merchant
+		{"type": "flatten_rect", "center": Vector2(-62, 25), "size": Vector2(4, 3.5)},  # Apothecary
+		{"type": "flatten_rect", "center": Vector2(-28, 20), "size": Vector2(3.5, 3)},  # Pawn Shop
+		{"type": "flatten_rect", "center": Vector2(-50, 40), "size": Vector2(6, 5)},    # Tavern
+		{"type": "flatten_rect", "center": Vector2(-35, 45), "size": Vector2(3.5, 3)},  # Fish Monger
+		{"type": "flatten_rect", "center": Vector2(-28, 45), "size": Vector2(3.5, 3)},  # Butcher
+		{"type": "flatten_rect", "center": Vector2(-65, 35), "size": Vector2(4, 4)},    # Grain Store
+		{"type": "flatten_rect", "center": Vector2(-24, 15), "size": Vector2(3.5, 3)},  # Cartographer
+		{"type": "flatten_rect", "center": Vector2(-65, 45), "size": Vector2(3.5, 3)},  # Chandler
+
+		# Flatten building sites — Residential
+		{"type": "flatten_rect", "center": Vector2(-28, -30), "size": Vector2(4, 4)},     # House 8
+		{"type": "flatten_rect", "center": Vector2(-58, -42), "size": Vector2(4, 3.5)},   # House 9
+		{"type": "flatten_rect", "center": Vector2(-32, -35), "size": Vector2(3.5, 3.5)}, # House 10
+		{"type": "flatten_rect", "center": Vector2(-40, -28), "size": Vector2(4, 4)},     # House 11
+		{"type": "flatten_rect", "center": Vector2(-55, -30), "size": Vector2(4, 3.5)},   # House 12
+		{"type": "flatten_rect", "center": Vector2(-28, -45), "size": Vector2(3, 3)},     # Midwife Hut
+		{"type": "flatten_rect", "center": Vector2(-65, -42), "size": Vector2(3.5, 3)},   # Woodcarver
+		{"type": "flatten_rect", "center": Vector2(-48, -35), "size": Vector2(4, 3.5)},   # Wash House
+
+		# Flatten building sites — Noble/Temple
+		{"type": "flatten_rect", "center": Vector2(-15, -25), "size": Vector2(5, 5)},    # Magistrate Court
+		{"type": "flatten_rect", "center": Vector2(-15, -35), "size": Vector2(5, 4.5)},  # Noble House 1
+		{"type": "flatten_rect", "center": Vector2(20, -20), "size": Vector2(4.5, 4)},   # Noble House 2
+		{"type": "flatten_rect", "center": Vector2(-5, -43), "size": Vector2(3, 3)},     # Shrine
+		{"type": "flatten_rect", "center": Vector2(10, -18), "size": Vector2(3.5, 3)},   # Clerk Office
+		{"type": "flatten_rect", "center": Vector2(22, -45), "size": Vector2(3, 3)},     # Archive Tower
+
+		# Flatten building sites — Park/Gardens
+		{"type": "flatten_rect", "center": Vector2(30, -15), "size": Vector2(4, 3.5)},  # Herbalist
+		{"type": "flatten_rect", "center": Vector2(55, -25), "size": Vector2(5, 4)},    # Greenhouse
+		{"type": "flatten_rect", "center": Vector2(60, -40), "size": Vector2(4, 4)},    # Groundskeeper Lodge
+		{"type": "flatten_rect", "center": Vector2(50, -40), "size": Vector2(3, 3)},    # Pond Pavilion
+		{"type": "flatten_rect", "center": Vector2(30, -42), "size": Vector2(3, 3)},    # Garden Storage
+
+		# Flatten building sites — Craft/Workshop
+		{"type": "flatten_rect", "center": Vector2(15, 20), "size": Vector2(5, 4)},    # Lumberyard
+		{"type": "flatten_rect", "center": Vector2(8, 38), "size": Vector2(3.5, 3.5)}, # Kiln House
+		{"type": "flatten_rect", "center": Vector2(5, 18), "size": Vector2(4, 3.5)},   # Carpenter Shop
+		{"type": "flatten_rect", "center": Vector2(-10, 42), "size": Vector2(3, 3)},   # Rope Maker
+		{"type": "flatten_rect", "center": Vector2(-15, 40), "size": Vector2(4, 3.5)}, # Dye Works
+		{"type": "flatten_rect", "center": Vector2(20, 30), "size": Vector2(3, 3)},    # Tool Shed
+
+		# Flatten building sites — Garrison
+		{"type": "flatten_rect", "center": Vector2(35, 35), "size": Vector2(4, 4)},    # Officers Quarters
+		{"type": "flatten_rect", "center": Vector2(60, 35), "size": Vector2(4, 4)},    # Infirmary
+		{"type": "flatten_rect", "center": Vector2(60, 42), "size": Vector2(5, 4)},    # Military Stable
+		{"type": "flatten_rect", "center": Vector2(42, 42), "size": Vector2(4, 3.5)},  # War Room
+		{"type": "flatten_rect", "center": Vector2(65, 42), "size": Vector2(2.5, 2.5)},# Watchtower
+
+		# Flatten building sites — Gate Area
+		{"type": "flatten_rect", "center": Vector2(56, 4), "size": Vector2(4, 3.5)},   # Customs House
+		{"type": "flatten_rect", "center": Vector2(49, 4), "size": Vector2(4, 4)},     # Gate Inn
+		{"type": "flatten_rect", "center": Vector2(62, 4), "size": Vector2(2.5, 2)},   # Toll Booth
+		{"type": "flatten_rect", "center": Vector2(-3, -47), "size": Vector2(2, 2)},   # North Guard Post W
+		{"type": "flatten_rect", "center": Vector2(3, -47), "size": Vector2(2, 2)},    # North Guard Post E
+		{"type": "flatten_rect", "center": Vector2(-8, -46), "size": Vector2(3.5, 3)}, # North Waystation
+		{"type": "flatten_rect", "center": Vector2(8, -46), "size": Vector2(3, 3)},    # North Toll Office
+		{"type": "flatten_rect", "center": Vector2(-3, 47), "size": Vector2(2, 2)},    # South Guard Post W
+		{"type": "flatten_rect", "center": Vector2(3, 47), "size": Vector2(2, 2)},     # South Guard Post E
+		{"type": "flatten_rect", "center": Vector2(-8, 46), "size": Vector2(3.5, 3)},  # South Waystation
+		{"type": "flatten_rect", "center": Vector2(8, 46), "size": Vector2(3, 3)},     # South Customs
+
+		# Park walking paths — dirt (channel 0)
+		{"type": "line", "start": Vector2(25, -10), "end": Vector2(55, -40), "width": 0.8, "channel": 0},  # Park diagonal path
+		{"type": "line", "start": Vector2(35, -15), "end": Vector2(55, -15), "width": 0.8, "channel": 0},  # Park perimeter path N
+		{"type": "line", "start": Vector2(55, -15), "end": Vector2(55, -40), "width": 0.8, "channel": 0},  # Park perimeter path E
+		{"type": "line", "start": Vector2(55, -40), "end": Vector2(35, -40), "width": 0.8, "channel": 0},  # Park perimeter path S
+		{"type": "line", "start": Vector2(35, -40), "end": Vector2(35, -15), "width": 0.8, "channel": 0},  # Park perimeter path W
 	]
 
 func _field_terrain_rules() -> Array:

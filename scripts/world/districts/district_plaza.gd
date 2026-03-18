@@ -8,6 +8,11 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_fountain(nav_region, noise, hs)
 	_build_benches(nav_region, noise, hs)
 	_build_street_lamps(nav_region, noise, hs)
+	_build_town_hall(nav_region, noise, hs)
+	_build_chapel(nav_region, noise, hs)
+	_build_money_changer(nav_region, noise, hs)
+	_build_notice_board_shelter(nav_region, noise, hs)
+	_build_stalls(nav_region, noise, hs)
 
 
 static func _build_fountain(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -52,3 +57,120 @@ static func _build_street_lamps(nav_region: Node3D, noise: FastNoiseLite, hs: fl
 		lamp_light.position = Vector3(lpos.x, BuildingHelper.snap_y(noise, lpos.x, lpos.z, hs) + 3.1, lpos.z)
 		lamp_light.set_surface_override_material(0, lamp_glow_mat)
 		nav_region.add_child(lamp_light)
+
+
+static func _build_town_hall(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(-12, BuildingHelper.snap_y(noise, -12, -7, hs), -7),
+		Vector3(7, 4, 5), Color(0.55, 0.50, 0.45), "peaked", Color(0.35, 0.28, 0.22),
+		0.5, false, true, 0.0, "town_hall")
+	# 2 torches flanking entrance (+z face)
+	_create_torch(nav_region, noise, hs, Vector3(-14, 0, -4))
+	_create_torch(nav_region, noise, hs, Vector3(-10, 0, -4))
+
+
+static func _build_chapel(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(15, BuildingHelper.snap_y(noise, 15, 7, hs), 7),
+		Vector3(4, 3.5, 3.5), Color(0.60, 0.58, 0.55), "peaked", Color(0.35, 0.30, 0.25),
+		0.5, false, true, 0.0, "chapel")
+	# 1 torch at entrance (+z face)
+	_create_torch(nav_region, noise, hs, Vector3(15, 0, 9))
+
+
+static func _build_money_changer(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(-12, BuildingHelper.snap_y(noise, -12, 7, hs), 7),
+		Vector3(3.5, 3, 3), Color(0.55, 0.48, 0.38), "peaked", Color(0.38, 0.25, 0.15),
+		0.5, false, true, 0.0, "shop")
+
+
+static func _build_notice_board_shelter(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(15, BuildingHelper.snap_y(noise, 15, -5, hs), -5),
+		Vector3(2.5, 2.5, 2), Color(0.48, 0.42, 0.35), "flat", Color(0.35, 0.30, 0.25),
+		0.5, false, false, 0.0, "shelter")
+
+
+static func _build_stalls(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Flower Cart
+	_create_stall(nav_region, noise, hs, Vector3(8, 0, -8), Color(0.75, 0.45, 0.60), "stall")
+	# Water Cart
+	_create_stall(nav_region, noise, hs, Vector3(-8, 0, 8), Color(0.25, 0.45, 0.70), "stall")
+
+
+static func _create_stall(nav_region: Node3D, noise: FastNoiseLite, hs: float,
+		spos: Vector3, canopy_color: Color, building_type: String) -> void:
+	var stall := Node3D.new()
+	stall.position = Vector3(spos.x, BuildingHelper.snap_y(noise, spos.x, spos.z, hs), spos.z)
+	if building_type != "":
+		stall.set_meta("building_type", building_type)
+
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.45, 0.35, 0.22)
+
+	# 4 corner posts
+	for px: float in [-1.2, 1.2]:
+		for pz: float in [-0.8, 0.8]:
+			var post := MeshInstance3D.new()
+			var post_mesh := CylinderMesh.new()
+			post_mesh.top_radius = 0.06
+			post_mesh.bottom_radius = 0.08
+			post_mesh.height = 2.5
+			post.mesh = post_mesh
+			post.position = Vector3(px, 1.25, pz)
+			post.set_surface_override_material(0, post_mat)
+			stall.add_child(post)
+
+	# Canopy
+	var canopy := MeshInstance3D.new()
+	var canopy_mesh := BoxMesh.new()
+	canopy_mesh.size = Vector3(3.0, 0.1, 2.0)
+	canopy.mesh = canopy_mesh
+	canopy.position = Vector3(0, 2.55, 0)
+	var canopy_mat := StandardMaterial3D.new()
+	canopy_mat.albedo_color = canopy_color
+	canopy.set_surface_override_material(0, canopy_mat)
+	stall.add_child(canopy)
+
+	# Counter
+	var counter := MeshInstance3D.new()
+	var counter_mesh := BoxMesh.new()
+	counter_mesh.size = Vector3(2.4, 0.8, 0.4)
+	counter.mesh = counter_mesh
+	counter.position = Vector3(0, 0.4, 0.6)
+	counter.set_surface_override_material(0, post_mat)
+	stall.add_child(counter)
+
+	nav_region.add_child(stall)
+
+
+static func _create_torch(nav_region: Node3D, noise: FastNoiseLite, hs: float, tpos: Vector3) -> void:
+	var wood_mat := StandardMaterial3D.new()
+	wood_mat.albedo_color = Color(0.40, 0.30, 0.18)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.6, 0.1)
+	flame_mat.emission_enabled = true
+	flame_mat.emission = Color(1.0, 0.5, 0.05)
+	flame_mat.emission_energy_multiplier = 0.8
+
+	var ground_y: float = BuildingHelper.snap_y(noise, tpos.x, tpos.z, hs)
+
+	var post := MeshInstance3D.new()
+	var post_mesh := CylinderMesh.new()
+	post_mesh.top_radius = 0.04
+	post_mesh.bottom_radius = 0.05
+	post_mesh.height = 1.2
+	post.mesh = post_mesh
+	post.position = Vector3(tpos.x, ground_y + 0.6, tpos.z)
+	post.set_surface_override_material(0, wood_mat)
+	nav_region.add_child(post)
+
+	var flame := MeshInstance3D.new()
+	var flame_mesh := SphereMesh.new()
+	flame_mesh.radius = 0.08
+	flame_mesh.height = 0.16
+	flame.mesh = flame_mesh
+	flame.position = Vector3(tpos.x, ground_y + 1.3, tpos.z)
+	flame.set_surface_override_material(0, flame_mat)
+	nav_region.add_child(flame)

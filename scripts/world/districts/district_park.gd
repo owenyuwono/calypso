@@ -9,6 +9,11 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_benches(nav_region, noise, hs)
 	_build_gardener_cottage(nav_region, noise, hs)
 	_build_gazebo(nav_region, noise, hs)
+	_build_herbalist_shop(nav_region, noise, hs)
+	_build_greenhouse(nav_region, noise, hs)
+	_build_groundskeeper_lodge(nav_region, noise, hs)
+	_build_pond_pavilion(nav_region, noise, hs)
+	_build_garden_storage(nav_region, noise, hs)
 
 
 static func _build_fountain(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -66,3 +71,92 @@ static func _build_gazebo(nav_region: Node3D, noise: FastNoiseLite, hs: float) -
 	gazebo.add_child(gz_roof)
 
 	nav_region.add_child(gazebo)
+
+
+static func _build_herbalist_shop(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var pos := Vector3(30, BuildingHelper.snap_y(noise, 30, -15, hs), -15)
+	BuildingHelper.create_building(nav_region, pos,
+		Vector3(4, 3, 3.5), Color(0.48, 0.55, 0.42), "peaked", Color(0.25, 0.38, 0.18),
+		0.5, false, true, 0.0, "shop")
+
+	# Torches flanking the door
+	var torch_mat := StandardMaterial3D.new()
+	torch_mat.albedo_color = Color(0.35, 0.28, 0.20)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.55, 0.1)
+	for side: int in [-1, 1]:
+		var torch := MeshInstance3D.new()
+		var torch_mesh := CylinderMesh.new()
+		torch_mesh.top_radius = 0.06
+		torch_mesh.bottom_radius = 0.08
+		torch_mesh.height = 0.7
+		torch.mesh = torch_mesh
+		torch.position = Vector3(pos.x + side * 0.65, pos.y + 1.0, pos.z + 1.85)
+		torch.set_surface_override_material(0, torch_mat)
+		nav_region.add_child(torch)
+
+		var flame := MeshInstance3D.new()
+		var flame_mesh := SphereMesh.new()
+		flame_mesh.radius = 0.1
+		flame_mesh.height = 0.2
+		flame.mesh = flame_mesh
+		flame.position = Vector3(pos.x + side * 0.65, pos.y + 1.42, pos.z + 1.85)
+		flame.set_surface_override_material(0, flame_mat)
+		nav_region.add_child(flame)
+
+
+static func _build_greenhouse(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var pos := Vector3(55, BuildingHelper.snap_y(noise, 55, -25, hs), -25)
+	BuildingHelper.create_building(nav_region, pos,
+		Vector3(5, 3, 4), Color(0.50, 0.58, 0.48), "flat", Color(0.35, 0.42, 0.32),
+		0.5, false, true, 0.0, "greenhouse")
+
+	# Torches flanking the door
+	var torch_mat := StandardMaterial3D.new()
+	torch_mat.albedo_color = Color(0.35, 0.28, 0.20)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.55, 0.1)
+	for side: int in [-1, 1]:
+		var torch := MeshInstance3D.new()
+		var torch_mesh := CylinderMesh.new()
+		torch_mesh.top_radius = 0.06
+		torch_mesh.bottom_radius = 0.08
+		torch_mesh.height = 0.7
+		torch.mesh = torch_mesh
+		torch.position = Vector3(pos.x + side * 0.7, pos.y + 1.0, pos.z + 2.1)
+		torch.set_surface_override_material(0, torch_mat)
+		nav_region.add_child(torch)
+
+		var flame := MeshInstance3D.new()
+		var flame_mesh := SphereMesh.new()
+		flame_mesh.radius = 0.1
+		flame_mesh.height = 0.2
+		flame.mesh = flame_mesh
+		flame.position = Vector3(pos.x + side * 0.7, pos.y + 1.42, pos.z + 2.1)
+		flame.set_surface_override_material(0, flame_mat)
+		nav_region.add_child(flame)
+
+
+static func _build_groundskeeper_lodge(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(60, BuildingHelper.snap_y(noise, 60, -40, hs), -40),
+		Vector3(4, 3, 4), Color(0.52, 0.46, 0.38), "peaked", Color(0.38, 0.25, 0.16),
+		0.5, false, true, 0.0, "lodge")
+
+
+static func _build_pond_pavilion(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(50, BuildingHelper.snap_y(noise, 50, -40, hs), -40),
+		Vector3(3, 2.5, 3), Color(0.50, 0.45, 0.38), "flat", Color(0.35, 0.30, 0.25),
+		0.5, false, true, 0.0, "pavilion")
+
+	# Bench near the pavilion
+	var bench_pos := Vector3(50, BuildingHelper.snap_y(noise, 50, -43, hs) + 0.2, -43)
+	BuildingHelper.create_bench(nav_region, bench_pos)
+
+
+static func _build_garden_storage(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(nav_region,
+		Vector3(30, BuildingHelper.snap_y(noise, 30, -42, hs), -42),
+		Vector3(3, 2.5, 3), Color(0.45, 0.42, 0.38), "flat", Color(0.35, 0.32, 0.28),
+		0.5, false, false, 0.0, "shed")

@@ -8,6 +8,9 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_shops(nav_region, noise, hs)
 	_build_stalls(nav_region, noise, hs)
 	_build_cluster_a(nav_region, noise, hs)
+	_build_new_shops(nav_region, noise, hs)
+	_build_new_stalls(nav_region, noise, hs)
+	_build_props(nav_region, noise, hs)
 
 
 static func _build_shops(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -107,3 +110,150 @@ static func _build_cluster_a(nav_region: Node3D, noise: FastNoiseLite, hs: float
 	BuildingHelper.create_building(nav_region,
 		Vector3(-24, BuildingHelper.snap_y(noise, -24, 5, hs), 5),
 		Vector3(3.5, 3, 3), Color(0.52, 0.46, 0.36), "flat", Color(0.35, 0.30, 0.25), 0.5, false, true)
+
+
+static func _build_new_shops(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Spice Shop
+	BuildingHelper.create_building(nav_region,
+		Vector3(-50, BuildingHelper.snap_y(noise, -50, 20, hs), 20),
+		Vector3(4, 3, 3.5), Color(0.60, 0.45, 0.28), "peaked", Color(0.45, 0.22, 0.12), 0.5, false, true, 0.0, "shop")
+
+	# Cloth Merchant
+	BuildingHelper.create_building(nav_region,
+		Vector3(-38, BuildingHelper.snap_y(noise, -38, 25, hs), 25),
+		Vector3(4, 3, 4), Color(0.52, 0.46, 0.40), "peaked", Color(0.30, 0.35, 0.45), 0.5, false, true, 0.0, "shop")
+
+	# Apothecary
+	BuildingHelper.create_building(nav_region,
+		Vector3(-62, BuildingHelper.snap_y(noise, -62, 25, hs), 25),
+		Vector3(4, 3, 3.5), Color(0.48, 0.52, 0.42), "peaked", Color(0.22, 0.38, 0.18), 0.5, false, true, 0.0, "shop")
+
+	# Pawn Shop
+	BuildingHelper.create_building(nav_region,
+		Vector3(-28, BuildingHelper.snap_y(noise, -28, 20, hs), 20),
+		Vector3(3.5, 3, 3), Color(0.50, 0.42, 0.32), "peaked", Color(0.38, 0.28, 0.18), 0.5, false, true, 0.0, "shop")
+
+	# Tavern
+	BuildingHelper.create_building(nav_region,
+		Vector3(-50, BuildingHelper.snap_y(noise, -50, 40, hs), 40),
+		Vector3(6, 3.5, 5), Color(0.50, 0.38, 0.25), "peaked", Color(0.40, 0.18, 0.10), 0.5, false, true, 0.0, "tavern")
+
+	# Fish Monger
+	BuildingHelper.create_building(nav_region,
+		Vector3(-35, BuildingHelper.snap_y(noise, -35, 45, hs), 45),
+		Vector3(3.5, 3, 3), Color(0.48, 0.48, 0.52), "flat", Color(0.35, 0.35, 0.38), 0.5, false, true, 0.0, "shop")
+
+	# Butcher
+	BuildingHelper.create_building(nav_region,
+		Vector3(-28, BuildingHelper.snap_y(noise, -28, 45, hs), 45),
+		Vector3(3.5, 3, 3), Color(0.55, 0.38, 0.35), "peaked", Color(0.45, 0.20, 0.15), 0.5, false, true, 0.0, "shop")
+
+	# Grain Store
+	BuildingHelper.create_building(nav_region,
+		Vector3(-65, BuildingHelper.snap_y(noise, -65, 35, hs), 35),
+		Vector3(4, 3, 4), Color(0.52, 0.45, 0.32), "flat", Color(0.38, 0.32, 0.25), 0.5, false, true, 0.0, "warehouse")
+
+	# Cartographer
+	BuildingHelper.create_building(nav_region,
+		Vector3(-24, BuildingHelper.snap_y(noise, -24, 15, hs), 15),
+		Vector3(3.5, 3, 3), Color(0.55, 0.50, 0.42), "peaked", Color(0.35, 0.28, 0.20), 0.5, false, true, 0.0, "shop")
+
+	# Chandler
+	BuildingHelper.create_building(nav_region,
+		Vector3(-65, BuildingHelper.snap_y(noise, -65, 45, hs), 45),
+		Vector3(3.5, 3, 3), Color(0.58, 0.52, 0.38), "peaked", Color(0.42, 0.32, 0.18), 0.5, false, true, 0.0, "shop")
+
+
+static func _build_new_stalls(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Fruit Stall — orange canopy
+	_create_stall(nav_region, noise, hs, Vector3(-42, 0, 30), 0.0, Color(0.85, 0.45, 0.10))
+
+	# Trinket Stall — purple canopy
+	_create_stall(nav_region, noise, hs, Vector3(-60, 0, 22), 0.15, Color(0.45, 0.20, 0.65))
+
+	# Herb Stall — green canopy
+	_create_stall(nav_region, noise, hs, Vector3(-32, 0, 35), -0.1, Color(0.20, 0.55, 0.20))
+
+
+static func _build_props(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var barrel_mat := StandardMaterial3D.new()
+	barrel_mat.albedo_color = Color(0.35, 0.25, 0.15)
+
+	var crate_mat := StandardMaterial3D.new()
+	crate_mat.albedo_color = Color(0.45, 0.32, 0.18)
+
+	var torch_pole_mat := StandardMaterial3D.new()
+	torch_pole_mat.albedo_color = Color(0.30, 0.22, 0.12)
+
+	var torch_flame_mat := StandardMaterial3D.new()
+	torch_flame_mat.albedo_color = Color(1.0, 0.65, 0.1)
+	torch_flame_mat.emission_enabled = true
+	torch_flame_mat.emission = Color(1.0, 0.55, 0.05)
+	torch_flame_mat.emission_energy_multiplier = 1.2
+
+	# Barrel cluster at (-38, y, 20)
+	for i: int in 3:
+		var barrel := MeshInstance3D.new()
+		var barrel_mesh := CylinderMesh.new()
+		barrel_mesh.top_radius = 0.25
+		barrel_mesh.bottom_radius = 0.28
+		barrel_mesh.height = 0.7
+		barrel.mesh = barrel_mesh
+		barrel.position = Vector3(-38.0 + i * 0.6, BuildingHelper.snap_y(noise, -38.0 + i * 0.6, 20.0, hs) + 0.35, 20.0 + i * 0.3)
+		barrel.set_surface_override_material(0, barrel_mat)
+		nav_region.add_child(barrel)
+
+	# Barrel cluster at (-50, y, 45)
+	for i: int in 2:
+		var barrel := MeshInstance3D.new()
+		var barrel_mesh := CylinderMesh.new()
+		barrel_mesh.top_radius = 0.25
+		barrel_mesh.bottom_radius = 0.28
+		barrel_mesh.height = 0.7
+		barrel.mesh = barrel_mesh
+		barrel.position = Vector3(-50.0 + i * 0.6, BuildingHelper.snap_y(noise, -50.0 + i * 0.6, 45.0, hs) + 0.35, 45.0)
+		barrel.set_surface_override_material(0, barrel_mat)
+		nav_region.add_child(barrel)
+
+	# Crate stack near Grain Store (-65, y, 33)
+	for i: int in 2:
+		var crate := MeshInstance3D.new()
+		var crate_mesh := BoxMesh.new()
+		crate_mesh.size = Vector3(0.7, 0.7, 0.7)
+		crate.mesh = crate_mesh
+		crate.position = Vector3(-65.0, BuildingHelper.snap_y(noise, -65.0, 33.0, hs) + 0.35 + i * 0.7, 33.0)
+		crate.set_surface_override_material(0, crate_mat)
+		nav_region.add_child(crate)
+
+	# Crate stack near Tavern (-48, y, 40)
+	for i: int in 2:
+		var crate := MeshInstance3D.new()
+		var crate_mesh := BoxMesh.new()
+		crate_mesh.size = Vector3(0.7, 0.7, 0.7)
+		crate.mesh = crate_mesh
+		crate.position = Vector3(-48.0, BuildingHelper.snap_y(noise, -48.0, 40.0, hs) + 0.35 + i * 0.7, 40.0)
+		crate.set_surface_override_material(0, crate_mat)
+		nav_region.add_child(crate)
+
+	# Torches: Tavern entrance (-50, y, 42), Apothecary entrance (-62, y, 27),
+	#          Pawn Shop entrance (-28, y, 22)
+	var torch_positions: Array = [Vector3(-50, 0, 42), Vector3(-62, 0, 27), Vector3(-28, 0, 22)]
+	for tpos: Vector3 in torch_positions:
+		var pole := MeshInstance3D.new()
+		var pole_mesh := CylinderMesh.new()
+		pole_mesh.top_radius = 0.04
+		pole_mesh.bottom_radius = 0.05
+		pole_mesh.height = 1.8
+		pole.mesh = pole_mesh
+		pole.position = Vector3(tpos.x, BuildingHelper.snap_y(noise, tpos.x, tpos.z, hs) + 0.9, tpos.z)
+		pole.set_surface_override_material(0, torch_pole_mat)
+		nav_region.add_child(pole)
+
+		var flame := MeshInstance3D.new()
+		var flame_mesh := SphereMesh.new()
+		flame_mesh.radius = 0.12
+		flame_mesh.height = 0.24
+		flame.mesh = flame_mesh
+		flame.position = Vector3(tpos.x, BuildingHelper.snap_y(noise, tpos.x, tpos.z, hs) + 1.85, tpos.z)
+		flame.set_surface_override_material(0, torch_flame_mat)
+		nav_region.add_child(flame)

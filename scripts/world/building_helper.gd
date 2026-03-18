@@ -14,11 +14,14 @@ static func snap_y(noise: FastNoiseLite, x: float, z: float, height_scale: float
 static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3,
 		wall_color: Color, roof_type: String, roof_color: Color,
 		roof_overhang: float = 0.5, has_chimney: bool = false,
-		has_door: bool = true, rot_y: float = 0.0) -> Node3D:
+		has_door: bool = true, rot_y: float = 0.0,
+		building_type: String = "") -> Node3D:
 	var building := Node3D.new()
 	building.position = pos
 	if rot_y != 0.0:
 		building.rotation.y = rot_y
+	if building_type != "":
+		building.set_meta("building_type", building_type)
 
 	# --- Walls ---
 	var wall_body := StaticBody3D.new()

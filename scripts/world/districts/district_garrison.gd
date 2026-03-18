@@ -10,6 +10,8 @@ static func build(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
 	_build_weapon_racks(nav_region, noise, hs)
 	_build_archery_targets(nav_region, noise, hs)
 	_build_cluster_e(nav_region, noise, hs)
+	_build_new_buildings(nav_region, noise, hs)
+	_build_new_props(nav_region, noise, hs)
 
 
 static func _build_barracks(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
@@ -139,3 +141,109 @@ static func _build_cluster_e(nav_region: Node3D, noise: FastNoiseLite, hs: float
 	BuildingHelper.create_building(nav_region,
 		Vector3(55, BuildingHelper.snap_y(noise, 55, 25, hs), 25),
 		Vector3(5, 3.5, 4), Color(0.48, 0.44, 0.38), "flat", Color(0.32, 0.28, 0.24), 0.3, false, true)
+
+
+static func _build_new_buildings(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	# Officers Quarters
+	BuildingHelper.create_building(nav_region,
+		Vector3(35, BuildingHelper.snap_y(noise, 35, 35, hs), 35),
+		Vector3(4, 3.5, 4), Color(0.44, 0.42, 0.40), "peaked", Color(0.32, 0.28, 0.24), 0.3, false, true, 0.0, "quarters")
+
+	# Infirmary
+	BuildingHelper.create_building(nav_region,
+		Vector3(60, BuildingHelper.snap_y(noise, 60, 35, hs), 35),
+		Vector3(4, 3, 4), Color(0.58, 0.55, 0.52), "peaked", Color(0.40, 0.38, 0.35), 0.3, false, true, 0.0, "infirmary")
+
+	# Military Stable
+	BuildingHelper.create_building(nav_region,
+		Vector3(60, BuildingHelper.snap_y(noise, 60, 42, hs), 42),
+		Vector3(5, 3, 4), Color(0.50, 0.42, 0.32), "flat", Color(0.38, 0.32, 0.25), 0.3, false, true, 0.0, "stable")
+
+	# War Room
+	BuildingHelper.create_building(nav_region,
+		Vector3(42, BuildingHelper.snap_y(noise, 42, 42, hs), 42),
+		Vector3(4, 3.5, 3.5), Color(0.42, 0.40, 0.38), "flat", Color(0.30, 0.28, 0.25), 0.3, false, true, 0.0, "war_room")
+
+	# Watchtower
+	BuildingHelper.create_building(nav_region,
+		Vector3(65, BuildingHelper.snap_y(noise, 65, 42, hs), 42),
+		Vector3(2.5, 6, 2.5), Color(0.45, 0.42, 0.38), "flat", Color(0.35, 0.32, 0.28), 0.3, false, false, 0.0, "watchtower")
+
+
+static func _build_new_props(nav_region: Node3D, noise: FastNoiseLite, hs: float) -> void:
+	var flag_mat := StandardMaterial3D.new()
+	flag_mat.albedo_color = Color(0.6, 0.15, 0.15)
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color(0.5, 0.42, 0.32)
+
+	# Banner flags at Officers Quarters and War Room
+	for fx: float in [35.0, 42.0]:
+		var pole := MeshInstance3D.new()
+		var pole_mesh := CylinderMesh.new()
+		pole_mesh.top_radius = 0.04
+		pole_mesh.bottom_radius = 0.05
+		pole_mesh.height = 3.5
+		pole.mesh = pole_mesh
+		pole.position = Vector3(fx + 2.3, BuildingHelper.snap_y(noise, fx + 2.3, 33, hs) + 1.75, 33)
+		pole.set_surface_override_material(0, pole_mat)
+		nav_region.add_child(pole)
+
+		var flag := MeshInstance3D.new()
+		var flag_mesh := BoxMesh.new()
+		flag_mesh.size = Vector3(0.8, 0.5, 0.04)
+		flag.mesh = flag_mesh
+		flag.position = Vector3(fx + 2.7, BuildingHelper.snap_y(noise, fx + 2.3, 33, hs) + 3.25, 33)
+		flag.set_surface_override_material(0, flag_mat)
+		nav_region.add_child(flag)
+
+	# Torch material
+	var torch_body_mat := StandardMaterial3D.new()
+	torch_body_mat.albedo_color = Color(0.35, 0.25, 0.15)
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color(1.0, 0.6, 0.1)
+
+	# Torches at Infirmary
+	for tx: float in [58.5, 61.5]:
+		var torch := Node3D.new()
+		torch.position = Vector3(tx, BuildingHelper.snap_y(noise, tx, 33, hs), 33)
+		var t_body := MeshInstance3D.new()
+		var tb_mesh := CylinderMesh.new()
+		tb_mesh.top_radius = 0.05
+		tb_mesh.bottom_radius = 0.05
+		tb_mesh.height = 1.2
+		t_body.mesh = tb_mesh
+		t_body.position = Vector3(0, 0.6, 0)
+		t_body.set_surface_override_material(0, torch_body_mat)
+		torch.add_child(t_body)
+		var flame := MeshInstance3D.new()
+		var fl_mesh := SphereMesh.new()
+		fl_mesh.radius = 0.1
+		fl_mesh.height = 0.2
+		flame.mesh = fl_mesh
+		flame.position = Vector3(0, 1.3, 0)
+		flame.set_surface_override_material(0, flame_mat)
+		torch.add_child(flame)
+		nav_region.add_child(torch)
+
+	# Torches along barracks perimeter
+	for bx: float in [40.0, 45.0, 50.0]:
+		var torch := Node3D.new()
+		torch.position = Vector3(bx, BuildingHelper.snap_y(noise, bx, 37, hs), 37)
+		var t_body := MeshInstance3D.new()
+		var tb_mesh := CylinderMesh.new()
+		tb_mesh.top_radius = 0.05
+		tb_mesh.bottom_radius = 0.05
+		tb_mesh.height = 1.2
+		t_body.mesh = tb_mesh
+		t_body.position = Vector3(0, 0.6, 0)
+		t_body.set_surface_override_material(0, torch_body_mat)
+		torch.add_child(t_body)
+		var flame := MeshInstance3D.new()
+		var fl_mesh := SphereMesh.new()
+		fl_mesh.radius = 0.1
+		fl_mesh.height = 0.2
+		flame.mesh = fl_mesh
+		flame.position = Vector3(0, 1.3, 0)
+		flame.set_surface_override_material(0, flame_mat)
+		torch.add_child(flame)
+		nav_region.add_child(torch)
