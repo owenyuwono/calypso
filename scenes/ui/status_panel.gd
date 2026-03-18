@@ -23,7 +23,6 @@ var _def_value: Label
 var _def_bonus: Label
 var _speed_value: Label
 var _range_value: Label
-var _gold_label: Label
 
 func _ready() -> void:
 	visible = false
@@ -34,13 +33,10 @@ func _ready() -> void:
 	GameEvents.entity_healed.connect(func(_a, _b, _c): _refresh())
 	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): _refresh())
 	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
-	GameEvents.item_looted.connect(func(_a, _b, _c): _refresh())
-	GameEvents.item_purchased.connect(func(_a, _b, _c): _refresh())
-	GameEvents.item_sold.connect(func(_a, _b, _c): _refresh())
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(320, 420)
+	_panel.custom_minimum_size = Vector2(220, 0)
 
 	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	add_child(_panel)
@@ -107,32 +103,6 @@ func _build_ui() -> void:
 	_range_value = range_row.value
 	vbox.add_child(range_row.container)
 
-	vbox.add_child(HSeparator.new())
-
-	# Gold
-	var gold_row := HBoxContainer.new()
-	vbox.add_child(gold_row)
-
-	var gold_icon := TextureRect.new()
-	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
-	gold_icon.custom_minimum_size = Vector2(16, 16)
-	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gold_row.add_child(gold_icon)
-
-	var gold_name := Label.new()
-	gold_name.text = "Gold"
-	gold_name.add_theme_font_size_override("font_size", 14)
-	gold_name.custom_minimum_size.x = 60
-	gold_row.add_child(gold_name)
-
-	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 14)
-	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	gold_row.add_child(_gold_label)
 
 
 func _create_stat_row(stat_name: String) -> Dictionary:
@@ -188,9 +158,8 @@ func _refresh() -> void:
 		return
 
 	var stats = _player.get_node("StatsComponent")
-	var inv = _player.get_node("InventoryComponent")
 	var equip = _player.get_node("EquipmentComponent")
-	if not stats or not inv or not equip:
+	if not stats or not equip:
 		return
 
 	var level: int = stats.level
@@ -200,8 +169,6 @@ func _refresh() -> void:
 	var base_def: int = stats.def
 	var attack_speed: float = stats.attack_speed
 	var attack_range: float = stats.attack_range
-	var gold: int = inv.gold
-
 	_name_label.text = "Player"
 	_level_label.text = "Total Lv. %d" % level
 
@@ -221,8 +188,6 @@ func _refresh() -> void:
 
 	_speed_value.text = "%.1fs" % attack_speed
 	_range_value.text = "%.1f" % attack_range
-
-	_gold_label.text = str(gold)
 
 func is_open() -> bool:
 	return _is_open

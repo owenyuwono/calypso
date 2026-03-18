@@ -44,7 +44,7 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(420, 500)
+	_panel.custom_minimum_size = Vector2(340, 0)
 	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	add_child(_panel)
 
@@ -61,7 +61,7 @@ func _build_ui() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 420)
+	scroll.custom_minimum_size = Vector2(0, 300)
 	vbox.add_child(scroll)
 
 	_content = VBoxContainer.new()
