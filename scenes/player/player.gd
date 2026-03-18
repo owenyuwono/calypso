@@ -391,6 +391,7 @@ func _cancel_harvest() -> void:
 	_chop_timer = _chop_interval
 	_chop_hit_pending = false
 	_chop_hit_timer = 0.0
+	_hover.clear_ring()
 
 func _process_harvesting(delta: float) -> bool:
 	# Validate target still exists and is harvestable
@@ -494,6 +495,7 @@ func _on_arrived() -> void:
 				_open_shop(_interact_target)
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
+		_hover.clear_ring()
 
 	_interact_target = ""
 
@@ -597,6 +599,7 @@ func _handle_left_click() -> void:
 			_cancel_attack()
 			_cancel_harvest()
 			_interact_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.3, 0.6, 1.0, 0.6))
 			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
 				# Check if already in range
@@ -612,6 +615,7 @@ func _handle_left_click() -> void:
 			_cancel_attack()
 			_cancel_harvest()
 			_harvest_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.4, 0.8, 0.3, 0.6))
 			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
 				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))

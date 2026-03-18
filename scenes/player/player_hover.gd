@@ -11,10 +11,15 @@ const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 var _player: Node3D
 var _cursor_manager: RefCounted
 
-# Hover ring (world-space torus that tracks the locked combat target)
+# Lock ring (world-space torus that tracks the locked target)
+var _lock_ring: MeshInstance3D
+var _lock_ring_material: StandardMaterial3D
+var _ring_target_id: String = ""
+
+# Hover ring (world-space torus that tracks the currently hovered entity)
 var _hover_ring: MeshInstance3D
 var _hover_ring_material: StandardMaterial3D
-var _ring_target_id: String = ""
+var _hover_ring_target_id: String = ""
 
 # Tooltip
 var _tooltip_label: Label
@@ -34,6 +39,7 @@ func setup(player: Node3D, cursor_manager: RefCounted) -> void:
 	_player = player
 	_cursor_manager = cursor_manager
 	_setup_tooltip()
+	_setup_lock_ring()
 	_setup_hover_ring()
 
 
@@ -42,25 +48,35 @@ func get_hovered_entity_id() -> String:
 	return _hovered_entity_id
 
 
-## Lock/unlock the hover ring onto a target entity.
+## Lock/unlock the lock ring onto a target entity.
 func lock_ring(target_id: String, color: Color) -> void:
 	_ring_target_id = target_id
-	_hover_ring_material.albedo_color = color
+	_lock_ring_material.albedo_color = color
 	var target_node := WorldState.get_entity(target_id)
 	if target_node and is_instance_valid(target_node):
-		_hover_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
-		_hover_ring.visible = true
+		_lock_ring.global_position = target_node.global_position + Vector3(0, 0.05, 0)
+		_lock_ring.visible = true
+	# If this target was showing the hover ring, hide hover ring — lock takes priority
+	if target_id == _hover_ring_target_id:
+		_hover_ring.visible = false
 
 
-## Hide and clear the hover ring.
+## Hide and clear the lock ring.
 func clear_ring() -> void:
+	var was_target: String = _ring_target_id
 	_ring_target_id = ""
-	_hover_ring.visible = false
+	_lock_ring.visible = false
+	# Restore hover ring if the entity we just unlocked is still being hovered
+	if was_target != "" and was_target == _hover_ring_target_id:
+		var hover_node := WorldState.get_entity(was_target)
+		if hover_node and is_instance_valid(hover_node):
+			_hover_ring.global_position = hover_node.global_position + Vector3(0, 0.05, 0)
+			_hover_ring.visible = true
 
 
-## Returns whether the ring is currently visible.
+## Returns whether the lock ring is currently visible.
 func is_ring_visible() -> bool:
-	return _hover_ring.visible
+	return _lock_ring.visible
 
 
 func _setup_tooltip() -> void:
@@ -88,6 +104,30 @@ func _setup_tooltip() -> void:
 	canvas_layer.add_child(_tooltip_panel)
 
 
+func _setup_lock_ring() -> void:
+	_lock_ring = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.4
+	torus.outer_radius = 0.6
+	_lock_ring.mesh = torus
+	_lock_ring.top_level = true
+
+	_lock_ring_material = StandardMaterial3D.new()
+	_lock_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+	_lock_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_lock_ring_material.no_depth_test = false
+	_lock_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_lock_ring.material_override = _lock_ring_material
+
+	_lock_ring.visible = false
+	add_child(_lock_ring)
+
+	# Looping pulse tween
+	var tween := get_tree().create_tween().set_loops()
+	tween.tween_property(_lock_ring, "scale", Vector3(1.15, 1.0, 1.15), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_lock_ring, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+
 func _setup_hover_ring() -> void:
 	_hover_ring = MeshInstance3D.new()
 	var torus := TorusMesh.new()
@@ -97,33 +137,37 @@ func _setup_hover_ring() -> void:
 	_hover_ring.top_level = true
 
 	_hover_ring_material = StandardMaterial3D.new()
-	_hover_ring_material.albedo_color = Color(1.0, 0.3, 0.2, 0.6)
+	_hover_ring_material.albedo_color = Color(1.0, 0.9, 0.6, 0.35)
 	_hover_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_hover_ring_material.no_depth_test = true
+	_hover_ring_material.no_depth_test = false
 	_hover_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_hover_ring.material_override = _hover_ring_material
 
 	_hover_ring.visible = false
 	add_child(_hover_ring)
 
-	# Looping pulse tween
-	var tween := get_tree().create_tween().set_loops()
-	tween.tween_property(_hover_ring, "scale", Vector3(1.15, 1.0, 1.15), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_hover_ring, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-
 
 func _process(delta: float) -> void:
 	if not _player:
 		return
 
-	# Track ring to locked target every frame
-	if _hover_ring.visible and _ring_target_id != "":
+	# Track lock ring to locked target every frame
+	if _lock_ring.visible and _ring_target_id != "":
 		var entity := WorldState.get_entity(_ring_target_id)
-		if entity and is_instance_valid(entity) and WorldState.is_alive(_ring_target_id):
-			_hover_ring.global_position = entity.global_position + Vector3(0, 0.05, 0)
+		if entity and is_instance_valid(entity):
+			_lock_ring.global_position = entity.global_position + Vector3(0, 0.05, 0)
+		else:
+			_lock_ring.visible = false
+			_ring_target_id = ""
+
+	# Track hover ring to hovered entity every frame
+	if _hover_ring.visible and _hover_ring_target_id != "":
+		var hover_entity := WorldState.get_entity(_hover_ring_target_id)
+		if hover_entity and is_instance_valid(hover_entity):
+			_hover_ring.global_position = hover_entity.global_position + Vector3(0, 0.05, 0)
 		else:
 			_hover_ring.visible = false
-			_ring_target_id = ""
+			_hover_ring_target_id = ""
 
 	_hover_timer -= delta
 	if _hover_timer <= 0.0:
@@ -185,6 +229,20 @@ func _process_hover() -> void:
 			if new_node and is_instance_valid(new_node) and new_node.has_method("highlight"):
 				new_node.highlight()
 		_hovered_entity_id = new_entity_id
+
+		# Update hover ring to follow new hovered entity
+		if new_entity_id != "" and new_entity_id != _ring_target_id:
+			var new_node := WorldState.get_entity(new_entity_id)
+			if new_node and is_instance_valid(new_node):
+				_hover_ring.global_position = new_node.global_position + Vector3(0, 0.05, 0)
+				_hover_ring.visible = true
+				_hover_ring_target_id = new_entity_id
+			else:
+				_hover_ring.visible = false
+				_hover_ring_target_id = ""
+		else:
+			_hover_ring.visible = false
+			_hover_ring_target_id = ""
 
 	# Highlight / unhighlight vend sign border
 	if prev_vend_sign and not hovered_vend_sign and not prev_vend_sign_owner.is_empty():
@@ -252,7 +310,7 @@ func _process_hover() -> void:
 			var tier: String = data.get("tree_tier", "")
 			if not tier.is_empty():
 				display_name += " (%s)" % tier.capitalize()
-			_cursor_manager.set_cursor("default")
+			_cursor_manager.set_cursor("woodcut")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name
