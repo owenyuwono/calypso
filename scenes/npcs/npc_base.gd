@@ -534,7 +534,9 @@ func navigate_to_entity(target_id: String) -> void:
 	if target_node:
 		navigate_to(target_node.global_position)
 	elif WorldState.has_location(target_id):
-		navigate_to(WorldState.get_location(target_id))
+		var loc: Vector3 = WorldState.get_location(target_id)
+		var offset := Vector3(randf_range(-4.0, 4.0), 0.0, randf_range(-4.0, 4.0))
+		navigate_to(loc + offset)
 	else:
 		change_state(STATE_FAILED)
 		GameEvents.npc_action_completed.emit(npc_id, "move_to", false)

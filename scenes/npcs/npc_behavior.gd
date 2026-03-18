@@ -16,6 +16,8 @@ const TICK_INTERVAL: float = 1.0
 # Alternate hunt spots to roam when no monsters nearby
 const FIELD_SPOTS: Array = ["FieldCenter", "FieldFar", "FieldNorth", "FieldSouth"]
 const PATROL_SPOTS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
+const TOWN_DESTINATIONS: Array = ["TownSquare", "MarketDistrict", "NobleQuarter", "ParkGardens"]
+const REST_SPOTS: Array = ["TownWell", "TownInn", "MarketDistrict", "NobleQuarter", "ParkGardens"]
 
 const POTION_STOCK_TARGET: int = 3
 const POTION_RESTOCK_THRESHOLD: int = 2
@@ -106,7 +108,7 @@ func evaluate() -> void:
 		if boldness < 0.4 and not _is_in_town() and npc.current_goal == "hunt_field":
 			npc.set_goal("return_to_town")
 			npc.last_thought = "It's getting dark, better head back"
-			_do_action("move_to", "TownSquare")
+			_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 			return
 	# Priority 2.5: Schedule override for routine NPCs
 	var identity = npc.get_node_or_null("NpcIdentity")
@@ -164,7 +166,7 @@ func _check_survival() -> bool:
 		if hp_pct < 0.30:
 			_emit_npc_event("low_resources", {"hp_percent": hp_pct})
 		npc.set_goal("return_to_town")
-		_do_action("move_to", "TownSquare")
+		_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 		return true
 
 	# Stamina check — return to town if exhausted
@@ -176,7 +178,7 @@ func _check_survival() -> bool:
 		if (stamina_pct < rest_threshold or stamina_pct < 0.05) and not _is_in_town():
 			npc.set_goal("return_to_town")
 			npc.last_thought = "Getting tired, heading back"
-			_do_action("move_to", "TownSquare")
+			_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 			return true
 
 	return false
@@ -547,7 +549,7 @@ func _execute_return_to_town() -> void:
 		_do_action("wait", "")
 	else:
 		npc.last_thought = "Retreating to town"
-		_do_action("move_to", "TownSquare")
+		_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 
 func _execute_rest() -> void:
 	var stamina_comp = npc.get_node_or_null("StaminaComponent")
@@ -557,7 +559,7 @@ func _execute_rest() -> void:
 	# Find nearest rest spot and move to it
 	var nearest_spot: String = ""
 	var nearest_dist: float = INF
-	for spot_id in ["TownWell", "TownInn"]:
+	for spot_id in REST_SPOTS:
 		if WorldState.has_location(spot_id):
 			var spot_pos := WorldState.get_location(spot_id)
 			var dist := npc.global_position.distance_to(spot_pos)
