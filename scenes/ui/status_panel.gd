@@ -36,7 +36,7 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(220, 0)
+	_panel.custom_minimum_size = Vector2(320, 420)
 
 	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	add_child(_panel)
