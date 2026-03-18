@@ -1,6 +1,6 @@
 extends StaticBody3D
 ## Choppable tree entity. Spawned by the tree spawner into the world.
-## Registers with WorldState for perception and hover system integration.
+## Registers with WorldState for hover and NPC targeting.
 ## Swaps between tree and stump mesh on depletion/respawn.
 
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
@@ -12,6 +12,9 @@ const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
 const STUMP_MODEL_PATH := "res://assets/models/environment/nature/trees/fir/SM_FirStump1.FBX"
 
 static var _next_id: int = 1
+static var _bark_mat: StandardMaterial3D = null
+static var _leaf_mats: Dictionary = {}  # leaf_color.to_html() → StandardMaterial3D
+static var _highlight_mat: StandardMaterial3D = null
 
 var entity_id: String = ""
 var tree_tier: String = ""
@@ -23,7 +26,6 @@ var _scale_val: float = 1.0
 
 var _tree_model: Node3D = null
 var _stump_model: Node3D = null
-var _overlay: StandardMaterial3D = null
 var _mesh_instances: Array[MeshInstance3D] = []
 
 var _harvestable: Node = null
@@ -45,9 +47,7 @@ func setup(tier: String, model_path: String, rotation_y: float, scale_val: float
 	rotation.y = rotation_y
 
 	_build_trunk_collision()
-	_build_perception_area()
 	_load_tree_model()
-	_build_overlay()
 	_add_harvestable_component()
 
 	WorldState.register_entity(entity_id, self, {
@@ -61,30 +61,13 @@ func setup(tier: String, model_path: String, rotation_y: float, scale_val: float
 func _build_trunk_collision() -> void:
 	var col := CollisionShape3D.new()
 	var shape := CylinderShape3D.new()
-	shape.radius = 0.3
+	shape.radius = 1.0
 	shape.height = 3.0
 	col.shape = shape
 	col.position = Vector3(0.0, 1.5, 0.0)
 	add_child(col)
 	collision_layer = 1
 	collision_mask = 0
-
-
-func _build_perception_area() -> void:
-	var area := Area3D.new()
-	area.name = "PerceptionShape"
-	area.collision_layer = (1 << 8)
-	area.collision_mask = 0
-	area.monitorable = true
-	area.monitoring = false
-
-	var col := CollisionShape3D.new()
-	var shape := SphereShape3D.new()
-	shape.radius = 2.0
-	col.shape = shape
-	area.add_child(col)
-
-	add_child(area)
 
 
 func _load_tree_model() -> void:
@@ -99,6 +82,7 @@ func _load_tree_model() -> void:
 	_tree_model = instance
 
 	_apply_tree_materials(instance)
+	_refresh_mesh_instances()
 
 
 func _load_stump_model() -> void:
@@ -115,23 +99,32 @@ func _load_stump_model() -> void:
 	_apply_tree_materials(instance)
 
 
+func _get_bark_material() -> StandardMaterial3D:
+	if _bark_mat:
+		return _bark_mat
+	_bark_mat = StandardMaterial3D.new()
+	_bark_mat.albedo_texture = load(TREE_TEX_DIR + "T_FirBark_BC.PNG") as Texture2D
+	return _bark_mat
+
+
+func _get_leaf_material(color: Color) -> StandardMaterial3D:
+	var key: String = color.to_html()
+	if _leaf_mats.has(key):
+		return _leaf_mats[key]
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	mat.alpha_scissor_threshold = 0.5
+	mat.albedo_texture = load(TREE_TEX_DIR + "T_Leaf_Fir_Filled.PNG") as Texture2D
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_leaf_mats[key] = mat
+	return mat
+
+
 func _apply_tree_materials(instance: Node3D) -> void:
-	var bark_mat := StandardMaterial3D.new()
-	bark_mat.albedo_texture = load(TREE_TEX_DIR + "T_FirBark_BC.PNG") as Texture2D
-
-	var leaf_mat := StandardMaterial3D.new()
-	leaf_mat.albedo_color = _leaf_color
-	leaf_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-	leaf_mat.alpha_scissor_threshold = 0.5
-	leaf_mat.albedo_texture = load(TREE_TEX_DIR + "T_Leaf_Fir_Filled.PNG") as Texture2D
-	leaf_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-
-	AssetSpawner.apply_tree_materials_recursive(instance, bark_mat, leaf_mat)
-
-
-func _build_overlay() -> void:
-	_overlay = ModelHelper.create_overlay_material()
-	_refresh_mesh_instances()
+	var bark: StandardMaterial3D = _get_bark_material()
+	var leaf: StandardMaterial3D = _get_leaf_material(_leaf_color)
+	AssetSpawner.apply_tree_materials_recursive(instance, bark, leaf)
 
 
 func _refresh_mesh_instances() -> void:
@@ -142,8 +135,6 @@ func _refresh_mesh_instances() -> void:
 	if _stump_model:
 		var stump_meshes := ModelHelper.find_mesh_instances(_stump_model)
 		_mesh_instances.append_array(stump_meshes)
-	if _overlay:
-		ModelHelper.apply_overlay(_mesh_instances, _overlay)
 
 
 func _add_harvestable_component() -> void:
@@ -165,18 +156,15 @@ func _on_depleted() -> void:
 
 
 func _play_fall_animation() -> void:
-	# Compute fall direction: away from last chopper
 	var fall_dir: Vector3 = global_position - last_chopper_pos
 	fall_dir.y = 0.0
 	if fall_dir.length_squared() < 0.01:
 		fall_dir = Vector3(0.0, 0.0, 1.0)
 	fall_dir = fall_dir.normalized()
 
-	# Convert fall direction to a rotation axis (perpendicular to fall dir, in XZ plane)
 	var fall_angle: float = atan2(fall_dir.x, fall_dir.z)
 
 	var tween := create_tween()
-	# Tilt tree ~80 degrees away from chopper over 0.8s, then swap to stump
 	tween.tween_property(_tree_model, "rotation:x", cos(fall_angle) * deg_to_rad(80.0), 0.8).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	tween.parallel().tween_property(_tree_model, "rotation:z", -sin(fall_angle) * deg_to_rad(80.0), 0.8).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	tween.tween_callback(_swap_to_stump)
@@ -228,13 +216,18 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 
 
 func highlight() -> void:
-	if _overlay:
-		ModelHelper.set_highlight(_overlay, true)
+	if not _highlight_mat:
+		_highlight_mat = ModelHelper.create_overlay_material()
+		ModelHelper.set_highlight(_highlight_mat, true)
+	for mesh in _mesh_instances:
+		if is_instance_valid(mesh):
+			mesh.material_overlay = _highlight_mat
 
 
 func unhighlight() -> void:
-	if _overlay:
-		ModelHelper.set_highlight(_overlay, false)
+	for mesh in _mesh_instances:
+		if is_instance_valid(mesh):
+			mesh.material_overlay = null
 
 
 func shake() -> void:

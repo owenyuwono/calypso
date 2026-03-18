@@ -388,7 +388,7 @@ func _get_approach_pos(target_pos: Vector3, standoff: float) -> Vector3:
 
 func _cancel_harvest() -> void:
 	_harvest_target = ""
-	_chop_timer = 0.0
+	_chop_timer = _chop_interval
 	_chop_hit_pending = false
 	_chop_hit_timer = 0.0
 
