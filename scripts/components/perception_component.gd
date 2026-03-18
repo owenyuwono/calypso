@@ -111,6 +111,7 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	var monsters: Array = []
 	var items: Array = []
 	var objects: Array = []
+	var trees: Array = []
 	var locations: Array = []
 	var vendors: Array = []
 
@@ -172,6 +173,14 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 					"distance": snapped(dist, 0.1),
 					"name": data.get("name", eid),
 				})
+			"tree":
+				trees.append({
+					"id": eid,
+					"distance": snapped(dist, 0.1),
+					"name": data.get("name", eid),
+					"tree_tier": data.get("tree_tier", ""),
+					"harvestable": data.get("harvestable", false),
+				})
 
 	for eid in stale:
 		_tracked.erase(eid)
@@ -180,6 +189,7 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	monsters.sort_custom(func(a, b): return a.distance < b.distance)
 	items.sort_custom(func(a, b): return a.distance < b.distance)
 	objects.sort_custom(func(a, b): return a.distance < b.distance)
+	trees.sort_custom(func(a, b): return a.distance < b.distance)
 	vendors.sort_custom(func(a, b): return a.distance < b.distance)
 
 	# Location markers are not tracked via Area3D — scan directly from WorldState
@@ -194,6 +204,7 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 		"monsters": monsters,
 		"items": items,
 		"objects": objects,
+		"trees": trees,
 		"locations": locations,
 		"vendors": vendors,
 	}

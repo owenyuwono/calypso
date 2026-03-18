@@ -46,6 +46,13 @@ var _is_dead: bool = false
 var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
 
+# Harvesting
+var _harvest_target: String = ""
+var _chop_timer: float = 0.0
+var _chop_interval: float = 2.0
+var _chop_hit_pending: bool = false
+var _chop_hit_timer: float = 0.0
+
 # Visuals component
 var _visuals: Node
 var _stats: Node
@@ -268,6 +275,8 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
 	elif not _attack_target.is_empty():
 		is_moving = _process_combat(delta)
+	elif not _harvest_target.is_empty():
+		is_moving = _process_harvesting(delta)
 	elif _is_navigating and not nav_agent.is_navigation_finished():
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position)
@@ -304,7 +313,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 
 	# Update animation
-	if _attack_target.is_empty():
+	if _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
 			_visuals.play_anim("Walking_A")
 		else:
@@ -369,6 +378,92 @@ func _cancel_attack() -> void:
 	_auto_attack.cancel()
 	_player_skills.cancel_pending()
 	_hover.clear_ring()
+
+func _get_approach_pos(target_pos: Vector3, standoff: float) -> Vector3:
+	var offset: Vector3 = global_position - target_pos
+	offset.y = 0.0
+	if offset.length_squared() < 0.01:
+		offset = Vector3(1.0, 0.0, 0.0)
+	return target_pos + offset.normalized() * standoff
+
+func _cancel_harvest() -> void:
+	_harvest_target = ""
+	_chop_timer = 0.0
+	_chop_hit_pending = false
+	_chop_hit_timer = 0.0
+
+func _process_harvesting(delta: float) -> bool:
+	# Validate target still exists and is harvestable
+	if not WorldState.get_entity(_harvest_target):
+		_cancel_harvest()
+		return false
+
+	var tree_node: Node = WorldState.get_entity(_harvest_target)
+	if not is_instance_valid(tree_node):
+		_cancel_harvest()
+		return false
+
+	var harvestable: Node = tree_node.get_node_or_null("HarvestableComponent")
+	if not harvestable:
+		_cancel_harvest()
+		return false
+
+	if not harvestable.can_harvest("player"):
+		_cancel_harvest()
+		return false
+
+	# Move toward tree if out of range
+	var dist: float = global_position.distance_to(tree_node.global_position)
+	if dist > 3.0:
+		nav_agent.target_position = _get_approach_pos(tree_node.global_position, 2.5)
+		_is_navigating = true
+		_last_nav_pos = global_position
+		var next_pos: Vector3 = nav_agent.get_next_path_position()
+		var dir: Vector3 = next_pos - global_position
+		dir.y = 0.0
+		if dir.length_squared() > 0.01:
+			dir = dir.normalized()
+			velocity.x = dir.x * SPEED
+			velocity.z = dir.z * SPEED
+			_visuals.face_direction(dir)
+		return true
+
+	# In range — stop moving and chop
+	_is_navigating = false
+	velocity.x = move_toward(velocity.x, 0.0, SPEED)
+	velocity.z = move_toward(velocity.z, 0.0, SPEED)
+
+	# Face the tree
+	var face_dir: Vector3 = tree_node.global_position - global_position
+	face_dir.y = 0.0
+	if face_dir.length_squared() > 0.01:
+		_visuals.face_direction(face_dir.normalized())
+
+	# Advance chop timer
+	_chop_timer += delta
+	if _chop_timer >= _chop_interval:
+		_chop_timer = 0.0
+		_visuals.play_anim("1H_Melee_Attack_Chop")
+		_chop_hit_pending = true
+		_chop_hit_timer = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
+
+	# Resolve hit frame
+	if _chop_hit_pending:
+		_chop_hit_timer -= delta
+		if _chop_hit_timer <= 0.0:
+			_chop_hit_pending = false
+			var result: Dictionary = harvestable.process_chop("player")
+			if result.is_empty():
+				_cancel_harvest()
+				return false
+			_progression.grant_proficiency_xp("woodcutting", result.xp)
+			tree_node.last_chopper_pos = global_position
+			tree_node.shake()
+			if result.depleted:
+				tree_node.spawn_loot(result.item_id, result.bonus_item)
+				_cancel_harvest()
+
+	return false
 
 func _stop_navigation() -> void:
 	_is_navigating = false
@@ -452,6 +547,7 @@ func _handle_left_click() -> void:
 	# Vend sign click — walk to vendor NPC, then open shop
 	if _hover.hovered_vend_sign and not _hover.hovered_vend_sign_owner_id.is_empty() and _hover.hovered_vend_sign_owner_id != "player":
 		_cancel_attack()
+		_cancel_harvest()
 		_interact_target = _hover.hovered_vend_sign_owner_id
 		_hover.pending_vend_sign_click = true
 		var target_node := WorldState.get_entity(_hover.hovered_vend_sign_owner_id)
@@ -470,6 +566,7 @@ func _handle_left_click() -> void:
 
 		if etype == "monster" and WorldState.is_alive(hovered_entity_id):
 			# Click monster: walk to + auto-attack, lock ring on target
+			_cancel_harvest()
 			_interact_target = ""
 			_attack_target = hovered_entity_id
 			_auto_attack.cancel()
@@ -480,6 +577,7 @@ func _handle_left_click() -> void:
 		if etype == "loot_drop":
 			# Click loot: walk to + pick up on arrival
 			_cancel_attack()
+			_cancel_harvest()
 			_interact_target = hovered_entity_id
 			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
@@ -493,6 +591,7 @@ func _handle_left_click() -> void:
 		if etype == "npc":
 			# Click NPC: walk to + interact on arrival
 			_cancel_attack()
+			_cancel_harvest()
 			_interact_target = hovered_entity_id
 			var target_node := WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
@@ -504,12 +603,23 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
+		if etype == "tree":
+			# Click tree: walk to + chop when in range
+			_cancel_attack()
+			_cancel_harvest()
+			_harvest_target = hovered_entity_id
+			var target_node := WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
+			return
+
 	# Click on ground: move there, cancel target lock, close NPC info
 	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
 		npc_info_panel.close()
 	var ground_pos := _raycast_ground()
 	if ground_pos != Vector3.INF:
 		_cancel_attack()
+		_cancel_harvest()
 		_interact_target = ""
 		_spawn_click_marker(ground_pos)
 		_navigate_to(ground_pos)
@@ -567,6 +677,7 @@ func _open_shop(shop_id: String) -> void:
 func enter_vending_state() -> void:
 	_is_vending = true
 	_cancel_attack()
+	_cancel_harvest()
 	_stop_navigation()
 	velocity = Vector3.ZERO
 
@@ -595,6 +706,7 @@ func _die() -> void:
 	stop_vending()
 	_is_dead = true
 	_cancel_attack()
+	_cancel_harvest()
 	_stop_navigation()
 	velocity = Vector3.ZERO
 	_cursor_manager.reset()
@@ -663,6 +775,7 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
+	_cancel_harvest()
 
 # --- Duck typing delegations ---
 

@@ -8,7 +8,7 @@ const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const VALID_GOALS: Array = [
 	"hunt_field", "buy_potions", "sell_loot",
 	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest",
-	"vend", "buy_from_vendor", "tend_shop"
+	"vend", "buy_from_vendor", "tend_shop", "chop_wood"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -255,6 +255,14 @@ func _check_goal_completion() -> bool:
 				npc.set_goal("buy_potions")
 				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
+		"chop_wood":
+			# Sell logs if carrying enough (any wood material type)
+			var wood_count: int = npc._inventory.get_item_count("log") + npc._inventory.get_item_count("oak_log") + npc._inventory.get_item_count("ancient_log")
+			if wood_count >= 5:
+				var completed: String = npc.current_goal
+				npc.set_goal("sell_loot")
+				_emit_npc_event("goal_completed", {"completed_goal": completed})
+				return true
 		"vend":
 			# Vending NPCs stay in vend goal — never complete
 			# If VendingComponent stopped (e.g. sold out), restart it
@@ -300,6 +308,8 @@ func _execute_goal() -> void:
 			_execute_buy_from_vendor()
 		"tend_shop":
 			_execute_tend_shop()
+		"chop_wood":
+			_execute_chop_wood()
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
@@ -349,6 +359,26 @@ func _execute_hunt() -> void:
 	else:
 		npc.last_thought = "Heading to %s to hunt" % zone_center
 		_do_action("move_to", zone_center)
+
+func _execute_chop_wood() -> void:
+	var perception: Dictionary = _perception.get_perception()
+	var trees: Array = perception.get("trees", [])
+
+	# Find nearest harvestable tree
+	var target_tree: Dictionary = {}
+	for t in trees:
+		if t.get("harvestable", false):
+			target_tree = t
+			break
+
+	if target_tree.is_empty():
+		# No harvestable trees nearby — move to field zone
+		npc.last_thought = "Looking for trees to chop"
+		_do_action("move_to", "FieldCenter")
+		return
+
+	npc.last_thought = "Chopping %s" % target_tree.get("name", target_tree["id"])
+	_do_action("chop_tree", target_tree["id"])
 
 func _execute_buy_potions() -> void:
 	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, "healing_potion")
@@ -625,6 +655,20 @@ func _execute_idle() -> void:
 		var gold: int = inv.get_gold_amount()
 		if potion_count < 2 and gold >= 20:
 			npc.set_goal("buy_potions")
+			return
+
+	# In the field zone with woodcutting proficiency → chop wood (lower priority than combat/trade)
+	var in_field: bool = absf(npc.global_position.x) > 70.0
+	if in_field and npc._progression.get_proficiency_level("woodcutting") > 0:
+		var perception: Dictionary = _perception.get_perception() if _perception else {}
+		var trees: Array = perception.get("trees", [])
+		var has_harvestable_tree: bool = false
+		for t in trees:
+			if t.get("harvestable", false):
+				has_harvestable_tree = true
+				break
+		if has_harvestable_tree:
+			npc.set_goal("chop_wood")
 			return
 
 	# Fallback → patrol town

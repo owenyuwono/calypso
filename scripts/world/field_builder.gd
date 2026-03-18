@@ -23,12 +23,18 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 	var flower_files := ["SM_Flower_DaffodilsYellow.FBX", "SM_Flower_Sunflower1.FBX", "SM_Flower_Sunflower2.FBX", "SM_Flower_Sunflower3.FBX", "SM_Flower_TulipsRed.FBX", "SM_FlowerCrocus01.FBX", "SM_Flower_Allium.FBX", "SM_Flower_Foxtails1.FBX"]
 	var sapling_files := ["SM_FirSapling1.FBX", "SM_FirSapling2.FBX"]
 
+	var mature_leaf := Color(0.10, 0.38, 0.07)
+	var ancient_leaf := Color(0.07, 0.28, 0.05)
+	var ancient_files := ["SM_FirTree4.FBX", "SM_FirTree5.FBX"]
+
 	var biomes := [
 		# Dense Forest — NW field, thick trees
 		{
 			"bounds": [73, 22, 22, 20], "noise_threshold": -0.1,
 			"recipes": [
-				{"type": "tree", "count": 19, "min_spacing": 2.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 11, "min_spacing": 2.5, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 6, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 2, "min_spacing": 4.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 11, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": grass_files, "colors": [grass_color], "scale": 0.25},
@@ -57,7 +63,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [110, 22, 30, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "tree", "count": 8, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 2, "min_spacing": 3.5, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 			]
@@ -66,7 +74,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [73, -10, 17, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "tree", "count": 7, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 4, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 2, "min_spacing": 3.5, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
 				{"type": "stump", "count": 1, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},
@@ -98,7 +108,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [-152, 12, 22, 20], "noise_threshold": -0.1,
 			"recipes": [
-				{"type": "tree", "count": 19, "min_spacing": 2.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 11, "min_spacing": 2.5, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 6, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 2, "min_spacing": 4.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 11, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": grass_files, "colors": [grass_color], "scale": 0.25},
@@ -127,7 +139,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [-140, 22, 30, 18], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "tree", "count": 8, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 2, "min_spacing": 3.5, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 5, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 			]
@@ -136,7 +150,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [-90, -20, 17, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "tree", "count": 7, "min_spacing": 3.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "normal", "count": 4, "min_spacing": 3.0, "files": tree_files, "leaf_colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "choppable_tree", "tier": "mature", "count": 2, "min_spacing": 3.5, "files": tree_files, "leaf_colors": [mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": ancient_files, "leaf_colors": [ancient_leaf], "scale": 0.45},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green, dark_green], "scale": 0.25},
 				{"type": "stump", "count": 1, "min_spacing": 3.0, "files": ["SM_FirStump1.FBX"], "colors": [], "scale": 0.25},

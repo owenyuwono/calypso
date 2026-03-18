@@ -126,5 +126,19 @@ static func spawn_tree(ctx: WorldBuilderContext, filename: String, pos: Vector3,
 		instance.add_child(body)
 	return instance
 
+static func spawn_choppable_tree(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float, scale_val: float, leaf_color: Color, tier: String) -> StaticBody3D:
+	const ChoppableTree = preload("res://scenes/objects/choppable_tree.gd")
+	var tree := StaticBody3D.new()
+	tree.set_script(ChoppableTree)
+	if pos.y == 0.0 and ctx.terrain_noise:
+		var height_scale := ctx.terrain_height_scale_field
+		if ctx.is_in_city(pos):
+			height_scale = ctx.terrain_height_scale_city
+		pos.y = TerrainGenerator.get_height_at(ctx.terrain_noise, pos.x, pos.z, height_scale)
+	tree.position = pos
+	ctx.nav_region.add_child(tree)
+	tree.setup(tier, TREE_DIR + filename, rot_y, scale_val, leaf_color)
+	return tree
+
 static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	return spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
