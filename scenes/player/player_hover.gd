@@ -232,7 +232,7 @@ func _process_hover() -> void:
 			_cursor_manager.set_cursor("attack")
 		elif entity_type == "loot_drop":
 			display_name += " [Loot]"
-			_cursor_manager.set_cursor("move")
+			_cursor_manager.set_cursor("click")
 		elif entity_type == "npc":
 			var npc_node := WorldState.get_entity(_hovered_entity_id)
 			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]

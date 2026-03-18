@@ -443,10 +443,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		_interact_with_nearest()
 
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _is_ui_open():
-			return
-		_handle_left_click()
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_cursor_manager.press()
+			if _is_ui_open():
+				return
+			_handle_left_click()
+		else:
+			_cursor_manager.release()
 
 func _handle_left_click() -> void:
 	# Vend sign click — walk to vendor NPC, then open shop
