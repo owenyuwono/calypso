@@ -127,10 +127,9 @@ func _pick_best_skill(target_id: String) -> String:
 			continue
 
 		# Must require the NPC's current weapon proficiency
-		if not skill_data.has("required_proficiency"):
+		if not skill_data.has("synergy"):
 			continue
-		var req: Dictionary = skill_data.required_proficiency
-		if req.get("skill", "") != weapon_type:
+		if skill_data.synergy.primary.get("skill", "") != weapon_type:
 			continue
 
 		var skill_type: String = skill_data.get("type", "")

@@ -194,14 +194,6 @@ func _ready() -> void:
 	add_child(_player_skills)
 	_player_skills.setup(self, _combat, _stats, _skills_comp, _progression, _visuals, _perception)
 
-	# Auto-unlock any skills whose proficiency requirements are already met at startup
-	for s_id in SkillDatabase.SKILLS:
-		var s_data: Dictionary = SkillDatabase.SKILLS[s_id]
-		var req: Dictionary = s_data.get("required_proficiency", {})
-		if not req.is_empty():
-			var prof_level: int = _progression.get_proficiency_level(req.get("skill", ""))
-			if prof_level >= req.get("level", 1) and not _skills_comp.has_skill(s_id):
-				_skills_comp.unlock_skill(s_id)
 
 	_setup_dialogue_bubble()
 	_setup_click_marker()
@@ -810,16 +802,9 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 func _on_entity_healed(eid: String, _amount: int, _current_hp: int) -> void:
 	pass
 
-func _on_proficiency_level_up(eid: String, skill_id: String, new_level: int) -> void:
+func _on_proficiency_level_up(eid: String, _skill_id: String, _new_level: int) -> void:
 	if eid != "player":
 		return
-	# Check if any active skills should be unlocked
-	for active_skill_id in SkillDatabase.SKILLS:
-		var skill: Dictionary = SkillDatabase.SKILLS[active_skill_id]
-		var req: Dictionary = skill.get("required_proficiency", {})
-		if req.get("skill", "") == skill_id and req.get("level", 1) <= new_level:
-			if not _skills_comp.has_skill(active_skill_id):
-				_skills_comp.unlock_skill(active_skill_id)
 
 func _on_vending_started(eid: String, shop_title: String) -> void:
 	if eid == entity_id:

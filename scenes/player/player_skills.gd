@@ -69,8 +69,6 @@ func use_skill(skill_id: String) -> void:
 	if skill.is_empty():
 		return
 	var skill_level: int = _skills_comp.get_skill_level(skill_id)
-	if skill_level <= 0:
-		return
 
 	# All skill types require a valid, in-range, alive target
 	var attack_target: String = _player._attack_target
@@ -96,10 +94,15 @@ func use_skill(skill_id: String) -> void:
 	var stamina_comp_node: Node = _player.get_node_or_null("StaminaComponent")
 	if stamina_comp_node:
 		stamina_comp_node.drain_flat(STAMINA_DRAIN_SKILL)
-	# Start cooldown
-	var cooldown: float = SkillDatabase.get_effective_cooldown(skill_id, skill_level)
+	# Start cooldown with synergy reduction applied
+	var cd_bonuses: Dictionary = {}
+	if _progression:
+		cd_bonuses = SkillDatabase.get_synergy_bonuses(skill_id, _progression)
+	var cd_reduction: float = cd_bonuses.get("cooldown_reduction", 0.0)
+	var base_cd: float = SkillDatabase.get_effective_cooldown(skill_id, skill_level)
+	var final_cd: float = base_cd * (1.0 - cd_reduction)
 	if _skill_hotbar:
-		_skill_hotbar.start_cooldown(skill_id, cooldown)
+		_skill_hotbar.start_cooldown(skill_id, final_cd)
 
 
 ## Handles the pending skill hit timing while suppressing auto-attack.
@@ -161,14 +164,36 @@ func _execute_skill_hit() -> void:
 	var skill_data: Dictionary = SkillDatabase.get_skill(_pending_skill_id)
 	var skill_level: int = _skills_comp.get_skill_level(_pending_skill_id)
 	var skill_color: Color = skill_data.get("color", Color(1, 1, 1))
+
+	var effectiveness_data: Dictionary = {}
+	if _progression:
+		var primary: Dictionary = SkillDatabase.get_primary_proficiency(_pending_skill_id)
+		var prof_level: int = _progression.get_proficiency_level(primary.skill)
+		var eff_data: Dictionary = SkillDatabase.get_primary_effectiveness(_pending_skill_id, prof_level)
+		var bonuses: Dictionary = SkillDatabase.get_synergy_bonuses(_pending_skill_id, _progression)
+		effectiveness_data = {
+			"effectiveness": eff_data.effectiveness,
+			"synergy_bonuses": bonuses,
+			"self_harm_chance": eff_data.self_harm_chance,
+			"self_harm_percent": eff_data.self_harm_percent,
+		}
+
 	var results: Array = SkillEffectResolver.resolve_skill_hit(
 		_combat, _perception, skill_data, skill_level,
-		_pending_target_id, _player.global_position, _active_bleeds, "player"
+		_pending_target_id, _player.global_position, _active_bleeds, "player",
+		effectiveness_data
 	)
 
 	# Spawn damage numbers and visual feedback for every hit in results
 	for i in range(results.size()):
 		var result: Dictionary = results[i]
+		if result.get("self_harm", false):
+			var self_damage: int = result.get("damage", 0)
+			_stats.take_damage(self_damage)
+			_visuals.flash_hit()
+			_visuals.spawn_damage_number("player", self_damage, Color.RED, _player.global_position)
+			GameEvents.skill_backfired.emit("player", _pending_skill_id, self_damage)
+			continue
 		var hit_target_id: String = result.get("target_id", "")
 		var hit_damage: int = result.get("damage", 0)
 		var hit_node: Node3D = WorldState.get_entity(hit_target_id)

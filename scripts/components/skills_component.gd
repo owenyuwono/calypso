@@ -8,30 +8,28 @@ var _skill_xp: Dictionary = {}  # skill_id -> current xp (int)
 var _hotbar: Array = ["", "", "", "", ""]
 
 func setup(skills: Dictionary, hotbar: Array) -> void:
-	_skills = skills.duplicate()
+	# Initialize all skills at minimum level 1
+	for skill_id in SkillDatabase.SKILLS:
+		_skills[skill_id] = maxi(1, skills.get(skill_id, 1))
 	_hotbar = hotbar.duplicate()
+	for skill_id in SkillDatabase.SKILLS:
+		_skill_xp[skill_id] = 0
+	_sync()
 
 func get_skill_level(skill_id: String) -> int:
-	return _skills.get(skill_id, 0)
+	if not SkillDatabase.SKILLS.has(skill_id):
+		return 0
+	return maxi(1, _skills.get(skill_id, 1))
 
 func has_skill(skill_id: String) -> bool:
-	return _skills.get(skill_id, 0) > 0
-
-func unlock_skill(skill_id: String) -> void:
-	## Called when proficiency milestone is reached.
-	if _skills.get(skill_id, 0) <= 0:
-		_skills[skill_id] = 1
-		_sync()
-		var parent := get_parent()
-		if parent and "entity_id" in parent:
-			GameEvents.skill_learned.emit(parent.entity_id, skill_id, 1)
+	return SkillDatabase.SKILLS.has(skill_id)
 
 func grant_skill_xp(skill_id: String, amount: int) -> void:
 	## Grant XP to an active skill. Levels up using same curve as proficiencies.
-	var current_level: int = _skills.get(skill_id, 0)
-	if current_level <= 0:
-		return  # Not learned
-	var skill := SkillDatabase.get_skill(skill_id)
+	var skill: Dictionary = SkillDatabase.get_skill(skill_id)
+	if skill.is_empty():
+		return
+	var current_level: int = _skills.get(skill_id, 1)
 	var max_level: int = skill.get("max_level", 5)
 	if current_level >= max_level:
 		return
