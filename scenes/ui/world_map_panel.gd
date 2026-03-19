@@ -7,17 +7,15 @@ const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 const MAP_W := 500.0
 const MAP_H := 400.0
 
-# World extents for mapping
-const WORLD_MIN_X := -150.0
-const WORLD_MAX_X := 150.0
-const WORLD_MIN_Z := -50.0
-const WORLD_MAX_Z := 50.0
-
 const COLOR_BG := Color(0.08, 0.08, 0.12, 0.92)
-const COLOR_CITY := Color(0.2, 0.35, 0.2, 0.2)
-const COLOR_FIELD := Color(0.35, 0.35, 0.15, 0.2)
 const COLOR_WALL := Color(0.5, 0.45, 0.35, 0.8)
 const UPDATE_INTERVAL := 0.5
+
+# World extents computed once from ZoneDatabase at startup
+var _world_min_x: float = 0.0
+var _world_max_x: float = 0.0
+var _world_min_z: float = 0.0
+var _world_max_z: float = 0.0
 
 const DISTRICT_LABELS: Array = [
 	{"name": "Central Plaza", "pos": Vector2(0, 0)},
@@ -42,7 +40,29 @@ var _player_world_pos := Vector2.ZERO
 
 func _ready() -> void:
 	visible = false
+	_compute_world_extents()
 	_build_ui()
+
+
+func _compute_world_extents() -> void:
+	var first: bool = true
+	for zone_id in ZoneDatabase.ZONES:
+		var bounds: Rect2 = ZoneDatabase.ZONES[zone_id]["bounds"]
+		var min_x: float = bounds.position.x
+		var min_z: float = bounds.position.y
+		var max_x: float = bounds.position.x + bounds.size.x
+		var max_z: float = bounds.position.y + bounds.size.y
+		if first:
+			_world_min_x = min_x
+			_world_max_x = max_x
+			_world_min_z = min_z
+			_world_max_z = max_z
+			first = false
+		else:
+			_world_min_x = minf(_world_min_x, min_x)
+			_world_max_x = maxf(_world_max_x, max_x)
+			_world_min_z = minf(_world_min_z, min_z)
+			_world_max_z = maxf(_world_max_z, max_z)
 
 
 func _build_ui() -> void:
@@ -122,8 +142,8 @@ func _update_dots() -> void:
 
 
 func _world_to_map(world_pos: Vector2) -> Vector2:
-	var mx: float = (world_pos.x - WORLD_MIN_X) / (WORLD_MAX_X - WORLD_MIN_X) * MAP_W
-	var my: float = (world_pos.y - WORLD_MIN_Z) / (WORLD_MAX_Z - WORLD_MIN_Z) * MAP_H
+	var mx: float = (world_pos.x - _world_min_x) / (_world_max_x - _world_min_x) * MAP_W
+	var my: float = (world_pos.y - _world_min_z) / (_world_max_z - _world_min_z) * MAP_H
 	return Vector2(mx, my)
 
 
@@ -131,20 +151,26 @@ func _on_draw_area_draw(draw_area: Control) -> void:
 	# Background
 	draw_area.draw_rect(Rect2(0, 0, MAP_W, MAP_H), COLOR_BG)
 
-	# City zone rect (x:-70..70, z:-50..50)
-	var city_tl := _world_to_map(Vector2(-70, -50))
-	var city_br := _world_to_map(Vector2(70, 50))
-	draw_area.draw_rect(Rect2(city_tl, city_br - city_tl), COLOR_CITY)
+	# Zone rects — dynamic from ZoneDatabase; highlight the currently loaded zone
+	var loaded_zone: Node3D = ZoneManager.get_loaded_zone()
+	var current_zone_id: String = ""
+	if loaded_zone and "zone_id" in loaded_zone:
+		current_zone_id = loaded_zone.zone_id
 
-	# East field zone rect (x:70..150, z:-40..40)
-	var field_tl := _world_to_map(Vector2(70, -40))
-	var field_br := _world_to_map(Vector2(150, 40))
-	draw_area.draw_rect(Rect2(field_tl, field_br - field_tl), COLOR_FIELD)
-
-	# West field zone rect (x:-150..-70, z:-40..40)
-	var wfield_tl := _world_to_map(Vector2(-150, -40))
-	var wfield_br := _world_to_map(Vector2(-70, 40))
-	draw_area.draw_rect(Rect2(wfield_tl, wfield_br - wfield_tl), COLOR_FIELD)
+	for zone_id in ZoneDatabase.ZONES:
+		var zone_data: Dictionary = ZoneDatabase.ZONES[zone_id]
+		var bounds: Rect2 = zone_data["bounds"]
+		var zone_color: Color = zone_data["color"]
+		var tl: Vector2 = _world_to_map(bounds.position)
+		var br: Vector2 = _world_to_map(bounds.position + bounds.size)
+		var fill_rect := Rect2(tl, br - tl)
+		if zone_id == current_zone_id:
+			# Brighter fill + highlighted border for active zone
+			var highlight_color := Color(zone_color.r, zone_color.g, zone_color.b, zone_color.a * 2.5)
+			draw_area.draw_rect(fill_rect, highlight_color)
+			draw_area.draw_rect(fill_rect, Color(0.8, 0.75, 0.5, 0.7), false, 2.0)
+		else:
+			draw_area.draw_rect(fill_rect, zone_color)
 
 	# City wall outline
 	var wall_top_left := _world_to_map(Vector2(-70, -50))

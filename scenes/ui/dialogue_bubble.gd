@@ -1,30 +1,39 @@
 extends Node3D
-## Dialogue bubble rendered via a single Label3D — no SubViewports.
+## Styled dialogue bubble rendered via SubViewport + Sprite3D.
 
-var _label: Label3D
+@onready var _viewport: SubViewport = $SubViewport
+@onready var _panel: PanelContainer = $SubViewport/PanelContainer
+@onready var _label: Label = $SubViewport/PanelContainer/MarginContainer/Label
+@onready var _sprite: Sprite3D = $Sprite3D
 
 var _display_timer: float = 0.0
 var _display_duration: float = 4.0
 var _showing: bool = false
 var _dialogue_queue: Array = []
 
+const MAX_WIDTH := 600
+const PIXEL_SIZE := 0.01
 const MAX_WORDS_PER_BUBBLE: int = 12
 
 func _ready() -> void:
-	_label = Label3D.new()
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.pixel_size = 0.008
-	_label.font_size = 24
-	_label.outline_size = 12
-	_label.modulate = Color(1, 1, 1, 1)
-	_label.outline_modulate = Color(0.12, 0.1, 0.08, 0.85)
-	_label.width = 300
-	_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.no_depth_test = true
-	_label.render_priority = 10
-	add_child(_label)
 	visible = false
+	_setup_style()
+
+func _setup_style() -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.1, 0.08, 0.85)
+	style.corner_radius_top_left = 6
+	style.corner_radius_top_right = 6
+	style.corner_radius_bottom_left = 6
+	style.corner_radius_bottom_right = 6
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	_panel.add_theme_stylebox_override("panel", style)
+
+	_label.add_theme_color_override("font_color", Color.WHITE)
+	_label.add_theme_font_size_override("font_size", 32)
 
 func _process(delta: float) -> void:
 	if not _showing:
@@ -42,6 +51,7 @@ func show_dialogue(text: String, duration: float = -1.0) -> void:
 	for sentence: String in sentences:
 		var words := sentence.split(" ", false)
 		if words.size() > MAX_WORDS_PER_BUBBLE:
+			# Long sentence — fall back to word-count split
 			var i := 0
 			while i < words.size():
 				var end := mini(i + MAX_WORDS_PER_BUBBLE, words.size())
@@ -61,6 +71,7 @@ func _split_sentences(text: String) -> Array:
 		current += ch
 		var is_end := ch == "." or ch == "!" or ch == "?"
 		if is_end and (i + 1 >= text.length() or text.substr(i + 1, 1) == " "):
+			# Don't split inside repeated punctuation (ellipsis "...", "!!", "??")
 			var prev_is_punct := i > 0 and text.substr(i - 1, 1) in [".", "!", "?"]
 			var next_is_punct := i + 1 < text.length() and text.substr(i + 1, 1) in [".", "!", "?"]
 			if not prev_is_punct and not next_is_punct:
@@ -76,12 +87,15 @@ func _show_chunk(text: String, duration: float = -1.0) -> void:
 	_display_timer = 0.0
 	_showing = true
 	visible = true
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_update_viewport_size()
 
 func _show_next_chunk() -> void:
 	var chunk: String = _dialogue_queue.pop_front()
 	_show_chunk(chunk)
 
 func _calc_duration(text: String) -> float:
+	# ~0.4s per word, minimum 3s, maximum 12s
 	var word_count := text.split(" ", false).size()
 	return clampf(word_count * 0.4, 3.0, 12.0)
 
@@ -89,3 +103,28 @@ func hide_bubble() -> void:
 	_showing = false
 	visible = false
 	_dialogue_queue.clear()
+
+func _update_viewport_size() -> void:
+	# Use font metrics directly for reliable measurement.
+	var h_margin := 24  # left + right content margins (12+12)
+	var v_margin := 16  # top + bottom content margins (8+8)
+
+	var font := _label.get_theme_font("font")
+	var font_size := _label.get_theme_font_size("font_size")
+
+	# 1. Measure natural (unwrapped) text width via font metrics.
+	var natural_size := font.get_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var bubble_width := clampi(int(natural_size.x) + h_margin, 80, MAX_WIDTH)
+
+	# 2. Measure wrapped text height at the constrained width.
+	var wrap_width := bubble_width - h_margin
+	var wrapped_size := font.get_multiline_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size)
+	var bubble_height := maxi(int(wrapped_size.y) + v_margin, 40)
+
+	# 3. Apply sizes to viewport and panel; children with layout_mode=2 fill automatically.
+	_viewport.size = Vector2i(bubble_width, bubble_height)
+
+	# Wait one frame for viewport to re-render, then assign texture.
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	await get_tree().process_frame
+	_sprite.texture = _viewport.get_texture()

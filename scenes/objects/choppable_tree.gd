@@ -204,7 +204,10 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 		loot.gold_amount = 0
 		var offset := Vector3(randf_range(-1.2, 1.2), 0.0, randf_range(-1.2, 1.2))
 		loot.position = global_position + offset
-		get_tree().current_scene.call_deferred("add_child", loot)
+		var loot_parent: Node = ZoneManager.get_loaded_zone()
+		if not loot_parent:
+			loot_parent = get_tree().current_scene
+		loot_parent.call_deferred("add_child", loot)
 	if not bonus_item.is_empty():
 		var bonus := Area3D.new()
 		bonus.set_script(loot_scene)
@@ -212,7 +215,10 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 		bonus.item_count = 1
 		bonus.gold_amount = 0
 		bonus.position = global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-		get_tree().current_scene.call_deferred("add_child", bonus)
+		var bonus_parent: Node = ZoneManager.get_loaded_zone()
+		if not bonus_parent:
+			bonus_parent = get_tree().current_scene
+		bonus_parent.call_deferred("add_child", bonus)
 
 
 func highlight() -> void:

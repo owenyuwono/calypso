@@ -24,6 +24,7 @@ WorldState="*res://autoloads/world_state.gd"
 LLMClient="*res://autoloads/llm_client.gd"
 GameEvents="*res://autoloads/game_events.gd"
 TimeManager="*res://autoloads/time_manager.gd"
+ZoneManager="*res://autoloads/zone_manager.gd"
 
 [display]
 

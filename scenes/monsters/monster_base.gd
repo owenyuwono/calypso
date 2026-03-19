@@ -401,9 +401,6 @@ func _drop_aggro() -> void:
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
 		_stagger_timer = 0.3
-		if attacker_id == "player":
-			_visuals.set_hp_bar_visible(true)
-			_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, state in ["aggro", "attacking"])
 
 func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
 	pass
@@ -563,4 +560,7 @@ func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: i
 	if index > 0:
 		offset += Vector3(float(index) * 0.5, 0, 0)
 	loot.position = origin + offset
-	get_tree().current_scene.call_deferred("add_child", loot)
+	var loot_parent: Node = ZoneManager.get_loaded_zone()
+	if not loot_parent:
+		loot_parent = get_tree().current_scene
+	loot_parent.call_deferred("add_child", loot)

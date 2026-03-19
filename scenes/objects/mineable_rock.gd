@@ -1,7 +1,7 @@
 extends StaticBody3D
 ## Mineable rock entity. Spawned by the rock spawner into the world.
 ## Registers with WorldState for hover and NPC targeting.
-## Uses a GLB model for tiers listed in MODEL_PATHS; falls back to procedural sphere-cluster geometry.
+## Uses procedural sphere-cluster geometry — no external model files.
 ## Depletion shrinks + darkens the rock; respawn restores scale and color.
 
 const OreDatabase = preload("res://scripts/data/ore_database.gd")
@@ -12,10 +12,6 @@ const TIER_COLORS: Dictionary = {
 	"copper": Color(0.72, 0.45, 0.2),
 	"iron": Color(0.55, 0.56, 0.62),
 	"gold": Color(0.85, 0.65, 0.13),
-}
-
-const MODEL_PATHS: Dictionary = {
-	"copper": "res://assets/models/environment/props/copper_ore.glb"
 }
 
 static var _next_id: int = 1
@@ -73,15 +69,6 @@ func _build_rock_mesh() -> void:
 	add_child(_rock_mesh_root)
 	_original_scale = _rock_mesh_root.scale
 
-	if MODEL_PATHS.has(rock_tier):
-		var result: Dictionary = ModelHelper.instantiate_model(MODEL_PATHS[rock_tier], 1.0)
-		var model_node: Node3D = result.get("model")
-		if model_node:
-			_rock_mesh_root.add_child(model_node)
-			_mesh_instances = ModelHelper.find_mesh_instances(model_node)
-			return
-
-	# Fallback: procedural sphere cluster for tiers without a model.
 	var mat: StandardMaterial3D = _get_ore_material(rock_tier)
 
 	var main: MeshInstance3D = _create_sphere(Vector3(0.0, 0.6, 0.0), 0.8, mat)
@@ -145,12 +132,10 @@ func _on_respawned() -> void:
 	if _rock_mesh_root:
 		var tween := create_tween()
 		tween.tween_property(_rock_mesh_root, "scale", _original_scale, 0.5).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		var mat: StandardMaterial3D = _get_ore_material(rock_tier)
 		for mi in _mesh_instances:
 			if is_instance_valid(mi):
-				if MODEL_PATHS.has(rock_tier):
-					mi.material_override = null
-				else:
-					mi.material_override = _get_ore_material(rock_tier)
+				mi.material_override = mat
 
 
 func spawn_loot(item_id: String, bonus_item: String = "") -> void:
@@ -168,7 +153,10 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 		loot.gold_amount = 0
 		var offset := Vector3(randf_range(-1.2, 1.2), 0.0, randf_range(-1.2, 1.2))
 		loot.position = global_position + offset
-		get_tree().current_scene.call_deferred("add_child", loot)
+		var loot_parent: Node = ZoneManager.get_loaded_zone()
+		if not loot_parent:
+			loot_parent = get_tree().current_scene
+		loot_parent.call_deferred("add_child", loot)
 	if not bonus_item.is_empty():
 		var bonus := Area3D.new()
 		bonus.set_script(loot_scene)
@@ -176,7 +164,10 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 		bonus.item_count = 1
 		bonus.gold_amount = 0
 		bonus.position = global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-		get_tree().current_scene.call_deferred("add_child", bonus)
+		var bonus_parent: Node = ZoneManager.get_loaded_zone()
+		if not bonus_parent:
+			bonus_parent = get_tree().current_scene
+		bonus_parent.call_deferred("add_child", bonus)
 
 
 func highlight() -> void:
