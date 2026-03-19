@@ -141,7 +141,7 @@ func _add_harvestable_component() -> void:
 	var comp := HarvestableComponent.new()
 	comp.name = "HarvestableComponent"
 	add_child(comp)
-	comp.setup(tree_tier)
+	comp.setup(tree_tier, "woodcutting", TreeDatabase.get_tree)
 	_harvestable = comp
 	comp.depleted.connect(_on_depleted)
 	comp.respawned.connect(_on_respawned)

@@ -224,6 +224,9 @@ static func _spawn_recipe(ctx: WorldBuilderContext, recipe: Dictionary, x: float
 			AssetSpawner.spawn_choppable_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, leaf_color, tier)
 		"foliage":
 			AssetSpawner.spawn_foliage(ctx, file, Vector3(x, 0, z), color, rot_y, scale_val)
+		"mineable_rock":
+			var tier: String = recipe.get("tier", "copper")
+			AssetSpawner.spawn_mineable_rock(ctx, Vector3(x, 0, z), rot_y, scale_val, tier)
 		"rock_cluster":
 			create_rock_cluster(ctx, Vector3(x, 0, z))
 		"stump", "fallen":

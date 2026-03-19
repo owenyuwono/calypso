@@ -5,6 +5,7 @@ class_name AssetSpawner
 const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
 const TREE_DIR := "res://assets/models/environment/nature/trees/fir/"
 const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
+const PROPS_DIR := "res://assets/models/environment/props/"
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
@@ -140,5 +141,23 @@ static func spawn_choppable_tree(ctx: WorldBuilderContext, filename: String, pos
 	tree.setup(tier, TREE_DIR + filename, rot_y, scale_val, leaf_color)
 	return tree
 
+static func spawn_mineable_rock(ctx: WorldBuilderContext, pos: Vector3, rot_y: float, scale_val: float, tier: String) -> StaticBody3D:
+	const MineableRock = preload("res://scenes/objects/mineable_rock.gd")
+	var rock := StaticBody3D.new()
+	rock.set_script(MineableRock)
+	if pos.y == 0.0 and ctx.terrain_noise:
+		var height_scale := ctx.terrain_height_scale_field
+		if ctx.is_in_city(pos):
+			height_scale = ctx.terrain_height_scale_city
+		pos.y = TerrainGenerator.get_height_at(ctx.terrain_noise, pos.x, pos.z, height_scale)
+	rock.position = pos
+	rock.rotation.y = rot_y
+	ctx.nav_region.add_child(rock)
+	rock.setup(tier, scale_val)
+	return rock
+
 static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	return spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
+
+static func spawn_prop(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
+	return spawn_model(ctx, PROPS_DIR + filename, pos, rot_y, scale_val)

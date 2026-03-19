@@ -12,12 +12,13 @@ var _hotspots: Dictionary = {
 	"attack": Vector2(2, 2),
 	"talk": Vector2(32, 32),
 	"woodcut": Vector2(32, 32),
+	"mine": Vector2(32, 32),
 }
 
 var _current_type: String = ""
 
 func _init() -> void:
-	var names: Array = ["default", "click", "attack", "talk", "woodcut"]
+	var names: Array = ["default", "click", "attack", "talk", "woodcut", "mine"]
 	for cursor_name: String in names:
 		var src: Texture2D = load("res://assets/textures/ui/cursors/cursor_%s.png" % cursor_name)
 		var img: Image = src.get_image()
