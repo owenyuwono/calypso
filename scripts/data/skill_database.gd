@@ -219,8 +219,29 @@ const SKILLS: Dictionary = {
 	},
 }
 
+const SKILL_CATEGORIES: Dictionary = {
+	"bash": "single_physical",
+	"chop": "single_physical",
+	"crush": "single_physical",
+	"stab": "single_physical",
+	"execute": "single_physical",
+	"shatter": "single_physical",
+	"backstab": "single_physical",
+	"arcane_bolt": "single_magic",
+	"cleave": "aoe_physical",
+	"whirlwind": "aoe_physical",
+	"quake": "aoe_physical",
+	"flame_burst": "aoe_magic",
+	"rend": "dot_physical",
+	"lacerate": "dot_physical",
+	"drain": "dot_magic",
+}
+
 static func get_skill(skill_id: String) -> Dictionary:
 	return SKILLS.get(skill_id, {})
+
+static func get_skill_category(skill_id: String) -> String:
+	return SKILL_CATEGORIES.get(skill_id, "single_physical")
 
 static func get_effective_multiplier(skill_id: String, skill_level: int) -> float:
 	var skill := get_skill(skill_id)

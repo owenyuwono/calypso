@@ -377,6 +377,26 @@ func _build_skill_row(skill_id: String) -> void:
 	top_row.add_theme_constant_override("separation", 8)
 	row_vbox.add_child(top_row)
 
+	var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
+	var icon_texture: Texture2D = null
+	if ResourceLoader.exists(icon_path):
+		icon_texture = load(icon_path)
+	else:
+		var category: String = SkillDatabase.get_skill_category(skill_id)
+		var base_path: String = "res://assets/textures/ui/skills/bases/" + category + "_base.png"
+		if ResourceLoader.exists(base_path):
+			icon_texture = load(base_path)
+	if icon_texture:
+		var skill_icon: TextureRect = TextureRect.new()
+		skill_icon.texture = icon_texture
+		skill_icon.custom_minimum_size = Vector2(24, 24)
+		skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		skill_icon.texture_filter = TEXTURE_FILTER_LINEAR
+		skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		skill_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top_row.add_child(skill_icon)
+
 	var name_label := Label.new()
 	name_label.text = skill.get("name", skill_id)
 	name_label.add_theme_font_size_override("font_size", 15)
