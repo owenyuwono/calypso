@@ -6,7 +6,7 @@ const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const INTERACT_RANGE: float = 4.0
 const HOVER_RAY_LENGTH: float = 100.0
-const MODEL_SCALE: float = 2.0
+const MODEL_SCALE: float = 1.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 3.0
@@ -323,7 +323,7 @@ func _physics_process(delta: float) -> void:
 	# Update animation
 	if _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
-			_visuals.play_anim("Walking_A")
+			_visuals.play_anim("Running_A")
 		else:
 			_visuals.play_anim("Idle")
 

@@ -162,7 +162,11 @@ func _setup_model(stats: Dictionary) -> void:
 		_create_slime_mesh(stats)
 		return
 
-	_visuals.setup_model(model_scene_path, scale_val, stats.get("color", Color.WHITE), true)
+	var anim_paths: Dictionary = stats.get("model_anim_paths", {})
+	if not anim_paths.is_empty():
+		_visuals.setup_model_with_anims(model_scene_path, anim_paths, scale_val, stats.get("color", Color.WHITE))
+	else:
+		_visuals.setup_model(model_scene_path, scale_val, stats.get("color", Color.WHITE), true)
 
 	# Apply color tint overlay for recolored monsters (goblin, dark_mage)
 	var tint_color: Color = stats.get("model_tint", Color(0, 0, 0, 0))

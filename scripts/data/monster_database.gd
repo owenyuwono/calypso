@@ -23,10 +23,11 @@ const MONSTERS: Dictionary = {
 		"aggro_range": 10.0, "attack_range": 2.0, "attack_speed": 1.0,
 		"color": Color(0.5, 0.5, 0.5),
 		"wander_radius": 8.0,
-		# Wolf uses Rogue model with gray tint (no wolf model available)
-		"model_scene": "res://assets/models/characters/Rogue_Hooded.glb",
-		"model_scale": 0.5,
-		"model_tint": Color(0.4, 0.35, 0.3, 0.2),
+		"model_scene": "res://assets/models/characters/wolf.glb",
+		"model_scale": 200.0,
+		"model_anim_paths": {
+			"Walking_A": "res://assets/models/characters/wolf_walk.glb",
+		},
 	},
 	"goblin": {
 		"name": "Goblin",
