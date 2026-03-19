@@ -33,6 +33,8 @@ var _rel_comp: Node  # RelationshipComponent, duck-typed
 var _perception: Node
 
 var _social_cooldown: float = 0.0
+var _process_timer: float = 0.0
+const PROCESS_INTERVAL: float = 1.0
 
 func setup(npc: CharacterBody3D, brain: Node, memory: Node) -> void:
 	_npc = npc
@@ -42,8 +44,14 @@ func setup(npc: CharacterBody3D, brain: Node, memory: Node) -> void:
 	_social_cooldown = randf_range(10.0, 20.0)
 
 func _process(delta: float) -> void:
+	_process_timer += delta
+	if _process_timer < PROCESS_INTERVAL:
+		return
+	var elapsed: float = _process_timer
+	_process_timer = 0.0
+
 	if _social_cooldown > 0.0:
-		_social_cooldown -= delta
+		_social_cooldown -= elapsed
 
 ## Returns true if a social chat was initiated, false otherwise.
 ## Called from NpcBehavior.evaluate() as priority 2.5.

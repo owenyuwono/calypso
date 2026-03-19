@@ -286,6 +286,7 @@ static func create_rock_cluster(ctx: WorldBuilderContext, center: Vector3) -> vo
 		mesh_inst.rotation.y = rng.randf() * TAU
 		mesh_inst.rotation.x = rng.randf_range(-0.2, 0.2)
 		mesh_inst.set_surface_override_material(0, rock_mat)
+		mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		rock.add_child(mesh_inst)
 
 		var col := CollisionShape3D.new()

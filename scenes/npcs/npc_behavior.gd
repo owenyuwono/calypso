@@ -39,12 +39,16 @@ var _perception: Node
 
 var _idle_timer: float = 0.0  # Tracks how long NPC has been idle with no activity
 var _was_in_combat: bool = false  # Detects combat → non-combat transition
+var _frame_skip: int = randi() % 2
+var _last_equip_check_hash: int = -1
 
 func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
 	brain = npc.get_node("NPCBrain")
+	# Stagger behavior ticks so 50+ NPCs don't all evaluate on the same frame
+	_behavior_timer = randf_range(0.0, TICK_INTERVAL)
 	_social = preload("res://scenes/npcs/npc_social.gd").new()
 	_social.name = "NpcSocial"
 	add_child(_social)
@@ -60,6 +64,11 @@ func _ready() -> void:
 	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
 
 func _process(delta: float) -> void:
+	_frame_skip += 1
+	if _frame_skip % 2 != 0:
+		return
+	var effective_delta: float = delta * 2.0
+
 	# Detect combat → non-combat transition to emit combat_outcome
 	var in_combat: bool = npc.current_state == "combat"
 	if _was_in_combat and not in_combat and npc.current_state != "dead":
@@ -81,12 +90,12 @@ func _process(delta: float) -> void:
 		return
 
 	# Track idle time and fire idle_timeout event
-	_idle_timer += delta
+	_idle_timer += effective_delta
 	if _idle_timer >= 60.0:
 		_idle_timer = 0.0
 		_emit_npc_event("idle_timeout", {})
 
-	_behavior_timer += delta
+	_behavior_timer += effective_delta
 	if _behavior_timer >= TICK_INTERVAL:
 		_behavior_timer = 0.0
 		evaluate()
@@ -700,15 +709,9 @@ func _on_time_phase_changed(_old_phase: String, new_phase: String) -> void:
 # Hunt Target Selection
 # =============================================================================
 
-func _is_monster_contested(monster_id: String) -> Dictionary:
-	# Only check NPCs visible in our own perception — avoids scanning all entity_data.
-	# Any NPC far enough away to be invisible won't contest for practical purposes.
-	if not _perception:
-		_perception = npc.get_node_or_null("PerceptionComponent")
-	if not _perception:
-		return {"contested": false, "fighter_id": "", "fighter_hp_pct": 1.0, "fighter_retreating": false}
-	var nearby_npcs: Array = _perception.get_nearby()
-	for entry in nearby_npcs:
+func _is_monster_contested(monster_id: String, nearby_entities: Array) -> Dictionary:
+	# Uses the pre-fetched nearby list — avoids calling get_nearby() once per monster.
+	for entry in nearby_entities:
 		var eid: String = entry.id
 		if eid == npc.npc_id:
 			continue
@@ -760,8 +763,11 @@ func _select_hunt_target(alive_monsters: Array) -> Dictionary:
 	var help_targets: Array = []  # contested where fighter is retreating
 	var contested: Array = []
 
+	# Fetch nearby entities once — passed to _is_monster_contested to avoid O(M×T) calls
+	var nearby: Array = _perception.get_nearby() if _perception else []
+
 	for m in alive_monsters:
-		var contest_info: Dictionary = _is_monster_contested(m["id"])
+		var contest_info: Dictionary = _is_monster_contested(m["id"], nearby)
 		var monster_data: Dictionary = WorldState.get_entity_data(m["id"])
 
 		# Skip monsters we can't handle (unless bold)
@@ -805,8 +811,12 @@ func _select_hunt_target(alive_monsters: Array) -> Dictionary:
 # =============================================================================
 
 func _auto_equip() -> void:
-	var equipment: Dictionary = npc._equipment.get_equipment()
 	var inv: Dictionary = npc._inventory.get_items()
+	var check_hash: int = inv.size()
+	if check_hash == _last_equip_check_hash:
+		return
+	_last_equip_check_hash = check_hash
+	var equipment: Dictionary = npc._equipment.get_equipment()
 	for item_id in inv:
 		var item := ItemDatabase.get_item(item_id)
 		var item_type: String = item.get("type", "")

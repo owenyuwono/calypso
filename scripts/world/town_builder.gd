@@ -35,6 +35,7 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	arch.mesh = arch_mesh
 	arch.position = Vector3(70, wall_height + 0.75, 0)
 	arch.set_surface_override_material(0, wall_mat)
+	arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(arch)  # Add to scene root, not nav region
 
 	# East gate torches
@@ -54,6 +55,7 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	west_arch.mesh = west_arch_mesh
 	west_arch.position = Vector3(-70, wall_height + 0.75, 0)
 	west_arch.set_surface_override_material(0, wall_mat)
+	west_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(west_arch)  # Add to scene root, not nav region
 
 	# West gate torches
@@ -76,6 +78,7 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	north_arch.mesh = north_arch_mesh
 	north_arch.position = Vector3(0, wall_height + 0.75, -50)
 	north_arch.set_surface_override_material(0, wall_mat)
+	north_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(north_arch)  # Add to scene root, not nav region
 
 	# North gate torches
@@ -95,6 +98,7 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	south_arch.mesh = south_arch_mesh
 	south_arch.position = Vector3(0, wall_height + 0.75, 50)
 	south_arch.set_surface_override_material(0, wall_mat)
+	south_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(south_arch)  # Add to scene root, not nav region
 
 	# South gate torches
@@ -160,6 +164,7 @@ static func _build_tower(ctx: WorldBuilderContext, pos: Vector3, height: float, 
 		cren.mesh = cren_mesh
 		cren.position = Vector3(pos.x + offset.x, height + cren_size.y * 0.5, pos.z + offset.z)
 		cren.set_surface_override_material(0, mat)
+		cren.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		ctx.nav_region.add_child(cren)
 
 static func decorate_biomes(ctx: WorldBuilderContext) -> void:

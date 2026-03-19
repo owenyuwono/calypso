@@ -90,6 +90,15 @@ var _auto_attack: Node
 var _npc_skills: Node = null
 var _perception: Node
 
+# Cached sub-node references (set after children are added in _ready)
+var _vending_comp: Node
+var _brain: Node
+var _behavior_node: Node
+var _memory: Node
+
+# Animation state cache to skip redundant play_anim calls
+var _current_anim: String = ""
+
 # Debug
 var _perception_circle: MeshInstance3D
 const PERCEPTION_RADIUS: float = 15.0
@@ -100,7 +109,7 @@ var _lod_level: int = 0
 var _lod_timer: float = 0.0
 var _sep_cache := Vector3.ZERO
 var _sep_timer: float = 0.0
-const SEP_INTERVAL: float = 0.2
+const SEP_INTERVAL: float = 0.5
 var _safe_velocity: Vector3 = Vector3.ZERO
 
 # State overlay colors
@@ -180,9 +189,9 @@ func _ready() -> void:
 	add_child(skills_comp)
 	skills_comp.setup({}, ["", "", "", "", ""])
 
-	var _vending_comp := VendingComponent.new()
-	_vending_comp.name = "VendingComponent"
-	add_child(_vending_comp)
+	var vc_node := VendingComponent.new()
+	vc_node.name = "VendingComponent"
+	add_child(vc_node)
 
 	# Add StaminaComponent
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
@@ -223,8 +232,8 @@ func _ready() -> void:
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.avoidance_enabled = true
 	nav_agent.radius = 0.5
-	nav_agent.neighbor_distance = 5.0
-	nav_agent.max_neighbors = 5
+	nav_agent.neighbor_distance = 3.0
+	nav_agent.max_neighbors = 3
 	nav_agent.time_horizon_agents = 1.0
 	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
@@ -246,6 +255,12 @@ func _ready() -> void:
 
 	_visuals.setup_hp_bar(1.8, npc_name)
 	_visuals.hide_hp_bar_keep_name()
+
+	# Cache sub-node lookups — all children added above
+	_vending_comp = get_node_or_null("VendingComponent")
+	_brain = get_node_or_null("NPCBrain")
+	_behavior_node = get_node_or_null("NPCBehavior")
+	_memory = get_node_or_null("NPCMemory")
 
 	_setup_perception_circle()
 
@@ -332,12 +347,10 @@ func _set_zone_active(active: bool) -> void:
 			_perception.set_process(true)
 			_perception.set_physics_process(true)
 		# Resume child behavior/brain processing
-		var behavior: Node = get_node_or_null("NPCBehavior")
-		if behavior:
-			behavior.set_process(true)
-		var brain: Node = get_node_or_null("NPCBrain")
-		if brain:
-			brain.set_process(true)
+		if _behavior_node:
+			_behavior_node.set_process(true)
+		if _brain:
+			_brain.set_process(true)
 	else:
 		visible = false
 		set_physics_process(false)
@@ -346,13 +359,11 @@ func _set_zone_active(active: bool) -> void:
 			_perception.set_process(false)
 			_perception.set_physics_process(false)
 		# Pause child behavior/brain and reset action state to prevent deadlock
-		var behavior: Node = get_node_or_null("NPCBehavior")
-		if behavior:
-			behavior.set_process(false)
-			behavior._action_in_progress = false
-		var brain: Node = get_node_or_null("NPCBrain")
-		if brain:
-			brain.set_process(false)
+		if _behavior_node:
+			_behavior_node.set_process(false)
+			_behavior_node._action_in_progress = false
+		if _brain:
+			_brain.set_process(false)
 
 func _update_lod() -> void:
 	if not _zone_active:
@@ -373,6 +384,12 @@ func _update_lod() -> void:
 		set_physics_process(false)
 	elif _lod_level < 2 and old_lod >= 2:
 		set_physics_process(true)
+	if _lod_level == 0:
+		if not nav_agent.avoidance_enabled:
+			nav_agent.avoidance_enabled = true
+	else:
+		if nav_agent.avoidance_enabled:
+			nav_agent.avoidance_enabled = false
 
 func _process(delta: float) -> void:
 	# LOD check runs in _process so it stays active when _physics_process is disabled
@@ -401,11 +418,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Don't move while vending
-	var _vc: Node = get_node_or_null("VendingComponent")
-	if _vc and _vc.is_vending():
+	if _vending_comp and _vending_comp.is_vending():
 		velocity = Vector3.ZERO
-		move_and_slide()
-		_visuals.play_anim("Idle")
+		if _current_anim != "Idle":
+			_current_anim = "Idle"
+			_visuals.play_anim("Idle")
 		return
 
 	if not is_on_floor():
@@ -426,8 +443,8 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
-	# Apply separation force to avoid overlap (not in combat, close range only)
-	if current_state != STATE_COMBAT and _lod_level == 0:
+	# Apply separation force to avoid overlap (skip combat/dead/thinking)
+	if _lod_level == 0 and current_state != STATE_COMBAT and current_state != STATE_DEAD and current_state != STATE_THINKING:
 		_sep_timer -= delta
 		if _sep_timer <= 0.0:
 			_sep_timer = SEP_INTERVAL
@@ -442,18 +459,21 @@ func _physics_process(delta: float) -> void:
 		velocity.x = _safe_velocity.x
 		velocity.z = _safe_velocity.z
 
+	# Skip move_and_slide when stationary on floor to avoid unnecessary physics work
+	if velocity.length_squared() < 0.001 and is_on_floor():
+		if _lod_level < 2 and current_state != STATE_COMBAT and current_state != STATE_DEAD:
+			if _current_anim != "Idle":
+				_current_anim = "Idle"
+				_visuals.play_anim("Idle")
+		return
 	move_and_slide()
 
 	# Update animation based on movement (skip at high LOD)
-	if _lod_level < 2:
-		if current_state == STATE_COMBAT:
-			pass  # Combat handles its own anims
-		elif current_state == STATE_DEAD:
-			pass
-		elif is_moving:
-			_visuals.play_anim("Walking_A")
-		else:
-			_visuals.play_anim("Idle")
+	if _lod_level < 2 and current_state != STATE_COMBAT and current_state != STATE_DEAD:
+		var target_anim: String = "Walking_A" if is_moving else "Idle"
+		if target_anim != _current_anim:
+			_current_anim = target_anim
+			_visuals.play_anim(target_anim)
 
 func _process_movement(delta: float) -> bool:
 	if not _nav_started:
@@ -557,6 +577,10 @@ func change_state(new_state: String) -> void:
 	current_state = new_state
 	WorldState.set_entity_data(npc_id, "state", new_state)
 
+	# Reset anim cache when entering states that manage their own animations
+	if new_state == STATE_COMBAT or new_state == STATE_DEAD:
+		_current_anim = ""
+
 	# Update overlay tint based on state
 	var tint: Color = STATE_COLORS.get(new_state, Color(0, 0, 0, 0))
 	_visuals.set_state_tint(tint)
@@ -606,21 +630,19 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		_die()
 	elif entity_id == combat_target:
 		# Target died — loot is handled by monster_base, just exit combat
-		var memory_node = get_node_or_null("NPCMemory")
-		if memory_node:
+		if _memory:
 			var target_name: String = WorldState.get_entity_data(combat_target).get("name", combat_target)
-			memory_node.add_memory("Killed %s in combat" % combat_target, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_LOW)
-			if not memory_node.has_key_memory_type("first_kill"):
-				memory_node.add_memory("First kill: defeated a %s" % target_name, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_HIGH, false, "first_kill")
+			_memory.add_memory("Killed %s in combat" % combat_target, _memory.SOURCE_WITNESSED, _memory.IMPORTANCE_LOW)
+			if not _memory.has_key_memory_type("first_kill"):
+				_memory.add_memory("First kill: defeated a %s" % target_name, _memory.SOURCE_WITNESSED, _memory.IMPORTANCE_HIGH, false, "first_kill")
 		combat_target = ""
 		WorldState.set_entity_data(npc_id, "combat_target", "")
 		_auto_attack.cancel()
 		change_state(STATE_IDLE)
 
 func _die() -> void:
-	var vc = get_node_or_null("VendingComponent")
-	if vc and vc.is_vending():
-		vc.stop_vending()
+	if _vending_comp and _vending_comp.is_vending():
+		_vending_comp.stop_vending()
 	change_state(STATE_DEAD)
 	combat_target = ""
 	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
@@ -631,9 +653,8 @@ func _die() -> void:
 	# Lose 10% gold
 	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
 
-	var memory_node = get_node_or_null("NPCMemory")
-	if memory_node:
-		memory_node.add_memory("Died and lost %d gold" % lost, memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_HIGH, false, "death")
+	if _memory:
+		_memory.add_memory("Died and lost %d gold" % lost, _memory.SOURCE_WITNESSED, _memory.IMPORTANCE_HIGH, false, "death")
 
 	# Visual: death animation + fade out
 	_visuals.play_anim("Death_A")
@@ -663,9 +684,8 @@ func _respawn() -> void:
 	change_state(STATE_IDLE)
 	GameEvents.entity_respawned.emit(npc_id)
 
-	var memory_node = get_node_or_null("NPCMemory")
-	if memory_node:
-		memory_node.add_memory("Respawned in town after dying", memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_LOW)
+	if _memory:
+		_memory.add_memory("Respawned in town after dying", _memory.SOURCE_WITNESSED, _memory.IMPORTANCE_LOW)
 
 func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
@@ -676,8 +696,7 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		if current_state != STATE_DEAD:
 			_stagger_timer = 0.3
 		# Fight back if not already in combat
-		var vc: Node = get_node_or_null("VendingComponent")
-		var is_vending: bool = vc != null and vc.is_vending()
+		var is_vending: bool = _vending_comp != null and _vending_comp.is_vending()
 		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "" and not is_vending:
 			enter_combat(attacker_id)
 
@@ -721,9 +740,8 @@ func initialize_from_loadout(loadout: Dictionary) -> void:
 	var goal: String = loadout.get("default_goal", "")
 	if not goal.is_empty():
 		set_goal(goal)
-		var behavior: Node = get_node_or_null("NPCBehavior")
-		if behavior:
-			behavior.default_goal = goal
+		if _behavior_node:
+			_behavior_node.default_goal = goal
 
 	# Re-init proficiencies and skills (trait_profile is set after _ready)
 	late_init_skills()

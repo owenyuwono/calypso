@@ -9,6 +9,8 @@ const REST_SPOT_RANGE: float = 4.0
 const VELOCITY_THRESHOLD: float = 0.5
 
 var _rest_spots: Array = []
+var _process_timer: float = 0.0
+const PROCESS_INTERVAL: float = 0.2
 
 var stamina: float = 100.0
 var max_stamina: float = 100.0
@@ -27,6 +29,12 @@ func _ready() -> void:
 		_entity_id = "player"
 
 func _process(delta: float) -> void:
+	_process_timer += delta
+	if _process_timer < PROCESS_INTERVAL:
+		return
+	var elapsed: float = _process_timer
+	_process_timer = 0.0
+
 	var parent := get_parent()
 	if not is_instance_valid(parent):
 		return
@@ -39,17 +47,16 @@ func _process(delta: float) -> void:
 		return  # player dead, skip
 
 	_is_resting = false
-	var old_stamina := stamina
 
 	# Drain
 	if state == "combat" or (state == "" and "_attack_target" in parent and not parent._attack_target.is_empty()):
-		stamina -= DRAIN_COMBAT * delta
+		stamina -= DRAIN_COMBAT * elapsed
 	elif vel_length > VELOCITY_THRESHOLD:
-		stamina -= DRAIN_MOVEMENT * delta
+		stamina -= DRAIN_MOVEMENT * elapsed
 
 	# Regen at rest spots when idle
 	if vel_length <= VELOCITY_THRESHOLD and state in ["idle", ""] and _is_near_rest_spot():
-		stamina += REGEN_REST * delta
+		stamina += REGEN_REST * elapsed
 		_is_resting = true
 
 	stamina = clampf(stamina, 0.0, max_stamina)

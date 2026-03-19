@@ -96,6 +96,6 @@ toggle_vend={
 
 [rendering]
 
-renderer/rendering_method="mobile"
+renderer/rendering_method="forward_plus"
 textures/default_filters/anisotropic_filtering_level=0
 environment/defaults/default_clear_color=Color(0.529, 0.706, 0.878, 1)

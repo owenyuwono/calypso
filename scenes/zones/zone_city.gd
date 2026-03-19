@@ -26,9 +26,7 @@ func _ready() -> void:
 	BiomeScatter.setup_exclusion_zones(ctx)
 	TownBuilder.decorate_biomes(ctx)
 	TownBuilder.place_props(ctx)
-	CityBuilderClass.build_all_districts(
-		$NavigationRegion3D, ctx.terrain_noise, ctx.terrain_height_scale_city
-	)
+	CityBuilderClass.build_all_districts(ctx)
 
 	# Portals — requires ZoneDatabase autoload (may not be present yet)
 	_create_portals()

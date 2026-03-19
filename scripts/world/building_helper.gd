@@ -11,7 +11,7 @@ static func snap_y(noise: FastNoiseLite, x: float, z: float, height_scale: float
 
 ## Create a complete building: walled box + roof + optional door/chimney.
 ## Returns the root Node3D (already added to nav_region).
-static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3,
+static func create_building(ctx: WorldBuilderContext, nav_region: Node3D, pos: Vector3, wall_size: Vector3,
 		wall_color: Color, roof_type: String, roof_color: Color,
 		roof_overhang: float = 0.5, has_chimney: bool = false,
 		has_door: bool = true, rot_y: float = 0.0,
@@ -30,8 +30,7 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 	var wall_box := BoxMesh.new()
 	wall_box.size = wall_size
 	wall_mesh_inst.mesh = wall_box
-	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = wall_color
+	var wall_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, wall_color)
 	wall_mesh_inst.set_surface_override_material(0, wall_mat)
 	wall_body.add_child(wall_mesh_inst)
 	var wall_col := CollisionShape3D.new()
@@ -43,8 +42,7 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 
 	# --- Roof ---
 	var roof_mesh_inst := MeshInstance3D.new()
-	var roof_mat := StandardMaterial3D.new()
-	roof_mat.albedo_color = roof_color
+	var roof_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, roof_color)
 
 	if roof_type == "peaked":
 		var roof_box := BoxMesh.new()
@@ -60,6 +58,7 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 		ridge.mesh = ridge_mesh
 		ridge.position = Vector3(0, wall_size.y + 0.7, 0)
 		ridge.set_surface_override_material(0, roof_mat)
+		ridge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		building.add_child(ridge)
 	else:
 		# Flat roof
@@ -78,9 +77,9 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 		door_mesh.size = Vector3(0.8, 1.6, 0.1)
 		door.mesh = door_mesh
 		door.position = Vector3(0, 0.8, wall_size.z * 0.5 + 0.05)
-		var door_mat := StandardMaterial3D.new()
-		door_mat.albedo_color = wall_color * 0.6
+		var door_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, wall_color * 0.6)
 		door.set_surface_override_material(0, door_mat)
+		door.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		building.add_child(door)
 
 	# --- Chimney ---
@@ -90,9 +89,9 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 		chimney_mesh.size = Vector3(0.5, 1.2, 0.5)
 		chimney.mesh = chimney_mesh
 		chimney.position = Vector3(wall_size.x * 0.3, wall_size.y + 0.6, -wall_size.z * 0.3)
-		var chimney_mat := StandardMaterial3D.new()
-		chimney_mat.albedo_color = Color(0.35, 0.32, 0.3)
+		var chimney_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, Color(0.35, 0.32, 0.3))
 		chimney.set_surface_override_material(0, chimney_mat)
+		chimney.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		building.add_child(chimney)
 
 	nav_region.add_child(building)
@@ -104,13 +103,12 @@ static func create_building(nav_region: Node3D, pos: Vector3, wall_size: Vector3
 ## base_radius: outer basin radius; base_height: basin height (plaza=0.4, park=0.5);
 ## pillar_height: center column height; top_radius: upper basin top radius.
 ## Returns the fountain Node3D (already added to nav_region).
-static func create_fountain(nav_region: Node3D, world_pos: Vector3,
+static func create_fountain(ctx: WorldBuilderContext, nav_region: Node3D, world_pos: Vector3,
 		base_radius: float, base_height: float, pillar_height: float, top_radius: float) -> Node3D:
 	var fountain := Node3D.new()
 	fountain.position = world_pos
 
-	var stone_mat := StandardMaterial3D.new()
-	stone_mat.albedo_color = Color(0.5, 0.48, 0.45)
+	var stone_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, Color(0.5, 0.48, 0.45))
 
 	var base := MeshInstance3D.new()
 	var base_mesh := CylinderMesh.new()
@@ -130,6 +128,7 @@ static func create_fountain(nav_region: Node3D, world_pos: Vector3,
 	pillar.mesh = pillar_mesh
 	pillar.position = Vector3(0, base_height + pillar_height * 0.5, 0)
 	pillar.set_surface_override_material(0, stone_mat)
+	pillar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	fountain.add_child(pillar)
 
 	var top_basin := MeshInstance3D.new()
@@ -139,9 +138,9 @@ static func create_fountain(nav_region: Node3D, world_pos: Vector3,
 	top_mesh.height = 0.3
 	top_basin.mesh = top_mesh
 	top_basin.position = Vector3(0, base_height + pillar_height + 0.15, 0)
-	var water_mat := StandardMaterial3D.new()
-	water_mat.albedo_color = Color(0.3, 0.5, 0.7)
+	var water_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, Color(0.3, 0.5, 0.7))
 	top_basin.set_surface_override_material(0, water_mat)
+	top_basin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	fountain.add_child(top_basin)
 
 	# Collision
@@ -161,9 +160,8 @@ static func create_fountain(nav_region: Node3D, world_pos: Vector3,
 
 ## Create a single wooden bench at world_pos with optional Y rotation.
 ## Returns the MeshInstance3D (already added to nav_region).
-static func create_bench(nav_region: Node3D, world_pos: Vector3, rot_y: float = 0.0) -> MeshInstance3D:
-	var bench_mat := StandardMaterial3D.new()
-	bench_mat.albedo_color = Color(0.45, 0.32, 0.18)
+static func create_bench(ctx: WorldBuilderContext, nav_region: Node3D, world_pos: Vector3, rot_y: float = 0.0) -> MeshInstance3D:
+	var bench_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, Color(0.45, 0.32, 0.18))
 
 	var bench := MeshInstance3D.new()
 	var bench_mesh := BoxMesh.new()
@@ -172,5 +170,6 @@ static func create_bench(nav_region: Node3D, world_pos: Vector3, rot_y: float = 
 	bench.position = world_pos
 	bench.rotation.y = rot_y
 	bench.set_surface_override_material(0, bench_mat)
+	bench.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	nav_region.add_child(bench)
 	return bench

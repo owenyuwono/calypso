@@ -50,6 +50,18 @@ static func get_or_create_color_mat(ctx: WorldBuilderContext, color: Color) -> S
 	ctx.color_mat_cache[key] = mat
 	return mat
 
+static func get_or_create_emissive_mat(ctx: WorldBuilderContext, albedo: Color, emission: Color, emission_energy: float) -> StandardMaterial3D:
+	var key := "emissive_" + albedo.to_html() + "_" + emission.to_html() + "_" + str(emission_energy)
+	if ctx.color_mat_cache.has(key):
+		return ctx.color_mat_cache[key]
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = albedo
+	mat.emission_enabled = true
+	mat.emission = emission
+	mat.emission_energy_multiplier = emission_energy
+	ctx.color_mat_cache[key] = mat
+	return mat
+
 static func apply_color_to_model(ctx: WorldBuilderContext, instance: Node3D, color: Color) -> void:
 	var mat := get_or_create_color_mat(ctx, color)
 	apply_material_recursive(instance, mat)
@@ -109,6 +121,7 @@ static func spawn_foliage(ctx: WorldBuilderContext, filename: String, pos: Vecto
 	var instance := spawn_model(ctx, FOLIAGE_DIR + filename, pos, rot_y, scale_val)
 	if instance:
 		apply_color_to_model(ctx, instance, color)
+		disable_shadows_recursive(instance)
 	return instance
 
 static func spawn_tree(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 0.25, leaf_color: Color = Color(0.18, 0.55, 0.12)) -> Node3D:
@@ -157,7 +170,10 @@ static func spawn_mineable_rock(ctx: WorldBuilderContext, pos: Vector3, rot_y: f
 	return rock
 
 static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
-	return spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
+	var instance: Node3D = spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
+	if instance:
+		disable_shadows_recursive(instance)
+	return instance
 
 static func spawn_prop(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	var instance: Node3D = spawn_model(ctx, PROPS_DIR + filename, pos, rot_y, scale_val)
@@ -166,7 +182,14 @@ static func spawn_prop(ctx: WorldBuilderContext, filename: String, pos: Vector3,
 		var aabb := _get_model_aabb(instance)
 		if aabb.position.y < -0.01:
 			instance.position.y -= aabb.position.y * scale_val
+		disable_shadows_recursive(instance)
 	return instance
+
+static func disable_shadows_recursive(node: Node) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for child in node.get_children():
+		disable_shadows_recursive(child)
 
 static func _get_model_aabb(node: Node3D) -> AABB:
 	var combined := AABB()

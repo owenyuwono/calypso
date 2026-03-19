@@ -246,6 +246,15 @@ static func apply_toon_to_model(root: Node) -> void:
 ## Spawn a floating damage number above a target entity.
 ## caller is needed because static functions can't call get_tree().
 static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO, target_pos: Vector3 = Vector3.ZERO) -> void:
+	# Skip damage numbers for off-screen combat: only spawn if attacker or target is within 30m of player.
+	const CULL_DISTANCE_SQ: float = 900.0  # 30m^2
+	var player_node: Node = WorldState.get_entity("player")
+	if player_node and is_instance_valid(player_node):
+		var player_pos: Vector3 = player_node.global_position
+		var attacker_in_range: bool = attacker_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
+		var target_in_range: bool = target_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
+		if not attacker_in_range and not target_in_range:
+			return
 	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
 	if not dmg_scene:
 		return

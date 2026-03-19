@@ -47,6 +47,9 @@ const EVENT_COOLDOWNS: Dictionary = {
 	"idle_timeout": 60.0,
 }
 
+var _process_timer: float = 0.0
+const PROCESS_INTERVAL: float = 0.5
+
 var _canned_greetings: Array = [
 	"Hey %s, how's the hunting going?",
 	"Watch yourself out there, %s.",
@@ -83,16 +86,22 @@ func _ready() -> void:
 	GameEvents.relationship_tier_changed.connect(_on_tier_changed)
 
 func _process(delta: float) -> void:
+	_process_timer += delta
+	if _process_timer < PROCESS_INTERVAL:
+		return
+	var elapsed: float = _process_timer
+	_process_timer = 0.0
+
 	if not _enabled or _waiting_for_llm:
 		return
 	if _speech_cooldown > 0.0:
-		_speech_cooldown -= delta
+		_speech_cooldown -= elapsed
 	if _conversation_hold > 0.0:
-		_conversation_hold -= delta
+		_conversation_hold -= elapsed
 		return
 	# Tick reading delay for NPC-NPC responses
 	if not _reading_queue.is_empty():
-		_reading_queue["timer"] -= delta
+		_reading_queue["timer"] -= elapsed
 		if _reading_queue["timer"] <= 0.0:
 			var queued := _reading_queue
 			_reading_queue = {}
