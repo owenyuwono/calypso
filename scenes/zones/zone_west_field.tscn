@@ -55,7 +55,8 @@ light_energy = 1.2
 shadow_enabled = true
 shadow_bias = 0.02
 shadow_normal_bias = 2.0
-directional_shadow_max_distance = 80.0
+directional_shadow_mode = 0
+directional_shadow_max_distance = 40.0
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
 navigation_mesh = SubResource("NavigationMesh_1")
