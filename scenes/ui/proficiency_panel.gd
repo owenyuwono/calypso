@@ -2,8 +2,6 @@ extends Control
 ## RuneScape-style proficiency skill list panel toggled with P key.
 
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
-
 const CATEGORY_DISPLAY_NAMES: Dictionary = {
 	"weapon": "Combat",
 	"attribute": "Attributes",
@@ -33,20 +31,11 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(280, 420)
-	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	var ui: Dictionary = UIHelper.create_titled_panel("Proficiencies", Vector2(280, 420), toggle)
+	_panel = ui["panel"]
 	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	_panel.add_child(vbox)
-
-	# Draggable title bar
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Proficiencies")
-	drag_handle.close_pressed.connect(toggle)
-	vbox.add_child(drag_handle)
+	var vbox: VBoxContainer = ui["vbox"]
 
 	# Total level label
 	_total_level_label = Label.new()

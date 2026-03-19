@@ -1,3 +1,4 @@
+class_name DragHandle
 extends PanelContainer
 ## Reusable draggable title bar for UI panels.
 ## Attach to a PanelContainer to make it draggable by its title bar.

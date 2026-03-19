@@ -86,14 +86,8 @@ func add_memory(fact: String, source: String = SOURCE_WITNESSED, importance: Str
 
 	# Evict lowest-scored memory if over cap
 	if memories.size() > MAX_MEMORIES:
-		var lowest_score: float = INF
-		var lowest_idx: int = 0
-		for i in memories.size():
-			var s: float = score_memory(memories[i])
-			if s < lowest_score:
-				lowest_score = s
-				lowest_idx = i
-		memories.remove_at(lowest_idx)
+		memories.sort_custom(func(a, b): return score_memory(a) < score_memory(b))
+		memories.remove_at(0)
 
 	GameEvents.memory_added.emit(_get_entity_id(), fact, importance)
 	return new_memory

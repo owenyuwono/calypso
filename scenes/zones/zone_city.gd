@@ -34,10 +34,8 @@ func _ready() -> void:
 	_create_portals()
 
 	# Bake navmesh; emit zone_ready after bake
-	var nav_region: NavigationRegion3D = $NavigationRegion3D
-	nav_region.bake_finished.connect(_on_navmesh_baked)
 	await get_tree().create_timer(0.5).timeout
-	nav_region.bake_navigation_mesh()
+	TerrainHelpers.begin_navmesh_bake($NavigationRegion3D, _on_navmesh_baked)
 
 
 func _on_navmesh_baked() -> void:
@@ -51,12 +49,7 @@ func _on_navmesh_baked() -> void:
 
 func _build_city_terrain(ctx: WorldBuilderContext) -> void:
 	# Shared noise used by terrain generator and biome scatter
-	var terrain_noise: FastNoiseLite = FastNoiseLite.new()
-	terrain_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	terrain_noise.frequency = 0.05
-	terrain_noise.fractal_octaves = 2
-	terrain_noise.seed = 42
-	ctx.terrain_noise = terrain_noise
+	ctx.terrain_noise = TerrainHelpers.create_terrain_noise()
 
 	# Load shader and city-specific textures
 	var terrain_shader: Shader = load("res://assets/shaders/terrain_blend.gdshader") as Shader
@@ -68,7 +61,7 @@ func _build_city_terrain(ctx: WorldBuilderContext) -> void:
 
 	var city_data: Dictionary = TerrainGenerator.generate_terrain(
 		Vector3(0, 0, 0), Vector2(140, 100), Vector2i(70, 50),
-		terrain_noise, ctx.terrain_height_scale_city, _city_terrain_rules()
+		ctx.terrain_noise, ctx.terrain_height_scale_city, _city_terrain_rules()
 	)
 
 	# Texture slots: [grass/base, dirt/ch0, stone/ch1, cobble/ch2, packed_earth/ch3]
@@ -80,12 +73,7 @@ func _build_city_terrain(ctx: WorldBuilderContext) -> void:
 	for i in textures.size():
 		if textures[i]:
 			mat.set_shader_parameter(tex_keys[i], textures[i])
-	mat.set_shader_parameter("uv_scale_pavement", 0.5)
-	mat.set_shader_parameter("uv_scale_dirt", 0.25)
-	mat.set_shader_parameter("uv_scale_stone", 0.2)
-	mat.set_shader_parameter("uv_scale_cobble", 0.5)
-	mat.set_shader_parameter("uv_scale_earth", 0.5)
-	mat.set_shader_parameter("blend_sharpness", 1.5)
+	TerrainHelpers.apply_standard_shader_params(mat)
 
 	var mi: MeshInstance3D = city_data["mesh_instance"]
 	mi.mesh.surface_set_material(0, mat)
@@ -264,10 +252,4 @@ func _city_terrain_rules() -> Array:
 # --- Portals -----------------------------------------------------------------
 
 func _create_portals() -> void:
-	var portals: Array = ZoneDatabase.get_portals("city")
-	var portal_script: Script = preload("res://scripts/world/zone_portal.gd")
-	for portal_def in portals:
-		var portal: Area3D = Area3D.new()
-		portal.set_script(portal_script)
-		add_child(portal)
-		portal.setup(portal_def)
+	TerrainHelpers.create_portals(self, zone_id)

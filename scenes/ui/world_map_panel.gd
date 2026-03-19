@@ -2,8 +2,6 @@ extends Control
 ## World map panel — shows full city + field layout with district labels and entity dots.
 ## Toggle with W key.
 
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
-
 const MAP_W := 500.0
 const MAP_H := 400.0
 
@@ -66,20 +64,11 @@ func _compute_world_extents() -> void:
 
 
 func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(MAP_W + 20, MAP_H + 50)
-	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	var ui: Dictionary = UIHelper.create_titled_panel("World Map", Vector2(MAP_W + 20, MAP_H + 50), toggle)
+	_panel = ui["panel"]
 	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	_panel.add_child(vbox)
-
-	# Draggable title bar
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "World Map")
-	drag_handle.close_pressed.connect(toggle)
-	vbox.add_child(drag_handle)
+	var vbox: VBoxContainer = ui["vbox"]
 
 	# Drawing area — a Control node that we draw on
 	var draw_area := Control.new()

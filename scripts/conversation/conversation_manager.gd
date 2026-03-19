@@ -238,19 +238,9 @@ func select_next_speaker(conversation_id: String) -> String:
 			var topic: String = state.topic.to_lower()
 			var likes: Array = identity.likes if "likes" in identity else []
 			var dislikes: Array = identity.dislikes if "dislikes" in identity else []
-			var found_like: bool = false
-			var found_dislike: bool = false
-			for like in likes:
-				if like.to_lower().contains(topic) or topic.contains(like.to_lower()):
-					found_like = true
-					break
-			for dislike in dislikes:
-				if dislike.to_lower().contains(topic) or topic.contains(dislike.to_lower()):
-					found_dislike = true
-					break
-			if found_like:
+			if _topic_matches(likes, topic):
 				score += 2.0
-			elif found_dislike:
+			elif _topic_matches(dislikes, topic):
 				score += 1.0  # they have something to say
 
 		# relationship_bonus: tier with last speaker
@@ -298,6 +288,13 @@ func select_next_speaker(conversation_id: String) -> String:
 	_update_silence_streaks(conversation_id, state, best_id)
 
 	return best_id
+
+
+func _topic_matches(items: Array, topic: String) -> bool:
+	for item in items:
+		if item.to_lower().contains(topic) or topic.contains(item.to_lower()):
+			return true
+	return false
 
 
 func _update_silence_streaks(conversation_id: String, state: ConversationState, speaker_id: String) -> void:

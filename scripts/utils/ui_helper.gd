@@ -28,6 +28,25 @@ static func set_border_width(style: StyleBoxFlat, width: int) -> void:
 	style.border_width_top = width
 	style.border_width_bottom = width
 
+## Creates a standard titled draggable panel.
+## Returns {"panel": PanelContainer, "vbox": VBoxContainer, "drag_handle": DragHandle}.
+## The caller is responsible for add_child(result.panel) and populating result.vbox.
+static func create_titled_panel(title: String, size: Vector2, close_callback: Callable) -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = size
+	panel.add_theme_stylebox_override("panel", create_panel_style())
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	var drag_handle := DragHandle.new()
+	drag_handle.setup(panel, title)
+	drag_handle.close_pressed.connect(close_callback)
+	vbox.add_child(drag_handle)
+
+	return {"panel": panel, "vbox": vbox, "drag_handle": drag_handle}
+
 static var _panel_texture: Texture2D = null
 
 static func create_panel_style(_bg_color: Color = Color.BLACK, _border_color: Color = Color.BLACK) -> StyleBoxTexture:
