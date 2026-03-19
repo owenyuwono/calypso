@@ -45,6 +45,11 @@ const ITEMS: Dictionary = {
 	"oak_log":      {"name": "Oak Log",      "type": "material", "value": 15},
 	"ancient_log":  {"name": "Ancient Log",  "type": "material", "value": 40},
 	"branch":       {"name": "Branch",       "type": "material", "value": 2},
+	# Ore and stone (mining drops)
+	"copper_ore":   {"name": "Copper Ore",   "type": "material", "value": 8},
+	"iron_ore":     {"name": "Iron Ore",     "type": "material", "value": 20},
+	"gold_ore":     {"name": "Gold Ore",     "type": "material", "value": 50},
+	"stone":        {"name": "Stone",        "type": "material", "value": 3},
 	# Monster drops (sell only)
 	"jelly": {"name": "Jelly", "type": "material", "value": 8},
 	"fur": {"name": "Fur", "type": "material", "value": 15},

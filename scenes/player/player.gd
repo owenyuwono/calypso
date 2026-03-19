@@ -399,12 +399,12 @@ func _process_harvesting(delta: float) -> bool:
 		_cancel_harvest()
 		return false
 
-	var tree_node: Node = WorldState.get_entity(_harvest_target)
-	if not is_instance_valid(tree_node):
+	var resource_node: Node = WorldState.get_entity(_harvest_target)
+	if not is_instance_valid(resource_node):
 		_cancel_harvest()
 		return false
 
-	var harvestable: Node = tree_node.get_node_or_null("HarvestableComponent")
+	var harvestable: Node = resource_node.get_node_or_null("HarvestableComponent")
 	if not harvestable:
 		_cancel_harvest()
 		return false
@@ -413,10 +413,10 @@ func _process_harvesting(delta: float) -> bool:
 		_cancel_harvest()
 		return false
 
-	# Move toward tree if out of range
-	var dist: float = global_position.distance_to(tree_node.global_position)
+	# Move toward resource if out of range
+	var dist: float = global_position.distance_to(resource_node.global_position)
 	if dist > 3.0:
-		nav_agent.target_position = _get_approach_pos(tree_node.global_position, 2.5)
+		nav_agent.target_position = _get_approach_pos(resource_node.global_position, 2.5)
 		_is_navigating = true
 		_last_nav_pos = global_position
 		var next_pos: Vector3 = nav_agent.get_next_path_position()
@@ -434,8 +434,8 @@ func _process_harvesting(delta: float) -> bool:
 	velocity.x = move_toward(velocity.x, 0.0, SPEED)
 	velocity.z = move_toward(velocity.z, 0.0, SPEED)
 
-	# Face the tree
-	var face_dir: Vector3 = tree_node.global_position - global_position
+	# Face the resource
+	var face_dir: Vector3 = resource_node.global_position - global_position
 	face_dir.y = 0.0
 	if face_dir.length_squared() > 0.01:
 		_visuals.face_direction(face_dir.normalized())
@@ -457,11 +457,12 @@ func _process_harvesting(delta: float) -> bool:
 			if result.is_empty():
 				_cancel_harvest()
 				return false
-			_progression.grant_proficiency_xp("woodcutting", result.xp)
-			tree_node.last_chopper_pos = global_position
-			tree_node.shake()
+			var skill_id: String = harvestable.get_skill_id()
+			_progression.grant_proficiency_xp(skill_id, result.xp)
+			resource_node.last_chopper_pos = global_position
+			resource_node.shake()
 			if result.depleted:
-				tree_node.spawn_loot(result.item_id, result.bonus_item)
+				resource_node.spawn_loot(result.item_id, result.bonus_item)
 				_cancel_harvest()
 
 	return false
@@ -617,6 +618,17 @@ func _handle_left_click() -> void:
 			_harvest_target = hovered_entity_id
 			_hover.lock_ring(hovered_entity_id, Color(0.4, 0.8, 0.3, 0.6))
 			var target_node := WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
+			return
+
+		if etype == "rock":
+			# Click rock: walk to + mine when in range
+			_cancel_attack()
+			_cancel_harvest()
+			_harvest_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.8, 0.5, 0.2, 0.6))
+			var target_node: Node = WorldState.get_entity(hovered_entity_id)
 			if target_node and is_instance_valid(target_node):
 				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
 			return

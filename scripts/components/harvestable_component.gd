@@ -1,11 +1,14 @@
 extends BaseComponent
-## Harvestable resource component for trees (woodcutting).
-## Add as child to a tree entity. Manages chop count, depletion, and respawn.
+## Harvestable resource component for gathering skills (woodcutting, mining, etc.).
+## Add as child to a harvestable entity. Manages chop count, depletion, and respawn.
 
 const TreeDatabase = preload("res://scripts/data/tree_database.gd")
 
 signal depleted()
 signal respawned()
+
+var _skill_id: String = "woodcutting"
+var _database_lookup: Callable = Callable()
 
 var _tier: String = ""
 var _required_level: int = 1
@@ -22,9 +25,16 @@ var _depleted: bool = false
 var _respawn_timer: float = 0.0
 
 
-func setup(tier: String) -> void:
+func setup(tier: String, skill_id: String = "woodcutting", database_lookup: Callable = Callable()) -> void:
 	_tier = tier
-	var data: Dictionary = TreeDatabase.get_tree(tier)
+	_skill_id = skill_id
+	_database_lookup = database_lookup
+
+	var data: Dictionary
+	if _database_lookup.is_valid():
+		data = _database_lookup.call(tier)
+	else:
+		data = TreeDatabase.get_tree(tier)
 	if data.is_empty():
 		push_error("HarvestableComponent: unknown tier '%s'" % tier)
 		return
@@ -55,8 +65,8 @@ func can_harvest(entity_id: String) -> bool:
 	if not progression:
 		return false
 
-	var woodcutting_level: int = progression.get_proficiency_level("woodcutting")
-	return woodcutting_level >= _required_level
+	var skill_level: int = progression.get_proficiency_level(_skill_id)
+	return skill_level >= _required_level
 
 
 func process_chop(entity_id: String) -> Dictionary:
@@ -88,6 +98,10 @@ func is_depleted() -> bool:
 
 func get_required_level() -> int:
 	return _required_level
+
+
+func get_skill_id() -> String:
+	return _skill_id
 
 
 func get_tier() -> String:

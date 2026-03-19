@@ -52,6 +52,9 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 			"bounds": [117, -32, 30, 22], "noise_threshold": -0.2,
 			"recipes": [
 				{"type": "rock_cluster", "count": 6, "min_spacing": 4.0, "files": [], "colors": []},
+				{"type": "mineable_rock", "tier": "copper", "count": 4, "min_spacing": 4.0, "files": [], "colors": [], "scale": 1.0},
+				{"type": "mineable_rock", "tier": "iron", "count": 2, "min_spacing": 5.0, "files": [], "colors": [], "scale": 1.1},
+				{"type": "mineable_rock", "tier": "gold", "count": 1, "min_spacing": 6.0, "files": [], "colors": [], "scale": 1.2},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 			]
@@ -119,6 +122,8 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 			"bounds": [-147, -32, 30, 22], "noise_threshold": -0.2,
 			"recipes": [
 				{"type": "rock_cluster", "count": 6, "min_spacing": 4.0, "files": [], "colors": []},
+				{"type": "mineable_rock", "tier": "copper", "count": 4, "min_spacing": 4.0, "files": [], "colors": [], "scale": 1.0},
+				{"type": "mineable_rock", "tier": "iron", "count": 2, "min_spacing": 5.0, "files": [], "colors": [], "scale": 1.1},
 				{"type": "foliage", "count": 4, "min_spacing": 1.5, "files": fern_files, "colors": [fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": grass_files, "colors": [grass_color], "scale": 0.25},
 			]

@@ -311,6 +311,11 @@ func _process_hover() -> void:
 			if not tier.is_empty():
 				display_name += " (%s)" % tier.capitalize()
 			_cursor_manager.set_cursor("woodcut")
+		elif entity_type == "rock":
+			var tier: String = data.get("rock_tier", "")
+			if not tier.is_empty():
+				display_name += " (%s)" % tier.capitalize()
+			_cursor_manager.set_cursor("mine")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name
