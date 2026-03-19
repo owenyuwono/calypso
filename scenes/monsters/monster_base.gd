@@ -205,6 +205,7 @@ func _update_lod() -> void:
 	if not cam:
 		_lod_level = 0
 		return
+	var old_lod := _lod_level
 	var dist := global_position.distance_to(cam.global_position)
 	if dist < LOD_FULL_DIST:
 		_lod_level = 0
@@ -212,6 +213,12 @@ func _update_lod() -> void:
 		_lod_level = 1
 	else:
 		_lod_level = 2
+	# Dead monsters must keep running _physics_process for the respawn timer
+	if state != "dead":
+		if _lod_level >= 2 and old_lod < 2:
+			set_physics_process(false)
+		elif _lod_level < 2 and old_lod >= 2:
+			set_physics_process(true)
 
 func _physics_process(delta: float) -> void:
 	if state == "dead":
@@ -274,9 +281,9 @@ func _process_idle(delta: float) -> void:
 	if _wander_timer <= 0.0:
 		_start_wander()
 
-	# Throttled aggro check (every 0.3s)
+	# Throttled aggro check (every 1.0s)
 	if _aggro_check_timer <= 0.0:
-		_aggro_check_timer = 0.3
+		_aggro_check_timer = 1.0
 		_check_aggro()
 
 func _start_wander() -> void:
@@ -318,7 +325,7 @@ func _process_wander_movement() -> bool:
 
 	# Throttled aggro check while wandering
 	if _aggro_check_timer <= 0.0:
-		_aggro_check_timer = 0.3
+		_aggro_check_timer = 1.0
 		_check_aggro()
 	return true
 
@@ -464,6 +471,7 @@ func _respawn() -> void:
 		push_warning("MonsterBase: Cannot respawn, unknown type '%s'" % monster_type)
 		return
 	state = "idle"
+	set_physics_process(true)
 	_visuals.reset_anim()
 	global_position = spawn_point
 	collision_shape.disabled = false

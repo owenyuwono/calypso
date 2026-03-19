@@ -23,12 +23,12 @@ const DistrictGarrison    = preload("res://scripts/world/districts/district_garr
 const DistrictGate        = preload("res://scripts/world/districts/district_gate.gd")
 
 
-static func build_all_districts(nav_region: Node3D, noise: FastNoiseLite, height_scale: float) -> void:
-	DistrictPlaza.build(nav_region, noise, height_scale)
-	DistrictMarket.build(nav_region, noise, height_scale)
-	DistrictResidential.build(nav_region, noise, height_scale)
-	DistrictNoble.build(nav_region, noise, height_scale)
-	DistrictPark.build(nav_region, noise, height_scale)
-	DistrictCraft.build(nav_region, noise, height_scale)
-	DistrictGarrison.build(nav_region, noise, height_scale)
-	DistrictGate.build(nav_region, noise, height_scale)
+static func build_all_districts(ctx: WorldBuilderContext) -> void:
+	DistrictPlaza.build(ctx)
+	DistrictMarket.build(ctx)
+	DistrictResidential.build(ctx)
+	DistrictNoble.build(ctx)
+	DistrictPark.build(ctx)
+	DistrictCraft.build(ctx)
+	DistrictGarrison.build(ctx)
+	DistrictGate.build(ctx)

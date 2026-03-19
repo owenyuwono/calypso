@@ -6,23 +6,48 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 const VENDOR_SEARCH_RADIUS: float = 200.0
 const VEND_PRICE_RATIO: float = 0.8
+const VENDOR_CACHE_TTL: float = 3.0
 
-## Returns the entity ID of the nearest vending NPC.
-## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
-static func find_vendor(npc_id: String, npc_position: Vector3, item_id: String = "") -> String:
-	var best_id: String = ""
-	var best_dist: float = INF
+## Cached list of active vendor entity IDs. Refreshes every VENDOR_CACHE_TTL seconds.
+## Each entry: {id: String, node: Node3D}
+static var _vendor_cache: Array = []
+static var _vendor_cache_age: float = VENDOR_CACHE_TTL  # force rebuild on first call
+
+## Rebuilds _vendor_cache from WorldState.entities. Called when cache is stale.
+static func _refresh_vendor_cache() -> void:
+	_vendor_cache.clear()
 	for eid in WorldState.entities:
-		if eid == npc_id:
-			continue
 		var entity_node: Node3D = WorldState.entities[eid]
 		if not is_instance_valid(entity_node):
 			continue
 		var edata: Dictionary = WorldState.get_entity_data(eid)
-		if not edata.get("vending", false):
+		if edata.get("vending", false):
+			_vendor_cache.append({"id": eid, "node": entity_node})
+	_vendor_cache_age = 0.0
+
+## Called once per frame by the game world to age the vendor cache.
+## Without this, the cache never expires. Wire this to a _process() in game_world.gd,
+## or call it from any singleton that has a _process().
+static func tick_vendor_cache(delta: float) -> void:
+	_vendor_cache_age += delta
+
+## Returns the entity ID of the nearest vending NPC.
+## Pass item_id to require that vendor to stock that item; pass "" to find any vendor.
+static func find_vendor(npc_id: String, npc_position: Vector3, item_id: String = "") -> String:
+	if _vendor_cache_age >= VENDOR_CACHE_TTL:
+		_refresh_vendor_cache()
+
+	var best_id: String = ""
+	var best_dist: float = INF
+	for entry in _vendor_cache:
+		var eid: String = entry["id"]
+		if eid == npc_id:
+			continue
+		var entity_node: Node3D = entry["node"]
+		if not is_instance_valid(entity_node):
 			continue
 		if not item_id.is_empty():
-			var listings: Dictionary = edata.get("listings", {})
+			var listings: Dictionary = WorldState.get_entity_data(eid).get("listings", {})
 			if not listings.has(item_id):
 				continue
 		var dist: float = npc_position.distance_to(entity_node.global_position)

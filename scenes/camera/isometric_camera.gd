@@ -46,7 +46,7 @@ func _ready() -> void:
 	projection = PROJECTION_PERSPECTIVE
 	fov = 50.0
 
-	_setup_outline_effect()
+	#_setup_outline_effect()
 
 
 func _setup_outline_effect() -> void:

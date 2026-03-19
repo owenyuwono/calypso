@@ -241,11 +241,16 @@ func _setup_fps_counter() -> void:
 	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	$UILayer.add_child(_fps_label)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	NpcTradeHelper.tick_vendor_cache(delta)
 	if _fps_label:
 		var fps: int = Engine.get_frames_per_second()
 		var tris: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
-		_fps_label.text = "FPS: %d | Tris: %s" % [fps, _format_number(tris)]
+		var draws: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+		var objs: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+		var phys_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		var script_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		_fps_label.text = "FPS: %d | Tris: %s | Draw: %d | Obj: %d\nPhysics: %.1fms | Script: %.1fms" % [fps, _format_number(tris), draws, objs, phys_ms, script_ms]
 
 static func _format_number(n: int) -> String:
 	if n >= 1000000:

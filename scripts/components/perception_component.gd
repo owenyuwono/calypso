@@ -3,11 +3,14 @@ extends BaseComponent
 ## Per-entity Area3D-based perception. Replaces WorldState.get_npc_perception()
 ## with a local spatial cache built from physics overlap signals.
 
-const AREA_RADIUS: float = 25.0
+const AREA_RADIUS: float = 15.0
 const DETECTABLE_LAYER: int = 8  # bit index — layer 9 in the editor
+const PERCEPTION_CACHE_TTL: float = 0.5
 
 var _area: Area3D
 var _tracked: Dictionary = {}  # entity_id (String) -> Node3D
+var _perception_cache: Dictionary = {}  # radius (float) -> cached result Dictionary
+var _perception_cache_timer: float = 0.0
 
 
 func setup() -> void:
@@ -32,6 +35,10 @@ func setup() -> void:
 	_area.body_exited.connect(_on_body_exited)
 	_area.area_entered.connect(_on_area_entered)
 	_area.area_exited.connect(_on_area_exited)
+
+
+func _process(delta: float) -> void:
+	_perception_cache_timer += delta
 
 
 # --- Signal handlers ---
@@ -74,7 +81,7 @@ func _on_area_exited(area: Area3D) -> void:
 
 # --- Queries ---
 
-## Returns tracked entities within `radius`, sorted by distance ascending.
+## Returns tracked entities within `radius`. Order is not guaranteed.
 ## Each entry: {id: String, node: Node3D, distance: float}
 func get_nearby(radius: float = AREA_RADIUS) -> Array:
 	var parent_node: Node3D = get_parent()
@@ -93,13 +100,16 @@ func get_nearby(radius: float = AREA_RADIUS) -> Array:
 			result.append({"id": eid, "node": node, "distance": dist})
 	for eid in stale:
 		_tracked.erase(eid)
-	result.sort_custom(func(a, b): return a.distance < b.distance)
 	return result
 
 
 ## Produces the exact same dict shape as WorldState.get_npc_perception().
 ## Categorizes tracked entities into npcs, monsters, items, objects, vendors.
+## Result is cached per radius for PERCEPTION_CACHE_TTL seconds.
 func get_perception(radius: float = 15.0) -> Dictionary:
+	if _perception_cache_timer < PERCEPTION_CACHE_TTL and _perception_cache.has(radius):
+		return _perception_cache[radius]
+
 	var parent_node: Node3D = get_parent()
 	if not parent_node:
 		return {}
@@ -182,16 +192,14 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	objects.sort_custom(func(a, b): return a.distance < b.distance)
 	vendors.sort_custom(func(a, b): return a.distance < b.distance)
 
-	# Trees are not tracked via Area3D — scan WorldState by position
-	for tree_id in WorldState.entities:
-		var tree_data: Dictionary = WorldState.entity_data.get(tree_id, {})
-		if tree_data.get("type", "") != "tree":
-			continue
-		var tree_node: Node3D = WorldState.entities[tree_id]
+	# Trees are not tracked via Area3D — use the cached tree registry for O(1) lookup
+	for tree_id in WorldState.tree_entities:
+		var tree_node: Node3D = WorldState.tree_entities[tree_id]
 		if not is_instance_valid(tree_node):
 			continue
 		var tree_dist: float = own_pos.distance_to(tree_node.global_position)
 		if tree_dist <= radius:
+			var tree_data: Dictionary = WorldState.entity_data.get(tree_id, {})
 			trees.append({
 				"id": tree_id,
 				"distance": snapped(tree_dist, 0.1),
@@ -208,7 +216,7 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 			locations.append({"id": loc_id, "distance": snapped(dist, 0.1)})
 	locations.sort_custom(func(a, b): return a.distance < b.distance)
 
-	return {
+	var result: Dictionary = {
 		"npcs": npcs,
 		"monsters": monsters,
 		"items": items,
@@ -217,6 +225,9 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 		"locations": locations,
 		"vendors": vendors,
 	}
+	_perception_cache[radius] = result
+	_perception_cache_timer = 0.0
+	return result
 
 
 func is_tracking(entity_id: String) -> bool:
