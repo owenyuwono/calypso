@@ -180,15 +180,6 @@ func _ready() -> void:
 	add_child(skills_comp)
 	skills_comp.setup({}, ["", "", "", "", ""])
 
-	# Auto-unlock skills that match current proficiency levels
-	for skill_id in SkillDatabase.SKILLS:
-		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
-		if skill_data.has("required_proficiency"):
-			var req: Dictionary = skill_data.required_proficiency
-			var prof_level: int = _progression.get_proficiency_level(req.skill)
-			if prof_level >= req.get("level", 1):
-				skills_comp.unlock_skill(skill_id)
-
 	var _vending_comp := VendingComponent.new()
 	_vending_comp.name = "VendingComponent"
 	add_child(_vending_comp)
@@ -701,20 +692,9 @@ func _on_vending_stopped(eid: String) -> void:
 	if eid == npc_id:
 		_visuals.hide_vend_sign()
 
-func _on_proficiency_level_up(leveled_entity_id: String, prof_id: String, new_level: int) -> void:
+func _on_proficiency_level_up(leveled_entity_id: String, _prof_id: String, _new_level: int) -> void:
 	if leveled_entity_id != entity_id:
 		return
-	var skills_node: Node = get_node_or_null("SkillsComponent")
-	if not skills_node:
-		return
-	for skill_id in SkillDatabase.SKILLS:
-		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
-		if not skill_data.has("required_proficiency"):
-			continue
-		var req: Dictionary = skill_data.required_proficiency
-		if req.get("skill", "") == prof_id and new_level >= req.get("level", 1):
-			if not skills_node.has_skill(skill_id):
-				skills_node.unlock_skill(skill_id)
 
 # --- Generated NPC initialization ---
 
@@ -758,17 +738,6 @@ func late_init_skills() -> void:
 	var initial_profs: Dictionary = profile.get("starting_proficiencies", {})
 	if not initial_profs.is_empty():
 		_progression.setup(_stats, initial_profs, _equipment)
-	# Unlock skills matching proficiency levels
-	var skills_node: Node = get_node_or_null("SkillsComponent")
-	if not skills_node:
-		return
-	for skill_id in SkillDatabase.SKILLS:
-		var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
-		if skill_data.has("required_proficiency"):
-			var req: Dictionary = skill_data.required_proficiency
-			var prof_level: int = _progression.get_proficiency_level(req.skill)
-			if prof_level >= req.get("level", 1) and not skills_node.has_skill(skill_id):
-				skills_node.unlock_skill(skill_id)
 
 # --- Duck typing delegations ---
 

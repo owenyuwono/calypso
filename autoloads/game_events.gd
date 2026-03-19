@@ -29,6 +29,7 @@ signal vending_stopped(entity_id: String)
 # Skills
 signal skill_used(entity_id: String, skill_id: String)
 signal skill_learned(entity_id: String, skill_id: String, new_level: int)
+signal skill_backfired(entity_id: String, skill_id: String, self_damage: int)
 
 # Time
 signal time_phase_changed(old_phase: String, new_phase: String)

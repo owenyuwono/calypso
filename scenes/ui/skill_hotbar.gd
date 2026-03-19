@@ -8,7 +8,7 @@ const SLOT_SIZE: float = 64.0
 const SLOT_GAP: float = 4.0
 const BOTTOM_MARGIN: float = 16.0
 
-var _slots: Array = []  # Array of {panel, name_label, key_label, cooldown_overlay, cooldown_label, skill_id}
+var _slots: Array = []  # Array of {panel, icon_rect, name_label, key_label, cooldown_overlay, cooldown_label, skill_id}
 var _cooldowns: Dictionary = {}  # skill_id -> {remaining: float, total: float}
 var _player: Node
 
@@ -62,7 +62,25 @@ func _create_slot(index: int) -> Dictionary:
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(container)
 
-	# Skill name label (centered)
+	# Skill icon (centered, 48x48 within 64x64 slot)
+	var icon_rect := TextureRect.new()
+	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_rect.texture_filter = TEXTURE_FILTER_LINEAR
+	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_rect.custom_minimum_size = Vector2(48.0, 48.0)
+	icon_rect.anchor_left = 0.5
+	icon_rect.anchor_top = 0.5
+	icon_rect.anchor_right = 0.5
+	icon_rect.anchor_bottom = 0.5
+	icon_rect.offset_left = -24.0
+	icon_rect.offset_top = -24.0
+	icon_rect.offset_right = 24.0
+	icon_rect.offset_bottom = 24.0
+	icon_rect.visible = false
+	container.add_child(icon_rect)
+
+	# Skill name label (centered, text fallback when no icon)
 	var name_label := Label.new()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -104,6 +122,7 @@ func _create_slot(index: int) -> Dictionary:
 
 	return {
 		"panel": panel,
+		"icon_rect": icon_rect,
 		"name_label": name_label,
 		"key_label": key_label,
 		"cooldown_overlay": cooldown_overlay,
@@ -151,7 +170,23 @@ func refresh() -> void:
 		var skill_id: String = hotbar[i] if i < hotbar.size() else ""
 		_slots[i].skill_id = skill_id
 		if skill_id.is_empty():
+			_slots[i].icon_rect.visible = false
 			_slots[i].name_label.text = ""
+			_slots[i].name_label.visible = false
 		else:
-			var skill := SkillDatabase.get_skill(skill_id)
-			_slots[i].name_label.text = skill.get("name", skill_id)
+			var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
+			if ResourceLoader.exists(icon_path):
+				_slots[i].icon_rect.texture = load(icon_path)
+				_slots[i].icon_rect.visible = true
+				_slots[i].name_label.visible = false
+			else:
+				var category: String = SkillDatabase.get_skill_category(skill_id)
+				var base_path: String = "res://assets/textures/ui/skills/bases/" + category + "_base.png"
+				if ResourceLoader.exists(base_path):
+					_slots[i].icon_rect.texture = load(base_path)
+					_slots[i].icon_rect.visible = true
+				else:
+					_slots[i].icon_rect.visible = false
+				var skill: Dictionary = SkillDatabase.get_skill(skill_id)
+				_slots[i].name_label.text = skill.get("name", skill_id)
+				_slots[i].name_label.visible = true
