@@ -3,7 +3,7 @@
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
 - **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals), TimeManager (24h day cycle: dawn/day/dusk/night phases, `time_phase_changed` signal)
-- **Static utility classes**: ModelHelper (3D models, effects), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), world builders (see below)
+- **Static utility classes**: ModelHelper (3D models, effects, animation merging), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
@@ -94,7 +94,7 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **ProficiencyDatabase**: 13 skills, 4 categories (weapon/attribute/gathering/production), max level 10, XP formula: `level * 50`
 - **Weapon** (5): sword, axe, mace, dagger, staff. **Attribute** (2): constitution, agility. **Gathering** (3): mining, woodcutting, fishing. **Production** (3): smithing, cooking, crafting
 - **Stat derivation**: ATK = 5 + weapon_level * 2, DEF = 3 + constitution_level, Max HP = 40 + constitution_level * 10, player level = sum of all proficiency levels
-- **XP sources**: weapon proficiency XP on combat hits, constitution XP on taking damage. Gathering/production are placeholders (not yet implemented)
+- **XP sources**: weapon proficiency XP on combat hits, constitution XP on taking damage, woodcutting XP on tree chops, mining XP on rock chops
 - **Monsters**: `proficiency_xp` field in MonsterDatabase (3–20 per monster type)
 - **Items**: `weapon_type`, `slot_type` (main_hand/off_hand), `required_skill`, `required_level` fields for equipment proficiency requirements
 - **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`, `skill_learned(entity_id, skill_id)`, `skill_used(entity_id, skill_id, target_id)`
@@ -123,14 +123,29 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 ## World Builder Utilities (`scripts/world/`)
 Static utility classes for procedural world construction (one-shot builders, no per-frame lifecycle):
 - `WorldBuilderContext` — shared mutable context (terrain_noise, caches, exclusion zones, nav_region)
-- `AssetSpawner` — model spawning, material caching, tree/foliage model helpers
+- `AssetSpawner` — model spawning, material caching, tree/foliage model helpers, `spawn_prop()` for Meshy props (auto-corrects center-origin Y offset), `spawn_mineable_rock()` for ore nodes
 - `BiomeScatter` — exclusion zones, scatter algorithm, rock clusters
 - `TownBuilder` — city walls (4 gates: north/south/east/west), city biome definitions + props
 - `BuildingHelper` — `create_building()` with optional `building_type: String` metadata for future mesh replacement. Also `create_bench()`, `create_fountain()`
 - `CityBuilder` — district building placement, delegates to 8 district scripts
-- `FieldBuilder` — field biome definitions
+- `FieldBuilder` — field biome definitions (trees, rocks, mineable ore nodes)
 - **District scripts** (`scripts/world/districts/`): `district_plaza`, `district_market`, `district_residential`, `district_noble`, `district_park`, `district_craft`, `district_garrison`, `district_gate` (east + north + south gates)
 - **City walls**: 4 gates at x=±70 (east/west, gap z:-5..5) and z=±50 (north/south, gap x:-5..5). Gate towers height 6.0, width 3.0. Archways above each gate. ~97 buildings total across 8 districts
+
+## Meshy AI Asset Pipeline
+- **Prop models**: `assets/models/environment/props/` — barrel.glb, crate.glb, street_lamp.glb, copper_ore.glb. Spawned via `AssetSpawner.spawn_prop()` which auto-detects center-origin models (Meshy default) and shifts Y so base sits on ground
+- **Character models**: `assets/models/characters/` — Meshy exports separate .glb files: one mesh (T-pose) + separate per-animation files (withSkin). Loaded via `ModelHelper.instantiate_model_with_anims(mesh_path, anim_paths, scale)` which merges animations into a single AnimationPlayer. Auto-creates zero-track Idle fallback if no Idle animation provided
+- **EntityVisuals**: `setup_model_with_anims(mesh_path, anim_paths, scale, color)` for Meshy characters with separate animation files + center-origin Y offset. `setup_model()` still works for single-file KayKit models
+- **Art style**: Anime fantasy, realistic proportions, flat color textures. Prompt suffix: `flat color texture, anime style coloring, no realistic shading, no specular highlights, simple diffuse colors, 3D game-ready model`
+- **Prompt catalog**: `docs/assets/PROMPT.md` — all Meshy prompts for characters (16), weapons (7), buildings (6), props (6), mining rocks (5)
+- **Naming**: Characters `{archetype}_{m|f}.glb`, animations `{archetype}_{m|f}_{anim}.glb`, props `{name}.glb`
+
+## Gathering System
+- **HarvestableComponent** (`scripts/components/harvestable_component.gd`): Generic gathering component for woodcutting and mining. `setup(tier, skill_id, database_lookup)` — skill_id determines which proficiency grants XP, database_lookup is a Callable to the tier's database. Manages chop count, depletion, and respawn
+- **MineableRock** (`scenes/objects/mineable_rock.gd`): StaticBody3D ore node. Tiers: copper/iron/gold. Uses GLB model for copper (MODEL_PATHS dict), procedural spheres for others. Depletion scales down to 30% + darkens. Respawn restores original textures for GLB models (`material_override = null`)
+- **OreDatabase** (`scripts/data/ore_database.gd`): Static tier data — copper (3-5 chops, 5 XP, level 1), iron (5-8, 12 XP, level 3), gold (8-12, 25 XP, level 6). Drops: ore + stone
+- **ChoppableTree** (`scenes/objects/choppable_tree.gd`): Uses same HarvestableComponent with `skill_id: "woodcutting"` and `TreeDatabase.get_tree` lookup
+- **Player interaction**: Left-click rock → walk to + mine. Mining cursor on hover. `player.gd` generalizes harvesting for both trees and rocks via `HarvestableComponent.get_skill_id()`
 
 ## Project Structure Notes
 - **Stale directories**: `content/`, `features/`, `inference/` are old branch copies — NOT the active project. The active project root is `/home/owenyuwono/Work/Ventures/arcadia/`
