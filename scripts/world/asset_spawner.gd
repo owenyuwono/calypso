@@ -175,7 +175,7 @@ static func _get_model_aabb(node: Node3D) -> AABB:
 		if child is Node3D:
 			for sub in child.get_children():
 				if sub is MeshInstance3D and sub.mesh:
-					var mesh_aabb := sub.mesh.get_aabb()
+					var mesh_aabb: AABB = sub.mesh.get_aabb()
 					if first:
 						combined = mesh_aabb
 						first = false
