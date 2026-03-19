@@ -120,7 +120,7 @@ const WORLD_FACTS := """WORLD FACTS:
 const CHAT_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
 Personality: {personality}
 {trait_line}{backstory_line}You are currently {activity}.
-{grounding_facts}
+{grounding_facts}{opinions_block}{secrets_block}
 Reply in 1 short sentence (under 15 words).
 You may reference YOUR FACTS but do NOT recite them directly. Do NOT invent events, items, or scenarios that are not listed.
 {voice}
@@ -145,7 +145,7 @@ Respond as {npc_name}:"""
 const CHAT_INITIATE_SYSTEM_TEMPLATE := """You are {npc_name}, an adventurer in a medieval village.
 Personality: {personality}
 {trait_line}{backstory_line}You are currently {activity}.
-{grounding_facts}
+{grounding_facts}{opinions_block}{secrets_block}
 You see {target_name} nearby. {intent_cue} {topic}.
 
 Say 1 short sentence (under 15 words).
@@ -167,7 +167,7 @@ time:{time_display}({phase}) stamina:{stamina_text}
 
 Say something to {target_name} as {npc_name}:"""
 
-static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String, topic: String = "", trait_summary: String = "", intent_cue: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "") -> Dictionary:
+static func build_chat_initiate_system_message(npc_name: String, personality: String, activity: String, target_name: String, topic: String = "", trait_summary: String = "", intent_cue: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "", opinions_block: String = "", secrets_block: String = "") -> Dictionary:
 	var effective_topic := topic if not topic.is_empty() else "whatever comes to mind"
 	var effective_cue := intent_cue if not intent_cue.is_empty() else "Chat with %s about" % target_name
 	var trait_line := "Traits: %s\n" % trait_summary if not trait_summary.is_empty() else ""
@@ -187,6 +187,8 @@ static func build_chat_initiate_system_message(npc_name: String, personality: St
 		"mood": effective_mood,
 		"world_facts": WORLD_FACTS,
 		"grounding_facts": grounding_facts,
+		"opinions_block": opinions_block,
+		"secrets_block": secrets_block,
 		"goal_instruction": "",
 	})
 	return {"role": "system", "content": content}
@@ -234,7 +236,7 @@ static func build_chat_initiate_user_message(npc_name: String, npc_id: String, t
 	})
 	return {"role": "user", "content": content}
 
-static func build_chat_system_message(npc_name: String, personality: String, activity: String, player_speaking: bool = false, trait_summary: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "") -> Dictionary:
+static func build_chat_system_message(npc_name: String, personality: String, activity: String, player_speaking: bool = false, trait_summary: String = "", backstory: String = "", voice_style: String = "", mood: String = "", grounding_facts: String = "", opinions_block: String = "", secrets_block: String = "") -> Dictionary:
 	var trait_line := "Traits: %s\n" % trait_summary if not trait_summary.is_empty() else ""
 	var backstory_line := "Background: %s\n" % backstory if not backstory.is_empty() else ""
 	var effective_voice := ("Your vibe: " + voice_style) if not voice_style.is_empty() else "Talk like a real MMO player. Casual and brief."
@@ -249,6 +251,8 @@ static func build_chat_system_message(npc_name: String, personality: String, act
 		"mood": effective_mood,
 		"world_facts": WORLD_FACTS,
 		"grounding_facts": grounding_facts,
+		"opinions_block": opinions_block,
+		"secrets_block": secrets_block,
 		"goal_instruction": GOAL_INSTRUCTION if player_speaking else "",
 	})
 	return {"role": "system", "content": content}
@@ -450,6 +454,45 @@ static func build_conversation_user_message(npc_node: Node, conversation: Conver
 				parts.append("Your opinions on \"%s\":\n" % conversation.topic + "\n".join(op_lines))
 
 	return "\n\n".join(parts)
+
+
+## Build compact opinions block for chat prompts. Returns empty string when no opinions qualify.
+static func build_opinions_block(identity: Node, rel_tier: String) -> String:
+	if not identity or not identity.has_method("get_opinions_for"):
+		return ""
+	var ops: Array = identity.get_opinions_for("", rel_tier)
+	if ops.is_empty():
+		return ""
+	var lines: Array = []
+	for op in ops:
+		var take: String = op.get("take", op.get("reasoning", ""))
+		var topic: String = op.get("topic", "")
+		if take.is_empty():
+			continue
+		if not topic.is_empty():
+			lines.append("%s: %s" % [topic, take])
+		else:
+			lines.append(take)
+	if lines.is_empty():
+		return ""
+	return "\nYour opinions:\n" + "\n".join(lines) + "\n"
+
+
+## Build compact secrets block for chat prompts. Returns empty string when tier is too low.
+static func build_secrets_block(identity: Node, rel_tier: String) -> String:
+	if not identity or not identity.has_method("get_secrets_for_tier"):
+		return ""
+	var secs: Array = identity.get_secrets_for_tier(rel_tier)
+	if secs.is_empty():
+		return ""
+	var lines: Array = []
+	for s in secs:
+		var fact: String = s.get("fact", str(s))
+		if not fact.is_empty():
+			lines.append("- " + fact)
+	if lines.is_empty():
+		return ""
+	return "\nSecrets (share only if pressed by a close friend):\n" + "\n".join(lines) + "\n"
 
 
 static func get_activity_description(goal: String) -> String:

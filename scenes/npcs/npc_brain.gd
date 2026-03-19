@@ -164,9 +164,11 @@ func _on_llm_response(req_id: String, response: Dictionary) -> void:
 		_handle_opinion_response(response)
 		return
 	elif req_id.begins_with("impression_"):
-		if not req_id.substr(11).begins_with(npc.npc_id):
+		var after_prefix: String = req_id.substr(11)  # strip "impression_"
+		if not after_prefix.begins_with(npc.npc_id):
 			return
-		_handle_impression_response(response)
+		var partner_id: String = after_prefix.substr(npc.npc_id.length() + 1)  # strip "{npc_id}_"
+		_handle_impression_response(response, partner_id)
 		return
 	elif req_id.begins_with("conv_"):
 		# conv_{npc_id}_{conversation_id} — strip "conv_{npc_id}_" prefix
@@ -230,6 +232,13 @@ func _on_llm_failed(req_id: String, error: String) -> void:
 		executor.execute("talk_to", speaker_id, greeting)
 		_responding_to = ""
 		return
+
+	# Background tasks (impression, opinion, extract) — silent discard on failure
+	for bg_prefix in ["impression_", "opinion_", "extract_"]:
+		if req_id.begins_with(bg_prefix):
+			var after: String = req_id.substr(bg_prefix.length())
+			if after.begins_with(npc.npc_id):
+				return  # silently discard — background task, no state impact
 
 	if req_id != npc.npc_id:
 		return
@@ -351,8 +360,10 @@ func request_reactive_response(speaker_id: String, spoken_text: String, overhear
 		var original_target_name: String = ""
 		if overheard and not original_target_id.is_empty():
 			original_target_name = _get_display_name(original_target_id)
+		var opinions_block: String = PromptBuilder.build_opinions_block(_identity, rel_label)
+		var secrets_block: String = PromptBuilder.build_secrets_block(_identity, rel_label)
 		var messages: Array = [
-			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player, trait_summary, ctx.backstory, ctx.voice_style, ctx.mood_prompt, grounding),
+			PromptBuilder.build_chat_system_message(npc.npc_name, npc.personality, activity, is_player, trait_summary, ctx.backstory, ctx.voice_style, ctx.mood_prompt, grounding, opinions_block, secrets_block),
 			PromptBuilder.build_chat_user_message(npc.npc_name, npc.npc_id, speaker_name, spoken_text, memory, rel_label, overheard, original_target_name),
 		]
 
@@ -385,8 +396,10 @@ func initiate_social_chat(target_id: String, topic: String = "", intent_cue: Str
 		var ctx := _get_identity_context()
 		var rel_label: String = _relationship.get_tier(target_id) if _relationship else "stranger"
 		var grounding := _format_grounding_facts(facts, 4)
+		var opinions_block: String = PromptBuilder.build_opinions_block(_identity, rel_label)
+		var secrets_block: String = PromptBuilder.build_secrets_block(_identity, rel_label)
 		var messages: Array = [
-			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name, topic, trait_summary, intent_cue, ctx.backstory, ctx.voice_style, ctx.mood_prompt, grounding),
+			PromptBuilder.build_chat_initiate_system_message(npc.npc_name, npc.personality, activity, target_name, topic, trait_summary, intent_cue, ctx.backstory, ctx.voice_style, ctx.mood_prompt, grounding, opinions_block, secrets_block),
 			PromptBuilder.build_chat_initiate_user_message(npc.npc_name, npc.npc_id, target_name, target_id, target_activity, memory, rel_label),
 		]
 
@@ -568,8 +581,21 @@ func _handle_opinion_response(response: Dictionary) -> void:
 	_identity.add_opinion(opinion)
 	GameEvents.opinion_formed.emit(npc.npc_id, topic, stance)
 
-func _handle_impression_response(response: Dictionary) -> void:
-	pass  # Future: parse impression, store via relationship.set_impression()
+func _handle_impression_response(response: Dictionary, partner_id: String) -> void:
+	if not _relationship or partner_id.is_empty():
+		return
+	var content: String = response.get("message", {}).get("content", "").strip_edges()
+	if content.is_empty():
+		return
+	# Take only the first sentence to keep impressions concise
+	var sentence_end: int = content.find(".")
+	var impression: String = content
+	if sentence_end >= 0:
+		impression = content.substr(0, sentence_end + 1).strip_edges()
+	if impression.is_empty():
+		return
+	_relationship.set_impression(partner_id, impression)
+	print("[IMPRESSION] %s about %s: %s" % [npc.npc_id, partner_id, impression])
 
 func _handle_conversation_response(conversation_id: String, response: Dictionary) -> void:
 	var conv_manager = get_tree().get_first_node_in_group("conversation_manager")
@@ -600,7 +626,23 @@ func request_memory_extraction(conversation_id: String, transcript: String = "")
 	LLMClient.send_chat(req_id, messages, {}, 4)
 
 func _request_impression_update(entity_id: String) -> void:
-	pass  # Future: send impression prompt with priority 5
+	if not _identity:
+		return
+	var partner_name: String = _get_display_name(entity_id)
+	var npc_name: String = _identity.npc_name if _identity.npc_name else npc.npc_id
+	var personality: String = _identity.get_personality_prompt()
+	var tier: String = _relationship.get_tier(entity_id) if _relationship else "stranger"
+	var recent_memories: Array = memory.gather_chat_facts(entity_id) if memory else []
+	var context_lines: Array = []
+	for m in recent_memories:
+		var fact: String = m.get("fact", "")
+		if not fact.is_empty():
+			context_lines.append(fact)
+	var context_text: String = "\n".join(context_lines) if not context_lines.is_empty() else "recent interaction"
+	var prompt: String = "You are %s, %s.\nYour relationship with %s is currently: %s.\nRecent interaction context:\n%s\n\nIn one sentence, summarize your impression of %s." % [npc_name, personality, partner_name, tier, context_text, partner_name]
+	var req_id: String = "impression_%s_%s" % [npc.npc_id, entity_id]
+	var messages: Array = [{"role": "user", "content": prompt}]
+	LLMClient.send_chat(req_id, messages, {}, 5)
 
 func _maybe_form_opinion(entity_id: String, fact: String, importance: String) -> void:
 	if importance != "high":

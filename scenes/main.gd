@@ -41,6 +41,12 @@ func _ready() -> void:
 	conversation_manager.name = "ConversationManager"
 	add_child(conversation_manager)
 
+	# Day/night lighting cycle — persists across zone transitions
+	var DayNightCycle: GDScript = preload("res://scripts/world/day_night_cycle.gd")
+	var day_night: Node3D = DayNightCycle.new()
+	day_night.name = "DayNightCycle"
+	add_child(day_night)
+
 	var player := $Player
 	var shop_panel := $UILayer/ShopPanel
 	var inventory_panel := $UILayer/InventoryPanel
