@@ -371,13 +371,36 @@ func _process_combat(delta: float) -> bool:
 	var result: Dictionary = _auto_attack.process_attack(
 		delta, _attack_target, global_position, SPEED, attack_range, attack_speed
 	)
+	# Keep locked target's HP bar updated
+	if not _attack_target.is_empty():
+		_show_target_hp_bar(_attack_target)
 	return result.get("is_moving", false)
 
 func _cancel_attack() -> void:
+	_hide_target_hp_bar(_attack_target)
 	_attack_target = ""
 	_auto_attack.cancel()
 	_player_skills.cancel_pending()
 	_hover.clear_ring()
+
+func _show_target_hp_bar(target_id: String) -> void:
+	var target: Node3D = WorldState.get_entity(target_id)
+	if target:
+		var visuals: Node = target.get_node_or_null("EntityVisuals")
+		if visuals:
+			var stats: Node = target.get_node_or_null("StatsComponent")
+			if stats:
+				visuals.set_hp_bar_visible(true)
+				visuals.update_hp_bar_combat(stats.hp, stats.max_hp, true)
+
+func _hide_target_hp_bar(target_id: String) -> void:
+	if target_id.is_empty():
+		return
+	var target: Node3D = WorldState.get_entity(target_id)
+	if target:
+		var visuals: Node = target.get_node_or_null("EntityVisuals")
+		if visuals:
+			visuals.set_hp_bar_visible(false)
 
 func _get_approach_pos(target_pos: Vector3, standoff: float) -> Vector3:
 	var offset: Vector3 = global_position - target_pos
@@ -575,10 +598,13 @@ func _handle_left_click() -> void:
 			# Click monster: walk to + auto-attack, lock ring on target
 			_cancel_harvest()
 			_interact_target = ""
+			_cancel_attack()  # Hide HP bar on old target before switching
 			_attack_target = hovered_entity_id
 			_auto_attack.cancel()
 			_is_navigating = false
 			_hover.lock_ring(hovered_entity_id, Color(1.0, 0.3, 0.2, 0.6))
+			# Show HP bar on locked target
+			_show_target_hp_bar(hovered_entity_id)
 			return
 
 		if etype == "loot_drop":
@@ -743,9 +769,6 @@ func _die() -> void:
 func _respawn() -> void:
 	_is_dead = false
 	_visuals.reset_anim()
-	# Teleport to town
-	global_position = Vector3(0, 1, 0)
-	velocity = Vector3.ZERO
 
 	# Restore HP via StatsComponent (source of truth)
 	_stats.restore_full_hp()
@@ -755,6 +778,20 @@ func _respawn() -> void:
 	_visuals.play_anim("Idle")
 
 	GameEvents.entity_respawned.emit("player")
+
+	var city_spawn: Vector3 = ZoneDatabase.ZONES["city"]["spawn_point"]
+	var loaded_zone: Node3D = ZoneManager.get_loaded_zone()
+	var current_zone_id: String = ""
+	if loaded_zone and "zone_id" in loaded_zone:
+		current_zone_id = loaded_zone.zone_id
+
+	if current_zone_id == "city":
+		# Already in city — just teleport to spawn point
+		global_position = city_spawn
+		velocity = Vector3.ZERO
+	elif not ZoneManager.is_transitioning():
+		# In a field or unknown zone — load city
+		ZoneManager.load_zone("city", city_spawn)
 
 func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":

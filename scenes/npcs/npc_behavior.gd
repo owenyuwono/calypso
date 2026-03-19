@@ -23,7 +23,7 @@ const POTION_STOCK_TARGET: int = 3
 const POTION_RESTOCK_THRESHOLD: int = 2
 const POTION_BUY_GOLD_MIN: int = 40
 
-var default_goal: String = "idle"
+var default_goal: String = "patrol"
 
 var npc: CharacterBody3D
 var memory: Node
@@ -689,6 +689,8 @@ func _do_action_with_data(action: String, target: String, data: Dictionary) -> v
 func _on_action_completed(completed_npc_id: String, _action: String, _success: bool) -> void:
 	if completed_npc_id == npc.npc_id:
 		_action_in_progress = false
+		# Evaluate next action immediately instead of waiting for next tick
+		_behavior_timer = TICK_INTERVAL
 
 func _on_time_phase_changed(_old_phase: String, new_phase: String) -> void:
 	if new_phase == "night" or new_phase == "dawn":

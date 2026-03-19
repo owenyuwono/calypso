@@ -780,7 +780,10 @@ func _ctx_discard() -> void:
 		loot.gold_amount = 0
 		var offset := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
 		loot.position = _player.global_position + offset
-		get_tree().current_scene.call_deferred("add_child", loot)
+		var loot_parent: Node = ZoneManager.get_loaded_zone()
+		if not loot_parent:
+			loot_parent = get_tree().current_scene
+		loot_parent.call_deferred("add_child", loot)
 	_hide_context_menu()
 	_refresh()
 

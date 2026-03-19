@@ -32,6 +32,9 @@ const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
 var entity_id: String = ""
 
+# Zone awareness
+var _zone_active: bool = true
+
 # States as strings to avoid cross-script class_name issues
 const STATE_IDLE: String = "idle"
 const STATE_THINKING: String = "thinking"
@@ -238,6 +241,10 @@ func _ready() -> void:
 		name_label.text = npc_name
 		name_label.visible = false
 
+	# Connect to ZoneManager if available
+	if Engine.has_singleton("ZoneManager") or get_tree().root.has_node("ZoneManager"):
+		ZoneManager.zone_changed.connect(_on_zone_changed)
+
 	GameEvents.npc_spoke.connect(_on_any_npc_spoke)
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
@@ -311,7 +318,54 @@ func _register_with_world() -> void:
 	stats["equipment"] = {"head": "", "torso": "", "legs": "", "gloves": "", "feet": "", "back": "", "main_hand": "", "off_hand": ""}
 	WorldState.register_entity(npc_id, self, stats)
 
+func _on_zone_changed(_old_zone_id: String, new_zone_id: String) -> void:
+	var my_zone: String = ZoneDatabase.get_zone_at_position(global_position)
+	var should_be_active: bool = (my_zone == new_zone_id)
+	if should_be_active != _zone_active:
+		_set_zone_active(should_be_active)
+	# Reassign nav map when becoming active (zone's NavigationRegion3D changed)
+	if _zone_active:
+		var loaded_zone: Node3D = ZoneManager.get_loaded_zone()
+		if loaded_zone:
+			var nav_region: NavigationRegion3D = loaded_zone.get_node_or_null("NavigationRegion3D")
+			if nav_region:
+				nav_agent.set_navigation_map(nav_region.get_navigation_map())
+
+func _set_zone_active(active: bool) -> void:
+	_zone_active = active
+	if active:
+		visible = true
+		set_physics_process(true)
+		nav_agent.avoidance_enabled = true
+		if _perception:
+			_perception.set_process(true)
+			_perception.set_physics_process(true)
+		# Resume child behavior/brain processing
+		var behavior: Node = get_node_or_null("NPCBehavior")
+		if behavior:
+			behavior.set_process(true)
+		var brain: Node = get_node_or_null("NPCBrain")
+		if brain:
+			brain.set_process(true)
+	else:
+		visible = false
+		set_physics_process(false)
+		nav_agent.set_velocity_forced(Vector3.ZERO)
+		if _perception:
+			_perception.set_process(false)
+			_perception.set_physics_process(false)
+		# Pause child behavior/brain and reset action state to prevent deadlock
+		var behavior: Node = get_node_or_null("NPCBehavior")
+		if behavior:
+			behavior.set_process(false)
+			behavior._action_in_progress = false
+		var brain: Node = get_node_or_null("NPCBrain")
+		if brain:
+			brain.set_process(false)
+
 func _update_lod() -> void:
+	if not _zone_active:
+		return
 	var cam := get_viewport().get_camera_3d()
 	if not cam:
 		_lod_level = 0
@@ -340,6 +394,8 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 	_safe_velocity = safe_velocity
 
 func _physics_process(delta: float) -> void:
+	if not _zone_active:
+		return
 	if current_state == STATE_DEAD:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:

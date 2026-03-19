@@ -10,14 +10,6 @@ const UPDATE_INTERVAL := 0.3
 const COLOR_BG := Color(0.1, 0.1, 0.15, 0.85)
 const COLOR_BORDER := Color(0.4, 0.35, 0.2)
 
-# Zone rectangles in world XZ (Rect2 uses x,y = world x,z)
-const ZONE_TOWN := Rect2(-70, -50, 140, 100)
-const ZONE_FIELD := Rect2(70, -40, 80, 80)
-const ZONE_WEST_FIELD := Rect2(-150, -40, 80, 80)
-
-const COLOR_ZONE_TOWN := Color(0.2, 0.3, 0.2, 0.15)
-const COLOR_ZONE_FIELD := Color(0.3, 0.3, 0.15, 0.15)
-
 var _timer: float = 0.0
 var _dots: Array = []  # [{pos: Vector2, color: Color, radius: float, is_player: bool}]
 var _zone_label_text: String = "Town"
@@ -53,13 +45,12 @@ func _update_dots() -> void:
 		return
 	_player_pos = player_node.global_position
 
-	# Determine zone
-	if _player_pos.x >= 70:
-		_zone_label_text = "Field"
-	elif _player_pos.x <= -70:
-		_zone_label_text = "West Field"
+	# Determine zone name from the currently loaded zone
+	var loaded_zone: Node3D = ZoneManager.get_loaded_zone()
+	if loaded_zone and "zone_id" in loaded_zone:
+		_zone_label_text = ZoneDatabase.get_zone_name(loaded_zone.zone_id)
 	else:
-		_zone_label_text = "City"
+		_zone_label_text = ZoneDatabase.get_zone_name(ZoneDatabase.get_zone_at_position(_player_pos))
 
 	for id in WorldState.entities:
 		var node: Node3D = WorldState.entities[id]
@@ -121,10 +112,13 @@ func _draw() -> void:
 	# Border
 	draw_rect(map_rect, COLOR_BORDER, false, BORDER)
 
-	# Zone hint rectangles
-	_draw_zone_rect(ZONE_TOWN, COLOR_ZONE_TOWN)
-	_draw_zone_rect(ZONE_FIELD, COLOR_ZONE_FIELD)
-	_draw_zone_rect(ZONE_WEST_FIELD, COLOR_ZONE_FIELD)
+	# Zone hint rectangles — drawn from ZoneDatabase with per-zone colors
+	for zone_id in ZoneDatabase.ZONES:
+		var zone_data: Dictionary = ZoneDatabase.ZONES[zone_id]
+		var bounds: Rect2 = zone_data["bounds"]
+		var base_color: Color = zone_data["color"]
+		var zone_color := Color(base_color.r, base_color.g, base_color.b, 0.15)
+		_draw_zone_rect(bounds, zone_color)
 
 	# Draw non-player dots first, player last
 	for dot in _dots:
