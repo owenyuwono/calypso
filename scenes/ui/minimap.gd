@@ -104,6 +104,38 @@ func _update_dots() -> void:
 			"is_player": is_player,
 		})
 
+	# Portal markers for current zone
+	var current_zone_id: String = ""
+	if loaded_zone and "zone_id" in loaded_zone:
+		current_zone_id = loaded_zone.zone_id
+
+	var portals: Array = ZoneDatabase.get_portals(current_zone_id)
+	for portal_def in portals:
+		var rect: Rect2 = portal_def["source_rect"]
+		var portal_world_pos: Vector3 = Vector3(
+			rect.position.x + rect.size.x / 2.0,
+			0,
+			rect.position.y + rect.size.y / 2.0
+		)
+		if portal_world_pos.distance_to(_player_pos) > MAP_RADIUS:
+			continue
+		var world_offset: Vector3 = portal_world_pos - _player_pos
+		var map_x: float = (world_offset.x / MAP_RADIUS) * (MAP_SIZE * 0.5)
+		var map_z: float = (world_offset.z / MAP_RADIUS) * (MAP_SIZE * 0.5)
+		if absf(map_x) > MAP_SIZE * 0.5 or absf(map_z) > MAP_SIZE * 0.5:
+			continue
+		var screen_pos: Vector2 = Vector2(
+			BORDER + MAP_SIZE * 0.5 + map_x,
+			BORDER + MAP_SIZE * 0.5 + map_z
+		)
+		_dots.append({
+			"pos": screen_pos,
+			"color": Color(0.4, 0.7, 1.0),
+			"radius": 4.0,
+			"is_player": false,
+			"is_portal": true,
+		})
+
 func _draw() -> void:
 	var map_rect := Rect2(0, 0, MAP_SIZE + BORDER * 2, MAP_SIZE + BORDER * 2)
 
@@ -120,9 +152,25 @@ func _draw() -> void:
 		var zone_color := Color(base_color.r, base_color.g, base_color.b, 0.15)
 		_draw_zone_rect(bounds, zone_color)
 
+	# Draw portal markers as diamonds (before entity dots)
+	for dot in _dots:
+		if not dot.get("is_portal", false):
+			continue
+		var p: Vector2 = dot.pos
+		var r: float = dot.radius
+		var points: PackedVector2Array = PackedVector2Array([
+			Vector2(p.x, p.y - r),      # top
+			Vector2(p.x + r, p.y),      # right
+			Vector2(p.x, p.y + r),      # bottom
+			Vector2(p.x - r, p.y),      # left
+		])
+		draw_colored_polygon(points, dot.color)
+
 	# Draw non-player dots first, player last
 	for dot in _dots:
 		if dot.is_player:
+			continue
+		if dot.get("is_portal", false):
 			continue
 		draw_circle(dot.pos, dot.radius, dot.color)
 

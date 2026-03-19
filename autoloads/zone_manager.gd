@@ -9,16 +9,16 @@ signal zone_load_completed(zone_id: String)
 var _loaded_zone: Node3D = null
 var _zone_anchor: Node3D = null
 var _player: CharacterBody3D = null
-var _transition_screen: ColorRect = null
+var _loading_screen: Node = null
 var _is_transitioning: bool = false
 
 # --- Setup ---
 
-func setup(zone_anchor: Node3D, player: CharacterBody3D, transition_screen: ColorRect) -> void:
+func setup(zone_anchor: Node3D, player: CharacterBody3D, root_node: Node) -> void:
 	_zone_anchor = zone_anchor
 	_player = player
-	_transition_screen = transition_screen
-	_transition_screen.modulate.a = 0.0
+	_loading_screen = load("res://scenes/ui/loading_screen.gd").new()
+	root_node.add_child(_loading_screen)
 
 # --- Accessors ---
 
@@ -50,8 +50,8 @@ func load_zone(zone_id: String, spawn_position: Vector3) -> void:
 
 	zone_load_started.emit(zone_id)
 
-	# Fade to black
-	await _fade(0.0, 1.0, 0.3)
+	# Show loading screen (handles fade-in internally; first load skips fade)
+	await _loading_screen.show_loading(zone_id)
 
 	# Unload current zone
 	if _loaded_zone:
@@ -79,8 +79,8 @@ func load_zone(zone_id: String, spawn_position: Vector3) -> void:
 	zone_changed.emit(old_zone_id, zone_id)
 	zone_load_completed.emit(zone_id)
 
-	# Fade from black
-	await _fade(1.0, 0.0, 0.3)
+	# Hide loading screen (enforces min display time, animates progress to 1.0, fades out)
+	await _loading_screen.hide_loading()
 
 	# Re-enable player
 	_player.set_process_unhandled_input(true)
@@ -109,10 +109,3 @@ func _unload_current_zone() -> void:
 	_loaded_zone = null
 	await get_tree().process_frame
 
-func _fade(from: float, to: float, duration: float) -> void:
-	if not _transition_screen:
-		return
-	var tween: Tween = create_tween()
-	_transition_screen.modulate.a = from
-	tween.tween_property(_transition_screen, "modulate:a", to, duration)
-	await tween.finished

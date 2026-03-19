@@ -105,8 +105,7 @@ func _ready() -> void:
 		panel_toggles.world_map_panel = $UILayer/WorldMapPanel
 
 	# Boot ZoneManager — loads first zone and bakes navmesh
-	var transition_overlay: ColorRect = $UILayer/TransitionOverlay
-	ZoneManager.setup($ZoneAnchor, player, transition_overlay)
+	ZoneManager.setup($ZoneAnchor, player, self)
 
 	# Spawn NPCs + apply loadouts once the first zone's navmesh is ready
 	# (matches original game_world.gd flow where NPCs spawned inside _on_navmesh_baked)

@@ -198,6 +198,42 @@ func _on_draw_area_draw(draw_area: Control) -> void:
 		var text_width: float = font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 		draw_area.draw_string(font, Vector2(map_pos.x - text_width * 0.5, map_pos.y - 6), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.75, 0.72, 0.6, 0.7))
 
+	# Portal markers — deduplicate overlapping positions
+	var drawn_portals: Dictionary = {}  # "x,z" -> true, to avoid duplicate markers
+	for zone_id in ZoneDatabase.PORTALS:
+		var portals: Array = ZoneDatabase.PORTALS[zone_id]
+		for portal_def in portals:
+			var rect: Rect2 = portal_def["source_rect"]
+			var center_x: float = rect.position.x + rect.size.x / 2.0
+			var center_z: float = rect.position.y + rect.size.y / 2.0
+			var key: String = "%.0f,%.0f" % [center_x, center_z]
+			if drawn_portals.has(key):
+				continue
+			drawn_portals[key] = true
+
+			var map_pos: Vector2 = _world_to_map(Vector2(center_x, center_z))
+
+			# Diamond shape
+			var r: float = 5.0
+			var points: PackedVector2Array = PackedVector2Array([
+				Vector2(map_pos.x, map_pos.y - r),
+				Vector2(map_pos.x + r, map_pos.y),
+				Vector2(map_pos.x, map_pos.y + r),
+				Vector2(map_pos.x - r, map_pos.y),
+			])
+			draw_area.draw_colored_polygon(points, Color(0.4, 0.7, 1.0, 0.9))
+
+			# Destination label — pick one target to show (first portal found at this position)
+			var dest_name: String = ZoneDatabase.get_zone_name(portal_def["target"])
+			draw_area.draw_string(
+				ThemeDB.fallback_font,
+				Vector2(map_pos.x + 8, map_pos.y + 4),
+				dest_name,
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1, 9,
+				Color(0.5, 0.8, 1.0, 0.8)
+			)
+
 	# Entity dots — non-player first
 	for dot in _dots:
 		var map_pos := _world_to_map(dot["pos"])

@@ -11,6 +11,7 @@ const ZONES: Dictionary = {
 		"bounds": Rect2(-70, -50, 140, 100),  # world XZ (x, z, width, height)
 		"spawn_point": Vector3(0, 1, 0),
 		"color": Color(0.2, 0.35, 0.2, 0.2),
+		"loading_art": "res://assets/textures/ui/loading/city.png",
 	},
 	"east_field": {
 		"name": "East Field",
@@ -18,6 +19,7 @@ const ZONES: Dictionary = {
 		"bounds": Rect2(70, -40, 80, 80),
 		"spawn_point": Vector3(75, 1, 0),
 		"color": Color(0.35, 0.35, 0.15, 0.2),
+		"loading_art": "res://assets/textures/ui/loading/east_field.png",
 	},
 	"west_field": {
 		"name": "West Field",
@@ -25,6 +27,7 @@ const ZONES: Dictionary = {
 		"bounds": Rect2(-150, -40, 80, 80),
 		"spawn_point": Vector3(-75, 1, 0),
 		"color": Color(0.35, 0.35, 0.15, 0.2),
+		"loading_art": "res://assets/textures/ui/loading/west_field.png",
 	},
 }
 
