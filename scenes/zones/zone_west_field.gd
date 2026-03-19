@@ -21,7 +21,8 @@ func _ready() -> void:
 	# Build west field terrain
 	_build_terrain(ctx)
 
-	# Scatter west field vegetation, trees, and mineable rocks
+	# Setup exclusion zones and scatter west field vegetation, trees, and mineable rocks
+	BiomeScatter.setup_exclusion_zones(ctx)
 	FieldBuilder.decorate_west_biomes(ctx)
 
 	# Create zone portals
