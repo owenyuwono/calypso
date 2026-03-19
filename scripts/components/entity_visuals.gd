@@ -30,12 +30,46 @@ func setup_model(path: String, scale_val: float, fallback_color: Color, use_box:
 	_model = result.model
 	parent.add_child(_model)
 	_anim_player = result.anim_player
+	_finish_model_setup()
 
+func setup_model_with_anims(mesh_path: String, anim_paths: Dictionary, scale_val: float, fallback_color: Color) -> void:
+	var parent: Node3D = get_parent()
+	var result: Dictionary = {"model": null, "anim_player": null}
+	if not mesh_path.is_empty():
+		result = ModelHelper.instantiate_model_with_anims(mesh_path, anim_paths, scale_val)
+	if result.model == null:
+		push_warning("EntityVisuals: Could not load model '%s', using fallback" % mesh_path)
+		var fb := ModelHelper.create_fallback_mesh(parent, fallback_color, false)
+		_model = fb.model
+		_mesh_instances = fb.mesh_instances
+		_overlay_material = fb.overlay
+		return
+
+	_model = result.model
+	parent.add_child(_model)
+	_anim_player = result.anim_player
+
+	# Detect center-origin models (AABB starts below ground) and shift up so feet sit at y=0
+	var aabb := AABB()
+	var first := true
+	for mi in ModelHelper.find_mesh_instances(_model):
+		if mi.mesh:
+			var mesh_aabb: AABB = mi.get_aabb()
+			if first:
+				aabb = mesh_aabb
+				first = false
+			else:
+				aabb = aabb.merge(mesh_aabb)
+	if not first and aabb.position.y < -0.01:
+		_model.position.y += abs(aabb.position.y) * scale_val
+
+	_finish_model_setup()
+
+func _finish_model_setup() -> void:
 	_mesh_instances = ModelHelper.find_mesh_instances(_model)
 	_overlay_material = ModelHelper.create_overlay_material()
 	ModelHelper.apply_overlay(_mesh_instances, _overlay_material)
 	ModelHelper.apply_toon_to_model(_model)
-
 	if _anim_player:
 		play_anim("Idle")
 

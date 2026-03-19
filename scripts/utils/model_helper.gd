@@ -37,6 +37,76 @@ static func instantiate_model(path: String, scale_val: float) -> Dictionary:
 		strip_unused_animations(anim_player)
 	return { "model": instance, "anim_player": anim_player }
 
+## Load a mesh .glb and merge animations from separate .glb files into its AnimationPlayer.
+## anim_paths: { target_name: String -> anim_glb_path: String }
+## Returns {"model": Node3D, "anim_player": AnimationPlayer} same as instantiate_model().
+static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictionary, scale_val: float) -> Dictionary:
+	var result := instantiate_model(mesh_path, scale_val)
+	if not result["model"]:
+		return result
+
+	var model: Node3D = result["model"]
+	var anim_player: AnimationPlayer = result["anim_player"]
+
+	# Create an AnimationPlayer if the mesh .glb didn't include one
+	if not anim_player:
+		anim_player = AnimationPlayer.new()
+		model.add_child(anim_player)
+		anim_player.add_animation_library("", AnimationLibrary.new())
+		result["anim_player"] = anim_player
+
+	# Ensure the default library exists
+	if not anim_player.has_animation_library(""):
+		anim_player.add_animation_library("", AnimationLibrary.new())
+
+	var library: AnimationLibrary = anim_player.get_animation_library("")
+
+	for target_name in anim_paths:
+		var anim_path: String = anim_paths[target_name]
+		var anim_scene := load_model(anim_path)
+		if not anim_scene:
+			push_warning("ModelHelper: Animation .glb not found: %s" % anim_path)
+			continue
+
+		var anim_instance: Node3D = anim_scene.instantiate()
+		var src_player := find_animation_player(anim_instance)
+		if not src_player:
+			push_warning("ModelHelper: No AnimationPlayer in %s" % anim_path)
+			anim_instance.queue_free()
+			continue
+
+		# Pick the first animation from the source (Meshy puts one anim per file)
+		var src_library_names := src_player.get_animation_library_list()
+		var animation: Animation = null
+		for lib_name in src_library_names:
+			var src_lib: AnimationLibrary = src_player.get_animation_library(lib_name)
+			var anim_list := src_lib.get_animation_list()
+			if anim_list.size() > 0:
+				animation = src_lib.get_animation(anim_list[0])
+				break
+
+		if not animation:
+			push_warning("ModelHelper: No animations found in %s" % anim_path)
+			anim_instance.queue_free()
+			continue
+
+		if library.has_animation(target_name):
+			library.remove_animation(target_name)
+		library.add_animation(target_name, animation)
+
+		anim_instance.queue_free()
+
+	# Ensure an Idle animation exists — Meshy base meshes only contain a T-pose clip
+	# that gets stripped before this point. A zero-track animation holds the rest pose.
+	if not anim_player.has_animation("Idle"):
+		var idle_anim := Animation.new()
+		idle_anim.length = 0.1
+		idle_anim.loop_mode = Animation.LOOP_LINEAR
+		var lib: AnimationLibrary = anim_player.get_animation_library("")
+		lib.add_animation("Idle", idle_anim)
+
+	return result
+
 static func strip_unused_animations(anim_player: AnimationPlayer, keep_list: PackedStringArray = ANIM_WHITELIST) -> void:
 	for lib_name in anim_player.get_animation_library_list():
 		var library: AnimationLibrary = anim_player.get_animation_library(lib_name)

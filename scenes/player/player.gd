@@ -1,6 +1,6 @@
 extends CharacterBody3D
 ## Player controller with point-and-click movement, click-to-attack/interact, and death/respawn.
-## Uses KayKit Knight 3D model with animations.
+## Uses Meshy AI swordsman model with separate animation files.
 
 const SPEED: float = 7.2
 const GRAVITY: float = 9.8
@@ -105,7 +105,15 @@ func _ready() -> void:
 
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
-	_visuals.setup_model("res://assets/models/characters/Knight.glb", MODEL_SCALE, Color(0.2, 0.4, 0.7))
+	_visuals.setup_model_with_anims(
+		"res://assets/models/characters/swordsman_m.glb",
+		{
+			"Walking_A": "res://assets/models/characters/swordsman_m_walk.glb",
+			"Running_A": "res://assets/models/characters/swordsman_m_run.glb",
+		},
+		MODEL_SCALE,
+		Color(0.2, 0.4, 0.7)
+	)
 
 	_stats = StatsComponent.new()
 	_stats.name = "StatsComponent"
