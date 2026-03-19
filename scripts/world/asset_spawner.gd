@@ -160,4 +160,25 @@ static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos:
 	return spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
 
 static func spawn_prop(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
-	return spawn_model(ctx, PROPS_DIR + filename, pos, rot_y, scale_val)
+	var instance: Node3D = spawn_model(ctx, PROPS_DIR + filename, pos, rot_y, scale_val)
+	if instance:
+		# Meshy models have center-origin geometry; shift up so bottom sits on ground
+		var aabb := _get_model_aabb(instance)
+		if aabb.position.y < -0.01:
+			instance.position.y -= aabb.position.y * scale_val
+	return instance
+
+static func _get_model_aabb(node: Node3D) -> AABB:
+	var combined := AABB()
+	var first := true
+	for child in node.get_children():
+		if child is Node3D:
+			for sub in child.get_children():
+				if sub is MeshInstance3D and sub.mesh:
+					var mesh_aabb := sub.mesh.get_aabb()
+					if first:
+						combined = mesh_aabb
+						first = false
+					else:
+						combined = combined.merge(mesh_aabb)
+	return combined

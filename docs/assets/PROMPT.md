@@ -206,7 +206,12 @@ Anime fantasy wooden crate, reinforced corners with iron brackets, planked sides
 
 ## Mining Rocks
 
-Static ore node models for gathering. 4 variants.
+Static ore node models for gathering. 5 variants.
+
+**Stone**
+```
+Anime fantasy stone rock, plain grey rough stone, simple rounded boulder shape, no ore veins, no crystals, flat color texture, anime style coloring, no realistic shading, no specular highlights, simple diffuse colors, 3D game-ready model
+```
 
 **Copper Ore**
 ```
