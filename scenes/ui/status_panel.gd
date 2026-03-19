@@ -1,8 +1,6 @@
 extends Control
 ## Player status/character screen toggled with C key.
 
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
-
 const _STAT_ICONS: Dictionary = {
 	"HP": "res://assets/textures/ui/stats/stat_hp.png",
 	"ATK": "res://assets/textures/ui/stats/stat_atk.png",
@@ -35,21 +33,11 @@ func _ready() -> void:
 	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
 
 func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(320, 420)
-
-	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(320, 420), toggle)
+	_panel = ui["panel"]
 	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	_panel.add_child(vbox)
-
-	# Draggable title bar
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Status")
-	drag_handle.close_pressed.connect(toggle)
-	vbox.add_child(drag_handle)
+	var vbox: VBoxContainer = ui["vbox"]
 
 	# Name + Level row
 	var name_row := HBoxContainer.new()

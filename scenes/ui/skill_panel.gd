@@ -5,8 +5,6 @@ extends Control
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
-
 const CATEGORY_LABELS: Dictionary = {
 	"weapon": "Weapon",
 	"attribute": "Attributes",
@@ -43,19 +41,11 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(420, 500)
-	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	var ui: Dictionary = UIHelper.create_titled_panel("Skills & Proficiencies", Vector2(420, 500), toggle)
+	_panel = ui["panel"]
 	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	_panel.add_child(vbox)
-
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Skills & Proficiencies")
-	drag_handle.close_pressed.connect(toggle)
-	vbox.add_child(drag_handle)
+	var vbox: VBoxContainer = ui["vbox"]
 
 	vbox.add_child(HSeparator.new())
 

@@ -219,21 +219,6 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	}
 
 
-## Location markers within `radius`, sorted by distance ascending.
-func get_nearby_locations(radius: float = 15.0) -> Array:
-	var parent_node: Node3D = get_parent()
-	if not parent_node:
-		return []
-	var own_pos: Vector3 = parent_node.global_position
-	var result: Array = []
-	for loc_id in WorldState.location_markers:
-		var dist: float = own_pos.distance_to(WorldState.location_markers[loc_id])
-		if dist <= radius:
-			result.append({"id": loc_id, "distance": snapped(dist, 0.1)})
-	result.sort_custom(func(a, b): return a.distance < b.distance)
-	return result
-
-
 func is_tracking(entity_id: String) -> bool:
 	return _tracked.has(entity_id)
 

@@ -63,7 +63,7 @@ func show_npc(npc_id: String) -> void:
 	_current_npc_id = npc_id
 	_is_open = true
 	visible = true
-	_center_panel()
+	UIHelper.center_panel(_panel)
 	_refresh()
 	_refresh_timer.start()
 
@@ -79,14 +79,6 @@ func is_open() -> bool:
 func toggle() -> void:
 	if _is_open:
 		close()
-
-func _center_panel() -> void:
-	_panel.anchor_left = 0.0
-	_panel.anchor_top = 0.0
-	_panel.anchor_right = 0.0
-	_panel.anchor_bottom = 0.0
-	var vp_size := get_viewport_rect().size
-	_panel.position = (vp_size - _panel.custom_minimum_size) * 0.5
 
 func _refresh() -> void:
 	if _current_npc_id.is_empty():

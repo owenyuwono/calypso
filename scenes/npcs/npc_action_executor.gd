@@ -127,15 +127,11 @@ func _do_use_item(item_id: String) -> void:
 			var heal: int = item.get("heal", 0)
 			if heal > 0:
 				var healed: int = npc._combat.heal(heal)
-				var memory_node = npc.get_node_or_null("NPCMemory")
-				if memory_node:
-					memory_node.add_memory("Used %s, healed %d HP" % [item.get("name", item_id), healed], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
+				_add_npc_memory("Used %s, healed %d HP" % [item.get("name", item_id), healed])
 			npc._inventory.remove_item(item_id)
 		"weapon", "armor":
 			npc._equipment.equip(item_id)
-			var memory_node = npc.get_node_or_null("NPCMemory")
-			if memory_node:
-				memory_node.add_memory("Equipped %s" % item.get("name", item_id), memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
+			_add_npc_memory("Equipped %s" % item.get("name", item_id))
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "use_item", true)
 	npc.change_state("idle")
@@ -176,11 +172,9 @@ func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 		GameEvents.item_purchased.emit(npc.npc_id, item_id, cost)
 
 	var item: Dictionary = ItemDatabase.get_item(item_id)
-	var memory_node = npc.get_node_or_null("NPCMemory")
-	if memory_node:
-		memory_node.add_memory("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
-		if item.get("type", "") in ["weapon", "armor"]:
-			memory_node.add_memory("Bought %s for %d gold" % [item.get("name", item_id), cost], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM, false, "big_purchase")
+	_add_npc_memory("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost])
+	if item.get("type", "") in ["weapon", "armor"]:
+		_add_npc_memory("Bought %s for %d gold" % [item.get("name", item_id), cost], "medium", false, "big_purchase")
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "buy_item", true)
 	npc.change_state("idle")
@@ -218,9 +212,7 @@ func _do_sell_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 		vendor_inv.remove_gold_amount(revenue)
 		vendor_inv.add_item(item_id, count)
 
-	var memory_node = npc.get_node_or_null("NPCMemory")
-	if memory_node:
-		memory_node.add_memory("Sold %dx %s for %d gold" % [count, item.get("name", item_id), revenue], memory_node.SOURCE_WITNESSED, memory_node.IMPORTANCE_MEDIUM)
+	_add_npc_memory("Sold %dx %s for %d gold" % [count, item.get("name", item_id), revenue])
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "sell_item", true)
 	npc.change_state("idle")
@@ -368,6 +360,11 @@ func _do_chop_tree(tree_id: String) -> void:
 	GameEvents.npc_action_completed.emit(npc.npc_id, "chop_tree", true)
 	if npc.current_state == "interacting":
 		npc.change_state("idle")
+
+func _add_npc_memory(fact: String, importance: String = "medium", emotional: bool = false, topic: String = "") -> void:
+	var memory_node: Node = npc.get_node_or_null("NPCMemory")
+	if memory_node:
+		memory_node.add_memory(fact, memory_node.SOURCE_WITNESSED, importance, emotional, topic)
 
 func _fail(action: String, reason: String) -> void:
 	push_warning("NPC %s action '%s' failed: %s" % [npc.npc_id, action, reason])
