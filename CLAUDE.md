@@ -110,6 +110,11 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **Skill leveling**: Use-based, 5 XP per hit, independent from proficiency XP. `get_effective_multiplier()` and `get_effective_cooldown()` scale with skill level
 - **Bleed tracking**: `_active_bleeds` Dictionary lives in player_skills/npc_skills (not CombatComponent). Tracks `damage_per_tick`, `ticks_remaining`, `tick_timer`, `tick_interval` per target
 
+## Toon Shading & Shadows
+- **Shaders**: `terrain_blend.gdshader` (terrain), `toon.gdshader` (characters/objects), `toon_cutout.gdshader` (foliage) — all use `render_mode diffuse_toon, specular_toon` with custom `light()` functions
+- **Shadow rule**: In custom `light()` functions, `ATTENUATION` (cast shadow data) must be applied **independently** of `light_band` (NdotL toon banding). Multiplying `light_band * ATTENUATION` causes cast shadows to disappear when `light_band = 0` (flat surfaces in self-shadow). Correct pattern: compute toon result from NdotL first, then `result *= ATTENUATION` separately
+- **Ambient vs shadow contrast**: Environment `ambient_light_energy` must be low enough (≤0.25) for cast shadows to be visible — high ambient washes out the DIFFUSE_LIGHT contribution where shadow data lives
+
 ## Terrain & Texturing
 - **Shader**: `terrain_blend.gdshader` — vertex-color-based blending, no anti-tiling/rotation (straight tiling only)
 - **Texture channels**: R=dirt, G=stone, B=cobble (roads), A(inverted)=packed_earth (pavements). Default (no channel)=pavement base texture

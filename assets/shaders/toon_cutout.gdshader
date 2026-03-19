@@ -27,16 +27,20 @@ void fragment() {
 
 void light() {
 	float NdotL = dot(NORMAL, LIGHT);
-	float light_band = smoothstep(shadow_threshold - shadow_softness, shadow_threshold + shadow_softness, NdotL);
+	float self_lit = smoothstep(shadow_threshold - shadow_softness, shadow_threshold + shadow_softness, NdotL);
 
-	vec3 shadow_color = mix(shadow_tint, vec3(1.0), light_band);
-	vec3 diffuse = ALBEDO * shadow_color * ATTENUATION;
-	diffuse = mix(ALBEDO * shadow_tint * shadow_strength, diffuse, light_band);
+	vec3 lit = ALBEDO * LIGHT_COLOR;
+	vec3 shaded = ALBEDO * shadow_tint * shadow_strength;
 
+	// Toon banding for surface normals
+	vec3 result = mix(shaded, lit, self_lit);
+
+	// Cast shadow from light's shadow map — applied independently
+	result *= ATTENUATION;
+	DIFFUSE_LIGHT += result;
+
+	// Rim lighting — only on lit side
 	float rim = pow(1.0 - max(dot(NORMAL, VIEW), 0.0), rim_power);
-	rim *= light_band * rim_intensity;
-	vec3 rim_color = LIGHT_COLOR * rim;
-
-	vec3 ambient = ALBEDO * 0.12;
-	DIFFUSE_LIGHT += diffuse * LIGHT_COLOR + rim_color + ambient;
+	rim *= self_lit * ATTENUATION * rim_intensity;
+	DIFFUSE_LIGHT += LIGHT_COLOR * rim;
 }

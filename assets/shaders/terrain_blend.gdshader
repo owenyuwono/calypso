@@ -55,12 +55,16 @@ void fragment() {
 
 void light() {
 	float NdotL = dot(NORMAL, LIGHT);
-	float light_band = smoothstep(shadow_threshold - shadow_softness, shadow_threshold + shadow_softness, NdotL);
+	float self_lit = smoothstep(shadow_threshold - shadow_softness, shadow_threshold + shadow_softness, NdotL);
 
-	vec3 shadow_color = mix(shadow_tint, vec3(1.0), light_band);
-	vec3 diffuse = ALBEDO * shadow_color * ATTENUATION;
-	diffuse = mix(ALBEDO * shadow_tint * shadow_strength, diffuse, light_band);
+	vec3 lit = ALBEDO * LIGHT_COLOR;
+	vec3 shaded = ALBEDO * shadow_tint * shadow_strength;
 
-	vec3 ambient = ALBEDO * 0.15;
-	DIFFUSE_LIGHT += diffuse * LIGHT_COLOR + ambient;
+	// Toon banding for surface normals
+	vec3 result = mix(shaded, lit, self_lit);
+
+	// Cast shadow from light's shadow map — applied independently
+	result *= ATTENUATION;
+
+	DIFFUSE_LIGHT += result;
 }
