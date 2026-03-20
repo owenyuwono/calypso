@@ -3,7 +3,7 @@
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
 - **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals), TimeManager (24h day cycle: dawn/day/dusk/night phases, `time_phase_changed` signal)
-- **Static utility classes**: ModelHelper (3D models, effects, animation merging), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), world builders (see below)
+- **Static utility classes**: ModelHelper (3D models, effects, animation merging), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), FishDatabase (fishing tier data), RecipeDatabase (unified crafting recipes), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
@@ -146,11 +146,20 @@ Static utility classes for procedural world construction (one-shot builders, no 
 - **Naming**: Characters `{archetype}_{m|f}.glb`, animations `{archetype}_{m|f}_{anim}.glb`, props `{name}.glb`
 
 ## Gathering System
-- **HarvestableComponent** (`scripts/components/harvestable_component.gd`): Generic gathering component for woodcutting and mining. `setup(tier, skill_id, database_lookup)` — skill_id determines which proficiency grants XP, database_lookup is a Callable to the tier's database. Manages chop count, depletion, and respawn
-- **MineableRock** (`scenes/objects/mineable_rock.gd`): StaticBody3D ore node. Tiers: copper/iron/gold. Uses GLB model for copper (MODEL_PATHS dict), procedural spheres for others. Depletion scales down to 30% + darkens. Respawn restores original textures for GLB models (`material_override = null`)
+- **HarvestableComponent** (`scripts/components/harvestable_component.gd`): Generic gathering component for woodcutting, mining, and fishing. `setup(tier, skill_id, database_lookup)` — skill_id determines which proficiency grants XP, database_lookup is a Callable to the tier's database. Manages chop count, depletion, and respawn. `respawn_mode`: `"in_place"` (default, trees/fishing) or `"destroy"` (rocks — zone manages respawn at random position)
+- **MineableRock** (`scenes/objects/mineable_rock.gd`): StaticBody3D ore node. Tiers: copper/iron/gold. On depletion: shrinks then `queue_free()`, emits `rock_depleted(tier, respawn_time)`. Zone field scripts listen and spawn replacement at random biome position after delay
 - **OreDatabase** (`scripts/data/ore_database.gd`): Static tier data — copper (3-5 chops, 5 XP, level 1), iron (5-8, 12 XP, level 3), gold (8-12, 25 XP, level 6). Drops: ore + stone
-- **ChoppableTree** (`scenes/objects/choppable_tree.gd`): Uses same HarvestableComponent with `skill_id: "woodcutting"` and `TreeDatabase.get_tree` lookup
-- **Player interaction**: Left-click rock → walk to + mine. Mining cursor on hover. `player.gd` generalizes harvesting for both trees and rocks via `HarvestableComponent.get_skill_id()`
+- **ChoppableTree** (`scenes/objects/choppable_tree.gd`): Uses HarvestableComponent with `skill_id: "woodcutting"` and `TreeDatabase.get_tree` lookup. Respawns in-place
+- **FishingSpot** (`scenes/objects/fishing_spot.gd`): StaticBody3D with blue water disc visual. Tiers: shallow/medium/deep. Uses HarvestableComponent with `skill_id: "fishing"` and `FishDatabase.get_fish`. Fades on depletion, respawns in-place
+- **FishDatabase** (`scripts/data/fish_database.gd`): 3 tiers — shallow (sardine, lv1), medium (trout, lv3), deep (salmon, lv6)
+- **Player interaction**: Left-click rock/tree/fishing spot → walk to + harvest. `player.gd` generalizes harvesting for all types via `HarvestableComponent.get_skill_id()`
+
+## Production/Crafting System
+- **RecipeDatabase** (`scripts/data/recipe_database.gd`): Unified recipe store for cooking, smithing, crafting. Each recipe: `{name, skill_id, required_level, inputs: {item_id: count}, outputs: {item_id: count}, xp, craft_time}`. API: `get_recipe(id)`, `get_recipes_for_skill(skill_id)`
+- **CraftingStation** (`scenes/objects/crafting_station.gd`): StaticBody3D with colored marker + Label3D. Properties: `station_type` ("cooking"/"smithing"/"crafting"), `station_name`. 3 stations near center fountain in plaza district. Player left-clicks → walks to → opens CraftingPanel
+- **CraftingPanel** (`scenes/ui/crafting_panel.gd`): Two-column UI (recipe list + detail). Filters recipes by station's skill_id. Shows input availability (green/red), craft button (disabled if requirements unmet). On craft: removes inputs, adds outputs, grants proficiency XP. `open(skill_id, station_name)`, `set_player(player)`
+- **Recipes**: 5 cooking (cooked fish, stew, soup), 5 smithing (ingots, weapons), 4 crafting (bandage, potion, armor, dagger)
+- **Items**: Fish (sardine/trout/salmon), ingots (copper/iron/gold), cooked food (5 consumables with heal), crafted goods (bandage, leather armor, bone dagger)
 
 ## Project Structure Notes
 - **Stale directories**: `content/`, `features/`, `inference/` are old branch copies — NOT the active project. The active project root is `/home/owenyuwono/Work/Ventures/arcadia/`

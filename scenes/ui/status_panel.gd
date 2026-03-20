@@ -51,7 +51,7 @@ func _ready() -> void:
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
 func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(320, 620), toggle)
+	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(280, 0), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
 
@@ -191,8 +191,8 @@ func _build_prof_entry(skill_id: String, skill_name: String) -> Control:
 	if ResourceLoader.exists(icon_path):
 		var icon := TextureRect.new()
 		icon.texture = load(icon_path)
-		icon.custom_minimum_size = Vector2(18, 18)
-		icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+		icon.custom_minimum_size = Vector2(20, 20)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = TEXTURE_FILTER_NEAREST
 		icon.tooltip_text = skill_name

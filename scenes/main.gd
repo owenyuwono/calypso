@@ -82,6 +82,11 @@ func _ready() -> void:
 		vend_setup_panel.set_player(player)
 		player.vend_setup_panel = vend_setup_panel
 
+	var crafting_panel := $UILayer/CraftingPanel
+	if player and crafting_panel:
+		crafting_panel.set_player(player)
+		player.crafting_panel = crafting_panel
+
 	# Wire player ref to UI panels
 	var player_hud := $UILayer/PlayerHUD
 	if player and player_hud:

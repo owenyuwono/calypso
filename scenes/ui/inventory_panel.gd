@@ -60,7 +60,6 @@ const STAT_ICON_MAP: Dictionary = {
 var _panel: PanelContainer
 var _equip_grid: GridContainer
 var _grid: GridContainer
-var _attack_type_label: Label
 var _gold_label: Label
 var _gold_icon: TextureRect
 var _tooltip: PanelContainer
@@ -95,14 +94,21 @@ func _load_slot_icons() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(470, 440)
+	_panel.custom_minimum_size = Vector2(470, 0)
 	var style := UIHelper.create_panel_style()
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
 
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	_panel.add_child(margin)
+
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
 	# Title bar (full width)
 	var drag_handle := DragHandle.new()
@@ -110,45 +116,9 @@ func _build_ui() -> void:
 	drag_handle.close_pressed.connect(_toggle)
 	vbox.add_child(drag_handle)
 
-	# Attack type + gold row (full width)
-	var info_row := HBoxContainer.new()
-	info_row.add_theme_constant_override("separation", 8)
-	vbox.add_child(info_row)
-
-	_attack_type_label = Label.new()
-	_attack_type_label.add_theme_font_size_override("font_size", 15)
-	_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
-	_attack_type_label.text = "Unarmed"
-	_attack_type_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_row.add_child(_attack_type_label)
-
-	var gold_hbox := HBoxContainer.new()
-	gold_hbox.add_theme_constant_override("separation", 4)
-	gold_hbox.alignment = BoxContainer.ALIGNMENT_END
-	info_row.add_child(gold_hbox)
-
-	_gold_icon = TextureRect.new()
-	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
-	_gold_icon.texture = gold_coin_tex
-	_gold_icon.custom_minimum_size = Vector2(16, 16)
-	_gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	_gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	_gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gold_hbox.add_child(_gold_icon)
-
-	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 14)
-	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	_gold_label.text = "0"
-	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	gold_hbox.add_child(_gold_label)
-
 	# Main body: equipment (left) | separator | items (right)
 	var body_hbox := HBoxContainer.new()
-	body_hbox.add_theme_constant_override("separation", 0)
-	body_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_hbox.add_theme_constant_override("separation", 10)
 	vbox.add_child(body_hbox)
 
 	# --- Left: equipment VBox ---
@@ -171,24 +141,48 @@ func _build_ui() -> void:
 	_equip_grid.add_theme_constant_override("v_separation", 6)
 	equip_vbox.add_child(_equip_grid)
 
-	# Vend button below equipment grid
+	# Gold section under equipment
+	var gold_sep := HSeparator.new()
+	equip_vbox.add_child(gold_sep)
+
+	var gold_hbox := HBoxContainer.new()
+	gold_hbox.add_theme_constant_override("separation", 4)
+	gold_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	equip_vbox.add_child(gold_hbox)
+
+	_gold_icon = TextureRect.new()
+	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
+	_gold_icon.texture = gold_coin_tex
+	_gold_icon.custom_minimum_size = Vector2(16, 16)
+	_gold_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
+	_gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gold_hbox.add_child(_gold_icon)
+
+	_gold_label = Label.new()
+	_gold_label.add_theme_font_size_override("font_size", 13)
+	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	_gold_label.text = "0"
+	gold_hbox.add_child(_gold_label)
+
+	# Vend button below gold
 	var vend_btn := Button.new()
 	vend_btn.text = "Set Up Shop [V]"
 	vend_btn.add_theme_font_size_override("font_size", 11)
-	vend_btn.custom_minimum_size = Vector2(0, 28)
+	vend_btn.custom_minimum_size = Vector2(0, 26)
 	vend_btn.pressed.connect(_on_vend_button_pressed)
 	equip_vbox.add_child(vend_btn)
 
 	# --- Vertical separator ---
 	var vsep := VSeparator.new()
-	vsep.add_theme_constant_override("separation", 8)
 	body_hbox.add_child(vsep)
 
 	# --- Right: items VBox ---
 	var items_vbox := VBoxContainer.new()
 	items_vbox.add_theme_constant_override("separation", 6)
 	items_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	items_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_hbox.add_child(items_vbox)
 
 	var items_header := Label.new()
@@ -198,19 +192,13 @@ func _build_ui() -> void:
 	items_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	items_vbox.add_child(items_header)
 
-	# Scroll + inventory grid
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 300)
-	items_vbox.add_child(scroll)
-
+	# Item grid (no scroll — panel fits to content)
 	_grid = GridContainer.new()
 	_grid.columns = GRID_COLUMNS
 	_grid.add_theme_constant_override("h_separation", 4)
 	_grid.add_theme_constant_override("v_separation", 4)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_grid)
+	items_vbox.add_child(_grid)
 
 	# Tooltip — child of root Control so it overlays everything
 	_tooltip = PanelContainer.new()
@@ -318,22 +306,6 @@ func _refresh() -> void:
 
 	if not _inventory or not _equipment:
 		return
-
-	# Attack type label
-	if _combat:
-		var weapon_type: String = _combat.get_equipped_weapon_type()
-		var weapon_id: String = _equipment.get_slot("main_hand")
-		if weapon_id.is_empty():
-			_attack_type_label.text = "Unarmed"
-			_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
-		else:
-			var wtype_cap: String = weapon_type.substr(0, 1).to_upper() + weapon_type.substr(1)
-			_attack_type_label.text = "◆ " + wtype_cap
-			var wcolor: Color = WEAPON_COLORS.get(weapon_type, UIHelper.COLOR_DISABLED)
-			_attack_type_label.add_theme_color_override("font_color", wcolor)
-	else:
-		_attack_type_label.text = "Unarmed"
-		_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
 
 	# Gold
 	var gold: int = _inventory.get_gold_amount()

@@ -316,6 +316,11 @@ func _process_hover() -> void:
 			if not tier.is_empty():
 				display_name += " (%s)" % tier.capitalize()
 			_cursor_manager.set_cursor("mine")
+		elif entity_type == "fishing_spot":
+			var tier: String = data.get("fish_tier", "")
+			if not tier.is_empty():
+				display_name += " (%s)" % tier.capitalize()
+			_cursor_manager.set_cursor("click")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name

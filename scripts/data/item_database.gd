@@ -56,6 +56,25 @@ const ITEMS: Dictionary = {
 	"goblin_tooth": {"name": "Goblin Tooth", "type": "material", "value": 25},
 	"bone": {"name": "Bone", "type": "material", "value": 20},
 	"dark_crystal": {"name": "Dark Crystal", "type": "material", "value": 50},
+	# Fish (fishing drops)
+	"sardine": {"name": "Sardine", "type": "material", "value": 5},
+	"trout":   {"name": "Trout",   "type": "material", "value": 12},
+	"salmon":  {"name": "Salmon",  "type": "material", "value": 25},
+	# Ingots (smithing intermediate)
+	"copper_ingot": {"name": "Copper Ingot", "type": "material", "value": 15},
+	"iron_ingot":   {"name": "Iron Ingot",   "type": "material", "value": 30},
+	"gold_ingot":   {"name": "Gold Ingot",   "type": "material", "value": 60},
+	# Cooked food (cooking outputs)
+	"cooked_sardine": {"name": "Cooked Sardine", "type": "consumable", "heal": 15, "value": 10},
+	"cooked_trout":   {"name": "Cooked Trout",   "type": "consumable", "heal": 30, "value": 25},
+	"cooked_salmon":  {"name": "Cooked Salmon",  "type": "consumable", "heal": 50, "value": 45},
+	"fish_stew":      {"name": "Fish Stew",      "type": "consumable", "heal": 40, "value": 35},
+	"hearty_soup":    {"name": "Hearty Soup",    "type": "consumable", "heal": 70, "value": 60},
+	# Crafted goods (crafting + smithing outputs)
+	"bandage":      {"name": "Bandage",      "type": "consumable", "heal": 20, "value": 8},
+	"leather_armor": {"name": "Leather Armor", "type": "armor",  "slot_type": "torso",     "def_bonus": 3, "value": 40},
+	"bone_dagger":   {"name": "Bone Dagger",   "type": "weapon", "slot_type": "main_hand", "weapon_type": "dagger", "atk_bonus": 6, "value": 25},
+	"copper_sword":  {"name": "Copper Sword",  "type": "weapon", "slot_type": "main_hand", "weapon_type": "sword",  "atk_bonus": 7, "value": 60},
 }
 
 static func get_item(item_id: String) -> Dictionary:

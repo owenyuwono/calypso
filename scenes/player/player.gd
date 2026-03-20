@@ -81,6 +81,7 @@ var skill_hotbar: Control:
 var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
+var crafting_panel: Control
 
 # Click marker (reused single instance)
 var _click_marker: MeshInstance3D
@@ -526,6 +527,12 @@ func _on_arrived() -> void:
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
 		_hover.clear_ring()
+	elif etype == "crafting_station":
+		if crafting_panel and target_node and is_instance_valid(target_node):
+			var stype: String = data.get("station_type", "")
+			var sname: String = data.get("name", "Crafting")
+			crafting_panel.open(stype, sname)
+		_hover.clear_ring()
 
 	_interact_target = ""
 
@@ -665,6 +672,32 @@ func _handle_left_click() -> void:
 				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
 			return
 
+		if etype == "fishing_spot":
+			# Click fishing spot: walk to + fish when in range
+			_cancel_attack()
+			_cancel_harvest()
+			_harvest_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.2, 0.5, 1.0, 0.6))
+			var target_node: Node = WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
+			return
+
+		if etype == "crafting_station":
+			# Click crafting station: walk to + open panel on arrival
+			_cancel_attack()
+			_cancel_harvest()
+			_interact_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.5, 0.8, 0.6, 0.6))
+			var target_node: Node = WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				var dist: float = global_position.distance_to(target_node.global_position)
+				if dist <= INTERACT_RANGE:
+					_on_arrived()
+					return
+				_navigate_to(_get_approach_pos(target_node.global_position, 2.0))
+			return
+
 	# Click on ground: move there, cancel target lock, close NPC info
 	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
 		npc_info_panel.close()
@@ -740,7 +773,7 @@ func stop_vending() -> void:
 		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
-	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel]:
+	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel, crafting_panel]:
 		if panel and panel.is_open():
 			return true
 	return false
