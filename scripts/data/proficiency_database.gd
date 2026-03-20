@@ -83,6 +83,13 @@ static func get_skill(skill_id: String) -> Dictionary:
 static func get_xp_to_next_level(current_level: int) -> int:
 	return current_level * 50
 
+static func get_xp_fill_percent(level: int, xp: int, xp_to_next: int) -> float:
+	if level >= MAX_LEVEL:
+		return 1.0
+	if xp_to_next <= 0:
+		return 0.0
+	return clampf(float(xp) / float(xp_to_next), 0.0, 1.0)
+
 static func get_all_skills() -> Dictionary:
 	return SKILLS
 

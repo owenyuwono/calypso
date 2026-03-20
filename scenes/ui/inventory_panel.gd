@@ -115,10 +115,7 @@ func _build_ui() -> void:
 	info_row.add_theme_constant_override("separation", 8)
 	vbox.add_child(info_row)
 
-	_attack_type_label = Label.new()
-	_attack_type_label.add_theme_font_size_override("font_size", 15)
-	_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
-	_attack_type_label.text = "Unarmed"
+	_attack_type_label = UIHelper.create_label("Unarmed", 15, UIHelper.COLOR_DISABLED)
 	_attack_type_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.add_child(_attack_type_label)
 
@@ -127,22 +124,10 @@ func _build_ui() -> void:
 	gold_hbox.alignment = BoxContainer.ALIGNMENT_END
 	info_row.add_child(gold_hbox)
 
-	_gold_icon = TextureRect.new()
-	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
-	_gold_icon.texture = gold_coin_tex
-	_gold_icon.custom_minimum_size = Vector2(16, 16)
-	_gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	_gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	_gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_gold_icon = UIHelper.create_icon("res://assets/textures/ui/stats/gold_coin.png", Vector2(16, 16))
 	gold_hbox.add_child(_gold_icon)
 
-	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 14)
-	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	_gold_label.text = "0"
-	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_gold_label = UIHelper.create_label("0", 14, UIHelper.COLOR_GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	gold_hbox.add_child(_gold_label)
 
 	# Main body: equipment (left) | separator | items (right)
@@ -157,11 +142,7 @@ func _build_ui() -> void:
 	equip_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	body_hbox.add_child(equip_vbox)
 
-	var equip_header := Label.new()
-	equip_header.text = "EQUIPMENT"
-	equip_header.add_theme_font_size_override("font_size", 11)
-	equip_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
-	equip_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var equip_header: Label = UIHelper.create_label("EQUIPMENT", 11, Color(0.7, 0.6, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
 	equip_vbox.add_child(equip_header)
 
 	# Single 2×4 grid for all 8 slots
@@ -191,11 +172,7 @@ func _build_ui() -> void:
 	items_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_hbox.add_child(items_vbox)
 
-	var items_header := Label.new()
-	items_header.text = "ITEMS"
-	items_header.add_theme_font_size_override("font_size", 11)
-	items_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
-	items_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var items_header: Label = UIHelper.create_label("ITEMS", 11, Color(0.7, 0.6, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
 	items_vbox.add_child(items_header)
 
 	# Scroll + inventory grid
@@ -214,19 +191,13 @@ func _build_ui() -> void:
 
 	# Tooltip — child of root Control so it overlays everything
 	_tooltip = PanelContainer.new()
-	var tooltip_style := StyleBoxFlat.new()
-	tooltip_style.bg_color = Color(0.06, 0.05, 0.04, 0.96)
-	tooltip_style.border_color = Color(0.55, 0.45, 0.25)
-	tooltip_style.set_border_width_all(1)
-	tooltip_style.set_corner_radius_all(3)
+	var tooltip_style: StyleBoxFlat = UIHelper.create_style_box(Color(0.06, 0.05, 0.04, 0.96), Color(0.55, 0.45, 0.25), 3, 1)
 	tooltip_style.content_margin_left = 6
 	tooltip_style.content_margin_right = 6
 	tooltip_style.content_margin_top = 2
 	tooltip_style.content_margin_bottom = 2
 	_tooltip.add_theme_stylebox_override("panel", tooltip_style)
-	_tooltip_label = Label.new()
-	_tooltip_label.add_theme_font_size_override("font_size", 12)
-	_tooltip_label.add_theme_color_override("font_color", Color.WHITE)
+	_tooltip_label = UIHelper.create_label("", 12, Color.WHITE)
 	_tooltip.add_child(_tooltip_label)
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -237,11 +208,7 @@ func _build_ui() -> void:
 
 func _build_desc_panel() -> void:
 	_desc_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
-	style.border_color = Color(0.55, 0.45, 0.25)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
+	var style: StyleBoxFlat = UIHelper.create_style_box(Color(0.07, 0.06, 0.05, 0.97), Color(0.55, 0.45, 0.25), 6, 1)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
 	style.content_margin_top = 8
@@ -258,11 +225,7 @@ func _build_desc_panel() -> void:
 
 func _build_context_menu() -> void:
 	_context_menu = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
-	style.border_color = Color(0.55, 0.45, 0.25)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
+	var style: StyleBoxFlat = UIHelper.create_style_box(Color(0.07, 0.06, 0.05, 0.97), Color(0.55, 0.45, 0.25), 4, 1)
 	style.content_margin_left = 4
 	style.content_margin_right = 4
 	style.content_margin_top = 4
@@ -320,20 +283,14 @@ func _refresh() -> void:
 		return
 
 	# Attack type label
-	if _combat:
-		var weapon_type: String = _combat.get_equipped_weapon_type()
-		var weapon_id: String = _equipment.get_slot("main_hand")
-		if weapon_id.is_empty():
-			_attack_type_label.text = "Unarmed"
-			_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
-		else:
-			var wtype_cap: String = weapon_type.substr(0, 1).to_upper() + weapon_type.substr(1)
-			_attack_type_label.text = "◆ " + wtype_cap
-			var wcolor: Color = WEAPON_COLORS.get(weapon_type, UIHelper.COLOR_DISABLED)
-			_attack_type_label.add_theme_color_override("font_color", wcolor)
-	else:
+	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else ""
+	var weapon_id: String = _equipment.get_slot("main_hand") if _equipment else ""
+	if weapon_id.is_empty():
 		_attack_type_label.text = "Unarmed"
 		_attack_type_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
+	else:
+		_attack_type_label.text = "◆ " + weapon_type.capitalize()
+		_attack_type_label.add_theme_color_override("font_color", WEAPON_COLORS.get(weapon_type, UIHelper.COLOR_DISABLED))
 
 	# Gold
 	var gold: int = _inventory.get_gold_amount()
@@ -391,12 +348,7 @@ func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(cell_size, cell_size)
 	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.09, 0.07)
-	style.border_color = Color(0.25, 0.22, 0.18)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(5)
-	cell.add_theme_stylebox_override("panel", style)
+	cell.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.1, 0.09, 0.07), Color(0.25, 0.22, 0.18), 5, 1))
 
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -422,12 +374,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var slot_color: Color = EQUIP_SLOT_COLORS.get(slot_name, EQUIP_SLOT_COLOR_DEFAULT)
-	var style := StyleBoxFlat.new()
-	style.bg_color = slot_color
-	style.border_color = Color(0.6, 0.5, 0.3)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(5)
-	cell.add_theme_stylebox_override("panel", style)
+	cell.add_theme_stylebox_override("panel", UIHelper.create_style_box(slot_color, Color(0.6, 0.5, 0.3), 5, 1))
 
 	var item_data: Dictionary = ItemDatabase.get_item(item_id)
 	var item_name: String = item_data.get("name", item_id)
@@ -450,11 +397,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 
 	# 2-char abbreviation of item name, centered
 	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
-	var letter := Label.new()
-	letter.text = abbrev
-	letter.add_theme_font_size_override("font_size", 16)
-	letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
-	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var letter: Label = UIHelper.create_label(abbrev, 16, Color(1, 1, 1, 0.9), HORIZONTAL_ALIGNMENT_CENTER)
 	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	letter.set_anchors_preset(Control.PRESET_FULL_RECT)
 	letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -476,12 +419,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 	var type_str: String = item_data.get("type", "")
 	var type_color: Color = TYPE_COLORS.get(type_str, Color(0.22, 0.2, 0.18))
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = type_color
-	style.border_color = Color(0.4, 0.35, 0.28)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(5)
-	cell.add_theme_stylebox_override("panel", style)
+	cell.add_theme_stylebox_override("panel", UIHelper.create_style_box(type_color, Color(0.4, 0.35, 0.28), 5, 1))
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 4)
@@ -492,12 +430,8 @@ func _build_cell(item_id: String, count: int) -> Control:
 
 	var item_name: String = item_data.get("name", "?")
 	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
-	var letter := Label.new()
-	letter.text = abbrev
-	letter.add_theme_font_size_override("font_size", 18)
-	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var letter: Label = UIHelper.create_label(abbrev, 18, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_CENTER)
 	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
 	letter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	letter.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(letter)
@@ -509,19 +443,14 @@ func _build_cell(item_id: String, count: int) -> Control:
 		badge.offset_top = -18
 		badge.offset_right = -2
 		badge.offset_bottom = -2
-		var badge_style := StyleBoxFlat.new()
-		badge_style.bg_color = Color(0.0, 0.0, 0.0, 0.7)
-		badge_style.set_corner_radius_all(3)
+		var badge_style: StyleBoxFlat = UIHelper.create_style_box(Color(0.0, 0.0, 0.0, 0.7), Color.TRANSPARENT, 3, 0)
 		badge_style.content_margin_left = 3
 		badge_style.content_margin_right = 3
 		badge_style.content_margin_top = 1
 		badge_style.content_margin_bottom = 1
 		badge.add_theme_stylebox_override("panel", badge_style)
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var count_label := Label.new()
-		count_label.text = "x%d" % count
-		count_label.add_theme_font_size_override("font_size", 10)
-		count_label.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+		var count_label: Label = UIHelper.create_label("x%d" % count, 10, Color(1, 0.95, 0.8))
 		badge.add_child(count_label)
 		cell.add_child(badge)
 
@@ -536,12 +465,7 @@ func _build_empty_cell() -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
 	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.09, 0.07)
-	style.border_color = Color(0.22, 0.2, 0.16)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(5)
-	cell.add_theme_stylebox_override("panel", style)
+	cell.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.1, 0.09, 0.07), Color(0.22, 0.2, 0.16), 5, 1))
 	return cell
 
 func _format_tooltip(item_id: String) -> String:
@@ -609,17 +533,11 @@ func _show_desc(item_id: String) -> void:
 	var type_color: Color = TYPE_COLORS.get(type_str, Color(0.5, 0.5, 0.5))
 
 	# Item name (large, colored)
-	var name_label := Label.new()
-	name_label.text = item.get("name", item_id)
-	name_label.add_theme_font_size_override("font_size", 16)
-	name_label.add_theme_color_override("font_color", type_color.lightened(0.4))
+	var name_label: Label = UIHelper.create_label(item.get("name", item_id), 16, type_color.lightened(0.4))
 	_desc_vbox.add_child(name_label)
 
 	# Type label
-	var type_label := Label.new()
-	type_label.text = type_str.capitalize()
-	type_label.add_theme_font_size_override("font_size", 11)
-	type_label.add_theme_color_override("font_color", Color(0.6, 0.55, 0.45))
+	var type_label: Label = UIHelper.create_label(type_str.capitalize(), 11, Color(0.6, 0.55, 0.45))
 	_desc_vbox.add_child(type_label)
 
 	_desc_vbox.add_child(HSeparator.new())
@@ -665,26 +583,14 @@ func _add_desc_stat(label_text: String, value_text: String, color: Color) -> voi
 
 	var icon_file: String = STAT_ICON_MAP.get(label_text, "")
 	if not icon_file.is_empty():
-		var icon := TextureRect.new()
-		icon.texture = load(STAT_ICON_DIR + icon_file) as Texture2D
-		icon.custom_minimum_size = Vector2(16, 16)
-		icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture_filter = TEXTURE_FILTER_NEAREST
-		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
+		var icon: TextureRect = UIHelper.create_icon(STAT_ICON_DIR + icon_file, Vector2(16, 16))
+		if icon != null:
+			row.add_child(icon)
 
-	var lbl := Label.new()
-	lbl.text = label_text + ":"
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
+	var lbl: Label = UIHelper.create_label(label_text + ":", 12, Color(0.55, 0.5, 0.4))
 	lbl.custom_minimum_size.x = 60
 	row.add_child(lbl)
-	var val := Label.new()
-	val.text = value_text
-	val.add_theme_font_size_override("font_size", 12)
-	val.add_theme_color_override("font_color", color)
+	var val: Label = UIHelper.create_label(value_text, 12, color)
 	row.add_child(val)
 
 func _hide_desc() -> void:

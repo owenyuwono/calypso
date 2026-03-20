@@ -7,6 +7,8 @@ var _sta_bar: ProgressBar
 var _sta_label: Label
 var _player: Node
 var _time_label: Label
+var _stats: Node
+var _stamina_comp: Node
 
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
 
@@ -42,20 +44,11 @@ func _build_ui() -> void:
 	hp_header.add_theme_constant_override("separation", 2)
 	hp_row.add_child(hp_header)
 
-	var hp_icon := TextureRect.new()
-	hp_icon.texture = load("res://assets/textures/ui/stats/stat_hp.png")
-	hp_icon.custom_minimum_size = Vector2(16, 16)
-	hp_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	hp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	hp_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hp_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	hp_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_header.add_child(hp_icon)
+	var hp_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/stat_hp.png", Vector2(16, 16))
+	if hp_icon:
+		hp_header.add_child(hp_icon)
 
-	var hp_title := Label.new()
-	hp_title.text = "HP"
-	hp_title.add_theme_font_size_override("font_size", 13)
-	hp_title.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
+	var hp_title: Label = UIHelper.create_label("HP", 13, Color(1, 0.3, 0.3))
 	hp_header.add_child(hp_title)
 
 	_hp_bar = _create_styled_bar(
@@ -64,21 +57,15 @@ func _build_ui() -> void:
 	)
 	hp_row.add_child(_hp_bar)
 
-	_hp_label = Label.new()
-	_hp_label.text = "50/50"
-	_hp_label.add_theme_font_size_override("font_size", 12)
+	_hp_label = UIHelper.create_label("50/50", 12, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
 	_hp_label.custom_minimum_size = Vector2(60, 0)
-	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hp_row.add_child(_hp_label)
 
 	# Stamina bar
 	var sta_row := HBoxContainer.new()
 	vbox.add_child(sta_row)
 
-	var sta_title := Label.new()
-	sta_title.text = "STA"
-	sta_title.add_theme_font_size_override("font_size", 13)
-	sta_title.add_theme_color_override("font_color", Color(0.2, 0.75, 0.5))
+	var sta_title: Label = UIHelper.create_label("STA", 13, Color(0.2, 0.75, 0.5))
 	sta_title.custom_minimum_size = Vector2(32, 0)
 	sta_row.add_child(sta_title)
 
@@ -88,11 +75,8 @@ func _build_ui() -> void:
 	)
 	sta_row.add_child(_sta_bar)
 
-	_sta_label = Label.new()
-	_sta_label.text = "100/100"
-	_sta_label.add_theme_font_size_override("font_size", 12)
+	_sta_label = UIHelper.create_label("100/100", 12, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
 	_sta_label.custom_minimum_size = Vector2(60, 0)
-	_sta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	sta_row.add_child(_sta_label)
 
 	# Time panel — separate panel to the left of the minimap
@@ -108,11 +92,7 @@ func _build_time_panel() -> void:
 	time_panel.position = Vector2(minimap_left - 160.0, 10)
 	add_child(time_panel)
 
-	_time_label = Label.new()
-	_time_label.text = "08:00 - Day 1 (day)"
-	_time_label.add_theme_font_size_override("font_size", 12)
-	_time_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
-	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_time_label = UIHelper.create_label("08:00 - Day 1 (day)", 12, Color(0.9, 0.85, 0.7), HORIZONTAL_ALIGNMENT_CENTER)
 	time_panel.add_child(_time_label)
 
 func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color, bar_height: int) -> ProgressBar:
@@ -121,36 +101,29 @@ func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, 
 	bar.show_percentage = false
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = bg_color
-	bg_style.border_color = bg_border
-	UIHelper.set_border_width(bg_style, 1)
-	UIHelper.set_corner_radius(bg_style, 3)
+	var bg_style: StyleBoxFlat = UIHelper.create_style_box(bg_color, bg_border, 3, 1)
 	bar.add_theme_stylebox_override("background", bg_style)
 
-	var fill_style := StyleBoxFlat.new()
-	fill_style.bg_color = fill_color
-	fill_style.border_color = fill_border
-	UIHelper.set_border_width(fill_style, 1)
-	UIHelper.set_corner_radius(fill_style, 3)
+	var fill_style: StyleBoxFlat = UIHelper.create_style_box(fill_color, fill_border, 3, 1)
 	bar.add_theme_stylebox_override("fill", fill_style)
 
 	return bar
 
 func set_player(p: Node) -> void:
 	_player = p
+	_stats = p.get_node_or_null("StatsComponent")
+	_stamina_comp = p.get_node_or_null("StaminaComponent")
 	_refresh_all()
 
 func _refresh_all() -> void:
 	if not _player:
 		return
-	var stats = _player.get_node_or_null("StatsComponent")
-	if not stats:
+	if not _stats:
 		return
 
-	_hp_bar.max_value = stats.max_hp
-	_hp_bar.value = stats.hp
-	_hp_label.text = "%d/%d" % [stats.hp, stats.max_hp]
+	_hp_bar.max_value = _stats.max_hp
+	_hp_bar.value = _stats.hp
+	_hp_label.text = "%d/%d" % [_stats.hp, _stats.max_hp]
 
 	_refresh_stamina()
 	_refresh_time()
@@ -171,14 +144,10 @@ func _on_game_hour_changed(_hour: int) -> void:
 	_refresh_time()
 
 func _refresh_stamina() -> void:
-	var player_node = WorldState.get_entity("player")
-	if not player_node:
+	if not _stamina_comp:
 		return
-	var comp = player_node.get_node_or_null("StaminaComponent")
-	if not comp:
-		return
-	var sta: float = comp.get_stamina()
-	var max_sta: float = comp.get_max_stamina()
+	var sta: float = _stamina_comp.get_stamina()
+	var max_sta: float = _stamina_comp.get_max_stamina()
 	_sta_bar.max_value = max_sta
 	_sta_bar.value = sta
 	_sta_label.text = "%d/%d" % [int(sta), int(max_sta)]

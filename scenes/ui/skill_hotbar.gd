@@ -73,12 +73,7 @@ func _create_slot(index: int) -> Dictionary:
 	panel.custom_minimum_size = Vector2(SLOT_SIZE, SLOT_SIZE)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.12, 0.18, 0.9)
-	style.border_color = Color(0.4, 0.35, 0.2)
-	UIHelper.set_border_width(style, 1)
-	UIHelper.set_corner_radius(style, 4)
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.12, 0.12, 0.18, 0.9), Color(0.4, 0.35, 0.2), 4, 1))
 
 	# Container for layering
 	var container := Control.new()
@@ -105,23 +100,16 @@ func _create_slot(index: int) -> Dictionary:
 	container.add_child(icon_rect)
 
 	# Skill name label (centered, text fallback when no icon)
-	var name_label := Label.new()
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var name_label: Label = UIHelper.create_label("", 11, Color(0.9, 0.85, 0.7), HORIZONTAL_ALIGNMENT_CENTER)
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	name_label.add_theme_font_size_override("font_size", 11)
-	name_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	container.add_child(name_label)
 
 	# Key number label (bottom-right)
-	var key_label := Label.new()
-	key_label.text = str(index + 1)
-	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var key_label: Label = UIHelper.create_label(str(index + 1), 10, Color(0.5, 0.5, 0.5), HORIZONTAL_ALIGNMENT_RIGHT)
 	key_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	key_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	key_label.add_theme_font_size_override("font_size", 10)
-	key_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	key_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	container.add_child(key_label)
 
@@ -134,12 +122,9 @@ func _create_slot(index: int) -> Dictionary:
 	container.add_child(cooldown_overlay)
 
 	# Cooldown timer text (centered)
-	var cooldown_label := Label.new()
-	cooldown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var cooldown_label: Label = UIHelper.create_label("", 13, Color(1, 1, 1, 0.9), HORIZONTAL_ALIGNMENT_CENTER)
 	cooldown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cooldown_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	cooldown_label.add_theme_font_size_override("font_size", 13)
-	cooldown_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 	cooldown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cooldown_label.visible = false
 	container.add_child(cooldown_label)

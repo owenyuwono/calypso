@@ -34,12 +34,6 @@ func set_cursor(type: String) -> void:
 	var hotspot: Vector2 = _hotspots.get(type, Vector2.ZERO)
 	Input.set_custom_mouse_cursor(tex, Input.CURSOR_ARROW, hotspot)
 
-func press() -> void:
-	pass
-
-func release() -> void:
-	pass
-
 func reset() -> void:
 	_current_type = ""
 	set_cursor("default")

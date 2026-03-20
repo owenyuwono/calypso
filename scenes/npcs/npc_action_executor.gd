@@ -49,7 +49,7 @@ func _approach_entity(entity_node: Node3D, max_dist: float = 3.0) -> bool:
 	var dist: float = npc.global_position.distance_to(entity_node.global_position)
 	if dist <= max_dist:
 		return true
-	npc._suppress_nav_complete = true
+	npc.set_suppress_nav_complete(true)
 	npc.navigate_to(entity_node.global_position)
 	var timeout := get_tree().create_timer(8.0)
 	await signal_race([npc.nav_agent.navigation_finished, timeout.timeout])
@@ -61,7 +61,7 @@ func _approach_position(entity_node: Node3D, nav_pos: Vector3, max_dist: float =
 	var dist: float = npc.global_position.distance_to(entity_node.global_position)
 	if dist <= max_dist:
 		return true
-	npc._suppress_nav_complete = true
+	npc.set_suppress_nav_complete(true)
 	npc.navigate_to(nav_pos)
 	var timeout := get_tree().create_timer(8.0)
 	await signal_race([npc.nav_agent.navigation_finished, timeout.timeout])
@@ -311,7 +311,7 @@ func _do_chop_tree(tree_id: String) -> void:
 		var dist: float = npc.global_position.distance_to(tree_node.global_position)
 		if dist > CHOP_RANGE:
 			# Drifted away — re-approach with offset to avoid NavMesh obstacle
-			npc._suppress_nav_complete = true
+			npc.set_suppress_nav_complete(true)
 			var reapproach_pos: Vector3 = _get_approach_pos(npc.global_position, tree_node.global_position, 2.5)
 			npc.navigate_to(reapproach_pos)
 			var timeout_timer := get_tree().create_timer(5.0)

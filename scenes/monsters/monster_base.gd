@@ -8,7 +8,6 @@ const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
-const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 @export var monster_type: String = "slime"
 @export var monster_id: String = ""
@@ -143,7 +142,6 @@ func _ready() -> void:
 	# Connect signals
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
-	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.time_phase_changed.connect(_on_time_phase_changed)
 	# Apply night buffs if spawned during night
 	if TimeManager.is_night():
@@ -408,9 +406,6 @@ func _drop_aggro() -> void:
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
 		_stagger_timer = 0.3
-
-func _on_entity_healed(entity_id: String, _amount: int, _current_hp: int) -> void:
-	pass
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:

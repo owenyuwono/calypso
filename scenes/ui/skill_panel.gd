@@ -14,16 +14,8 @@ class SkillDragSource extends PanelContainer:
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		var preview := PanelContainer.new()
-		var preview_style := StyleBoxFlat.new()
-		preview_style.bg_color = Color(0.1, 0.09, 0.07, 0.95)
-		UIHelper.set_corner_radius(preview_style, 4)
-		UIHelper.set_border_width(preview_style, 1)
-		preview_style.border_color = UIHelper.COLOR_GOLD
-		preview.add_theme_stylebox_override("panel", preview_style)
-		var label := Label.new()
-		label.text = skill_name
-		label.add_theme_font_size_override("font_size", 13)
-		label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+		preview.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.1, 0.09, 0.07, 0.95), UIHelper.COLOR_GOLD, 4, 1))
+		var label: Label = UIHelper.create_label(skill_name, 13, UIHelper.COLOR_GOLD)
 		preview.add_child(label)
 		set_drag_preview(preview)
 		return {"skill_id": skill_id, "type": "skill_drag"}
@@ -165,10 +157,7 @@ func _build_sidebar() -> void:
 			continue
 
 		# Category label
-		var cat_label := Label.new()
-		cat_label.text = CATEGORY_LABELS.get(category, category.to_upper())
-		cat_label.add_theme_font_size_override("font_size", 11)
-		cat_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+		var cat_label: Label = UIHelper.create_label(CATEGORY_LABELS.get(category, category.to_upper()), 11, UIHelper.COLOR_GOLD)
 		cat_label.add_theme_constant_override("margin_top", 4)
 		_sidebar.add_child(cat_label)
 
@@ -188,10 +177,7 @@ func _build_sidebar_entry(prof_id: String) -> Control:
 		level = xp_data.get("level", 1)
 		var xp: int = xp_data.get("xp", 0)
 		var xp_next: int = xp_data.get("xp_to_next", 1)
-		if level >= ProficiencyDatabase.MAX_LEVEL:
-			xp_percent = 1.0
-		elif xp_next > 0:
-			xp_percent = clampf(float(xp) / float(xp_next), 0.0, 1.0)
+		xp_percent = ProficiencyDatabase.get_xp_fill_percent(level, xp, xp_next)
 
 	var prof_def: Dictionary = ProficiencyDatabase.get_skill(prof_id)
 	var display_name: String = prof_def.get("name", prof_id)
@@ -253,47 +239,18 @@ func _build_sidebar_entry(prof_id: String) -> Control:
 	wrapper.add_child(margin)
 
 	# Icon (20x20)
-	var icon_path: String = "res://assets/textures/ui/proficiencies/" + prof_id + ".png"
-	if ResourceLoader.exists(icon_path):
-		var icon: TextureRect = TextureRect.new()
-		icon.texture = load(icon_path)
-		icon.custom_minimum_size = Vector2(20, 20)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture_filter = TEXTURE_FILTER_LINEAR
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/proficiencies/" + prof_id + ".png", Vector2(20, 20), CanvasItem.TEXTURE_FILTER_LINEAR)
+	if icon:
 		row.add_child(icon)
 
 	# Name label
-	var name_label: Label = Label.new()
-	name_label.text = display_name
-	name_label.add_theme_font_size_override("font_size", 12)
-	var name_color: Color
-	if is_selected:
-		name_color = UIHelper.COLOR_GOLD
-	elif is_max:
-		name_color = Color(0.9, 0.85, 0.6)
-	else:
-		name_color = Color(0.78, 0.75, 0.68)
-	name_label.add_theme_color_override("font_color", name_color)
+	var name_label: Label = UIHelper.create_label(display_name, 12, _sidebar_name_color(is_selected, is_max))
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(name_label)
 
 	# Level label (right-aligned)
-	var level_label: Label = Label.new()
-	level_label.text = "MAX" if is_max else str(level)
-	level_label.add_theme_font_size_override("font_size", 12)
-	var level_color: Color
-	if is_max:
-		level_color = UIHelper.COLOR_GOLD
-	elif is_selected:
-		level_color = Color(0.9, 0.85, 0.7)
-	else:
-		level_color = Color(0.6, 0.58, 0.5)
-	level_label.add_theme_color_override("font_color", level_color)
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var level_label: Label = UIHelper.create_label("MAX" if is_max else str(level), 12, _sidebar_level_color(is_selected, is_max), HORIZONTAL_ALIGNMENT_RIGHT)
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(level_label)
 
@@ -360,29 +317,15 @@ func _build_right_content(prof_id: String) -> void:
 	header.add_theme_constant_override("separation", 8)
 	_right_content.add_child(header)
 
-	var icon_path: String = "res://assets/textures/ui/proficiencies/" + prof_id + ".png"
-	if ResourceLoader.exists(icon_path):
-		var title_icon: TextureRect = TextureRect.new()
-		title_icon.texture = load(icon_path)
-		title_icon.custom_minimum_size = Vector2(24, 24)
-		title_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		title_icon.texture_filter = TEXTURE_FILTER_LINEAR
-		title_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var title_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/proficiencies/" + prof_id + ".png", Vector2(24, 24), CanvasItem.TEXTURE_FILTER_LINEAR)
+	if title_icon:
 		header.add_child(title_icon)
 
-	var name_label := Label.new()
-	name_label.text = display_name
-	name_label.add_theme_font_size_override("font_size", 15)
-	name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if is_max else Color.WHITE)
+	var name_label: Label = UIHelper.create_label(display_name, 15, UIHelper.COLOR_GOLD if is_max else Color.WHITE)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(name_label)
 
-	var level_label := Label.new()
-	level_label.text = "MAX" if is_max else "Lv. %d" % level
-	level_label.add_theme_font_size_override("font_size", 14)
-	level_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if is_max else Color(0.8, 0.8, 0.8))
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var level_label: Label = UIHelper.create_label("MAX" if is_max else "Lv. %d" % level, 14, UIHelper.COLOR_GOLD if is_max else Color(0.8, 0.8, 0.8), HORIZONTAL_ALIGNMENT_RIGHT)
 	level_label.custom_minimum_size.x = 52
 	header.add_child(level_label)
 
@@ -397,21 +340,11 @@ func _build_right_content(prof_id: String) -> void:
 	xp_bar.max_value = xp_to_next if not is_max else 1
 	xp_bar.value = xp if not is_max else 1
 	xp_bar.show_percentage = false
-	var bar_bg := StyleBoxFlat.new()
-	bar_bg.bg_color = Color(0.15, 0.15, 0.2)
-	UIHelper.set_corner_radius(bar_bg, 2)
-	xp_bar.add_theme_stylebox_override("background", bar_bg)
-	var bar_fill := StyleBoxFlat.new()
-	bar_fill.bg_color = Color(0.4, 0.35, 0.15) if is_max else Color(0.3, 0.6, 1.0)
-	UIHelper.set_corner_radius(bar_fill, 2)
-	xp_bar.add_theme_stylebox_override("fill", bar_fill)
+	xp_bar.add_theme_stylebox_override("background", UIHelper.create_style_box(Color(0.15, 0.15, 0.2), Color.TRANSPARENT, 2))
+	xp_bar.add_theme_stylebox_override("fill", UIHelper.create_style_box(Color(0.4, 0.35, 0.15) if is_max else Color(0.3, 0.6, 1.0), Color.TRANSPARENT, 2))
 	bar_row.add_child(xp_bar)
 
-	var xp_text := Label.new()
-	xp_text.text = "MAX" if is_max else "%d/%d XP" % [xp, xp_to_next]
-	xp_text.add_theme_font_size_override("font_size", 11)
-	xp_text.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if is_max else Color(0.6, 0.6, 0.6))
-	xp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var xp_text: Label = UIHelper.create_label("MAX" if is_max else "%d/%d XP" % [xp, xp_to_next], 11, UIHelper.COLOR_GOLD if is_max else Color(0.6, 0.6, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
 	xp_text.custom_minimum_size.x = 70
 	bar_row.add_child(xp_text)
 
@@ -422,10 +355,7 @@ func _build_right_content(prof_id: String) -> void:
 	if category == "weapon":
 		_build_weapon_skills_section(prof_id)
 	else:
-		var desc_label := Label.new()
-		desc_label.text = prof_def.get("description", "")
-		desc_label.add_theme_font_size_override("font_size", 12)
-		desc_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		var desc_label: Label = UIHelper.create_label(prof_def.get("description", ""), 12, Color(0.6, 0.6, 0.6))
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_right_content.add_child(desc_label)
 
@@ -433,10 +363,7 @@ func _build_right_content(prof_id: String) -> void:
 func _build_weapon_skills_section(weapon_type: String) -> void:
 	var skill_ids: Array = SkillDatabase.get_skills_for_proficiency(weapon_type)
 	if skill_ids.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = "No skills for this weapon type."
-		empty_label.add_theme_font_size_override("font_size", 13)
-		empty_label.add_theme_color_override("font_color", UIHelper.COLOR_DISABLED)
+		var empty_label: Label = UIHelper.create_label("No skills for this weapon type.", 13, UIHelper.COLOR_DISABLED)
 		_right_content.add_child(empty_label)
 		return
 
@@ -481,23 +408,11 @@ func _build_skill_row(skill_id: String) -> void:
 
 	# Icon (24x24)
 	var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
-	var icon_texture: Texture2D = null
-	if ResourceLoader.exists(icon_path):
-		icon_texture = load(icon_path)
-	else:
+	if not ResourceLoader.exists(icon_path):
 		var skill_category: String = SkillDatabase.get_skill_category(skill_id)
-		var base_path: String = "res://assets/textures/ui/skills/bases/" + skill_category + "_base.png"
-		if ResourceLoader.exists(base_path):
-			icon_texture = load(base_path)
-	if icon_texture:
-		var skill_icon: TextureRect = TextureRect.new()
-		skill_icon.texture = icon_texture
-		skill_icon.custom_minimum_size = Vector2(24, 24)
-		skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		skill_icon.texture_filter = TEXTURE_FILTER_LINEAR
-		skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		skill_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon_path = "res://assets/textures/ui/skills/bases/" + skill_category + "_base.png"
+	var skill_icon: TextureRect = UIHelper.create_icon(icon_path, Vector2(24, 24), CanvasItem.TEXTURE_FILTER_LINEAR)
+	if skill_icon:
 		row.add_child(skill_icon)
 
 	# Name + description vertical stack
@@ -508,37 +423,17 @@ func _build_skill_row(skill_id: String) -> void:
 	name_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(name_col)
 
-	var name_label: Label = Label.new()
-	name_label.text = skill.get("name", skill_id)
-	name_label.add_theme_font_size_override("font_size", 14)
-	var name_color: Color = skill_color
-	if eff_percent < 70:
-		name_color = skill_color.lerp(Color(0.5, 0.5, 0.5), 0.5)
-	name_label.add_theme_color_override("font_color", name_color)
+	var name_color: Color = skill_color if eff_percent >= 70 else skill_color.lerp(Color(0.5, 0.5, 0.5), 0.5)
+	var name_label: Label = UIHelper.create_label(skill.get("name", skill_id), 14, name_color)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_col.add_child(name_label)
 
-	var desc_label: Label = Label.new()
-	desc_label.text = skill.get("description", "")
-	desc_label.add_theme_font_size_override("font_size", 11)
-	desc_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.55))
+	var desc_label: Label = UIHelper.create_label(skill.get("description", ""), 11, Color(0.6, 0.6, 0.55))
 	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_col.add_child(desc_label)
 
 	# Effectiveness %
-	var eff_label: Label = Label.new()
-	eff_label.text = str(eff_percent) + "%"
-	eff_label.add_theme_font_size_override("font_size", 14)
-	var eff_color: Color
-	if eff_percent >= 100:
-		eff_color = Color(0.3, 1.0, 0.3)
-	elif eff_percent >= 70:
-		eff_color = Color(1.0, 1.0, 0.3)
-	elif eff_percent >= 30:
-		eff_color = Color(1.0, 0.6, 0.2)
-	else:
-		eff_color = Color(1.0, 0.2, 0.2)
-	eff_label.add_theme_color_override("font_color", eff_color)
+	var eff_label: Label = UIHelper.create_label(str(eff_percent) + "%", 14, _effectiveness_row_color(eff_percent))
 	eff_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	eff_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(eff_label)
@@ -575,6 +470,32 @@ func _get_prof_ids_in_category(category: String) -> Array:
 		if ProficiencyDatabase.SKILLS[prof_id].get("category", "") == category:
 			result.append(prof_id)
 	return result
+
+
+func _sidebar_name_color(is_selected: bool, is_max: bool) -> Color:
+	if is_selected:
+		return UIHelper.COLOR_GOLD
+	if is_max:
+		return Color(0.9, 0.85, 0.6)
+	return Color(0.78, 0.75, 0.68)
+
+
+func _sidebar_level_color(is_selected: bool, is_max: bool) -> Color:
+	if is_max:
+		return UIHelper.COLOR_GOLD
+	if is_selected:
+		return Color(0.9, 0.85, 0.7)
+	return Color(0.6, 0.58, 0.5)
+
+
+func _effectiveness_row_color(eff_percent: int) -> Color:
+	if eff_percent >= 100:
+		return Color(0.3, 1.0, 0.3)
+	elif eff_percent >= 70:
+		return Color(1.0, 1.0, 0.3)
+	elif eff_percent >= 30:
+		return Color(1.0, 0.6, 0.2)
+	return Color(1.0, 0.2, 0.2)
 
 
 func _exit_tree() -> void:

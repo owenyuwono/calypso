@@ -22,7 +22,6 @@ const AutoAttackComponent = preload("res://scripts/components/auto_attack_compon
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
-const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 
 var entity_id: String = "player"
@@ -202,7 +201,6 @@ func _ready() -> void:
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
-	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
@@ -336,19 +334,8 @@ func _process(delta: float) -> void:
 	_conv_scan_timer = 0.0
 
 	# Scan for nearby active conversations to allow the player to join
-	_nearby_conversation_id = ""
 	if _conv_manager:
-		for conv_id in _conv_manager.active_conversations:
-			var state: ConversationState = _conv_manager.active_conversations[conv_id]
-			if not state:
-				continue
-			for pid in state.participant_ids:
-				var entity: Node = WorldState.get_entity(pid)
-				if entity and global_position.distance_to(entity.global_position) < 15.0:
-					_nearby_conversation_id = conv_id
-					break
-			if not _nearby_conversation_id.is_empty():
-				break
+		_nearby_conversation_id = _conv_manager.find_nearby_conversation(global_position, 15.0)
 
 		# Auto-leave if all conversation participants moved out of range
 		var player_conv_id: String = _conv_manager.entity_to_conversation.get("player", "")
@@ -572,12 +559,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_cursor_manager.press()
 			if _is_ui_open():
 				return
 			_handle_left_click()
-		else:
-			_cursor_manager.release()
 
 func _handle_left_click() -> void:
 	# Vend sign click — walk to vendor NPC, then open shop
@@ -804,9 +788,6 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 		flash_hit()
 		_stagger_timer = 0.3
 		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
-
-func _on_entity_healed(eid: String, _amount: int, _current_hp: int) -> void:
-	pass
 
 func _on_proficiency_level_up(eid: String, _skill_id: String, _new_level: int) -> void:
 	if eid != "player":

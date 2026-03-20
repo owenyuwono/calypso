@@ -32,19 +32,11 @@ func _build_ui() -> void:
 	gold_row.add_theme_constant_override("separation", 3)
 	main_vbox.add_child(gold_row)
 
-	var gold_icon := TextureRect.new()
-	gold_icon.texture = load("res://assets/textures/ui/stats/gold_coin.png")
-	gold_icon.custom_minimum_size = Vector2(16, 16)
-	gold_icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
-	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	gold_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	gold_icon.texture_filter = TEXTURE_FILTER_NEAREST
-	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gold_row.add_child(gold_icon)
+	var gold_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/gold_coin.png", Vector2(16, 16))
+	if gold_icon != null:
+		gold_row.add_child(gold_icon)
 
-	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 16)
-	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	_gold_label = UIHelper.create_label("", 16, UIHelper.COLOR_GOLD)
 	gold_row.add_child(_gold_label)
 
 	# Draggable title bar with gold display on the right
@@ -55,10 +47,7 @@ func _build_ui() -> void:
 	main_vbox.move_child(_drag_handle, 0)
 
 	# Buy column header
-	var buy_title := Label.new()
-	buy_title.text = "Buy"
-	buy_title.add_theme_font_size_override("font_size", 16)
-	buy_title.add_theme_color_override("font_color", Color(0.5, 0.8, 0.5))
+	var buy_title: Label = UIHelper.create_label("Buy", 16, Color(0.5, 0.8, 0.5))
 	main_vbox.add_child(buy_title)
 
 	var shop_scroll := ScrollContainer.new()
@@ -132,9 +121,7 @@ func _refresh() -> void:
 		var row := HBoxContainer.new()
 		_shop_list.add_child(row)
 
-		var label := Label.new()
-		label.text = "%s x%d (%dg)" % [item_name, count, price]
-		label.add_theme_font_size_override("font_size", 13)
+		var label: Label = UIHelper.create_label("%s x%d (%dg)" % [item_name, count, price], 13)
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(label)
 

@@ -38,10 +38,7 @@ func _build_ui() -> void:
 	var vbox: VBoxContainer = ui["vbox"]
 
 	# Total level label
-	_total_level_label = Label.new()
-	_total_level_label.text = "Total Level: --"
-	_total_level_label.add_theme_font_size_override("font_size", 15)
-	_total_level_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	_total_level_label = UIHelper.create_label("Total Level: --", 15, UIHelper.COLOR_GOLD)
 	vbox.add_child(_total_level_label)
 
 	vbox.add_child(HSeparator.new())
@@ -56,14 +53,6 @@ func _build_ui() -> void:
 	_skill_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_skill_list.add_theme_constant_override("separation", 2)
 	scroll.add_child(_skill_list)
-
-
-## P key now opens the unified skill panel instead — see skill_panel.gd
-#func _input(event: InputEvent) -> void:
-#	if event.is_action_pressed("toggle_proficiencies"):
-#		if get_viewport().gui_get_focus_owner() is LineEdit:
-#			return
-#		toggle()
 
 
 func toggle() -> void:
@@ -98,11 +87,7 @@ func _refresh() -> void:
 			continue
 
 		# Category header
-		var header := Label.new()
-		header.text = "-- %s --" % display_name
-		header.add_theme_font_size_override("font_size", 13)
-		header.add_theme_color_override("font_color", Color(0.6, 0.8, 0.6))
-		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var header: Label = UIHelper.create_label("-- %s --" % display_name, 13, Color(0.6, 0.8, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
 		_skill_list.add_child(header)
 
 		# Skill rows
@@ -123,18 +108,11 @@ func _refresh() -> void:
 			top_row.add_theme_constant_override("separation", 4)
 			row_vbox.add_child(top_row)
 
-			var name_label := Label.new()
-			name_label.text = "  " + skill_def.get("name", skill_id)
-			name_label.add_theme_font_size_override("font_size", 14)
-			name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if is_max else Color.WHITE)
+			var name_label: Label = UIHelper.create_label("  " + skill_def.get("name", skill_id), 14, UIHelper.COLOR_GOLD if is_max else Color.WHITE)
 			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			top_row.add_child(name_label)
 
-			var level_label := Label.new()
-			level_label.text = "Lv. %d" % level if not is_max else "MAX"
-			level_label.add_theme_font_size_override("font_size", 13)
-			level_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD if is_max else Color(0.8, 0.8, 0.8))
-			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			var level_label: Label = UIHelper.create_label("Lv. %d" % level if not is_max else "MAX", 13, UIHelper.COLOR_GOLD if is_max else Color(0.8, 0.8, 0.8), HORIZONTAL_ALIGNMENT_RIGHT)
 			level_label.custom_minimum_size.x = 48
 			top_row.add_child(level_label)
 
@@ -155,21 +133,11 @@ func _refresh() -> void:
 				xp_bar.max_value = xp_to_next
 				xp_bar.value = xp
 				xp_bar.show_percentage = false
-				var bar_bg := StyleBoxFlat.new()
-				bar_bg.bg_color = Color(0.15, 0.15, 0.2)
-				UIHelper.set_corner_radius(bar_bg, 2)
-				xp_bar.add_theme_stylebox_override("background", bar_bg)
-				var bar_fill := StyleBoxFlat.new()
-				bar_fill.bg_color = Color(0.3, 0.6, 1.0)
-				UIHelper.set_corner_radius(bar_fill, 2)
-				xp_bar.add_theme_stylebox_override("fill", bar_fill)
+				xp_bar.add_theme_stylebox_override("background", UIHelper.create_style_box(Color(0.15, 0.15, 0.2), Color.TRANSPARENT, 2))
+				xp_bar.add_theme_stylebox_override("fill", UIHelper.create_style_box(Color(0.3, 0.6, 1.0), Color.TRANSPARENT, 2))
 				bar_row.add_child(xp_bar)
 
-				var xp_label := Label.new()
-				xp_label.text = "%d/%d" % [xp, xp_to_next]
-				xp_label.add_theme_font_size_override("font_size", 11)
-				xp_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
-				xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				var xp_label: Label = UIHelper.create_label("%d/%d" % [xp, xp_to_next], 11, Color(0.6, 0.6, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
 				xp_label.custom_minimum_size.x = 60
 				bar_row.add_child(xp_label)
 

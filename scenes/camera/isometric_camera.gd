@@ -46,24 +46,6 @@ func _ready() -> void:
 	projection = PROJECTION_PERSPECTIVE
 	fov = 50.0
 
-	#_setup_outline_effect()
-
-
-func _setup_outline_effect() -> void:
-	var quad := MeshInstance3D.new()
-	var mesh := QuadMesh.new()
-	mesh.size = Vector2(2, 2)
-	quad.mesh = mesh
-	var mat := ShaderMaterial.new()
-	mat.shader = preload("res://assets/shaders/outline.gdshader")
-	mat.set_shader_parameter("outline_thickness", 1.0)
-	mat.set_shader_parameter("depth_threshold", 8.0)
-	mat.set_shader_parameter("outline_color", Color(0.05, 0.03, 0.08, 1.0))
-	mat.render_priority = -100
-	quad.material_override = mat
-	quad.extra_cull_margin = 16384.0
-	add_child(quad)
-
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

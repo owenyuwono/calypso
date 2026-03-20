@@ -159,6 +159,18 @@ func add_turn(conversation_id: String, turn: Dictionary) -> void:
 # Queries
 # ---------------------------------------------------------------------------
 
+func find_nearby_conversation(from_pos: Vector3, range_dist: float) -> String:
+	for conv_id in active_conversations:
+		var state: ConversationState = active_conversations[conv_id]
+		if not state:
+			continue
+		for pid in state.participant_ids:
+			var entity: Node = WorldState.get_entity(pid)
+			if entity and from_pos.distance_to(entity.global_position) < range_dist:
+				return conv_id
+	return ""
+
+
 func get_conversation(entity_id: String) -> ConversationState:
 	var conv_id: String = entity_to_conversation.get(entity_id, "")
 	if conv_id.is_empty():

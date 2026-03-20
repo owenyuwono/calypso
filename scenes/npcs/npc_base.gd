@@ -16,7 +16,6 @@ const RelationshipComponent = preload("res://scripts/components/relationship_com
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
-const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 const NpcIdentityDatabase = preload("res://scripts/data/npc_identity_database.gd")
 const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
@@ -768,6 +767,11 @@ func late_init_skills() -> void:
 	var initial_profs: Dictionary = profile.get("starting_proficiencies", {})
 	if not initial_profs.is_empty():
 		_progression.setup(_stats, initial_profs, _equipment)
+
+# --- Public setters for private state ---
+
+func set_suppress_nav_complete(value: bool) -> void:
+	_suppress_nav_complete = value
 
 # --- Duck typing delegations ---
 

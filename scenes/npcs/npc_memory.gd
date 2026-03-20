@@ -209,18 +209,6 @@ func add_gossip_memory(gossip_entry: Dictionary) -> void:
 	mem["spread_count"] = gossip_entry.get("spread_count", 1)
 	mem["original_source"] = gossip_entry.get("original_source", "")
 
-# =============================================================================
-# Deprecated memory stubs — Wave 2 migration
-# =============================================================================
-
-# DEPRECATED: Use add_memory() directly. Migrated in Wave 2.
-func add_observation(text: String) -> void:
-	add_memory(text, SOURCE_WITNESSED, IMPORTANCE_LOW)
-
-# DEPRECATED: Use add_memory() directly. Migrated in Wave 2.
-func add_key_memory(type: String, text: String) -> void:
-	add_memory(text, SOURCE_WITNESSED, IMPORTANCE_HIGH, false, type)
-
 func has_key_memory_type(type: String) -> bool:
 	for mem in memories:
 		if mem["topic"] == type:

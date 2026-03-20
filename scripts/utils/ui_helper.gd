@@ -66,3 +66,54 @@ static func create_panel_style(_bg_color: Color = Color.BLACK, _border_color: Co
 	style.content_margin_top = 16
 	style.content_margin_bottom = 16
 	return style
+
+## Creates a TextureRect icon from a texture path.
+## Returns null if the path is empty or the resource does not exist.
+static func create_icon(texture_path: String, size: Vector2 = Vector2(16, 16), filter: CanvasItem.TextureFilter = CanvasItem.TEXTURE_FILTER_NEAREST) -> TextureRect:
+	if texture_path.is_empty():
+		return null
+	if not ResourceLoader.exists(texture_path):
+		return null
+	var icon := TextureRect.new()
+	icon.texture = load(texture_path) as Texture2D
+	icon.custom_minimum_size = size
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = filter
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+## Creates a Label with the given text, font size, color, and horizontal alignment.
+static func create_label(text: String, font_size: int = 14, color: Color = Color.WHITE, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.horizontal_alignment = alignment
+	return label
+
+## Creates a StyleBoxFlat with background color, border, and corner radius.
+static func create_style_box(bg_color: Color, border_color: Color = Color.TRANSPARENT, corner_radius: int = 4, border_width: int = 0) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_color = border_color
+	set_corner_radius(style, corner_radius)
+	set_border_width(style, border_width)
+	return style
+
+## Creates a gold display row (coin icon + amount label).
+## Returns {"container": HBoxContainer, "label": Label}.
+static func create_gold_display(gold: int = 0) -> Dictionary:
+	var container := HBoxContainer.new()
+	container.add_theme_constant_override("separation", 4)
+
+	var icon: TextureRect = create_icon("res://assets/textures/ui/stats/gold_coin.png", Vector2(16, 16))
+	if icon != null:
+		container.add_child(icon)
+
+	var label: Label = create_label(str(gold), 14, COLOR_GOLD)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	container.add_child(label)
+
+	return {"container": container, "label": label}
