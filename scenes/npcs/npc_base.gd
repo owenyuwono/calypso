@@ -59,6 +59,8 @@ var combat_target: String = ""
 var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
 var _combat_tracker: Dictionary = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
+var _combat_distance_traveled: float = 0.0
+var _hp_regen_accumulator: float = 0.0
 
 # Stuck detection
 var _stuck_timer: float = 0.0
@@ -90,6 +92,7 @@ var _npc_input: Node = null
 var _skills_comp: Node = null
 var _perception: Node
 var _audio: Node = null
+var _stamina: Node = null
 
 # Cached sub-node references (set after children are added in _ready)
 var _vending_comp: Node
@@ -209,6 +212,7 @@ func _ready() -> void:
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
+	_stamina = stamina_comp
 
 	var identity := NpcIdentity.new()
 	identity.name = "NpcIdentity"
@@ -266,6 +270,7 @@ func _ready() -> void:
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
+	GameEvents.attack_missed.connect(_on_attack_missed)
 
 	_visuals.setup_hp_bar(1.8, npc_name)
 	_visuals.hide_hp_bar_keep_name()
@@ -484,6 +489,7 @@ func _physics_process(delta: float) -> void:
 			if _current_anim != "Idle":
 				_current_anim = "Idle"
 				_visuals.play_anim("Idle")
+		_process_hp_regen(delta)
 		return
 	move_and_slide()
 
@@ -493,6 +499,8 @@ func _physics_process(delta: float) -> void:
 		if target_anim != _current_anim:
 			_current_anim = target_anim
 			_visuals.play_anim(target_anim)
+
+	_process_hp_regen(delta)
 
 func _process_movement(delta: float) -> bool:
 	if not _nav_started:
@@ -544,14 +552,17 @@ func _process_movement(delta: float) -> bool:
 	dir.y = 0.0
 	if dir.length_squared() > 0.01:
 		dir = dir.normalized()
+		var effective_speed: float = MOVE_SPEED * _stats.move_speed
+		if _stamina:
+			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
 		var speed_factor: float = 1.0
 		if not _navigating_to_entity:
 			var dist_to_target: float = global_position.distance_to(nav_agent.get_final_position())
 			var arrive_radius: float = 3.0
 			if dist_to_target < arrive_radius:
 				speed_factor = clampf(dist_to_target / arrive_radius, 0.15, 1.0)
-		velocity.x = dir.x * MOVE_SPEED * speed_factor
-		velocity.z = dir.z * MOVE_SPEED * speed_factor
+		velocity.x = dir.x * effective_speed * speed_factor
+		velocity.z = dir.z * effective_speed * speed_factor
 		_visuals.face_direction(dir)
 		return true
 	return false
@@ -567,12 +578,25 @@ func _process_combat(delta: float) -> bool:
 		return false
 
 	var attack_range: float = _stats.attack_range
-	var attack_speed: float = _stats.attack_speed
+	# Apply attack speed multiplier and fatigue
+	var effective_attack_speed: float = _stats.attack_speed / _stats.attack_speed_mult
+	if _stamina:
+		effective_attack_speed /= _stamina.get_fatigue_multiplier("attack_speed")
+
 	# NPCs run slightly faster than base speed when chasing
 	var result: Dictionary = _auto_attack.process_attack(
 		delta, combat_target, global_position,
-		MOVE_SPEED, attack_range, attack_speed, 1.1
+		MOVE_SPEED, attack_range, effective_attack_speed, 1.1
 	)
+
+	# Accumulate distance traveled in combat for AGI XP
+	if result.get("is_moving", false):
+		_combat_distance_traveled += velocity.length() * delta
+		while _combat_distance_traveled >= 10.0:
+			_combat_distance_traveled -= 10.0
+			if _progression:
+				_progression.grant_proficiency_xp("agi", 1)
+
 	return result.get("is_moving", false)
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
@@ -592,6 +616,10 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 	if not monster_type.is_empty():
 		var weapon_type: String = _combat.get_equipped_weapon_type()
 		_progression.grant_combat_xp(monster_type, weapon_type)
+	# Grant STR and DEX XP on every hit
+	if _progression:
+		_progression.grant_proficiency_xp("str", 3)
+		_progression.grant_proficiency_xp("dex", 2)
 	_combat_tracker["damage_dealt"] += damage
 	_combat_tracker["hits_dealt"] += 1
 	# Occasionally say something in combat
@@ -603,6 +631,7 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 func _on_auto_attack_target_lost() -> void:
 	combat_target = ""
 	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
+	_combat_distance_traveled = 0.0
 	WorldState.set_entity_data(npc_id, "combat_target", "")
 	if _audio:
 		_audio.stop_combat_loop()
@@ -753,7 +782,7 @@ func _respawn() -> void:
 func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _remaining_hp: int) -> void:
 	if target_id == npc_id:
 		flash_hit()
-		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
+		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 		_combat_tracker["damage_taken"] += damage
 		_combat_tracker["hits_taken"] += 1
 		if current_state != STATE_DEAD:
@@ -777,6 +806,27 @@ func _on_vending_stopped(eid: String) -> void:
 func _on_proficiency_level_up(leveled_entity_id: String, _prof_id: String, _new_level: int) -> void:
 	if leveled_entity_id != entity_id:
 		return
+
+func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
+	if target_id != npc_id:
+		return
+	if _progression:
+		_progression.grant_proficiency_xp("agi", 5)
+
+func _process_hp_regen(delta: float) -> void:
+	if not _stats:
+		return
+	if _stats.hp_regen <= 0.0:
+		return
+	if _stats.hp >= _stats.max_hp:
+		return
+	if current_state == STATE_COMBAT or current_state == STATE_DEAD:
+		return
+	_hp_regen_accumulator += _stats.hp_regen * delta
+	if _hp_regen_accumulator >= 1.0:
+		var heal_amount: int = int(_hp_regen_accumulator)
+		_stats.heal(heal_amount)
+		_hp_regen_accumulator -= heal_amount
 
 # --- Generated NPC initialization ---
 

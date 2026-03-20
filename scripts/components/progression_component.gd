@@ -79,23 +79,57 @@ func _recalculate_stats() -> void:
 	## Derive stats from proficiency levels. Call after any proficiency level change.
 	if not _stats:
 		return
-	# Get the weapon proficiency level (from equipped weapon type)
-	var weapon_level: int = _get_active_weapon_proficiency_level()
-	var con_level: int = get_proficiency_level("constitution")
 
-	# ATK = 5 + weapon_proficiency_level * 2
-	_stats.atk = 5 + weapon_level * 2
-	# DEF = 3 + constitution_level * 1
-	_stats.def = 3 + con_level
-	# Max HP = 40 + constitution_level * 10
-	var new_max_hp: int = 40 + con_level * 10
-	var hp_diff: int = new_max_hp - _stats.max_hp
-	_stats.max_hp = new_max_hp
-	if hp_diff > 0:
-		_stats.hp = mini(_stats.hp + hp_diff, new_max_hp)
-	elif _stats.hp > new_max_hp:
-		_stats.hp = new_max_hp
+	# Read attribute levels
+	var str_level: int = get_proficiency_level("str")
+	var con_level: int = get_proficiency_level("con")
+	var agi_level: int = get_proficiency_level("agi")
+	var int_level: int = get_proficiency_level("int")
+	var dex_level: int = get_proficiency_level("dex")
+	var wis_level: int = get_proficiency_level("wis")
 
+	# Determine weapon proficiency
+	var weapon_prof_level: int = _get_active_weapon_proficiency_level()
+
+	# Check if bow equipped for special ATK formula
+	var weapon_type: String = ""
+	if _equipment:
+		var weapon_id: String = _equipment.get_weapon()
+		if not weapon_id.is_empty():
+			var item: Dictionary = ItemDatabase.get_item(weapon_id)
+			weapon_type = item.get("weapon_type", "")
+
+	# Base stats (no equipment)
+	if weapon_type == "bow":
+		_stats.atk = 5 + dex_level * 3 + weapon_prof_level * 2  # Bow uses DEX
+	else:
+		_stats.atk = 5 + str_level * 3 + weapon_prof_level * 2
+
+	_stats.matk = 5 + int_level * 3 + get_proficiency_level("staff") * 2
+	_stats.def = 3 + con_level * 2
+	_stats.mdef = 3 + int_level * 1
+
+	var old_max_hp: int = _stats.max_hp
+	_stats.max_hp = 50 + con_level * 15
+	# Preserve HP ratio on max_hp change
+	if old_max_hp > 0:
+		var hp_diff: int = _stats.max_hp - old_max_hp
+		if hp_diff > 0:
+			_stats.hp = mini(_stats.hp + hp_diff, _stats.max_hp)
+
+	_stats.accuracy = 80 + dex_level * 5
+	_stats.evasion = agi_level * 3
+	_stats.crit_rate = 5 + dex_level * 2
+	_stats.crit_damage = 150 + str_level * 5
+	_stats.attack_speed_mult = 1.0 + agi_level * 0.05
+	_stats.move_speed = 1.0 + agi_level * 0.03
+	_stats.cast_speed = 1.0 + wis_level * 0.05
+	_stats.max_stamina = 100.0 + con_level * 10.0
+	_stats.stamina_regen = 1.0 + wis_level * 0.1
+	_stats.hp_regen = con_level * 0.5
+	_stats.cooldown_reduction = mini(wis_level * 3.0, 30.0)
+
+	# Total level = sum of all proficiency levels
 	_stats.level = get_total_level()
 	_stats._sync()
 

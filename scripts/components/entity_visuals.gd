@@ -168,6 +168,10 @@ func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1,
 	var parent: Node3D = get_parent()
 	ModelHelper.spawn_damage_number(parent, target_id, damage, color, parent.global_position, target_pos)
 
+func spawn_miss_number(target_pos: Vector3 = Vector3.ZERO) -> void:
+	var parent: Node3D = get_parent()
+	ModelHelper.spawn_text_number(parent, "MISS", Color(0.8, 0.8, 0.8), parent.global_position, target_pos)
+
 func flash_target(target_id: String) -> void:
 	var target_node: Node = WorldState.get_entity(target_id)
 	ModelHelper.flash_target(target_node)

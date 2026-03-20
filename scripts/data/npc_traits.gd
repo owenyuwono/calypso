@@ -11,62 +11,67 @@ const PROFILES: Dictionary = {
 	"bold_warrior": {
 		"boldness": 0.85, "sociability": 0.7, "generosity": 0.5, "curiosity": 0.3,
 		"weapon_type": "sword",
-		"starting_proficiencies": {"sword": 3, "constitution": 2, "agility": 1},
+		"starting_proficiencies": {"sword": 3, "str": 3, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 1},
 	},
 	"cautious_mage": {
 		"boldness": 0.2, "sociability": 0.4, "generosity": 0.6, "curiosity": 0.7,
 		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 3, "constitution": 1, "agility": 1},
-	},
-	"boisterous_brawler": {
-		"boldness": 0.75, "sociability": 0.9, "generosity": 0.6, "curiosity": 0.4,
-		"weapon_type": "sword",
-		"starting_proficiencies": {"sword": 3, "constitution": 2, "agility": 1},
+		"starting_proficiencies": {"staff": 3, "str": 1, "con": 1, "agi": 1, "int": 3, "dex": 1, "wis": 3},
 	},
 	"sly_rogue": {
 		"boldness": 0.5, "sociability": 0.8, "generosity": 0.2, "curiosity": 0.6,
 		"weapon_type": "dagger",
-		"starting_proficiencies": {"dagger": 3, "agility": 2, "constitution": 1},
+		"starting_proficiencies": {"dagger": 3, "str": 1, "con": 1, "agi": 3, "int": 1, "dex": 3, "wis": 1},
 	},
 	"stoic_knight": {
 		"boldness": 0.6, "sociability": 0.25, "generosity": 0.7, "curiosity": 0.2,
-		"weapon_type": "sword",
-		"starting_proficiencies": {"sword": 3, "constitution": 2, "agility": 1},
-	},
-	"cheerful_scholar": {
-		"boldness": 0.4, "sociability": 0.85, "generosity": 0.8, "curiosity": 0.9,
-		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 3, "constitution": 1, "agility": 1},
-	},
-	"mysterious_loner": {
-		"boldness": 0.55, "sociability": 0.15, "generosity": 0.3, "curiosity": 0.5,
-		"weapon_type": "dagger",
-		"starting_proficiencies": {"dagger": 3, "agility": 2, "constitution": 1},
+		"weapon_type": "spear",
+		"starting_proficiencies": {"spear": 3, "str": 2, "con": 3, "agi": 1, "int": 1, "dex": 2, "wis": 1},
 	},
 	"stern_guardian": {
 		"boldness": 0.7, "sociability": 0.2, "generosity": 0.75, "curiosity": 0.15,
 		"weapon_type": "sword",
-		"starting_proficiencies": {"sword": 4, "constitution": 3, "agility": 1},
+		"starting_proficiencies": {"sword": 4, "str": 2, "con": 3, "agi": 1, "int": 1, "dex": 1, "wis": 2},
 	},
 	"gentle_healer": {
 		"boldness": 0.15, "sociability": 0.75, "generosity": 0.95, "curiosity": 0.5,
 		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 2, "constitution": 3, "agility": 1},
+		"starting_proficiencies": {"staff": 2, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3},
 	},
 	"charming_bard": {
 		"boldness": 0.45, "sociability": 0.95, "generosity": 0.55, "curiosity": 0.8,
 		"weapon_type": "dagger",
-		"starting_proficiencies": {"dagger": 2, "agility": 2, "constitution": 1},
+		"starting_proficiencies": {"dagger": 2, "str": 1, "con": 1, "agi": 2, "int": 2, "dex": 2, "wis": 2},
+	},
+	"wild_berserker": {
+		"boldness": 0.75, "sociability": 0.9, "generosity": 0.6, "curiosity": 0.4,
+		"weapon_type": "axe",
+		"starting_proficiencies": {"axe": 3, "str": 3, "con": 2, "agi": 2, "int": 1, "dex": 1, "wis": 1},
+	},
+	"keen_archer": {
+		"boldness": 0.6, "sociability": 0.5, "generosity": 0.5, "curiosity": 0.6,
+		"weapon_type": "bow",
+		"starting_proficiencies": {"bow": 3, "str": 1, "con": 1, "agi": 2, "int": 1, "dex": 3, "wis": 2},
 	},
 	"earnest_apprentice": {
 		"boldness": 0.5, "sociability": 0.6, "generosity": 0.7, "curiosity": 0.55,
 		"weapon_type": "mace",
-		"starting_proficiencies": {"mace": 2, "constitution": 2, "smithing": 2},
+		"starting_proficiencies": {"mace": 2, "str": 2, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 2},
+	},
+	"devout_cleric": {
+		"boldness": 0.4, "sociability": 0.85, "generosity": 0.8, "curiosity": 0.9,
+		"weapon_type": "staff",
+		"starting_proficiencies": {"staff": 3, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3},
+	},
+	"shadow_stalker": {
+		"boldness": 0.55, "sociability": 0.15, "generosity": 0.3, "curiosity": 0.5,
+		"weapon_type": "dagger",
+		"starting_proficiencies": {"dagger": 3, "str": 2, "con": 1, "agi": 3, "int": 1, "dex": 2, "wis": 1},
 	},
 	"merchant": {
 		"boldness": 0.3, "sociability": 0.85, "generosity": 0.6, "curiosity": 0.4,
 		"weapon_type": "sword",
-		"starting_proficiencies": {"sword": 2, "constitution": 2, "agility": 1},
+		"starting_proficiencies": {"sword": 2, "str": 2, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 2},
 	},
 }
 

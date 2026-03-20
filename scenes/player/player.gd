@@ -46,6 +46,12 @@ var _attack_target: String = ""
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
+var _last_damage_time: int = 0
+var _hp_regen_accumulator: float = 0.0
+
+# AGI travel XP
+var _combat_distance_traveled: float = 0.0
+var _last_position: Vector3
 
 # Harvesting
 var _harvest_target: String = ""
@@ -67,6 +73,7 @@ var _progression: Node
 var _skills_comp: Node
 var _auto_attack: Node
 var _perception: Node
+var _stamina: Node
 
 # Child subsystem nodes
 var _hover: Node
@@ -179,6 +186,7 @@ func _ready() -> void:
 	stamina_comp.name = "StaminaComponent"
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
+	_stamina = stamina_comp
 
 	var perception_comp := PerceptionComponent.new()
 	perception_comp.name = "PerceptionComponent"
@@ -213,6 +221,9 @@ func _ready() -> void:
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.vending_started.connect(_on_vending_started)
 	GameEvents.vending_stopped.connect(_on_vending_stopped)
+	GameEvents.attack_missed.connect(_on_attack_missed)
+
+	_last_position = global_position
 
 	_conv_manager = get_tree().get_first_node_in_group("conversation_manager")
 
@@ -295,8 +306,11 @@ func _physics_process(delta: float) -> void:
 		var speed_factor: float = 1.0
 		if dist_to_target < arrive_radius:
 			speed_factor = clampf(dist_to_target / arrive_radius, 0.15, 1.0)
-		velocity.x = dir.x * SPEED * speed_factor
-		velocity.z = dir.z * SPEED * speed_factor
+		var effective_speed: float = SPEED * _stats.move_speed
+		if _stamina:
+			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
+		velocity.x = dir.x * effective_speed * speed_factor
+		velocity.z = dir.z * effective_speed * speed_factor
 		_visuals.face_direction(dir)
 		is_moving = true
 		# Stuck detection: if we haven't moved 0.1 units in 1.5 seconds, abort navigation
@@ -324,6 +338,27 @@ func _physics_process(delta: float) -> void:
 	if global_position.y < -10.0:
 		global_position = Vector3(0.0, 2.0, 0.0)
 		velocity = Vector3.ZERO
+
+	# AGI travel XP: 1 XP per 10m traveled while in combat
+	if not _attack_target.is_empty():
+		var dist: float = global_position.distance_to(_last_position)
+		_combat_distance_traveled += dist
+		if _combat_distance_traveled >= 10.0:
+			if _progression:
+				_progression.grant_proficiency_xp("agi", 1)
+			_combat_distance_traveled -= 10.0
+	_last_position = global_position
+
+	# HP Regen (out of combat only, 5 second delay after last damage)
+	if _stats and _stats.hp_regen > 0 and _stats.hp < _stats.max_hp:
+		var can_regen: bool = _last_damage_time == 0 or (Time.get_ticks_msec() - _last_damage_time) > 5000
+		if can_regen:
+			var regen_amount: float = _stats.hp_regen * delta
+			_hp_regen_accumulator += regen_amount
+			if _hp_regen_accumulator >= 1.0:
+				var heal_amount: int = int(_hp_regen_accumulator)
+				_stats.heal(heal_amount)
+				_hp_regen_accumulator -= heal_amount
 
 	# Update animation
 	if _attack_target.is_empty() and _harvest_target.is_empty():
@@ -372,7 +407,12 @@ func _process(delta: float) -> void:
 
 func _process_combat(delta: float) -> bool:
 	var attack_range: float = _stats.attack_range
-	var attack_speed: float = _stats.attack_speed
+	var effective_attack_speed: float = _stats.attack_speed / _stats.attack_speed_mult
+	if _stamina:
+		effective_attack_speed /= _stamina.get_fatigue_multiplier("attack_speed")
+	var effective_move_speed: float = SPEED * _stats.move_speed
+	if _stamina:
+		effective_move_speed *= _stamina.get_fatigue_multiplier("move_speed")
 
 	# While a skill hit is pending, handle it here — auto-attack is suppressed
 	if _player_input.pending_skill_hit:
@@ -380,7 +420,7 @@ func _process_combat(delta: float) -> bool:
 
 	# Normal auto-attack: delegate to component
 	var result: Dictionary = _auto_attack.process_attack(
-		delta, _attack_target, global_position, SPEED, attack_range, attack_speed
+		delta, _attack_target, global_position, effective_move_speed, attack_range, effective_attack_speed
 	)
 	# Keep locked target's HP bar updated
 	if not _attack_target.is_empty():
@@ -393,6 +433,7 @@ func _cancel_attack() -> void:
 	_auto_attack.cancel()
 	_player_input.cancel_pending()
 	_hover.clear_ring()
+	_combat_distance_traveled = 0.0
 	if _audio:
 		_audio.stop_combat_loop()
 
@@ -460,8 +501,11 @@ func _process_harvesting(delta: float) -> bool:
 		dir.y = 0.0
 		if dir.length_squared() > 0.01:
 			dir = dir.normalized()
-			velocity.x = dir.x * SPEED
-			velocity.z = dir.z * SPEED
+			var harvest_speed: float = SPEED * _stats.move_speed
+			if _stamina:
+				harvest_speed *= _stamina.get_fatigue_multiplier("move_speed")
+			velocity.x = dir.x * harvest_speed
+			velocity.z = dir.z * harvest_speed
 			_visuals.face_direction(dir)
 		return true
 
@@ -852,7 +896,9 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 	if target_id == "player":
 		flash_hit()
 		_stagger_timer = 0.3
-		_progression.grant_proficiency_xp("constitution", CONSTITUTION_XP_PER_HIT)
+		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
+		_last_damage_time = Time.get_ticks_msec()
+		_hp_regen_accumulator = 0.0
 
 func _on_proficiency_level_up(eid: String, _skill_id: String, _new_level: int) -> void:
 	if eid != "player":
@@ -874,6 +920,11 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
 		_progression.grant_combat_xp(monster_type, weapon_type)
+	# STR XP: 3 per physical auto-attack hit
+	if _progression:
+		_progression.grant_proficiency_xp("str", 3)
+		# DEX XP: 2 per hit landed
+		_progression.grant_proficiency_xp("dex", 2)
 	if _audio:
 		var hit_key: String = "combat_hit_" + weapon_type
 		if SfxDatabase.get_sfx(hit_key).is_empty():
@@ -883,6 +934,10 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
 	_cancel_harvest()
+
+func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
+	if target_id == entity_id and _progression:
+		_progression.grant_proficiency_xp("agi", 5)
 
 # --- Duck typing delegations ---
 

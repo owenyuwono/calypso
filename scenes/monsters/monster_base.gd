@@ -137,6 +137,8 @@ func _ready() -> void:
 		"level": 1,
 		"attack_speed": _attack_speed,
 		"attack_range": _attack_range,
+		"element": stats.get("element", ""),
+		"resistances": stats.get("resistances", {}),
 	})
 
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
@@ -527,6 +529,8 @@ func _respawn() -> void:
 		"level": 1,
 		"attack_speed": _attack_speed,
 		"attack_range": _attack_range,
+		"element": stats.get("element", ""),
+		"resistances": stats.get("resistances", {}),
 	})
 
 	_stats.setup({

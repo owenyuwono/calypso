@@ -20,22 +20,42 @@ const _CATEGORY_LABELS: Dictionary = {
 const _PROF_ICON_BASE: String = "res://assets/textures/ui/proficiencies/"
 const _COLOR_CATEGORY: Color = Color(0.6, 0.55, 0.45)
 const _COLOR_BONUS: Color = Color(0.4, 0.9, 0.4)
+const _COLOR_SECTION: Color = Color(0.8, 0.75, 0.5)
 
 var _panel: PanelContainer
 var _is_open: bool = false
 var _player: Node
 
-# Dynamic label refs — stats
+# Dynamic label refs — name/level
 var _name_label: Label
 var _level_label: Label
-var _hp_value: Label
+
+# Offensive stats
 var _atk_value: Label
 var _atk_bonus: Label
+var _matk_value: Label
+var _matk_bonus: Label
+var _accuracy_value: Label
+var _crit_rate_value: Label
+var _crit_dmg_value: Label
+
+# Defensive stats
+var _hp_value: Label
 var _def_value: Label
 var _def_bonus: Label
-var _speed_value: Label
-var _range_value: Label
+var _mdef_value: Label
+var _mdef_bonus: Label
+var _evasion_value: Label
+
+# Speed stats
+var _atk_speed_value: Label
+var _move_speed_value: Label
+var _cast_speed_value: Label
+
+# Resource stats
 var _stamina_value: Label
+var _hp_regen_value: Label
+var _cdr_value: Label
 
 # Proficiency level labels: {skill_id: Label}
 var _prof_level_labels: Dictionary = {}
@@ -51,7 +71,7 @@ func _ready() -> void:
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
 func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(280, 0), toggle)
+	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(300, 0), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
 
@@ -75,50 +95,96 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Stats section header
-	var stats_header := Label.new()
-	stats_header.text = "Stats"
-	stats_header.add_theme_font_size_override("font_size", 14)
-	stats_header.add_theme_color_override("font_color", UIHelper.COLOR_HEADER)
-	vbox.add_child(stats_header)
+	# --- Offensive section ---
+	_add_section_header(vbox, "Offensive")
 
-	# HP row
-	var hp_row := _create_stat_row("HP")
-	_hp_value = hp_row.value
-	vbox.add_child(hp_row.container)
-
-	# ATK row
-	var atk_row := _create_stat_row("ATK")
+	var atk_row := _create_stat_row("ATK", true)
 	_atk_value = atk_row.value
 	_atk_bonus = atk_row.bonus
 	vbox.add_child(atk_row.container)
 
-	# DEF row
-	var def_row := _create_stat_row("DEF")
+	var matk_row := _create_stat_row("MATK", true)
+	_matk_value = matk_row.value
+	_matk_bonus = matk_row.bonus
+	vbox.add_child(matk_row.container)
+
+	var acc_row := _create_stat_row("Accuracy", false)
+	_accuracy_value = acc_row.value
+	vbox.add_child(acc_row.container)
+
+	var crit_row := _create_stat_row("Crit Rate", false)
+	_crit_rate_value = crit_row.value
+	vbox.add_child(crit_row.container)
+
+	var critdmg_row := _create_stat_row("Crit Dmg", false)
+	_crit_dmg_value = critdmg_row.value
+	vbox.add_child(critdmg_row.container)
+
+	# --- Defensive section ---
+	_add_section_header(vbox, "Defensive")
+
+	var hp_row := _create_stat_row("HP", false)
+	_hp_value = hp_row.value
+	vbox.add_child(hp_row.container)
+
+	var def_row := _create_stat_row("DEF", true)
 	_def_value = def_row.value
 	_def_bonus = def_row.bonus
 	vbox.add_child(def_row.container)
 
-	# Speed row
-	var speed_row := _create_stat_row("Speed")
-	_speed_value = speed_row.value
-	vbox.add_child(speed_row.container)
+	var mdef_row := _create_stat_row("MDEF", true)
+	_mdef_value = mdef_row.value
+	_mdef_bonus = mdef_row.bonus
+	vbox.add_child(mdef_row.container)
 
-	# Range row
-	var range_row := _create_stat_row("Range")
-	_range_value = range_row.value
-	vbox.add_child(range_row.container)
+	var eva_row := _create_stat_row("Evasion", false)
+	_evasion_value = eva_row.value
+	vbox.add_child(eva_row.container)
 
-	# Stamina row
-	var stamina_row := _create_stat_row("Stamina")
+	# --- Speed section ---
+	_add_section_header(vbox, "Speed")
+
+	var aspd_row := _create_stat_row("Atk Speed", false)
+	_atk_speed_value = aspd_row.value
+	vbox.add_child(aspd_row.container)
+
+	var mspd_row := _create_stat_row("Move Spd", false)
+	_move_speed_value = mspd_row.value
+	vbox.add_child(mspd_row.container)
+
+	var cspd_row := _create_stat_row("Cast Spd", false)
+	_cast_speed_value = cspd_row.value
+	vbox.add_child(cspd_row.container)
+
+	# --- Resource section ---
+	_add_section_header(vbox, "Resource")
+
+	var stamina_row := _create_stat_row("Stamina", false)
 	_stamina_value = stamina_row.value
 	vbox.add_child(stamina_row.container)
+
+	var hpregen_row := _create_stat_row("HP Regen", false)
+	_hp_regen_value = hpregen_row.value
+	vbox.add_child(hpregen_row.container)
+
+	var cdr_row := _create_stat_row("CDR", false)
+	_cdr_value = cdr_row.value
+	vbox.add_child(cdr_row.container)
 
 	# Proficiency section
 	vbox.add_child(HSeparator.new())
 	_build_proficiency_section(vbox)
 
-func _create_stat_row(stat_name: String) -> Dictionary:
+func _add_section_header(vbox: VBoxContainer, title: String) -> void:
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+	var header := Label.new()
+	header.text = title
+	header.add_theme_font_size_override("font_size", 13)
+	header.add_theme_color_override("font_color", _COLOR_SECTION)
+	vbox.add_child(header)
+
+func _create_stat_row(stat_name: String, has_bonus: bool) -> Dictionary:
 	var hbox := HBoxContainer.new()
 
 	if _STAT_ICONS.has(stat_name):
@@ -134,18 +200,19 @@ func _create_stat_row(stat_name: String) -> Dictionary:
 
 	var name_lbl := Label.new()
 	name_lbl.text = stat_name
-	name_lbl.add_theme_font_size_override("font_size", 14)
-	name_lbl.custom_minimum_size.x = 60
+	name_lbl.add_theme_font_size_override("font_size", 13)
+	name_lbl.custom_minimum_size.x = 68
 	hbox.add_child(name_lbl)
 
 	var value_lbl := Label.new()
-	value_lbl.add_theme_font_size_override("font_size", 14)
+	value_lbl.add_theme_font_size_override("font_size", 13)
 	value_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(value_lbl)
 
 	var bonus_lbl := Label.new()
-	bonus_lbl.add_theme_font_size_override("font_size", 14)
+	bonus_lbl.add_theme_font_size_override("font_size", 13)
 	bonus_lbl.add_theme_color_override("font_color", _COLOR_BONUS)
+	bonus_lbl.visible = has_bonus
 	hbox.add_child(bonus_lbl)
 
 	return {"container": hbox, "value": value_lbl, "bonus": bonus_lbl}
@@ -242,14 +309,7 @@ func _on_stamina_changed(entity_id: String, stamina: float, max_stamina: float) 
 	_update_stamina_label(stamina, max_stamina)
 
 func _update_stamina_label(stamina: float, max_stamina: float) -> void:
-	var pct: int = int(stamina / max_stamina * 100.0) if max_stamina > 0.0 else 0
-	_stamina_value.text = "%d%%" % pct
-	if pct >= 70:
-		_stamina_value.add_theme_color_override("font_color", Color(0.4, 0.9, 0.4))
-	elif pct >= 35:
-		_stamina_value.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
-	else:
-		_stamina_value.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	_stamina_value.text = "%d / %d" % [int(stamina), int(max_stamina)]
 
 func _refresh() -> void:
 	if not _is_open or not _player:
@@ -260,40 +320,53 @@ func _refresh() -> void:
 	if not stats or not equip:
 		return
 
-	var level: int = stats.level
-	var hp: int = stats.hp
-	var max_hp: int = stats.max_hp
-	var base_atk: int = stats.atk
-	var base_def: int = stats.def
-	var attack_speed: float = stats.attack_speed
-	var attack_range: float = stats.attack_range
-
 	_name_label.text = "Player"
-	_level_label.text = "Total Lv. %d" % level
+	_level_label.text = "Total Lv. %d" % stats.level
 
-	# HP
-	_hp_value.text = "%d / %d" % [hp, max_hp]
-	_hp_value.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if hp < max_hp else Color.WHITE)
-
-	# ATK with equipment bonus in green
+	# --- Offensive ---
 	var atk_bonus: int = equip.get_atk_bonus()
-	_atk_value.text = str(base_atk)
+	_atk_value.text = str(stats.atk)
 	_atk_bonus.text = "+%d" % atk_bonus if atk_bonus > 0 else ""
 
-	# DEF with equipment bonus in green
+	var matk_bonus: int = equip.get_matk_bonus()
+	_matk_value.text = str(stats.matk)
+	_matk_bonus.text = "+%d" % matk_bonus if matk_bonus > 0 else ""
+
+	_accuracy_value.text = "%d%%" % stats.accuracy
+	_crit_rate_value.text = "%d%%" % stats.crit_rate
+	_crit_dmg_value.text = "%d%%" % stats.crit_damage
+
+	# --- Defensive ---
+	_hp_value.text = "%d / %d" % [stats.hp, stats.max_hp]
+	_hp_value.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if stats.hp < stats.max_hp else Color.WHITE)
+
 	var def_bonus: int = equip.get_def_bonus()
-	_def_value.text = str(base_def)
+	_def_value.text = str(stats.def)
 	_def_bonus.text = "+%d" % def_bonus if def_bonus > 0 else ""
 
-	_speed_value.text = "%.1fs" % attack_speed
-	_range_value.text = "%.1f" % attack_range
+	var mdef_bonus: int = equip.get_mdef_bonus()
+	_mdef_value.text = str(stats.mdef)
+	_mdef_bonus.text = "+%d" % mdef_bonus if mdef_bonus > 0 else ""
 
-	# Stamina
+	_evasion_value.text = "%d%%" % stats.evasion
+
+	# --- Speed ---
+	_atk_speed_value.text = "%.2f×" % stats.attack_speed_mult
+	_move_speed_value.text = "%.2f×" % stats.move_speed
+	_cast_speed_value.text = "%.2f×" % stats.cast_speed
+
+	# --- Resource ---
 	var stamina_comp: Node = _player.get_node_or_null("StaminaComponent")
 	if stamina_comp:
 		_update_stamina_label(stamina_comp.get_stamina(), stamina_comp.get_max_stamina())
 	else:
 		_stamina_value.text = "—"
+
+	var hp_regen: float = stats.hp_regen
+	_hp_regen_value.text = "%.1f/sec" % hp_regen if hp_regen > 0.0 else "0/sec"
+
+	var cdr: float = stats.cooldown_reduction
+	_cdr_value.text = "%d%%" % int(cdr)
 
 	# Proficiencies
 	var progression: Node = _player.get_node_or_null("ProgressionComponent")

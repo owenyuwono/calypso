@@ -55,6 +55,14 @@ const ARCHETYPES: Dictionary = {
 	},
 }
 
+const ARCHETYPE_PROFILES: Dictionary = {
+	"warrior": ["bold_warrior", "stern_guardian", "wild_berserker", "stoic_knight"],
+	"mage": ["cautious_mage", "devout_cleric", "gentle_healer"],
+	"rogue": ["sly_rogue", "charming_bard", "shadow_stalker"],
+	"ranger": ["keen_archer"],
+	"merchant": ["merchant"],
+}
+
 # ~200 fantasy names, excluding existing NPCs (Kael, Lyra, Bjorn, Sera, Thane, Mira, Dusk)
 const NAME_POOL: Array = [
 	# Nordic
@@ -155,11 +163,14 @@ static func generate_npc(used_names: Array) -> Dictionary:
 	var name: String = _pick_name(used_names)
 	var loadout: Dictionary = _generate_loadout(archetype_id, tier)
 
+	var profiles: Array = ARCHETYPE_PROFILES.get(archetype_id, ["earnest_apprentice"])
+
 	return {
 		"name": name,
 		"archetype": archetype_id,
 		"model": archetype["models"][randi() % archetype["models"].size()],
 		"trait": archetype_id,
+		"trait_profile": profiles.pick_random(),
 		"boldness": _rand_range(archetype["boldness_range"][0], archetype["boldness_range"][1]),
 		"generosity": _rand_range(archetype["generosity_range"][0], archetype["generosity_range"][1]),
 		"sociability": _rand_range(archetype["sociability_range"][0], archetype["sociability_range"][1]),

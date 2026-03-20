@@ -35,7 +35,6 @@ var _active_bleeds: Dictionary = {}
 
 var _execution_ready: bool = false
 
-const STAMINA_DRAIN_SKILL: float = 5.0
 
 func setup(skills: Dictionary, hotbar: Array) -> void:
 	# Initialize all skills at minimum level 1
@@ -149,14 +148,18 @@ func begin_skill_use(skill_id: String, target_id: String) -> bool:
 
 	var stamina_comp: Node = get_parent().get_node_or_null("StaminaComponent")
 	if stamina_comp:
-		stamina_comp.drain_flat(STAMINA_DRAIN_SKILL)
+		var cost: int = skill_data.get("stamina_cost", 15)
+		stamina_comp.drain_flat(float(cost))
 
 	var cd_bonuses: Dictionary = {}
 	if _progression:
 		cd_bonuses = SkillDatabase.get_synergy_bonuses(skill_id, _progression)
-	var cd_reduction: float = cd_bonuses.get("cooldown_reduction", 0.0)
+	var synergy_cdr: float = cd_bonuses.get("cooldown_reduction", 0.0)
+	var stats_cdr: float = _stats.cooldown_reduction if _stats else 0.0
+	var synergy_cdr_pct: float = synergy_cdr * 100.0  # Convert fraction to percentage
+	var total_cdr: float = minf(stats_cdr + synergy_cdr_pct, 40.0)
 	var base_cd: float = SkillDatabase.get_effective_cooldown(skill_id, skill_level)
-	var final_cd: float = base_cd * (1.0 - cd_reduction)
+	var final_cd: float = base_cd * (1.0 - total_cdr / 100.0)
 	start_cooldown(skill_id, final_cd)
 
 	_pending_skill_hit = true
@@ -303,6 +306,12 @@ func _execute_skill_hit() -> void:
 		effectiveness_data
 	)
 
+	# WIS XP: 2 per skill use, always (regardless of hit/miss)
+	if _progression:
+		_progression.grant_proficiency_xp("wis", 2)
+
+	var damage_category: String = skill_data.get("damage_category", "physical")
+
 	for result in results:
 		if result.get("self_harm", false):
 			var self_damage: int = result.get("damage", 0)
@@ -312,12 +321,31 @@ func _execute_skill_hit() -> void:
 			_visuals.spawn_damage_number(entity_id, self_damage, Color.RED, get_parent().global_position)
 			GameEvents.skill_backfired.emit(entity_id, _pending_skill_id, self_damage)
 			continue
+
 		var hit_target_id: String = result.get("target_id", "")
 		var hit_damage: int = result.get("damage", 0)
 		var hit_node: Node3D = WorldState.get_entity(hit_target_id)
 		var hit_pos: Vector3 = hit_node.global_position if hit_node else get_parent().global_position
-		_visuals.spawn_damage_number(hit_target_id, hit_damage, skill_color, hit_pos)
+
+		if result.get("is_miss", false):
+			_visuals.spawn_miss_number(hit_pos)
+			continue
+
+		var number_color: Color = Color(1.0, 0.9, 0.0) if result.get("is_crit", false) else skill_color
+		_visuals.spawn_damage_number(hit_target_id, hit_damage, number_color, hit_pos)
 		_visuals.flash_target(hit_target_id)
+
+		# DEX XP: 2 per hit landed
+		if _progression:
+			_progression.grant_proficiency_xp("dex", 2)
+
+		# STR XP: 3 per physical damage hit
+		if damage_category == "physical" and _progression:
+			_progression.grant_proficiency_xp("str", 3)
+
+		# INT XP: 3 per magical damage hit
+		if damage_category == "magical" and _progression:
+			_progression.grant_proficiency_xp("int", 3)
 
 	grant_skill_xp(_pending_skill_id, 5)
 

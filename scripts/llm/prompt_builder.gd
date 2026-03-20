@@ -84,8 +84,24 @@ static func build_user_message(npc_id: String, npc_node: Node3D, memory_node: No
 	var atk_bonus: int = eff_atk - atk
 	var def_bonus: int = eff_def - def_val
 
+	var weapon_type: String = combat_comp.get_equipped_weapon_type() if combat_comp else ""
+	var is_staff_user: bool = weapon_type == "staff"
+
+	var matk_val: int = stats.matk if stats else 0
+	var mdef_val: int = stats.mdef if stats else 0
+	var eff_matk: int = combat_comp.get_effective_matk() if combat_comp else matk_val
+	var eff_mdef: int = combat_comp.get_effective_mdef() if combat_comp else mdef_val
+	var matk_bonus: int = eff_matk - matk_val
+	var mdef_bonus: int = eff_mdef - mdef_val
+
+	var stats_str: String = "lv%d hp:%d/%d atk:%d+%d def:%d+%d gold:%d" % [level, hp, max_hp, atk, atk_bonus, def_val, def_bonus, gold]
+	if is_staff_user:
+		stats_str += " matk:%d+%d" % [matk_val, matk_bonus]
+	if eff_mdef > mdef_val:
+		stats_str += " mdef:%d+%d" % [mdef_val, mdef_bonus]
+
 	var content := USER_TEMPLATE.format({
-		"stats": "lv%d hp:%d/%d atk:%d+%d def:%d+%d gold:%d" % [level, hp, max_hp, atk, atk_bonus, def_val, def_bonus, gold],
+		"stats": stats_str,
 		"equipment": _format_equipment_compact(weapon_id, armor_id),
 		"inventory": _format_inventory_compact(inv),
 		"time": _format_time_compact(),
