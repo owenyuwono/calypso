@@ -87,6 +87,10 @@ func _ready() -> void:
 		crafting_panel.set_player(player)
 		player.crafting_panel = crafting_panel
 
+	var settings_panel := $UILayer/SettingsPanel
+	if player and settings_panel:
+		settings_panel.set_player(player)
+
 	# Wire player ref to UI panels
 	var player_hud := $UILayer/PlayerHUD
 	if player and player_hud:
@@ -112,6 +116,7 @@ func _ready() -> void:
 		panel_toggles.inventory_panel = inventory_panel
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
+		panel_toggles.settings_panel = settings_panel
 		panel_toggles.chat_input = chat_input
 
 	# Wire world map reference to minimap so the compass button can open it
