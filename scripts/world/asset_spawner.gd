@@ -169,6 +169,21 @@ static func spawn_mineable_rock(ctx: WorldBuilderContext, pos: Vector3, rot_y: f
 	rock.setup(tier, scale_val)
 	return rock
 
+static func spawn_fishing_spot(ctx: WorldBuilderContext, pos: Vector3, tier: String) -> StaticBody3D:
+	const FishingSpot = preload("res://scenes/objects/fishing_spot.gd")
+	var spot := StaticBody3D.new()
+	spot.set_script(FishingSpot)
+	if pos.y == 0.0 and ctx.terrain_noise:
+		var height_scale := ctx.terrain_height_scale_field
+		if ctx.is_in_city(pos):
+			height_scale = ctx.terrain_height_scale_city
+		pos.y = TerrainGenerator.get_height_at(ctx.terrain_noise, pos.x, pos.z, height_scale)
+	spot.position = pos
+	ctx.nav_region.add_child(spot)
+	spot.setup(tier)
+	return spot
+
+
 static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
 	var instance: Node3D = spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
 	if instance:

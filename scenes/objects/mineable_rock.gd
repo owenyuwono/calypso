@@ -14,6 +14,8 @@ const TIER_COLORS: Dictionary = {
 	"gold": Color(0.85, 0.65, 0.13),
 }
 
+signal rock_depleted(tier: String, respawn_time: float)
+
 static var _next_id: int = 1
 static var _ore_mats: Dictionary = {}  # tier → StandardMaterial3D
 static var _highlight_mat: StandardMaterial3D = null
@@ -107,35 +109,31 @@ func _get_ore_material(tier: String) -> StandardMaterial3D:
 func _add_harvestable_component() -> void:
 	var comp := HarvestableComponent.new()
 	comp.name = "HarvestableComponent"
+	comp.respawn_mode = "destroy"
 	add_child(comp)
 	comp.setup(rock_tier, "mining", OreDatabase.get_ore)
 	_harvestable = comp
 	comp.depleted.connect(_on_depleted)
-	comp.respawned.connect(_on_respawned)
 
 
 func _on_depleted() -> void:
 	WorldState.set_entity_data(entity_id, "harvestable", false)
 	if _rock_mesh_root:
-		var tween := create_tween()
-		tween.tween_property(_rock_mesh_root, "scale", _original_scale * 0.3, 0.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		# Darken the rock immediately
 		for mi in _mesh_instances:
 			if is_instance_valid(mi):
 				var dark_mat := StandardMaterial3D.new()
 				dark_mat.albedo_color = _base_color.darkened(0.6)
 				dark_mat.roughness = 0.9
 				mi.material_override = dark_mat
-
-
-func _on_respawned() -> void:
-	WorldState.set_entity_data(entity_id, "harvestable", true)
-	if _rock_mesh_root:
+		# Shrink animation, then emit signal and destroy
 		var tween := create_tween()
-		tween.tween_property(_rock_mesh_root, "scale", _original_scale, 0.5).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		var mat: StandardMaterial3D = _get_ore_material(rock_tier)
-		for mi in _mesh_instances:
-			if is_instance_valid(mi):
-				mi.material_override = mat
+		tween.tween_property(_rock_mesh_root, "scale", _original_scale * 0.3, 0.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		tween.tween_callback(func() -> void:
+			rock_depleted.emit(rock_tier, _harvestable.get_respawn_time())
+			WorldState.unregister_entity(entity_id)
+			queue_free()
+		)
 
 
 func spawn_loot(item_id: String, bonus_item: String = "") -> void:

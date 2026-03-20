@@ -3,8 +3,15 @@ extends Node3D
 ## Loaded by ZoneManager when the player passes through the east gate.
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
+const AssetSpawner = preload("res://scripts/world/asset_spawner.gd")
 
 var zone_id: String = "east_field"
+
+# Rocky Clearing biome: bounds [117, -32, 30, 22] → x: 102..132, z: -43..-21
+const _ROCK_BIOME_BOUNDS: Rect2 = Rect2(102.0, -43.0, 30.0, 22.0)
+const _ROCK_TIER_SCALES: Dictionary = {"copper": 1.0, "iron": 1.1, "gold": 1.2}
+
+var _ctx: WorldBuilderContext = null
 
 signal zone_ready
 
@@ -15,14 +22,16 @@ func _ready() -> void:
 		WorldState.register_location(marker.name, marker.global_position)
 
 	# Shared context for builder utilities
-	var ctx: WorldBuilderContext = WorldBuilderContext.new()
-	ctx.nav_region = $NavigationRegion3D
-	ctx.world_root = self
+	_ctx = WorldBuilderContext.new()
+	_ctx.nav_region = $NavigationRegion3D
+	_ctx.world_root = self
 
 	# Build terrain, decorate biomes, then create portals
-	_build_terrain(ctx)
-	BiomeScatter.setup_exclusion_zones(ctx)
-	FieldBuilder.decorate_east_biomes(ctx)
+	_build_terrain(_ctx)
+	BiomeScatter.setup_exclusion_zones(_ctx)
+	FieldBuilder.decorate_east_biomes(_ctx)
+	_connect_rock_signals($NavigationRegion3D)
+	_spawn_fishing_spots(_ctx)
 	_create_portals()
 
 	# Bake navmesh — emit zone_ready after bake so ZoneManager can await it
@@ -82,5 +91,40 @@ func _field_terrain_rules() -> Array:
 	]
 
 
+func _spawn_fishing_spots(ctx: WorldBuilderContext) -> void:
+	# Shallow spot near the zone entrance (accessible at fishing level 1)
+	AssetSpawner.spawn_fishing_spot(ctx, Vector3(82.0, 0.0, 18.0), "shallow")
+	# Medium spot mid-field beside the northern path branch
+	AssetSpawner.spawn_fishing_spot(ctx, Vector3(108.0, 0.0, 28.0), "medium")
+	# Deep spot at the far east end (high-level content)
+	AssetSpawner.spawn_fishing_spot(ctx, Vector3(138.0, 0.0, -5.0), "deep")
+
+
 func _create_portals() -> void:
 	TerrainHelpers.create_portals(self, zone_id)
+
+
+## Walk the nav_region children and connect any MineableRock signals found.
+func _connect_rock_signals(parent: Node) -> void:
+	for child in parent.get_children():
+		if child.has_signal("rock_depleted"):
+			child.rock_depleted.connect(_on_rock_depleted)
+
+
+## Called when a rock is depleted: schedule a replacement spawn after the respawn delay.
+func _on_rock_depleted(tier: String, respawn_time: float) -> void:
+	get_tree().create_timer(respawn_time).timeout.connect(_spawn_replacement_rock.bind(tier))
+
+
+## Spawn a new rock at a random position within the Rocky Clearing biome bounds.
+func _spawn_replacement_rock(tier: String) -> void:
+	if not is_instance_valid(_ctx):
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var x: float = rng.randf_range(_ROCK_BIOME_BOUNDS.position.x, _ROCK_BIOME_BOUNDS.position.x + _ROCK_BIOME_BOUNDS.size.x)
+	var z: float = rng.randf_range(_ROCK_BIOME_BOUNDS.position.y, _ROCK_BIOME_BOUNDS.position.y + _ROCK_BIOME_BOUNDS.size.y)
+	var scale_val: float = _ROCK_TIER_SCALES.get(tier, 1.0)
+	var rock: StaticBody3D = AssetSpawner.spawn_mineable_rock(_ctx, Vector3(x, 0.0, z), 0.0, scale_val, tier)
+	if is_instance_valid(rock) and rock.has_signal("rock_depleted"):
+		rock.rock_depleted.connect(_on_rock_depleted)

@@ -2,6 +2,7 @@
 class_name DistrictPlaza
 
 const BuildingHelper = preload("res://scripts/world/building_helper.gd")
+const CraftingStation = preload("res://scenes/objects/crafting_station.gd")
 
 
 static func build(ctx: WorldBuilderContext) -> void:
@@ -9,6 +10,7 @@ static func build(ctx: WorldBuilderContext) -> void:
 	var noise: FastNoiseLite = ctx.terrain_noise
 	var hs: float = ctx.terrain_height_scale_city
 	_build_fountain(ctx, nav_region, noise, hs)
+	_build_crafting_stations(ctx, nav_region, noise, hs)
 	_build_benches(ctx, nav_region, noise, hs)
 	_build_street_lamps(ctx, nav_region, noise, hs)
 	_build_town_hall(ctx, nav_region, noise, hs)
@@ -21,6 +23,32 @@ static func build(ctx: WorldBuilderContext) -> void:
 static func _build_fountain(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
 	var pos := Vector3(0, BuildingHelper.snap_y(noise, 0, 0, hs), 0)
 	BuildingHelper.create_fountain(ctx, nav_region, pos, 1.5, 0.4, 1.2, 0.8)
+
+
+static func _build_crafting_stations(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
+	# Smithing station — triangle around fountain, east side.
+	var forge_y: float = BuildingHelper.snap_y(noise, 4, 3, hs)
+	var smithing: StaticBody3D = StaticBody3D.new()
+	smithing.set_script(CraftingStation)
+	smithing.position = Vector3(4, forge_y, 3)
+	nav_region.add_child(smithing)
+	smithing.setup("smithing", "Forge")
+
+	# Cooking station — west side.
+	var cooking_y: float = BuildingHelper.snap_y(noise, -4, 3, hs)
+	var cooking: StaticBody3D = StaticBody3D.new()
+	cooking.set_script(CraftingStation)
+	cooking.position = Vector3(-4, cooking_y, 3)
+	nav_region.add_child(cooking)
+	cooking.setup("cooking", "Cooking Fire")
+
+	# Crafting station — north side.
+	var workbench_y: float = BuildingHelper.snap_y(noise, 0, -4, hs)
+	var crafting_st: StaticBody3D = StaticBody3D.new()
+	crafting_st.set_script(CraftingStation)
+	crafting_st.position = Vector3(0, workbench_y, -4)
+	nav_region.add_child(crafting_st)
+	crafting_st.setup("crafting", "Workbench")
 
 
 static func _build_benches(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:

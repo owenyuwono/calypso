@@ -18,6 +18,8 @@ var _bonus_drop: String = ""
 var _bonus_chance: float = 0.0
 var _respawn_time: float = 60.0
 
+var respawn_mode: String = "in_place"
+
 var _chops_remaining: int = 0
 var _chops_min: int = 0
 var _chops_max: int = 0
@@ -96,6 +98,10 @@ func is_depleted() -> bool:
 	return _depleted
 
 
+func get_respawn_time() -> float:
+	return _respawn_time
+
+
 func get_required_level() -> int:
 	return _required_level
 
@@ -111,6 +117,8 @@ func get_tier() -> String:
 func _process(delta: float) -> void:
 	if not _depleted:
 		return
+	if respawn_mode != "in_place":
+		return  # External manager handles respawn
 
 	_respawn_timer -= delta
 	if _respawn_timer <= 0.0:
