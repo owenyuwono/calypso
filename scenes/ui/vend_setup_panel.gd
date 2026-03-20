@@ -122,9 +122,11 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
 		_open_with_inventory()
 		_refresh()
 	else:
+		AudioManager.play_ui_sfx("ui_panel_close")
 		_close_inventory_if_auto_opened()
 
 func _open_with_inventory() -> void:

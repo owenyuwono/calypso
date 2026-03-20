@@ -82,12 +82,14 @@ func open_shop(vendor: Node) -> void:
 		_drag_handle.set_title(title)
 	_is_open = true
 	visible = true
+	AudioManager.play_ui_sfx("ui_panel_open")
 	UIHelper.center_panel(_panel)
 	_refresh()
 
 func close_shop() -> void:
 	_is_open = false
 	visible = false
+	AudioManager.play_ui_sfx("ui_panel_close")
 	_vendor = null
 	if _player and _player.has_method("stop_vending"):
 		_player.stop_vending()
@@ -138,6 +140,7 @@ func _buy_item(item_id: String) -> void:
 	if not vending_comp:
 		return
 	vending_comp.buy_from(_player, item_id, 1)
+	AudioManager.play_ui_sfx("ui_buy_sell")
 	_refresh()
 
 func is_open() -> bool:

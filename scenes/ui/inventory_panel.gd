@@ -287,9 +287,11 @@ func _toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
 		UIHelper.center_panel(_panel)
 		_refresh()
 	else:
+		AudioManager.play_ui_sfx("ui_panel_close")
 		_tooltip.visible = false
 		_hide_desc()
 		_hide_context_menu()
@@ -775,6 +777,7 @@ func _equip_to_slot(item_id: String, _slot_hint: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.equip(item_id):
+		AudioManager.play_ui_sfx("ui_item_equip")
 		_refresh()
 
 func _unequip(slot_name: String) -> void:

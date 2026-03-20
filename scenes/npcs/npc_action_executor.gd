@@ -341,6 +341,8 @@ func _do_chop_tree(tree_id: String) -> void:
 
 		# Apply chop and get result
 		var result: Dictionary = harvestable.process_chop(npc.npc_id)
+		if npc._audio:
+			npc._audio.play_oneshot("gather_tree_chop")
 
 		# Grant woodcutting XP
 		npc._progression.grant_proficiency_xp("woodcutting", result.get("xp", 0))

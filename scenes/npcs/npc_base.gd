@@ -88,6 +88,7 @@ var _progression: Node
 var _auto_attack: Node
 var _npc_skills: Node = null
 var _perception: Node
+var _audio: Node = null
 
 # Cached sub-node references (set after children are added in _ready)
 var _vending_comp: Node
@@ -134,6 +135,12 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model(model_path, model_scale, npc_color)
+
+	_audio = preload("res://scripts/audio/audio_component.gd").new()
+	_audio.name = "AudioComponent"
+	add_child(_audio)
+	_audio.setup(self)
+	_audio.start_presence("presence_npc_ambient")
 
 	_stats = StatsComponent.new()
 	_stats.name = "StatsComponent"
@@ -384,6 +391,8 @@ func _update_lod() -> void:
 		_lod_level = 2
 	if _lod_level >= 2 and old_lod < 2:
 		set_physics_process(false)
+		if _audio:
+			_audio.stop_all_loops()
 	elif _lod_level < 2 and old_lod >= 2:
 		set_physics_process(true)
 	if _lod_level == 0:
@@ -494,7 +503,11 @@ func _process_movement(delta: float) -> bool:
 	if nav_agent.is_navigation_finished():
 		if _suppress_nav_complete:
 			_suppress_nav_complete = false
+			if _audio:
+				_audio.stop_footsteps()
 			return false  # let the coroutine in npc_action_executor handle it
+		if _audio:
+			_audio.stop_footsteps()
 		change_state(STATE_IDLE)
 		GameEvents.npc_action_completed.emit(npc_id, "move_to", true)
 		return false
@@ -506,7 +519,11 @@ func _process_movement(delta: float) -> bool:
 		if moved < 0.1:
 			if _suppress_nav_complete:
 				_suppress_nav_complete = false
+				if _audio:
+					_audio.stop_footsteps()
 				return false  # let the coroutine in npc_action_executor handle it
+			if _audio:
+				_audio.stop_footsteps()
 			change_state(STATE_IDLE)
 			GameEvents.npc_action_completed.emit(npc_id, "move_to", false)
 			return false
@@ -551,6 +568,14 @@ func _process_combat(delta: float) -> bool:
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
+	if _audio:
+		var weapon_type: String = ""
+		if _combat:
+			weapon_type = _combat.get_equipped_weapon_type()
+		var hit_key: String = "combat_hit_" + weapon_type if weapon_type != "" else "combat_hit_generic"
+		if SfxDatabase.get_sfx(hit_key).is_empty():
+			hit_key = "combat_hit_generic"
+		_audio.play_oneshot(hit_key)
 	# Grant weapon proficiency XP
 	var target_data := WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
@@ -569,13 +594,19 @@ func _on_auto_attack_target_lost() -> void:
 	combat_target = ""
 	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 	WorldState.set_entity_data(npc_id, "combat_target", "")
+	if _audio:
+		_audio.stop_combat_loop()
 	change_state(STATE_IDLE)
 
 func _on_navigation_finished() -> void:
 	if current_state == STATE_MOVING and _nav_started:
 		if _suppress_nav_complete:
 			_suppress_nav_complete = false
+			if _audio:
+				_audio.stop_footsteps()
 			return
+		if _audio:
+			_audio.stop_footsteps()
 		change_state(STATE_IDLE)
 		GameEvents.npc_action_completed.emit(npc_id, "move_to", true)
 
@@ -609,6 +640,8 @@ func navigate_to(target_pos: Vector3) -> void:
 	_stuck_timer = 0.0
 	_last_nav_pos = global_position
 	nav_agent.target_position = target_pos
+	if _audio:
+		_audio.start_footsteps()
 
 func navigate_to_entity(target_id: String) -> void:
 	var target_node: Node3D = WorldState.get_entity(target_id)
@@ -633,6 +666,8 @@ func enter_combat(target_id: String) -> void:
 	WorldState.set_entity_data(npc_id, "combat_target", target_id)
 	_auto_attack.cancel()
 	change_state(STATE_COMBAT)
+	if _audio:
+		_audio.start_combat_loop()
 
 # --- Death / Respawn ---
 
@@ -649,6 +684,8 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		combat_target = ""
 		WorldState.set_entity_data(npc_id, "combat_target", "")
 		_auto_attack.cancel()
+		if _audio:
+			_audio.stop_combat_loop()
 		change_state(STATE_IDLE)
 
 func _die() -> void:
@@ -660,6 +697,9 @@ func _die() -> void:
 	WorldState.set_entity_data(npc_id, "combat_target", "")
 	_auto_attack.cancel()
 	velocity = Vector3.ZERO
+	if _audio:
+		_audio.play_oneshot("combat_death")
+		_audio.stop_all_loops()
 
 	# Lose 10% gold
 	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
