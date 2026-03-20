@@ -223,11 +223,6 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 
 static func place_props(ctx: WorldBuilderContext) -> void:
 	# Market district props
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-42, 0, 22))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-48, 0, 18), 0.3)
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-53, 0, 28), 0.0, 0.7)
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-58, 0, 32))
-
 	# Torches at shops
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-43, 0, 18))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-47, 0, 18))
@@ -238,10 +233,6 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(-2, 0, -33))
 	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(2, 0, -33))
 	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(15, 0, -23))
-
-	# Craft district
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-2, 0, 28))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(3, 0, 32), 0.5)
 
 	# Garrison
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(38, 0, 28))
@@ -258,44 +249,21 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	# House 6 — torch near door
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-60, 0, -18))
 
-	# House 7 — barrel near wall
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-36, 0, -38))
-
-	# Bakery — barrel + crate near entrance
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-28, 0, 32))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-32, 0, 32), 0.3)
-
-	# Storage Shed — 2 crates nearby
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-63, 0, 17), 0.3)
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-67, 0, 17), 0.3)
-
 	# Library — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(2, 0, -18))
 
 	# Chapel Annex — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(20, 0, -38))
 
-	# Stables — barrel + crate
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-13, 0, 22))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-17, 0, 22), 0.3)
-
 	# Guard Tower — 2 torches flanking entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(28, 0, 42))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(32, 0, 42))
 
-	# Armory — barrel + crate + torch
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(53, 0, 27))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(57, 0, 27), 0.3)
+	# Armory — torch
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(55, 0, 23))
 
 	# Gazebo — torch near path
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(37, 0, -18))
-
-	# House 12 — barrel near wall
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-56, 0, -30))
-
-	# House 8 — crate near wall
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-28, 0, -28), 0.3)
 
 	# Wash House — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-48, 0, -33))
@@ -303,61 +271,23 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	# Midwife Hut — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-28, 0, -43))
 
-	# Gatehouse Storage — crate nearby
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(62, 0, -5), 0.3)
-
 	# A1 Merchant Office — torch at door
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-36, 0, 7))
-
-	# A2 Tax Office — barrel near wall
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-30, 0, 7))
-
-	# A3 Courier Post — crate near door
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-24, 0, 7), 0.3)
 
 	# B1 Boarding House — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-47, 0, -16))
 
-	# B2 Tailor Shop — barrel
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-41, 0, -16))
-
-	# B3 Cobbler — crate
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-36, 0, -16), 0.3)
-
-	# C1 Scriptorium — torch + barrel
+	# C1 Scriptorium — torch
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(6, 0, -24))
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(8, 0, -24))
 
 	# C2 Records Hall — torch at entrance
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(18, 0, -33))
 
-	# D1 Tannery — barrel + crate
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-2, 0, 26))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-2, 0, 28), 0.3)
-
-	# D2 Potter Shop — crate
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-2, 0, 33), 0.3)
-
-	# D3 Weaver Hut — barrel
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-2, 0, 38))
-
-	# E1 Quartermaster — barrel + crate + torch
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(38, 0, 26))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(40, 0, 28), 0.3)
+	# E1 Quartermaster — torch
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(36, 0, 28))
-
-	# E2 Mess Hall — 2 barrels
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(50, 0, 30))
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(54, 0, 30))
 
 	# F1 Waystation — torch
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(49, 0, -2))
-
-	# F2 Gatehouse Office — crate
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(55, 0, -2), 0.3)
-
-	# P1 Gardener Cottage — barrel
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(40, 0, -36))
 
 	# Decorative pillars at central plaza corners (plaza ~8x8 centered at origin)
 	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(-8, 0, -8), 0.0, 1.2)
@@ -374,14 +304,6 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(50, 0, 3))
 	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(35, 0, 3))
 	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(20, 0, 3))
-
-	# Extra barrel/crate clusters at market district (x≈-42..-58, z≈18..32)
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-44, 0, 25))
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-50, 0, 25))
-	AssetSpawner.spawn_prop(ctx, "barrel.glb", Vector3(-44, 0, 35))
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-55, 0, 25), 0.4)
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-50, 0, 35), 0.5)
-	AssetSpawner.spawn_prop(ctx, "crate.glb", Vector3(-57, 0, 35), 0.3)
 
 	# Wall-mounted torches along city wall interior at ~15-unit intervals
 	# North wall interior (z≈-49), west of gate gap
@@ -416,20 +338,3 @@ static func place_props(ctx: WorldBuilderContext) -> void:
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, 20))
 	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, 35))
 
-	# Street lamps — plaza corners (±15, ±15 around center)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-15, 0, -15), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(15, 0, -15), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-15, 0, 15), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(15, 0, 15), 0.0, 1.5)
-
-	# Street lamps — main east-west road (z≈0) every ~20 units from x:-50 to x:50
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-50, 0, 0), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-30, 0, 0), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-10, 0, 0), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(10, 0, 0), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(30, 0, 0), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(50, 0, 0), 0.0, 1.5)
-
-	# Street lamps — market district entrances (x≈-42..-58, z≈18..22)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-42, 0, 15), 0.0, 1.5)
-	AssetSpawner.spawn_prop(ctx, "street_lamp.glb", Vector3(-58, 0, 15), 0.0, 1.5)

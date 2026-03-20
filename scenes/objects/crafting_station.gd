@@ -51,15 +51,29 @@ func _build_collision() -> void:
 func _build_visual() -> void:
 	var color: Color = TYPE_COLORS.get(station_type, Color(0.5, 0.5, 0.5))
 
-	var indicator := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.15
-	mesh.bottom_radius = 0.15
-	mesh.height = 0.3
-	indicator.mesh = mesh
-	indicator.position = Vector3(0.0, 1.9, 0.0)
+	# Stone pedestal underneath the indicator.
+	var pedestal: MeshInstance3D = MeshInstance3D.new()
+	var pedestal_mesh: CylinderMesh = CylinderMesh.new()
+	pedestal_mesh.top_radius = 0.6
+	pedestal_mesh.bottom_radius = 0.6
+	pedestal_mesh.height = 0.1
+	pedestal.mesh = pedestal_mesh
+	pedestal.position = Vector3(0.0, 0.05, 0.0)
+	var pedestal_mat: StandardMaterial3D = StandardMaterial3D.new()
+	pedestal_mat.albedo_color = Color(0.35, 0.33, 0.3)
+	pedestal.material_override = pedestal_mat
+	pedestal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pedestal)
 
-	var mat := StandardMaterial3D.new()
+	var indicator: MeshInstance3D = MeshInstance3D.new()
+	var mesh: CylinderMesh = CylinderMesh.new()
+	mesh.top_radius = 0.4
+	mesh.bottom_radius = 0.4
+	mesh.height = 0.8
+	indicator.mesh = mesh
+	indicator.position = Vector3(0.0, 0.5, 0.0)
+
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.emission_enabled = true
 	mat.emission = color
@@ -73,9 +87,9 @@ func _build_visual() -> void:
 func _build_label() -> void:
 	var label := Label3D.new()
 	label.text = station_name
-	label.position = Vector3(0.0, 2.3, 0.0)
+	label.position = Vector3(0.0, 1.8, 0.0)
 	label.pixel_size = 0.007
-	label.font_size = 32
+	label.font_size = 48
 	label.modulate = Color(1.0, 0.95, 0.7)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true

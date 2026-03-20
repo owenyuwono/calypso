@@ -9,13 +9,58 @@ static func snap_y(noise: FastNoiseLite, x: float, z: float, height_scale: float
 	return TerrainGenerator.get_height_at(noise, x, z, height_scale)
 
 
+## Return the combined AABB of all MeshInstance3D descendants of node.
+static func _get_model_aabb(node: Node3D) -> AABB:
+	var combined := AABB()
+	var first := true
+	for child in node.get_children():
+		if child is Node3D:
+			for sub in child.get_children():
+				if sub is MeshInstance3D and (sub as MeshInstance3D).mesh:
+					var mesh_aabb: AABB = (sub as MeshInstance3D).mesh.get_aabb()
+					if first:
+						combined = mesh_aabb
+						first = false
+					else:
+						combined = combined.merge(mesh_aabb)
+	return combined
+
+
 ## Create a complete building: walled box + roof + optional door/chimney.
+## When a GLB model exists at res://assets/models/environment/buildings/{building_type}.glb
+## it is loaded instead of the procedural box; falls back to procedural when absent.
 ## Returns the root Node3D (already added to nav_region).
 static func create_building(ctx: WorldBuilderContext, nav_region: Node3D, pos: Vector3, wall_size: Vector3,
 		wall_color: Color, roof_type: String, roof_color: Color,
 		roof_overhang: float = 0.5, has_chimney: bool = false,
 		has_door: bool = true, rot_y: float = 0.0,
 		building_type: String = "") -> Node3D:
+	# --- GLB model override ---
+	if not building_type.is_empty():
+		var model_path: String = "res://assets/models/environment/buildings/%s.glb" % building_type
+		if ResourceLoader.exists(model_path):
+			var scene: PackedScene = load(model_path) as PackedScene
+			if scene:
+				var instance: Node3D = scene.instantiate()
+				instance.position = pos
+				if rot_y != 0.0:
+					instance.rotation.y = rot_y
+				# Meshy center-origin Y adjustment: shift up so base sits on ground
+				var aabb: AABB = _get_model_aabb(instance)
+				if aabb.position.y < -0.1:
+					instance.position.y -= aabb.position.y
+				# Add collision sized to wall_size
+				var col := CollisionShape3D.new()
+				var box := BoxShape3D.new()
+				box.size = wall_size
+				col.shape = box
+				col.position.y = wall_size.y / 2.0
+				var body := StaticBody3D.new()
+				body.add_child(col)
+				instance.add_child(body)
+				nav_region.add_child(instance)
+				return instance
+
 	var building := Node3D.new()
 	building.position = pos
 	if rot_y != 0.0:
@@ -158,18 +203,51 @@ static func create_fountain(ctx: WorldBuilderContext, nav_region: Node3D, world_
 	return fountain
 
 
-## Create a single wooden bench at world_pos with optional Y rotation.
-## Returns the MeshInstance3D (already added to nav_region).
-static func create_bench(ctx: WorldBuilderContext, nav_region: Node3D, world_pos: Vector3, rot_y: float = 0.0) -> MeshInstance3D:
+## Create a wooden bench (seat + back rest + 4 legs) at world_pos with optional Y rotation.
+## Returns the root Node3D (already added to nav_region).
+static func create_bench(ctx: WorldBuilderContext, nav_region: Node3D, world_pos: Vector3, rot_y: float = 0.0) -> Node3D:
 	var bench_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, Color(0.45, 0.32, 0.18))
 
-	var bench := MeshInstance3D.new()
-	var bench_mesh := BoxMesh.new()
-	bench_mesh.size = Vector3(1.5, 0.4, 0.5)
-	bench.mesh = bench_mesh
+	var bench: Node3D = Node3D.new()
 	bench.position = world_pos
 	bench.rotation.y = rot_y
-	bench.set_surface_override_material(0, bench_mat)
-	bench.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	# --- Seat plank ---
+	var seat: MeshInstance3D = MeshInstance3D.new()
+	var seat_mesh: BoxMesh = BoxMesh.new()
+	seat_mesh.size = Vector3(1.2, 0.08, 0.4)
+	seat.mesh = seat_mesh
+	seat.position = Vector3(0.0, 0.4, 0.0)
+	seat.set_surface_override_material(0, bench_mat)
+	seat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bench.add_child(seat)
+
+	# --- Back rest ---
+	var back: MeshInstance3D = MeshInstance3D.new()
+	var back_mesh: BoxMesh = BoxMesh.new()
+	back_mesh.size = Vector3(1.2, 0.5, 0.06)
+	back.mesh = back_mesh
+	back.position = Vector3(0.0, 0.65, -0.17)
+	back.set_surface_override_material(0, bench_mat)
+	back.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bench.add_child(back)
+
+	# --- Legs (4 corners) ---
+	var leg_offsets: Array = [
+		Vector3(-0.55, 0.2, 0.15),   # front-left
+		Vector3(0.55, 0.2, 0.15),    # front-right
+		Vector3(-0.55, 0.2, -0.15),  # back-left
+		Vector3(0.55, 0.2, -0.15),   # back-right
+	]
+	for offset in leg_offsets:
+		var leg: MeshInstance3D = MeshInstance3D.new()
+		var leg_mesh: BoxMesh = BoxMesh.new()
+		leg_mesh.size = Vector3(0.06, 0.4, 0.06)
+		leg.mesh = leg_mesh
+		leg.position = offset
+		leg.set_surface_override_material(0, bench_mat)
+		leg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bench.add_child(leg)
+
 	nav_region.add_child(bench)
 	return bench
