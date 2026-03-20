@@ -26,6 +26,8 @@ func setup(
 
 	if ResourceLoader.exists(stream_path):
 		var stream: AudioStream = load(stream_path)
+		if stream is AudioStreamOggVorbis:
+			stream.loop = true
 		_player.stream = stream
 
 	# Start silent then apply correct volume for current phase
