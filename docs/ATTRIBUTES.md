@@ -453,21 +453,23 @@ Each trait profile defines starting proficiency levels for all 6 attributes. Thi
 
 ### New profiles
 
-| Profile | STR | CON | AGI | INT | DEX | WIS | Primary Weapon | Armor Type |
-|---------|-----|-----|-----|-----|-----|-----|----------------|------------|
-| bold_warrior | 3 | 2 | 1 | 1 | 2 | 1 | Sword | Heavy |
-| cautious_mage | 1 | 1 | 1 | 3 | 1 | 3 | Staff | Light |
-| sly_rogue | 1 | 1 | 3 | 1 | 3 | 1 | Dagger | Light |
-| stern_guardian | 2 | 3 | 1 | 1 | 1 | 2 | Sword | Heavy |
-| gentle_healer | 1 | 2 | 1 | 2 | 1 | 3 | Staff | Light |
-| charming_bard | 1 | 1 | 2 | 2 | 2 | 2 | Dagger | Medium |
-| wild_berserker | 3 | 2 | 2 | 1 | 1 | 1 | Axe | Medium |
-| stoic_knight | 2 | 3 | 1 | 1 | 2 | 1 | Spear | Heavy |
-| keen_archer | 1 | 1 | 2 | 1 | 3 | 2 | Bow | Medium |
-| earnest_apprentice | 2 | 2 | 1 | 1 | 2 | 2 | Mace | Medium |
-| devout_cleric | 1 | 2 | 1 | 2 | 1 | 3 | Staff | Medium |
-| shadow_stalker | 2 | 1 | 3 | 1 | 2 | 1 | Dagger | Light |
-| merchant | 2 | 2 | 1 | 1 | 2 | 2 | Dagger | Light |
+| Profile | STR | CON | AGI | INT | DEX | WIS |
+|---------|-----|-----|-----|-----|-----|-----|
+| bold_warrior | 3 | 2 | 1 | 1 | 2 | 1 |
+| cautious_mage | 1 | 1 | 1 | 3 | 1 | 3 |
+| sly_rogue | 1 | 1 | 3 | 1 | 3 | 1 |
+| stern_guardian | 2 | 3 | 1 | 1 | 1 | 2 |
+| gentle_healer | 1 | 2 | 1 | 2 | 1 | 3 |
+| charming_bard | 1 | 1 | 2 | 2 | 2 | 2 |
+| wild_berserker | 3 | 2 | 2 | 1 | 1 | 1 |
+| stoic_knight | 2 | 3 | 1 | 1 | 2 | 1 |
+| keen_archer | 1 | 1 | 2 | 1 | 3 | 2 |
+| earnest_apprentice | 2 | 2 | 1 | 1 | 2 | 2 |
+| devout_cleric | 1 | 2 | 1 | 2 | 1 | 3 |
+| shadow_stalker | 2 | 1 | 3 | 1 | 2 | 1 |
+| merchant | 2 | 2 | 1 | 1 | 2 | 2 |
+
+Weapon type and armor type are derived from equipped items at runtime, not stored in the trait profile.
 
 ### NpcGenerator archetype → profile mapping
 
@@ -487,12 +489,26 @@ NpcGenerator selects a random profile from the archetype's allowed list and incl
 
 Stamina serves as the single resource pool for all actions (physical skills and magic). No separate mana.
 
-**Stamina behavior** (changes from current system noted):
-- **In combat**: Drains 0.5/sec passively (unchanged). Skills cost additional stamina per use. Default formula: `stamina_cost = 10 + int(damage_multiplier × 5)`. Magical skills (staff) cost 1.5× the base amount. Examples: Bash (1.2× mult) = 16 stamina. Flame Burst (1.8× mult, magical) = 29 stamina.
-- **Moving**: Drains 0.15/sec while navigating (unchanged)
-- **Out of combat**: Regens at base 1.0/sec × Stamina Regen multiplier (**NEW** — currently no out-of-combat regen)
-- **At rest spots**: Regens at base 3.0/sec × Stamina Regen multiplier (unchanged base rate, now modified by WIS)
-- **At zero stamina**: Cannot use skills. Auto-attacks still work but at reduced speed (**NEW** — currently no zero-stamina penalty)
+**Stamina behavior:**
+- **Skill use**: Only source of stamina drain. Default cost formula: `stamina_cost = 10 + int(damage_multiplier × 5)`. Magical skills (staff) cost 1.5× the base amount. Examples: Bash (1.2× mult) = 16 stamina. Flame Burst (1.8× mult, magical) = 29 stamina.
+- **No passive drains**: No combat drain, no movement drain. Stamina is purely a skill resource.
+
+**Stamina regeneration:**
+- **Out of combat**: base 1.0/sec × Stamina Regen multiplier
+- **At rest spots**: base 3.0/sec × Stamina Regen multiplier
+- **In combat**: base 0.3/sec × Stamina Regen multiplier (slow recovery while fighting)
+
+**Fatigue system:** Low stamina applies a soft penalty to offensive and speed stats. No hard lockout — skills can always be used, but fighting while exhausted is less effective.
+
+| Stamina % | ATK/MATK | Move Speed | Attack Speed | Cast Speed |
+|-----------|----------|------------|--------------|------------|
+| 100% | 1.00× | 1.00× | 1.00× | 1.00× |
+| 50% | 0.95× | 0.90× | 0.925× | 0.925× |
+| 0% | 0.90× | 0.80× | 0.85× | 0.85× |
+
+Scaling is linear between these points. Formula: `fatigue_mult = 1.0 - (1.0 - min_mult) × (1.0 - stamina_percent)` where `min_mult` is the 0% value for each stat.
+
+**Not affected by fatigue:** DEF, MDEF, Max HP, Accuracy, Evasion, Crit Rate, Crit Damage. Defensive and precision stats don't degrade — you can still block and aim when tired, you just hit softer and move slower.
 
 **Max Stamina** scales with CON. **Stamina Regen** scales with WIS. This creates a meaningful choice: CON gives you a bigger pool (burst capacity), WIS gives you faster recovery (sustained efficiency).
 
