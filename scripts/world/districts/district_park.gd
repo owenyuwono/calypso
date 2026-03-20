@@ -2,6 +2,7 @@
 class_name DistrictPark
 
 const BuildingHelper = preload("res://scripts/world/building_helper.gd")
+const AmbientEmitterScript = preload("res://scripts/audio/ambient_emitter.gd")
 
 
 static func build(ctx: WorldBuilderContext) -> void:
@@ -17,6 +18,23 @@ static func build(ctx: WorldBuilderContext) -> void:
 	_build_groundskeeper_lodge(ctx, nav_region, noise, hs)
 	_build_pond_pavilion(ctx, nav_region, noise, hs)
 	_build_garden_storage(ctx, nav_region, noise, hs)
+	_build_ambient_emitters(nav_region, noise, hs)
+
+
+static func _build_ambient_emitters(nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
+	# Birds near the gazebo and open green space
+	var birds_pos: Vector3 = Vector3(45, BuildingHelper.snap_y(noise, 45, -30, hs), -30)
+	var birds_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(birds_emitter)
+	birds_emitter.global_position = birds_pos
+	birds_emitter.setup("res://assets/audio/ambient/birds_day.ogg", ["dawn", "day", "dusk"], -6.0, 30.0)
+
+	# Crickets at night — same general area
+	var crickets_pos: Vector3 = Vector3(45, BuildingHelper.snap_y(noise, 45, -30, hs), -30)
+	var crickets_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(crickets_emitter)
+	crickets_emitter.global_position = crickets_pos
+	crickets_emitter.setup("res://assets/audio/ambient/crickets_night.ogg", ["night", "dusk"], -6.0, 30.0)
 
 
 static func _build_fountain(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:

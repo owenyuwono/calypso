@@ -4,6 +4,7 @@ extends Node3D
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const AssetSpawner = preload("res://scripts/world/asset_spawner.gd")
+const AmbientEmitterScript = preload("res://scripts/audio/ambient_emitter.gd")
 
 var zone_id: String = "west_field"
 
@@ -35,6 +36,7 @@ func _ready() -> void:
 
 	# Create zone portals
 	_create_portals()
+	_spawn_ambient_emitters()
 
 	# Bake navmesh after environment is ready
 	await get_tree().create_timer(0.5).timeout
@@ -93,6 +95,28 @@ func _west_field_terrain_rules() -> Array:
 
 func _create_portals() -> void:
 	TerrainHelpers.create_portals(self, zone_id)
+
+
+func _spawn_ambient_emitters() -> void:
+	var nav: Node = $NavigationRegion3D
+
+	# Wind across the whole field — centered at zone center
+	var wind_emitter: Node3D = AmbientEmitterScript.new()
+	nav.add_child(wind_emitter)
+	wind_emitter.global_position = Vector3(-110.0, 0.0, 0.0)
+	wind_emitter.setup("res://assets/audio/ambient/wind_field.ogg", ["dawn", "day", "dusk", "night"], -6.0, 40.0)
+
+	# Birds during daytime — slightly north of center
+	var birds_emitter: Node3D = AmbientEmitterScript.new()
+	nav.add_child(birds_emitter)
+	birds_emitter.global_position = Vector3(-110.0, 0.0, -15.0)
+	birds_emitter.setup("res://assets/audio/ambient/birds_day.ogg", ["dawn", "day"], -8.0, 35.0)
+
+	# Crickets at night — slightly south of center
+	var crickets_emitter: Node3D = AmbientEmitterScript.new()
+	nav.add_child(crickets_emitter)
+	crickets_emitter.global_position = Vector3(-110.0, 0.0, 15.0)
+	crickets_emitter.setup("res://assets/audio/ambient/crickets_night.ogg", ["night"], -6.0, 35.0)
 
 
 ## Walk the nav_region children and connect any MineableRock signals found.

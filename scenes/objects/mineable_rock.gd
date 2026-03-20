@@ -7,6 +7,7 @@ extends StaticBody3D
 const OreDatabase = preload("res://scripts/data/ore_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 
 const TIER_COLORS: Dictionary = {
 	"copper": Color(0.72, 0.45, 0.2),
@@ -27,6 +28,7 @@ var _scale_val: float = 1.0
 var _rock_mesh_root: Node3D = null
 var _mesh_instances: Array[MeshInstance3D] = []
 var _harvestable: Node = null
+var _depletion_player: AudioStreamPlayer3D = null
 var last_chopper_pos: Vector3 = Vector3.ZERO
 var _original_scale: Vector3 = Vector3.ONE
 var _base_color: Color = Color.GRAY
@@ -107,6 +109,11 @@ func _get_ore_material(tier: String) -> StandardMaterial3D:
 
 
 func _add_harvestable_component() -> void:
+	_depletion_player = AudioStreamPlayer3D.new()
+	_depletion_player.max_distance = 40.0
+	_depletion_player.bus = &"SFX"
+	add_child(_depletion_player)
+
 	var comp := HarvestableComponent.new()
 	comp.name = "HarvestableComponent"
 	comp.respawn_mode = "destroy"
@@ -118,6 +125,13 @@ func _add_harvestable_component() -> void:
 
 func _on_depleted() -> void:
 	WorldState.set_entity_data(entity_id, "harvestable", false)
+	var sfx: Dictionary = SfxDatabase.get_sfx("gather_rock_break")
+	if not sfx.is_empty():
+		var stream: AudioStream = load(sfx["path"]) if ResourceLoader.exists(sfx["path"]) else null
+		if stream:
+			_depletion_player.stream = stream
+			_depletion_player.volume_db = sfx["volume_db"]
+			_depletion_player.play()
 	if _rock_mesh_root:
 		# Darken the rock immediately
 		for mi in _mesh_instances:

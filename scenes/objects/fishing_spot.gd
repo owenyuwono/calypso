@@ -5,6 +5,7 @@ extends StaticBody3D
 
 const FishDatabase = preload("res://scripts/data/fish_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
+const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 
 const WATER_COLOR: Color = Color(0.2, 0.4, 0.8, 0.5)
 const WATER_COLOR_DEPLETED: Color = Color(0.2, 0.4, 0.8, 0.05)
@@ -19,6 +20,7 @@ var fish_name: String = ""
 var _disc_instance: MeshInstance3D = null
 var _disc_mat: StandardMaterial3D = null
 var _harvestable: Node = null
+var _depletion_player: AudioStreamPlayer3D = null
 var _pulse_timer: float = 0.0
 
 var last_chopper_pos: Vector3 = Vector3.ZERO
@@ -84,6 +86,11 @@ func _build_water_disc() -> void:
 
 
 func _add_harvestable_component() -> void:
+	_depletion_player = AudioStreamPlayer3D.new()
+	_depletion_player.max_distance = 40.0
+	_depletion_player.bus = &"SFX"
+	add_child(_depletion_player)
+
 	var comp := HarvestableComponent.new()
 	comp.name = "HarvestableComponent"
 	add_child(comp)
@@ -107,6 +114,13 @@ func _process(delta: float) -> void:
 
 func _on_depleted() -> void:
 	WorldState.set_entity_data(entity_id, "harvestable", false)
+	var sfx: Dictionary = SfxDatabase.get_sfx("gather_fish_catch")
+	if not sfx.is_empty():
+		var stream: AudioStream = load(sfx["path"]) if ResourceLoader.exists(sfx["path"]) else null
+		if stream:
+			_depletion_player.stream = stream
+			_depletion_player.volume_db = sfx["volume_db"]
+			_depletion_player.play()
 	if is_instance_valid(_disc_mat):
 		var tween := create_tween()
 		tween.tween_property(_disc_mat, "albedo_color:a", WATER_COLOR_DEPLETED.a, 0.6).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)

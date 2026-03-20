@@ -2,6 +2,7 @@
 class_name DistrictCraft
 
 const BuildingHelper = preload("res://scripts/world/building_helper.gd")
+const AmbientEmitterScript = preload("res://scripts/audio/ambient_emitter.gd")
 
 
 static func build(ctx: WorldBuilderContext) -> void:
@@ -16,6 +17,16 @@ static func build(ctx: WorldBuilderContext) -> void:
 	_build_cluster_d(ctx, nav_region, noise, hs)
 	_build_new_buildings(ctx, nav_region, noise, hs)
 	_build_new_props(ctx, nav_region, noise, hs)
+	_build_ambient_emitters(nav_region, noise, hs)
+
+
+static func _build_ambient_emitters(nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
+	# Forge ambience near the main forge building
+	var forge_pos: Vector3 = Vector3(8, BuildingHelper.snap_y(noise, 8, 30, hs), 30)
+	var forge_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(forge_emitter)
+	forge_emitter.global_position = forge_pos
+	forge_emitter.setup("res://assets/audio/ambient/forge_hammer_loop.ogg", ["day"], -6.0, 20.0)
 
 
 static func _build_forge(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
