@@ -3,10 +3,9 @@ class_name AssetSpawner
 ## All methods take ctx as first parameter and operate on WorldBuilderContext state.
 
 const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
-const TREE_DIR := "res://assets/models/environment/nature/trees/fir/"
+const TREE_DIR := "res://assets/models/environment/nature/trees/stylized/"
+const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/stylized/textures/"
 const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
-const PROPS_DIR := "res://assets/models/environment/props/"
-const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
@@ -75,17 +74,16 @@ static func apply_material_recursive(node: Node, mat: Material) -> void:
 		apply_material_recursive(child, mat)
 
 static func create_bark_material(ctx: WorldBuilderContext, misc: bool = false) -> StandardMaterial3D:
-	var prefix := "T_FirBarkMisc" if misc else "T_FirBark"
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = load_texture(ctx, TREE_TEX_DIR + prefix + "_BC.PNG")
+	mat.albedo_texture = load_texture(ctx, TREE_TEX_DIR + "trunk_alb.png")
 	return mat
 
 static func create_leaf_material(ctx: WorldBuilderContext, color: Color = Color(0.18, 0.55, 0.12)) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
+	# Stylized textures have pre-baked color; no albedo_color tint needed
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	mat.alpha_scissor_threshold = 0.5
-	mat.albedo_texture = load_texture(ctx, TREE_TEX_DIR + "T_Leaf_Fir_Filled.PNG")
+	mat.albedo_texture = load_texture(ctx, TREE_TEX_DIR + "leaf_alb.png")
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
@@ -190,33 +188,9 @@ static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos:
 		disable_shadows_recursive(instance)
 	return instance
 
-static func spawn_prop(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
-	var instance: Node3D = spawn_model(ctx, PROPS_DIR + filename, pos, rot_y, scale_val)
-	if instance:
-		# Meshy models have center-origin geometry; shift up so bottom sits on ground
-		var aabb := _get_model_aabb(instance)
-		if aabb.position.y < -0.01:
-			instance.position.y -= aabb.position.y * scale_val
-		disable_shadows_recursive(instance)
-	return instance
-
 static func disable_shadows_recursive(node: Node) -> void:
 	if node is MeshInstance3D:
 		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for child in node.get_children():
 		disable_shadows_recursive(child)
 
-static func _get_model_aabb(node: Node3D) -> AABB:
-	var combined := AABB()
-	var first := true
-	for child in node.get_children():
-		if child is Node3D:
-			for sub in child.get_children():
-				if sub is MeshInstance3D and sub.mesh:
-					var mesh_aabb: AABB = sub.mesh.get_aabb()
-					if first:
-						combined = mesh_aabb
-						first = false
-					else:
-						combined = combined.merge(mesh_aabb)
-	return combined

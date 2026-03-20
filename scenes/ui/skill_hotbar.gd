@@ -11,13 +11,21 @@ class HotbarDropTarget extends PanelContainer:
 	var hotbar_ref: Node = null  # Reference to the skill_hotbar node for refresh
 
 	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-		return data is Dictionary and data.get("type") == "skill_drag"
+		var valid: bool = data is Dictionary and data.get("type") == "skill_drag"
+		if valid and hotbar_ref:
+			hotbar_ref.highlight_slot(slot_index)
+		return valid
 
 	func _drop_data(_at_position: Vector2, data: Variant) -> void:
 		if skills_comp:
-			skills_comp.set_hotbar_slot(slot_index, data.skill_id)
+			skills_comp.set_hotbar_slot(slot_index, data.get("skill_id", ""))
 		if hotbar_ref:
+			hotbar_ref.clear_slot_highlights()
 			hotbar_ref.refresh()
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_DRAG_END and hotbar_ref:
+			hotbar_ref.clear_slot_highlights()
 
 const SLOT_COUNT: int = 5
 const SLOT_SIZE: float = 64.0
@@ -27,6 +35,8 @@ const BOTTOM_MARGIN: float = 16.0
 var _slots: Array = []  # Array of {panel, icon_rect, name_label, key_label, cooldown_overlay, cooldown_label, skill_id}
 var _cooldowns: Dictionary = {}  # skill_id -> {remaining: float, total: float}
 var _player: Node
+var _normal_style: StyleBox
+var _highlight_style: StyleBox
 
 func set_player(p: Node) -> void:
 	_player = p
@@ -46,6 +56,9 @@ func _ready() -> void:
 	GameEvents.skill_learned.connect(func(_a, _b, _c): refresh())
 
 func _build_ui() -> void:
+	_normal_style = UIHelper.create_style_box(Color(0.12, 0.12, 0.18, 0.9), Color(0.4, 0.35, 0.2), 4, 1)
+	_highlight_style = UIHelper.create_style_box(Color(0.18, 0.18, 0.25, 0.95), UIHelper.COLOR_GOLD, 4, 2)
+
 	var hbox := HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", int(SLOT_GAP))
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -73,7 +86,7 @@ func _create_slot(index: int) -> Dictionary:
 	panel.custom_minimum_size = Vector2(SLOT_SIZE, SLOT_SIZE)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	panel.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.12, 0.12, 0.18, 0.9), Color(0.4, 0.35, 0.2), 4, 1))
+	panel.add_theme_stylebox_override("panel", _normal_style)
 
 	# Container for layering
 	var container := Control.new()
@@ -199,3 +212,13 @@ func refresh() -> void:
 				var skill: Dictionary = SkillDatabase.get_skill(skill_id)
 				_slots[i].name_label.text = skill.get("name", skill_id)
 				_slots[i].name_label.visible = true
+
+
+func highlight_slot(index: int) -> void:
+	for i in range(SLOT_COUNT):
+		_slots[i].panel.add_theme_stylebox_override("panel", _highlight_style if i == index else _normal_style)
+
+
+func clear_slot_highlights() -> void:
+	for slot in _slots:
+		slot.panel.add_theme_stylebox_override("panel", _normal_style)

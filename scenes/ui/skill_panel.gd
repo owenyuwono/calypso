@@ -11,14 +11,26 @@ const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd"
 class SkillDragSource extends PanelContainer:
 	var skill_id: String = ""
 	var skill_name: String = ""
+	var cursor_manager: RefCounted
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
-		var preview := PanelContainer.new()
-		preview.add_theme_stylebox_override("panel", UIHelper.create_style_box(Color(0.1, 0.09, 0.07, 0.95), UIHelper.COLOR_GOLD, 4, 1))
-		var label: Label = UIHelper.create_label(skill_name, 13, UIHelper.COLOR_GOLD)
-		preview.add_child(label)
-		set_drag_preview(preview)
+		if cursor_manager:
+			cursor_manager.set_cursor("drag")
+		var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
+		if not ResourceLoader.exists(icon_path):
+			var category: String = SkillDatabase.get_skill_category(skill_id)
+			icon_path = "res://assets/textures/ui/skills/bases/" + category + "_base.png"
+		var icon: TextureRect = UIHelper.create_icon(icon_path, Vector2(48, 48), CanvasItem.TEXTURE_FILTER_LINEAR)
+		if icon:
+			set_drag_preview(icon)
+		else:
+			var label: Label = UIHelper.create_label(skill_name, 13, UIHelper.COLOR_GOLD)
+			set_drag_preview(label)
 		return {"skill_id": skill_id, "type": "skill_drag"}
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_DRAG_END and cursor_manager:
+			cursor_manager.set_cursor("default")
 
 const CATEGORY_LABELS: Dictionary = {
 	"weapon": "WEAPON",
@@ -49,6 +61,7 @@ func set_player(p: Node) -> void:
 
 func _ready() -> void:
 	visible = false
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
 	GameEvents.skill_learned.connect(func(_a, _b, _c): _refresh())
 	GameEvents.skill_used.connect(func(_a, _b): _refresh())
@@ -386,6 +399,8 @@ func _build_skill_row(skill_id: String) -> void:
 	var drag_source: SkillDragSource = SkillDragSource.new()
 	drag_source.skill_id = skill_id
 	drag_source.skill_name = skill.get("name", skill_id)
+	if _player:
+		drag_source.cursor_manager = _player._cursor_manager
 	drag_source.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	drag_source.mouse_filter = Control.MOUSE_FILTER_STOP
 
