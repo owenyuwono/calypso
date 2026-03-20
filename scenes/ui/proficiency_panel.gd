@@ -59,8 +59,11 @@ func toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
 		UIHelper.center_panel(_panel)
 		_refresh()
+	else:
+		AudioManager.play_ui_sfx("ui_panel_close")
 
 
 func _refresh() -> void:

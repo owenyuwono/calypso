@@ -23,6 +23,7 @@ const VendingComponent = preload("res://scripts/components/vending_component.gd"
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
+const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 
 var entity_id: String = "player"
 
@@ -35,6 +36,7 @@ var _is_navigating: bool = false
 var _interact_target: String = ""
 var _stuck_timer: float = 0.0
 var _last_nav_pos: Vector3 = Vector3.ZERO
+var _was_moving: bool = false
 
 # Vending
 var _is_vending: bool = false
@@ -51,6 +53,9 @@ var _chop_timer: float = 0.0
 var _chop_interval: float = 2.0
 var _chop_hit_pending: bool = false
 var _chop_hit_timer: float = 0.0
+
+# Audio component
+var _audio: Node
 
 # Visuals component
 var _visuals: Node
@@ -114,6 +119,11 @@ func _ready() -> void:
 		MODEL_SCALE,
 		Color(0.2, 0.4, 0.7)
 	)
+
+	_audio = preload("res://scripts/audio/audio_component.gd").new()
+	_audio.name = "AudioComponent"
+	add_child(_audio)
+	_audio.setup(self)
 
 	_stats = StatsComponent.new()
 	_stats.name = "StatsComponent"
@@ -324,6 +334,15 @@ func _physics_process(delta: float) -> void:
 		else:
 			_visuals.play_anim("Idle")
 
+	# Footstep audio: trigger on movement state transitions
+	if is_moving and not _was_moving:
+		if _audio:
+			_audio.start_footsteps("stone")
+	elif not is_moving and _was_moving:
+		if _audio:
+			_audio.stop_footsteps()
+	_was_moving = is_moving
+
 
 func _process(delta: float) -> void:
 	if _is_dead:
@@ -376,6 +395,8 @@ func _cancel_attack() -> void:
 	_auto_attack.cancel()
 	_player_skills.cancel_pending()
 	_hover.clear_ring()
+	if _audio:
+		_audio.stop_combat_loop()
 
 func _show_target_hp_bar(target_id: String) -> void:
 	var target: Node3D = WorldState.get_entity(target_id)
@@ -478,6 +499,14 @@ func _process_harvesting(delta: float) -> bool:
 			_progression.grant_proficiency_xp(skill_id, result.xp)
 			resource_node.last_chopper_pos = global_position
 			resource_node.shake()
+			if _audio:
+				var gather_key: String = ""
+				match skill_id:
+					"woodcutting": gather_key = "gather_tree_chop"
+					"mining": gather_key = "gather_rock_mine"
+					"fishing": gather_key = "gather_fishing_cast"
+				if gather_key != "":
+					_audio.play_oneshot(gather_key)
 			if result.depleted:
 				resource_node.spawn_loot(result.item_id, result.bonus_item)
 				_cancel_harvest()
@@ -602,6 +631,8 @@ func _handle_left_click() -> void:
 			_hover.lock_ring(hovered_entity_id, Color(1.0, 0.3, 0.2, 0.6))
 			# Show HP bar on locked target
 			_show_target_hp_bar(hovered_entity_id)
+			if _audio:
+				_audio.start_combat_loop()
 			return
 
 		if etype == "loot_drop":
@@ -779,6 +810,9 @@ func _die() -> void:
 	_stop_navigation()
 	velocity = Vector3.ZERO
 	_cursor_manager.reset()
+	if _audio:
+		_audio.play_oneshot("combat_death")
+		_audio.stop_all_loops()
 
 	# Lose 10% gold
 	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
@@ -837,11 +871,16 @@ func _on_vending_stopped(eid: String) -> void:
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
+	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
 	var target_data: Dictionary = WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
-		var weapon_type: String = _combat.get_equipped_weapon_type()
 		_progression.grant_combat_xp(monster_type, weapon_type)
+	if _audio:
+		var hit_key: String = "combat_hit_" + weapon_type
+		if SfxDatabase.get_sfx(hit_key).is_empty():
+			hit_key = "combat_hit_generic"
+		_audio.play_oneshot(hit_key)
 
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()

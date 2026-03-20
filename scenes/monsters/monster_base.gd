@@ -57,6 +57,7 @@ var _stats: Node
 var _combat: Node
 var _auto_attack: Node
 var _perception: Node
+var _audio: Node = null
 
 func _ready() -> void:
 	call_deferred("_capture_spawn_point")
@@ -81,6 +82,12 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_setup_model(stats)
+
+	_audio = preload("res://scripts/audio/audio_component.gd").new()
+	_audio.name = "AudioComponent"
+	add_child(_audio)
+	_audio.setup(self)
+	_audio.start_presence("presence_monster_idle")
 
 	_stats = StatsComponent.new()
 	_stats.name = "StatsComponent"
@@ -215,8 +222,12 @@ func _update_lod() -> void:
 	if state != "dead":
 		if _lod_level >= 2 and old_lod < 2:
 			set_physics_process(false)
+			if _audio:
+				_audio.stop_all_loops()
 		elif _lod_level < 2 and old_lod >= 2:
 			set_physics_process(true)
+			if _audio:
+				_audio.start_presence("presence_monster_idle")
 
 func _physics_process(delta: float) -> void:
 	if state == "dead":
@@ -296,6 +307,8 @@ func _start_wander() -> void:
 	_nav_started = false
 	_nav_wait_frames = 0
 	nav_agent.target_position = target_pos
+	if _audio:
+		_audio.start_footsteps()
 
 func _process_wander_movement() -> bool:
 	if not _nav_started:
@@ -305,11 +318,15 @@ func _process_wander_movement() -> bool:
 			_nav_wait_frames += 1
 			if _nav_wait_frames > 30:
 				state = "idle"
+				if _audio:
+					_audio.stop_footsteps()
 			return false
 
 	if nav_agent.is_navigation_finished():
 		state = "idle"
 		_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+		if _audio:
+			_audio.stop_footsteps()
 		return false
 
 	var next_pos := nav_agent.get_next_path_position()
@@ -337,6 +354,9 @@ func _check_aggro() -> void:
 		if etype in ["player", "npc"] and WorldState.is_alive(entry.id):
 			aggro_target = entry.id
 			state = "aggro"
+			if _audio:
+				_audio.start_footsteps()
+				_audio.start_combat_loop()
 			return
 
 func _process_aggro(delta: float) -> bool:
@@ -389,6 +409,8 @@ func _process_attacking(delta: float) -> void:
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.spawn_damage_number(target_id, damage, Color(1, 0.2, 0.2), target_pos)
 	_visuals.flash_target(target_id)
+	if _audio:
+		_audio.play_oneshot("combat_hit_generic")
 
 func _on_auto_attack_target_lost() -> void:
 	_drop_aggro()
@@ -402,6 +424,9 @@ func _drop_aggro() -> void:
 	# Return to spawn area
 	nav_agent.target_position = spawn_point
 	_visuals.set_hp_bar_visible(false)
+	if _audio:
+		_audio.stop_combat_loop()
+		_audio.stop_footsteps()
 
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
@@ -419,6 +444,9 @@ func _die(killer_id: String) -> void:
 	_auto_attack.cancel()
 	collision_shape.disabled = true
 	velocity = Vector3.ZERO
+	if _audio:
+		_audio.play_oneshot("combat_death")
+		_audio.stop_all_loops()
 
 	# Spawn physical loot drops
 	var stats := MonsterDatabase.get_monster(monster_type)
@@ -510,6 +538,9 @@ func _respawn() -> void:
 
 	_combat.setup(_stats, null)
 	_auto_attack.cancel()
+
+	if _audio:
+		_audio.start_presence("presence_monster_idle")
 
 	GameEvents.entity_respawned.emit(monster_id)
 	_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, false)

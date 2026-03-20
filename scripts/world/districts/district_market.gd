@@ -2,6 +2,7 @@
 class_name DistrictMarket
 
 const BuildingHelper = preload("res://scripts/world/building_helper.gd")
+const AmbientEmitterScript = preload("res://scripts/audio/ambient_emitter.gd")
 
 
 static func build(ctx: WorldBuilderContext) -> void:
@@ -14,6 +15,16 @@ static func build(ctx: WorldBuilderContext) -> void:
 	_build_new_shops(ctx, nav_region, noise, hs)
 	_build_new_stalls(ctx, nav_region, noise, hs)
 	_build_props(ctx, nav_region, noise, hs)
+	_build_ambient_emitters(nav_region, noise, hs)
+
+
+static func _build_ambient_emitters(nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
+	# Market chatter centered in the stall area
+	var market_pos: Vector3 = Vector3(-45, BuildingHelper.snap_y(noise, -45, 25, hs), 25)
+	var market_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(market_emitter)
+	market_emitter.global_position = market_pos
+	market_emitter.setup("res://assets/audio/ambient/market_chatter_loop.ogg", ["day"], -6.0, 30.0)
 
 
 static func _build_shops(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:

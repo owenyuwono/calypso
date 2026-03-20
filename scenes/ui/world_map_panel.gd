@@ -630,12 +630,14 @@ func toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open
 	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
 		var zone_id: String = _get_current_zone_id()
 		_compute_zone_extents(zone_id)
 		_update_zone_title()
 		UIHelper.center_panel(_panel)
 		_draw_area.queue_redraw()
 	else:
+		AudioManager.play_ui_sfx("ui_panel_close")
 		_hide_hover_popup()
 
 

@@ -6,6 +6,7 @@ var status_panel: Control
 var inventory_panel: Control
 var skill_panel: Control
 var proficiency_panel: Control
+var settings_panel: Control
 var chat_input: Control
 
 var _buttons: Dictionary = {}  # key -> Button
@@ -17,6 +18,7 @@ const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "inventory", "label": "Inv", "hint": "I"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
+	{"key": "settings", "label": "Settings", "hint": "Esc"},
 ]
 
 func _ready() -> void:
@@ -25,7 +27,7 @@ func _ready() -> void:
 	anchor_top = 0.0
 	anchor_right = 1.0
 	anchor_bottom = 0.0
-	offset_left = -152
+	offset_left = -194
 	offset_top = 220
 	offset_right = -10
 	offset_bottom = 260
@@ -77,9 +79,14 @@ func _ready() -> void:
 		btn.add_theme_stylebox_override("disabled", disabled_style)
 		btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.4, 0.4))
 
-		btn.icon = load("res://assets/textures/ui/buttons/btn_" + def["key"] + ".png")
-		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		btn.texture_filter = TEXTURE_FILTER_NEAREST
+		var icon_path: String = "res://assets/textures/ui/buttons/btn_" + def["key"] + ".png"
+		if ResourceLoader.exists(icon_path):
+			btn.icon = load(icon_path)
+			btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			btn.texture_filter = TEXTURE_FILTER_NEAREST
+		else:
+			btn.text = def["label"]
+			btn.add_theme_font_size_override("font_size", 10)
 
 		var key: String = def["key"]
 		btn.pressed.connect(_on_button_pressed.bind(key))
@@ -119,6 +126,7 @@ func _get_panel(key: String) -> Control:
 		"status": return status_panel
 		"inventory": return inventory_panel
 		"skills": return skill_panel
+		"settings": return settings_panel
 	return null
 
 func _is_panel_open(key: String) -> bool:

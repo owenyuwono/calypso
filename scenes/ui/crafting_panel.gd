@@ -49,6 +49,7 @@ func open(skill_id: String, sname: String) -> void:
 
 	_is_open = true
 	visible = true
+	AudioManager.play_ui_sfx("ui_panel_open")
 	UIHelper.center_panel(_panel)
 	_refresh_title()
 	_refresh_sidebar()
@@ -58,6 +59,7 @@ func open(skill_id: String, sname: String) -> void:
 func close() -> void:
 	_is_open = false
 	visible = false
+	AudioManager.play_ui_sfx("ui_panel_close")
 
 
 func is_open() -> bool:
@@ -421,6 +423,8 @@ func _on_craft_pressed() -> void:
 	# Grant XP.
 	var xp: int = recipe.get("xp", 0)
 	_progression.grant_proficiency_xp(_skill_id, xp)
+
+	AudioManager.play_ui_sfx("ui_craft_complete")
 
 	# Visual feedback: brief flash on the craft button.
 	_flash_craft_btn()

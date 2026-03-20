@@ -3,6 +3,7 @@ class_name DistrictPlaza
 
 const BuildingHelper = preload("res://scripts/world/building_helper.gd")
 const CraftingStation = preload("res://scenes/objects/crafting_station.gd")
+const AmbientEmitterScript = preload("res://scripts/audio/ambient_emitter.gd")
 
 
 static func build(ctx: WorldBuilderContext) -> void:
@@ -24,6 +25,11 @@ static func _build_fountain(ctx: WorldBuilderContext, nav_region: Node, noise: F
 	var pos := Vector3(0, BuildingHelper.snap_y(noise, 0, 0, hs), 0)
 	BuildingHelper.create_fountain(ctx, nav_region, pos, 1.5, 0.4, 1.2, 0.8)
 
+	var fountain_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(fountain_emitter)
+	fountain_emitter.global_position = pos
+	fountain_emitter.setup("res://assets/audio/ambient/fountain_loop.ogg", ["dawn", "day", "dusk", "night"], -6.0, 25.0)
+
 
 static func _build_crafting_stations(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
 	# Smithing station — triangle around fountain, east side.
@@ -33,6 +39,11 @@ static func _build_crafting_stations(ctx: WorldBuilderContext, nav_region: Node,
 	smithing.position = Vector3(4, forge_y, 3)
 	nav_region.add_child(smithing)
 	smithing.setup("smithing", "Forge")
+
+	var forge_emitter: Node3D = AmbientEmitterScript.new()
+	nav_region.add_child(forge_emitter)
+	forge_emitter.global_position = Vector3(4, forge_y, 3)
+	forge_emitter.setup("res://assets/audio/ambient/forge_hammer_loop.ogg", ["day", "dusk"], -3.0, 20.0)
 
 	# Cooking station — west side.
 	var cooking_y: float = BuildingHelper.snap_y(noise, -4, 3, hs)

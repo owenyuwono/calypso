@@ -63,6 +63,7 @@ func show_npc(npc_id: String) -> void:
 	_current_npc_id = npc_id
 	_is_open = true
 	visible = true
+	AudioManager.play_ui_sfx("ui_panel_open")
 	UIHelper.center_panel(_panel)
 	_refresh()
 	_refresh_timer.start()
@@ -71,6 +72,7 @@ func close() -> void:
 	_refresh_timer.stop()
 	_is_open = false
 	visible = false
+	AudioManager.play_ui_sfx("ui_panel_close")
 	_current_npc_id = ""
 
 func is_open() -> bool:

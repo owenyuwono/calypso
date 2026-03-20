@@ -7,6 +7,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const AssetSpawner = preload("res://scripts/world/asset_spawner.gd")
 const TreeDatabase = preload("res://scripts/data/tree_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
+const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/stylized/textures/"
 
@@ -28,6 +29,7 @@ var _stump_model: Node3D = null
 var _mesh_instances: Array[MeshInstance3D] = []
 
 var _harvestable: Node = null
+var _depletion_player: AudioStreamPlayer3D = null
 var last_chopper_pos: Vector3 = Vector3.ZERO
 
 
@@ -129,6 +131,11 @@ func _refresh_mesh_instances() -> void:
 
 
 func _add_harvestable_component() -> void:
+	_depletion_player = AudioStreamPlayer3D.new()
+	_depletion_player.max_distance = 40.0
+	_depletion_player.bus = &"SFX"
+	add_child(_depletion_player)
+
 	var comp := HarvestableComponent.new()
 	comp.name = "HarvestableComponent"
 	add_child(comp)
@@ -140,6 +147,13 @@ func _add_harvestable_component() -> void:
 
 func _on_depleted() -> void:
 	WorldState.set_entity_data(entity_id, "harvestable", false)
+	var sfx: Dictionary = SfxDatabase.get_sfx("gather_tree_fall")
+	if not sfx.is_empty():
+		var stream: AudioStream = load(sfx["path"]) if ResourceLoader.exists(sfx["path"]) else null
+		if stream:
+			_depletion_player.stream = stream
+			_depletion_player.volume_db = sfx["volume_db"]
+			_depletion_player.play()
 	if _tree_model:
 		_play_fall_animation()
 	else:
