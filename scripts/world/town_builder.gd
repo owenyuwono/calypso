@@ -179,7 +179,7 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 	var flower_yellow := Color(0.9, 0.85, 0.3)
 	var flower_white := Color(0.9, 0.9, 0.85)
 
-	var tree_files := ["SM_FirTree1.FBX", "SM_FirTree2.FBX", "SM_FirTree3.FBX", "SM_FirTree4.FBX", "SM_FirTree5.FBX"]
+	var tree_files := ["tree_stylized.fbx"]
 	var bush_files := ["SM_Bush1.FBX", "SM_Bush2.FBX", "SM_Bush3.FBX"]
 	var fern_files := ["SM_Fern1.FBX", "SM_Fern2.FBX", "SM_Fern3.FBX"]
 	var flower_files := ["SM_FlowerBush01.FBX", "SM_FlowerBush02.FBX", "SM_Flower_Daisies1.FBX", "SM_Flower_TulipsRed.FBX", "SM_Flower_TulipsYellow.FBX"]
@@ -190,7 +190,7 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"center": Vector2(45, -30), "radius": 22.0, "noise_threshold": -0.2,
 			"recipes": [
-				{"type": "tree", "count": 10, "min_spacing": 3.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "tree", "count": 10, "min_spacing": 3.5, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.5},
 				{"type": "foliage", "count": 8, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow, flower_white], "scale": 0.25},
 				{"type": "foliage", "count": 6, "min_spacing": 2.0, "files": leafy_bush_files, "colors": [green, dark_green], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": fern_files, "colors": [dark_green], "scale": 0.25},
@@ -200,7 +200,7 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [-66, -46, 44, 34], "noise_threshold": 0.1,
 			"recipes": [
-				{"type": "tree", "count": 6, "min_spacing": 4.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.25},
+				{"type": "tree", "count": 6, "min_spacing": 4.0, "files": tree_files, "colors": [leaf_green, dark_leaf], "scale": 0.5},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": flower_files, "colors": [flower_pink, flower_yellow], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": bush_files, "colors": [green], "scale": 0.25},
 			]
@@ -209,7 +209,7 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 		{
 			"bounds": [-18, -48, 41, 36], "noise_threshold": 0.3,
 			"recipes": [
-				{"type": "tree", "count": 4, "min_spacing": 5.0, "files": tree_files, "colors": [leaf_green], "scale": 0.25},
+				{"type": "tree", "count": 4, "min_spacing": 5.0, "files": tree_files, "colors": [leaf_green], "scale": 0.5},
 				{"type": "foliage", "count": 3, "min_spacing": 3.0, "files": leafy_bush_files, "colors": [green], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 3.0, "files": flower_files, "colors": [flower_white, flower_pink], "scale": 0.25},
 			]

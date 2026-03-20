@@ -8,8 +8,7 @@ const AssetSpawner = preload("res://scripts/world/asset_spawner.gd")
 const TreeDatabase = preload("res://scripts/data/tree_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
 
-const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/textures/"
-const STUMP_MODEL_PATH := "res://assets/models/environment/nature/trees/fir/SM_FirStump1.FBX"
+const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/stylized/textures/"
 
 static var _next_id: int = 1
 static var _bark_mat: StandardMaterial3D = null
@@ -86,36 +85,28 @@ func _load_tree_model() -> void:
 
 
 func _load_stump_model() -> void:
-	var scene := ModelHelper.load_model(STUMP_MODEL_PATH)
-	if not scene:
-		push_warning("ChoppableTree: failed to load stump model")
-		return
-
-	var instance: Node3D = scene.instantiate()
-	instance.scale = Vector3.ONE * _scale_val
-	add_child(instance)
-	_stump_model = instance
-
-	_apply_tree_materials(instance)
+	# No stump model available — tree simply disappears on depletion
+	pass
 
 
 func _get_bark_material() -> StandardMaterial3D:
 	if _bark_mat:
 		return _bark_mat
 	_bark_mat = StandardMaterial3D.new()
-	_bark_mat.albedo_texture = load(TREE_TEX_DIR + "T_FirBark_BC.PNG") as Texture2D
+	_bark_mat.albedo_texture = load(TREE_TEX_DIR + "trunk_alb.png") as Texture2D
 	return _bark_mat
 
 
 func _get_leaf_material(color: Color) -> StandardMaterial3D:
-	var key: String = color.to_html()
+	# Stylized textures have pre-baked color; cache on a single key since no tint is applied
+	var key: String = "stylized"
 	if _leaf_mats.has(key):
 		return _leaf_mats[key]
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
+	# No albedo_color tint — stylized leaf texture already carries its own color
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	mat.alpha_scissor_threshold = 0.5
-	mat.albedo_texture = load(TREE_TEX_DIR + "T_Leaf_Fir_Filled.PNG") as Texture2D
+	mat.albedo_texture = load(TREE_TEX_DIR + "leaf_alb.png") as Texture2D
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_leaf_mats[key] = mat
 	return mat

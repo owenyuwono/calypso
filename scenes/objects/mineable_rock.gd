@@ -1,12 +1,20 @@
 extends StaticBody3D
 ## Mineable rock entity. Spawned by the rock spawner into the world.
 ## Registers with WorldState for hover and NPC targeting.
-## Uses procedural sphere-cluster geometry — no external model files.
-## Depletion shrinks + darkens the rock; respawn restores scale and color.
+## Renders using FBX rock models; falls back to a single sphere if assets fail to load.
+## Depletion shrinks + darkens the rock; destroy+respawn creates a fresh instance on respawn.
 
 const OreDatabase = preload("res://scripts/data/ore_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+
+const ROCK_DIR := "res://assets/models/environment/nature/rocks/"
+const ROCK_TEXTURE_PATH := "res://assets/models/environment/nature/rocks/textures/rock_alb.png"
+const ROCK_MODELS: Dictionary = {
+	"copper": "rock_01.fbx",
+	"iron": "rock_01.fbx",
+	"gold": "rock_01.fbx",
+}
 
 const TIER_COLORS: Dictionary = {
 	"copper": Color(0.72, 0.45, 0.2),
@@ -17,14 +25,15 @@ const TIER_COLORS: Dictionary = {
 signal rock_depleted(tier: String, respawn_time: float)
 
 static var _next_id: int = 1
-static var _ore_mats: Dictionary = {}  # tier → StandardMaterial3D
+static var _ore_mats: Dictionary = {}  # tier → ShaderMaterial
+static var _rock_texture: Texture2D = null
 static var _highlight_mat: StandardMaterial3D = null
 
 var entity_id: String = ""
 var rock_tier: String = ""
 var rock_name: String = ""
 var _scale_val: float = 1.0
-var _rock_mesh_root: Node3D = null
+var _model_instance: Node3D = null
 var _mesh_instances: Array[MeshInstance3D] = []
 var _harvestable: Node = null
 var last_chopper_pos: Vector3 = Vector3.ZERO
@@ -43,7 +52,7 @@ func setup(tier: String, scale_val: float = 1.0) -> void:
 	_base_color = TIER_COLORS.get(tier, Color.GRAY)
 
 	_build_collision()
-	_build_rock_mesh()
+	_load_rock_model()
 	_add_harvestable_component()
 
 	WorldState.register_entity(entity_id, self, {
@@ -56,54 +65,79 @@ func setup(tier: String, scale_val: float = 1.0) -> void:
 
 func _build_collision() -> void:
 	var col := CollisionShape3D.new()
-	var shape := SphereShape3D.new()
-	shape.radius = 1.2
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.5, 1.5, 1.5) * _scale_val
 	col.shape = shape
-	col.position = Vector3(0.0, 0.8, 0.0)
+	col.position = Vector3(0.0, 0.75 * _scale_val, 0.0)
 	add_child(col)
 	collision_layer = 1
 	collision_mask = 0
 
 
-func _build_rock_mesh() -> void:
-	_rock_mesh_root = Node3D.new()
-	_rock_mesh_root.scale = Vector3.ONE * _scale_val
-	add_child(_rock_mesh_root)
-	_original_scale = _rock_mesh_root.scale
+func _load_rock_model() -> void:
+	var model_file: String = ROCK_MODELS.get(rock_tier, "rock_01.fbx")
+	var model_path: String = ROCK_DIR + model_file
+	var scene: PackedScene = ModelHelper.load_model(model_path)
 
-	var mat: StandardMaterial3D = _get_ore_material(rock_tier)
+	if scene:
+		_model_instance = scene.instantiate()
+		_model_instance.scale = Vector3.ONE * _scale_val / 3.0
+		add_child(_model_instance)
+		_mesh_instances = ModelHelper.find_mesh_instances(_model_instance)
+		_apply_tier_material()
+	else:
+		_build_fallback_sphere()
 
-	var main: MeshInstance3D = _create_sphere(Vector3(0.0, 0.6, 0.0), 0.8, mat)
-	var bump1: MeshInstance3D = _create_sphere(Vector3(0.5, 0.4, 0.3), 0.5, mat)
-	var bump2: MeshInstance3D = _create_sphere(Vector3(-0.4, 0.3, -0.3), 0.45, mat)
-	var bump3: MeshInstance3D = _create_sphere(Vector3(0.1, 0.9, -0.2), 0.4, mat)
-
-	_mesh_instances = [main, bump1, bump2, bump3]
+	_original_scale = _model_instance.scale
 
 
-func _create_sphere(pos: Vector3, radius: float, mat: StandardMaterial3D) -> MeshInstance3D:
+func _apply_tier_material() -> void:
+	var mat: ShaderMaterial = _get_ore_material(rock_tier)
+	for mi in _mesh_instances:
+		if is_instance_valid(mi):
+			mi.material_override = mat
+
+
+func _get_ore_material(tier: String) -> ShaderMaterial:
+	if _ore_mats.has(tier):
+		return _ore_mats[tier]
+
+	# Load the shared rock albedo texture once
+	if _rock_texture == null and ResourceLoader.exists(ROCK_TEXTURE_PATH):
+		_rock_texture = load(ROCK_TEXTURE_PATH) as Texture2D
+
+	var color: Color = TIER_COLORS.get(tier, Color.GRAY)
+	var mat: ShaderMaterial = ModelHelper.create_toon_material_color(color)
+
+	if _rock_texture:
+		mat.set_shader_parameter("albedo_texture", _rock_texture)
+		mat.set_shader_parameter("use_texture", true)
+		# albedo_color multiplies the texture — tints it to the tier color
+		mat.set_shader_parameter("albedo_color", color)
+
+	_ore_mats[tier] = mat
+	return mat
+
+
+func _build_fallback_sphere() -> void:
+	_model_instance = Node3D.new()
+	_model_instance.scale = Vector3.ONE * _scale_val
+	add_child(_model_instance)
+
 	var mi := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
-	sphere.radius = radius
-	sphere.height = radius * 2.0
+	sphere.radius = 0.8
+	sphere.height = 1.6
 	sphere.radial_segments = 12
 	sphere.rings = 6
 	mi.mesh = sphere
+	mi.position = Vector3(0.0, 0.8, 0.0)
+	_model_instance.add_child(mi)
+
+	var mat: ShaderMaterial = ModelHelper.create_toon_material_color(_base_color)
 	mi.material_override = mat
-	mi.position = pos
-	_rock_mesh_root.add_child(mi)
-	return mi
 
-
-func _get_ore_material(tier: String) -> StandardMaterial3D:
-	if _ore_mats.has(tier):
-		return _ore_mats[tier]
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = TIER_COLORS.get(tier, Color.GRAY)
-	mat.roughness = 0.85
-	mat.metallic = 0.1
-	_ore_mats[tier] = mat
-	return mat
+	_mesh_instances = [mi]
 
 
 func _add_harvestable_component() -> void:
@@ -118,22 +152,24 @@ func _add_harvestable_component() -> void:
 
 func _on_depleted() -> void:
 	WorldState.set_entity_data(entity_id, "harvestable", false)
-	if _rock_mesh_root:
-		# Darken the rock immediately
-		for mi in _mesh_instances:
-			if is_instance_valid(mi):
-				var dark_mat := StandardMaterial3D.new()
-				dark_mat.albedo_color = _base_color.darkened(0.6)
-				dark_mat.roughness = 0.9
-				mi.material_override = dark_mat
-		# Shrink animation, then emit signal and destroy
-		var tween := create_tween()
-		tween.tween_property(_rock_mesh_root, "scale", _original_scale * 0.3, 0.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-		tween.tween_callback(func() -> void:
-			rock_depleted.emit(rock_tier, _harvestable.get_respawn_time())
-			WorldState.unregister_entity(entity_id)
-			queue_free()
-		)
+	if not _model_instance:
+		return
+
+	# Darken the rock immediately via a new toon material at reduced brightness
+	var dark_color: Color = _base_color.darkened(0.6)
+	var dark_mat: ShaderMaterial = ModelHelper.create_toon_material_color(dark_color)
+	for mi in _mesh_instances:
+		if is_instance_valid(mi):
+			mi.material_override = dark_mat
+
+	# Shrink animation, then emit signal and destroy
+	var tween := create_tween()
+	tween.tween_property(_model_instance, "scale", _original_scale * 0.3, 0.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	tween.tween_callback(func() -> void:
+		rock_depleted.emit(rock_tier, _harvestable.get_respawn_time())
+		WorldState.unregister_entity(entity_id)
+		queue_free()
+	)
 
 
 func spawn_loot(item_id: String, bonus_item: String = "") -> void:

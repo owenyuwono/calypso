@@ -16,13 +16,13 @@ static func _get_assets() -> Dictionary:
 	var mature_leaf := Color(0.10, 0.38, 0.07)
 	var ancient_leaf := Color(0.07, 0.28, 0.05)
 
-	var tree_files: Array = ["SM_FirTree1.FBX", "SM_FirTree2.FBX", "SM_FirTree3.FBX", "SM_FirTree4.FBX", "SM_FirTree5.FBX"]
+	var tree_files: Array = ["tree_stylized.fbx"]
 	var bush_files: Array = ["SM_Bush1.FBX", "SM_Bush2.FBX", "SM_Bush3.FBX", "SM_BushLeafy01.FBX", "SM_BushLeafy02.FBX"]
 	var fern_files: Array = ["SM_Fern1.FBX", "SM_Fern2.FBX", "SM_Fern3.FBX"]
 	var grass_files: Array = ["SM_Grass1.FBX", "SM_Grass2.FBX"]
 	var flower_files: Array = ["SM_Flower_DaffodilsYellow.FBX", "SM_Flower_Sunflower1.FBX", "SM_Flower_Sunflower2.FBX", "SM_Flower_Sunflower3.FBX", "SM_Flower_TulipsRed.FBX", "SM_FlowerCrocus01.FBX", "SM_Flower_Allium.FBX", "SM_Flower_Foxtails1.FBX"]
-	var sapling_files: Array = ["SM_FirSapling1.FBX", "SM_FirSapling2.FBX"]
-	var ancient_files: Array = ["SM_FirTree4.FBX", "SM_FirTree5.FBX"]
+	var sapling_files: Array = ["tree_stylized.fbx"]
+	var ancient_files: Array = ["tree_stylized.fbx"]
 
 	return {
 		"leaf_green": leaf_green, "dark_leaf": dark_leaf,
@@ -46,9 +46,9 @@ static func get_east_biome_defs() -> Array:
 		{
 			"bounds": [73, 22, 22, 20], "noise_threshold": -0.1,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.5, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
-				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": a.ancient_files, "leaf_colors": [a.ancient_leaf], "scale": 0.45},
+				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.5, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": a.ancient_files, "leaf_colors": [a.ancient_leaf], "scale": 0.9},
 				{"type": "foliage", "count": 8, "min_spacing": 1.5, "files": a.fern_files, "colors": [a.fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": a.bush_files, "colors": [a.green, a.dark_green], "scale": 0.25},
 			]
@@ -77,8 +77,8 @@ static func get_east_biome_defs() -> Array:
 		{
 			"bounds": [110, 22, 30, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "normal", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": a.grass_files, "colors": [a.grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 1.5, "files": a.fern_files, "colors": [a.fern_color], "scale": 0.25},
 			]
@@ -87,8 +87,8 @@ static func get_east_biome_defs() -> Array:
 		{
 			"bounds": [73, -10, 17, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 2, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "normal", "count": 2, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": a.grass_files, "colors": [a.grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": a.bush_files, "colors": [a.green, a.dark_green], "scale": 0.25},
 			]
@@ -120,9 +120,9 @@ static func get_west_biome_defs() -> Array:
 		{
 			"bounds": [-152, 12, 22, 20], "noise_threshold": -0.1,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.5, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
-				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": a.ancient_files, "leaf_colors": [a.ancient_leaf], "scale": 0.45},
+				{"type": "choppable_tree", "tier": "normal", "count": 5, "min_spacing": 3.5, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
+				{"type": "choppable_tree", "tier": "ancient", "count": 1, "min_spacing": 5.0, "files": a.ancient_files, "leaf_colors": [a.ancient_leaf], "scale": 0.9},
 				{"type": "foliage", "count": 8, "min_spacing": 1.5, "files": a.fern_files, "colors": [a.fern_color], "scale": 0.25},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": a.bush_files, "colors": [a.green, a.dark_green], "scale": 0.25},
 			]
@@ -150,8 +150,8 @@ static func get_west_biome_defs() -> Array:
 		{
 			"bounds": [-140, 22, 30, 18], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "normal", "count": 3, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
 				{"type": "foliage", "count": 4, "min_spacing": 2.0, "files": a.grass_files, "colors": [a.grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 3, "min_spacing": 1.5, "files": a.fern_files, "colors": [a.fern_color], "scale": 0.25},
 			]
@@ -160,8 +160,8 @@ static func get_west_biome_defs() -> Array:
 		{
 			"bounds": [-90, -20, 17, 20], "noise_threshold": 0.0,
 			"recipes": [
-				{"type": "choppable_tree", "tier": "normal", "count": 2, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.25},
-				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.35},
+				{"type": "choppable_tree", "tier": "normal", "count": 2, "min_spacing": 4.0, "files": a.tree_files, "leaf_colors": [a.leaf_green, a.dark_leaf], "scale": 0.5},
+				{"type": "choppable_tree", "tier": "mature", "count": 1, "min_spacing": 5.0, "files": a.tree_files, "leaf_colors": [a.mature_leaf], "scale": 0.7},
 				{"type": "foliage", "count": 3, "min_spacing": 2.0, "files": a.grass_files, "colors": [a.grass_color], "scale": 0.25},
 				{"type": "foliage", "count": 2, "min_spacing": 2.0, "files": a.bush_files, "colors": [a.green, a.dark_green], "scale": 0.25},
 			]

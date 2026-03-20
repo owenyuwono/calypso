@@ -128,7 +128,7 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 ## World Builder Utilities (`scripts/world/`)
 Static utility classes for procedural world construction (one-shot builders, no per-frame lifecycle):
 - `WorldBuilderContext` — shared mutable context (terrain_noise, caches, exclusion zones, nav_region)
-- `AssetSpawner` — model spawning, material caching, tree/foliage model helpers, `spawn_prop()` for Meshy props (auto-corrects center-origin Y offset), `spawn_mineable_rock()` for ore nodes
+- `AssetSpawner` — model spawning, material caching, tree/foliage model helpers, `spawn_mineable_rock()` for ore nodes
 - `BiomeScatter` — exclusion zones, scatter algorithm, rock clusters
 - `TownBuilder` — city walls (4 gates: north/south/east/west), city biome definitions + props
 - `BuildingHelper` — `create_building()` with optional `building_type: String` metadata for future mesh replacement. Also `create_bench()`, `create_fountain()`
@@ -138,12 +138,11 @@ Static utility classes for procedural world construction (one-shot builders, no 
 - **City walls**: 4 gates at x=±70 (east/west, gap z:-5..5) and z=±50 (north/south, gap x:-5..5). Gate towers height 6.0, width 3.0. Archways above each gate. ~97 buildings total across 8 districts
 
 ## Meshy AI Asset Pipeline
-- **Prop models**: `assets/models/environment/props/` — barrel.glb, crate.glb, street_lamp.glb, copper_ore.glb. Spawned via `AssetSpawner.spawn_prop()` which auto-detects center-origin models (Meshy default) and shifts Y so base sits on ground
 - **Character models**: `assets/models/characters/` — Meshy exports separate .glb files: one mesh (T-pose) + separate per-animation files (withSkin). Loaded via `ModelHelper.instantiate_model_with_anims(mesh_path, anim_paths, scale)` which merges animations into a single AnimationPlayer. Auto-creates zero-track Idle fallback if no Idle animation provided
 - **EntityVisuals**: `setup_model_with_anims(mesh_path, anim_paths, scale, color)` for Meshy characters with separate animation files + center-origin Y offset. `setup_model()` still works for single-file KayKit models
 - **Art style**: Anime fantasy, realistic proportions, flat color textures. Prompt suffix: `flat color texture, anime style coloring, no realistic shading, no specular highlights, simple diffuse colors, 3D game-ready model`
-- **Prompt catalog**: `docs/assets/PROMPT.md` — all Meshy prompts for characters (16), weapons (7), buildings (6), props (6), mining rocks (5)
-- **Naming**: Characters `{archetype}_{m|f}.glb`, animations `{archetype}_{m|f}_{anim}.glb`, props `{name}.glb`
+- **Prompt catalog**: `docs/assets/PROMPT.md` — all Meshy prompts for characters (16), weapons (7), buildings (6), mining rocks (5)
+- **Naming**: Characters `{archetype}_{m|f}.glb`, animations `{archetype}_{m|f}_{anim}.glb`
 
 ## Gathering System
 - **HarvestableComponent** (`scripts/components/harvestable_component.gd`): Generic gathering component for woodcutting, mining, and fishing. `setup(tier, skill_id, database_lookup)` — skill_id determines which proficiency grants XP, database_lookup is a Callable to the tier's database. Manages chop count, depletion, and respawn. `respawn_mode`: `"in_place"` (default, trees/fishing) or `"destroy"` (rocks — zone manages respawn at random position)
