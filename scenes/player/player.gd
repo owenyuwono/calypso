@@ -65,18 +65,14 @@ var _perception: Node
 
 # Child subsystem nodes
 var _hover: Node
-var _player_skills: Node
+var _player_input: Node
 
 # UI references (set by main scene setup)
 var shop_panel: Control
 var inventory_panel: Control
 var status_panel: Control
 var chat_input: Control
-var skill_hotbar: Control:
-	set(value):
-		skill_hotbar = value
-		if _player_skills:
-			_player_skills.set_skill_hotbar(value)
+var skill_hotbar: Control
 var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
@@ -188,11 +184,13 @@ func _ready() -> void:
 	add_child(_hover)
 	_hover.setup(self, _cursor_manager)
 
-	# Skills subsystem
-	_player_skills = preload("res://scenes/player/player_skills.gd").new()
-	_player_skills.name = "PlayerSkills"
-	add_child(_player_skills)
-	_player_skills.setup(self, _combat, _stats, _skills_comp, _progression, _visuals, _perception)
+	_skills_comp.setup_execution(_combat, _stats, _progression, _visuals, _perception, _auto_attack)
+
+	# Skills input adapter
+	_player_input = preload("res://scripts/components/player_input_component.gd").new()
+	_player_input.name = "PlayerInputComponent"
+	add_child(_player_input)
+	_player_input.setup(self, _skills_comp)
 
 
 	_setup_dialogue_bubble()
@@ -358,8 +356,8 @@ func _process_combat(delta: float) -> bool:
 	var attack_speed: float = _stats.attack_speed
 
 	# While a skill hit is pending, handle it here — auto-attack is suppressed
-	if _player_skills.pending_skill_hit:
-		return _player_skills.process_skill_hit(delta, attack_range)
+	if _player_input.pending_skill_hit:
+		return _player_input.process_skill_hit(delta, attack_range)
 
 	# Normal auto-attack: delegate to component
 	var result: Dictionary = _auto_attack.process_attack(
@@ -374,7 +372,7 @@ func _cancel_attack() -> void:
 	_hide_target_hp_bar(_attack_target)
 	_attack_target = ""
 	_auto_attack.cancel()
-	_player_skills.cancel_pending()
+	_player_input.cancel_pending()
 	_hover.clear_ring()
 
 func _show_target_hp_bar(target_id: String) -> void:
@@ -539,7 +537,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _is_ui_open():
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
-				_player_skills.try_use_hotbar_slot(i)
+				_player_input.try_use_hotbar_slot(i)
 				get_viewport().set_input_as_handled()
 				return
 

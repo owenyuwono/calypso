@@ -25,7 +25,6 @@ const SLOT_GAP: float = 4.0
 const BOTTOM_MARGIN: float = 16.0
 
 var _slots: Array = []  # Array of {panel, icon_rect, name_label, key_label, cooldown_overlay, cooldown_label, skill_id}
-var _cooldowns: Dictionary = {}  # skill_id -> {remaining: float, total: float}
 var _player: Node
 
 func set_player(p: Node) -> void:
@@ -139,34 +138,31 @@ func _create_slot(index: int) -> Dictionary:
 		"skill_id": "",
 	}
 
-func _process(delta: float) -> void:
-	for skill_id in _cooldowns.keys():
-		var cd: Dictionary = _cooldowns[skill_id]
-		cd.remaining -= delta
-		if cd.remaining <= 0.0:
-			_cooldowns.erase(skill_id)
+func _process(_delta: float) -> void:
+	if not _player:
+		return
+	var skills_comp: Node = _player.get_node_or_null("SkillsComponent")
+	if not skills_comp:
+		return
 
-	# Update visuals for each slot
+	# Update visuals for each slot using cooldown data from SkillsComponent
 	for slot in _slots:
 		var skill_id: String = slot.skill_id
-		if skill_id.is_empty() or not _cooldowns.has(skill_id):
+		var remaining: float = 0.0
+		if not skill_id.is_empty():
+			remaining = skills_comp.get_cooldown_remaining(skill_id)
+		if skill_id.is_empty() or remaining <= 0.0:
 			slot.cooldown_overlay.visible = false
 			slot.cooldown_label.visible = false
 			continue
-		var cd: Dictionary = _cooldowns[skill_id]
-		var ratio: float = cd.remaining / cd.total
+		var total: float = skills_comp.get_cooldown_total(skill_id)
+		var ratio: float = remaining / total if total > 0.0 else 0.0
 		slot.cooldown_overlay.visible = true
 		# Dark overlay shrinks top-down (top pinned, bottom rises)
 		slot.cooldown_overlay.anchor_top = 1.0 - ratio
 		slot.cooldown_overlay.anchor_bottom = 1.0
 		slot.cooldown_label.visible = true
-		slot.cooldown_label.text = "%.1fs" % cd.remaining
-
-func start_cooldown(skill_id: String, duration: float) -> void:
-	_cooldowns[skill_id] = {"remaining": duration, "total": duration}
-
-func is_on_cooldown(skill_id: String) -> bool:
-	return _cooldowns.has(skill_id) and _cooldowns[skill_id].remaining > 0.0
+		slot.cooldown_label.text = "%.1fs" % remaining
 
 func refresh() -> void:
 	if not _player:
