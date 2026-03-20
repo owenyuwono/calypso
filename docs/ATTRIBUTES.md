@@ -15,10 +15,10 @@ A three-layer combat system: **base stats** (the numbers), **proficiencies** (us
 ### Proficiency Changes (13 → 19)
 
 **Kept (renamed):**
-- `constitution` → `con` (Constitution) — same XP source (taking damage), expanded stat impact
-- `agility` → `agi` (Agility) — new XP source (dodging), new stat impact (was dormant)
+- `constitution` → `con` (Constitution) — `con` is the canonical ID everywhere, no compat layer. Same XP source (taking damage), expanded stat impact.
+- `agility` → `agi` (Agility) — `agi` is the canonical ID everywhere, no compat layer. New XP source (dodging), new stat impact (was dormant).
 
-**New attributes (4):**
+**New attributes (4) — canonical IDs:**
 - `str` (Strength), `int` (Intelligence), `dex` (Dexterity), `wis` (Wisdom)
 
 **New weapons (2):**
@@ -74,7 +74,7 @@ Higher ceilings create more room for build differentiation. Monster stats will n
 
 | Stat | Description | Driven By |
 |------|-------------|-----------|
-| **Attack Speed** | Auto-attack interval multiplier (higher = faster) | AGI |
+| **Attack Speed** | Auto-attack speed multiplier (higher = faster). Applied to base cooldown: `effective_cooldown = base_interval / attack_speed_mult` | AGI |
 | **Move Speed** | Navigation speed multiplier | AGI |
 | **Cast Speed** | Skill/spell cast time multiplier (higher = faster) | WIS |
 
@@ -85,7 +85,7 @@ Higher ceilings create more room for build differentiation. Monster stats will n
 | **Max Stamina** | Resource pool for skills and actions | CON |
 | **Stamina Regen** | Stamina recovery rate multiplier | WIS |
 | **HP Regen** | Passive HP recovery per second (out of combat only) | CON |
-| **Cooldown Reduction** | Flat % reduction on skill cooldowns (capped 30%) | WIS |
+| **Cooldown Reduction** | Flat % reduction on skill cooldowns (capped 30%). CDR stacks additively with skill synergy `cooldown_reduction` bonuses. Combined cap: 40%. | WIS |
 
 ### Stat Derivation Formulas
 
@@ -101,7 +101,7 @@ Accuracy  = 80 + DEX × 5
 Evasion   = AGI × 3
 Crit Rate = 5 + DEX × 2
 Crit Dmg  = 150 + STR × 5
-ASPD      = 1.0 + AGI × 0.05
+ASPD Mult  = 1.0 + AGI × 0.05
 Move Spd  = 1.0 + AGI × 0.03
 Cast Spd  = 1.0 + WIS × 0.05
 Max Stam  = 100 + CON × 10
@@ -123,7 +123,7 @@ CDR       = WIS × 3 (%, capped at 30%)
 | Evasion | 3% | 30% | |
 | Crit Rate | 7% | 25% | |
 | Crit Dmg | 155% | 200% | |
-| ASPD | 1.05× | 1.5× | |
+| ASPD Mult | 1.05× | 1.5× | |
 | Move Spd | 1.03× | 1.3× | |
 | Cast Spd | 1.05× | 1.5× | |
 | Max Stam | 110 | 200 | |
@@ -152,6 +152,8 @@ Crit Damage is stored as an integer percentage (150 = 1.5× multiplier).
 is_crit = randf() < (crit_rate / 100.0)
 crit_multiplier = crit_damage / 100.0  # e.g. 150 → 1.5×
 ```
+
+**Integration with synergies:** The existing SkillDatabase synergy `crit_chance` bonuses add to the DEX-based `crit_rate`. The `crit_damage` stat from STR replaces the old hardcoded 1.5× multiplier. There is no separate synergy crit system — it's unified into the global crit.
 
 ### Damage Formula
 
@@ -190,13 +192,13 @@ Use-based progression — you improve by doing. 19 total proficiencies across 4 
 |-----------|-------------|-----------|--------|--------------|
 | **Strength (STR)** | Raw physical power. Muscles trained through combat | Deal physical damage | 3 XP per hit | ATK, Crit Damage |
 | **Constitution (CON)** | Toughness. Bodies hardened by punishment | Take damage | 3 XP per hit taken | Max HP, DEF, HP Regen, Max Stamina |
-| **Agility (AGI)** | Reflexes. Trained by surviving danger | Evade an attack | 5 XP per dodge | Evasion, Attack Speed, Move Speed |
+| **Agility (AGI)** | Reflexes. Trained by surviving danger | Evade an attack (5 XP) / Travel 10m in combat (1 XP) | 5 XP per dodge / 1 XP per 10m | Evasion, Attack Speed, Move Speed |
 | **Intelligence (INT)** | Arcane knowledge. Power through understanding | Deal magical damage | 3 XP per magic hit | MATK, MDEF |
 | **Dexterity (DEX)** | Precision. Eyes and hands trained by practice | Land a hit | 2 XP per hit landed | Accuracy, Crit Rate |
 | **Wisdom (WIS)** | Mental discipline. Focus sharpened through practice | Use any skill | 2 XP per skill use | Cast Speed, CDR, Stamina Regen |
 
 **Design notes:**
-- AGI gives 5 XP per dodge (higher per-event since dodges are less frequent than hits). **Dependency**: requires hit/miss system implementation. Secondary XP source: 1 XP per 10m traveled in combat (fallback while dodge system is built)
+- AGI has two XP sources: 5 XP per successful dodge (requires hit/miss system implementation) and 1 XP per 10m traveled while in combat (always available). Both sources active simultaneously.
 - DEX gives 2 XP per hit (frequent but scaled to not outpace other attributes)
 - WIS is universal — every build uses skills, so every build levels WIS
 - STR only triggers on physical damage, INT only on magical — creates natural specialization
@@ -276,7 +278,7 @@ Each armor type has default physical resistances. Equipment items declare their 
 | Armor Type | Materials | Slash | Pierce | Blunt | Compensation |
 |------------|-----------|-------|--------|-------|--------------|
 | **Heavy** | Plate, full armor | Resist (0.5×) | Neutral (1.0×) | Weak (1.5×) | Highest raw DEF |
-| **Medium** | Chain, leather | Resist (0.5×) | Weak (1.5×) | Neutral (1.0×) | Balanced DEF + speed |
+| **Medium** | Chain, leather | Neutral (1.0×) | Weak (1.5×) | Neutral (1.0×) | Balanced DEF + speed |
 | **Light** | Cloth, robes | Weak (1.5×) | Neutral (1.0×) | Neutral (1.0×) | MDEF bonuses, no speed penalty, cast speed bonuses |
 
 **Design rationale:**
@@ -318,6 +320,27 @@ These are the defaults. Individual monsters can override with their own resistan
 
 **All non-staff weapon skills:** Physical damage, no element (element modifier = 1.0×). Physical type determined by weapon.
 
+**New fields on each skill entry:**
+- `"damage_category"`: `"physical"` or `"magical"` — determines ATK vs MATK and DEF vs MDEF
+- `"element"`: `"fire"`, `"ice"`, `"lightning"`, `"earth"`, `"light"`, `"dark"`, `"arcane"`, or `null` — determines element modifier
+
+Physical type (`slash`/`pierce`/`blunt`) is derived from the weapon, not stored on the skill.
+
+**Example updated skill entry:**
+```
+"flame_burst": {
+    "name": "Flame Burst",
+    "type": "melee_attack",
+    "damage_category": "magical",
+    "element": "fire",
+    "required_proficiency": {"skill": "staff", "level": 3},
+    "damage_multiplier": 1.8,
+    "cooldown": 4.0,
+    "stamina_cost": 19,
+    ...
+}
+```
+
 ### Combined Damage Formula
 
 ```
@@ -343,6 +366,47 @@ if is_crit:
 # Step 4: Floor
 final_damage = max(1, int(damage))
 ```
+
+**Staff auto-attacks:** Staff melee auto-attacks are physical Blunt damage using ATK (not MATK). For a pure mage with low STR, this means auto-attacks deal minimal damage. This is intentional — mages must use skills for meaningful damage output.
+
+---
+
+## Implementation Architecture
+
+Component responsibilities for implementing this system:
+
+### StatsComponent
+Holds all 16 base stats as properties. New fields to add: `matk`, `mdef`, `accuracy`, `evasion`, `crit_rate`, `crit_damage`, `move_speed`, `cast_speed`, `max_stamina`, `stamina_regen`, `hp_regen`, `cooldown_reduction`. Existing fields kept: `hp`, `max_hp`, `atk`, `def`, `level`, `attack_range`.
+
+**attack_speed change**: The existing `attack_speed` field stays as the base cooldown interval (e.g., 0.8s = attacks every 0.8s). A new `attack_speed_mult` field (from AGI) acts as a multiplier. Effective cooldown: `attack_speed / attack_speed_mult`. This preserves the existing semantic while adding AGI scaling.
+
+### ProgressionComponent
+`_recalculate_stats()` computes base stats (without equipment) from proficiency levels and writes them to StatsComponent. Equipment bonuses are NOT included here — CombatComponent adds those at read time.
+
+### CombatComponent
+Reads stats from StatsComponent + equipment bonuses from EquipmentComponent.
+- `get_effective_atk()` = `stats.atk + equipment.get_atk_bonus()`
+- `get_effective_matk()` = `stats.matk + equipment.get_matk_bonus()` (new)
+- `get_effective_def()` = `stats.def + equipment.get_def_bonus()`
+- `get_effective_mdef()` = `stats.mdef + equipment.get_mdef_bonus()` (new)
+- `get_armor_type()` = `equipment.get_armor_type()` (new)
+
+### EquipmentComponent
+New methods:
+- `get_matk_bonus()` — sum `matk_bonus` across all equipped items
+- `get_mdef_bonus()` — sum `mdef_bonus` across all equipped items
+- `get_armor_type() -> String` — returns armor type from torso slot ("heavy", "medium", or "light"). Defaults to "light" if nothing equipped.
+
+### SkillEffectResolver
+Owns the full damage formula. `resolve_skill_hit()` receives skill data with `damage_category`, `element` fields. Queries weapon `phys_type` from weapon data, monster resistances from MonsterDatabase. Applies the combined damage formula (ATK/MATK, DEF/MDEF, element modifier, phys type modifier, crit).
+
+### MonsterDatabase
+Each monster entry gets new fields:
+- `"element": "earth"` — innate element (affects own attack element + provides default resistances)
+- `"resistances": {"slash": "neutral", "pierce": "resist", ...}` — per-type overrides
+
+### StaminaComponent
+Receives `stats_component` ref via `setup(stats)`. Reads `max_stamina` and `stamina_regen` from StatsComponent instead of using hardcoded values. ProgressionComponent updates StatsComponent on level-up, StaminaComponent reads dynamically.
 
 ---
 
@@ -395,7 +459,7 @@ Each trait profile defines starting proficiency levels for all 6 attributes. Thi
 | cautious_mage | 1 | 1 | 1 | 3 | 1 | 3 | Staff | Light |
 | sly_rogue | 1 | 1 | 3 | 1 | 3 | 1 | Dagger | Light |
 | stern_guardian | 2 | 3 | 1 | 1 | 1 | 2 | Sword | Heavy |
-| gentle_healer | 1 | 3 | 1 | 2 | 1 | 3 | Staff | Light |
+| gentle_healer | 1 | 2 | 1 | 2 | 1 | 3 | Staff | Light |
 | charming_bard | 1 | 1 | 2 | 2 | 2 | 2 | Dagger | Medium |
 | wild_berserker | 3 | 2 | 2 | 1 | 1 | 1 | Axe | Medium |
 | stoic_knight | 2 | 3 | 1 | 1 | 2 | 1 | Spear | Heavy |
@@ -403,7 +467,7 @@ Each trait profile defines starting proficiency levels for all 6 attributes. Thi
 | earnest_apprentice | 2 | 2 | 1 | 1 | 2 | 2 | Mace | Medium |
 | devout_cleric | 1 | 2 | 1 | 2 | 1 | 3 | Staff | Medium |
 | shadow_stalker | 2 | 1 | 3 | 1 | 2 | 1 | Dagger | Light |
-| merchant | 1 | 2 | 1 | 1 | 1 | 2 | Dagger | Light |
+| merchant | 2 | 2 | 1 | 1 | 2 | 2 | Dagger | Light |
 
 ### NpcGenerator archetype → profile mapping
 
@@ -415,6 +479,8 @@ Each trait profile defines starting proficiency levels for all 6 attributes. Thi
 | ranger | keen_archer |
 | merchant | merchant |
 
+NpcGenerator selects a random profile from the archetype's allowed list and includes it directly in the loadout dict as `trait_profile`.
+
 ---
 
 ## Stamina as Unified Resource
@@ -422,7 +488,7 @@ Each trait profile defines starting proficiency levels for all 6 attributes. Thi
 Stamina serves as the single resource pool for all actions (physical skills and magic). No separate mana.
 
 **Stamina behavior** (changes from current system noted):
-- **In combat**: Drains 0.5/sec passively (unchanged). Skills cost additional stamina per use (skill costs TBD per skill)
+- **In combat**: Drains 0.5/sec passively (unchanged). Skills cost additional stamina per use. Default formula: `stamina_cost = 10 + int(damage_multiplier × 5)`. Magical skills (staff) cost 1.5× the base amount. Examples: Bash (1.2× mult) = 16 stamina. Flame Burst (1.8× mult, magical) = 29 stamina.
 - **Moving**: Drains 0.15/sec while navigating (unchanged)
 - **Out of combat**: Regens at base 1.0/sec × Stamina Regen multiplier (**NEW** — currently no out-of-combat regen)
 - **At rest spots**: Regens at base 3.0/sec × Stamina Regen multiplier (unchanged base rate, now modified by WIS)
@@ -493,9 +559,11 @@ Equipment provides flat bonuses to base stats. Each piece declares:
 
 ## Future Considerations (not in this spec)
 
+- **Monster stat rebalance** (hard dependency): Monster HP/ATK/DEF values must be rebalanced to match new stat ranges before this system ships
 - **Weapon enchantments**: Physical weapons gaining elemental damage
 - **Status effects**: Burn (fire DoT), Freeze (ice slow), Shock (lightning stun), etc.
 - **Elemental resistance on equipment**: Armor granting magic element resistances
 - **More monsters with diverse resistance profiles**
 - **Ranged combat mechanics**: Bow projectile system, range calculations
 - **Spear reach mechanics**: Extended melee range, line-of-effect skills
+- **Synergy system update**: Current SkillDatabase synergies reference `con`/`agi` — update to include new attributes (str, int, dex, wis) as secondary synergy sources
