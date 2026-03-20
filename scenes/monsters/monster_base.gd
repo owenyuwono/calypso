@@ -226,6 +226,8 @@ func _update_lod() -> void:
 				_audio.stop_all_loops()
 		elif _lod_level < 2 and old_lod >= 2:
 			set_physics_process(true)
+			if _audio:
+				_audio.start_presence("presence_monster_idle")
 
 func _physics_process(delta: float) -> void:
 	if state == "dead":
@@ -536,6 +538,9 @@ func _respawn() -> void:
 
 	_combat.setup(_stats, null)
 	_auto_attack.cancel()
+
+	if _audio:
+		_audio.start_presence("presence_monster_idle")
 
 	GameEvents.entity_respawned.emit(monster_id)
 	_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, false)

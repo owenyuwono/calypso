@@ -39,7 +39,7 @@ func start_footsteps(surface: String = "stone") -> void:
 	var stream: AudioStream = _load_stream(sfx["path"])
 	if stream == null:
 		return
-	_enable_loop(stream)
+	stream = _enable_loop(stream)
 	_footstep_player.stream = stream
 	_footstep_player.volume_db = sfx["volume_db"]
 	_footstep_player.play()
@@ -60,7 +60,7 @@ func start_presence(sound_key: String) -> void:
 	var stream: AudioStream = _load_stream(sfx["path"])
 	if stream == null:
 		return
-	_enable_loop(stream)
+	stream = _enable_loop(stream)
 	_presence_player.stream = stream
 	_presence_player.volume_db = sfx["volume_db"]
 	_presence_player.play()
@@ -80,7 +80,7 @@ func start_combat_loop() -> void:
 	var stream: AudioStream = _load_stream(sfx["path"])
 	if stream == null:
 		return
-	_enable_loop(stream)
+	stream = _enable_loop(stream)
 	_combat_loop_player.stream = stream
 	_combat_loop_player.volume_db = sfx["volume_db"]
 	_combat_loop_player.play()
@@ -135,9 +135,12 @@ func _apply_3d_config(player: AudioStreamPlayer3D) -> void:
 	player.bus = &"SFX"
 
 
-func _enable_loop(stream: AudioStream) -> void:
+func _enable_loop(stream: AudioStream) -> AudioStream:
 	if stream is AudioStreamOggVorbis:
-		stream.loop = true
+		var looped: AudioStream = stream.duplicate()
+		looped.loop = true
+		return looped
+	return stream
 
 
 func _load_stream(path: String) -> AudioStream:

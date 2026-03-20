@@ -395,6 +395,8 @@ func _update_lod() -> void:
 			_audio.stop_all_loops()
 	elif _lod_level < 2 and old_lod >= 2:
 		set_physics_process(true)
+		if _audio:
+			_audio.start_presence("presence_npc_ambient")
 	if _lod_level == 0:
 		if not nav_agent.avoidance_enabled:
 			nav_agent.avoidance_enabled = true
@@ -496,6 +498,8 @@ func _process_movement(delta: float) -> bool:
 		else:
 			_nav_wait_frames += 1
 			if _nav_wait_frames > 60:
+				if _audio:
+					_audio.stop_footsteps()
 				change_state(STATE_IDLE)
 				GameEvents.npc_action_completed.emit(npc_id, "move_to", false)
 			return false
@@ -733,6 +737,8 @@ func _respawn() -> void:
 	_visuals.hide_hp_bar_keep_name()
 
 	change_state(STATE_IDLE)
+	if _audio:
+		_audio.start_presence("presence_npc_ambient")
 	GameEvents.entity_respawned.emit(npc_id)
 
 	if _memory:

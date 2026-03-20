@@ -810,6 +810,9 @@ func _die() -> void:
 	_stop_navigation()
 	velocity = Vector3.ZERO
 	_cursor_manager.reset()
+	if _audio:
+		_audio.play_oneshot("combat_death")
+		_audio.stop_all_loops()
 
 	# Lose 10% gold
 	var lost := EntityHelpers.apply_death_gold_penalty(_inventory, DEATH_GOLD_PENALTY_RATIO)
@@ -868,13 +871,12 @@ func _on_vending_stopped(eid: String) -> void:
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
+	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
 	var target_data: Dictionary = WorldState.get_entity_data(target_id)
 	var monster_type: String = target_data.get("monster_type", "")
 	if not monster_type.is_empty():
-		var weapon_type: String = _combat.get_equipped_weapon_type()
 		_progression.grant_combat_xp(monster_type, weapon_type)
 	if _audio:
-		var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
 		var hit_key: String = "combat_hit_" + weapon_type
 		if SfxDatabase.get_sfx(hit_key).is_empty():
 			hit_key = "combat_hit_generic"
