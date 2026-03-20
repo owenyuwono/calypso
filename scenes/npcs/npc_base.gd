@@ -73,8 +73,8 @@ var _last_nav_pos: Vector3 = Vector3.ZERO
 const MOVE_SPEED: float = 7.2
 const ARRIVAL_THRESHOLD: float = 1.0
 const GRAVITY: float = 9.8
-const PERSONAL_SPACE: float = 3.5
-const SEPARATION_FORCE: float = 3.5
+const PERSONAL_SPACE: float = 1.5
+const SEPARATION_FORCE: float = 1.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 5.0
@@ -98,6 +98,9 @@ var _memory: Node
 
 # Animation state cache to skip redundant play_anim calls
 var _current_anim: String = ""
+
+# Navigation mode flag — true when chasing a moving entity (skips arrive deceleration)
+var _navigating_to_entity: bool = false
 
 # Debug
 var _perception_circle: MeshInstance3D
@@ -232,9 +235,9 @@ func _ready() -> void:
 	nav_agent.path_desired_distance = ARRIVAL_THRESHOLD
 	nav_agent.avoidance_enabled = true
 	nav_agent.radius = 0.5
-	nav_agent.neighbor_distance = 3.0
+	nav_agent.neighbor_distance = 2.0
 	nav_agent.max_neighbors = 3
-	nav_agent.time_horizon_agents = 1.0
+	nav_agent.time_horizon_agents = 0.5
 	_lod_timer = randf_range(0.0, LOD_CHECK_INTERVAL)
 
 	if name_label:
@@ -443,21 +446,22 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
 
-	# Apply separation force to avoid overlap (skip combat/dead/thinking)
+	# Refresh separation cache (skip combat/dead/thinking)
 	if _lod_level == 0 and current_state != STATE_COMBAT and current_state != STATE_DEAD and current_state != STATE_THINKING:
 		_sep_timer -= delta
 		if _sep_timer <= 0.0:
 			_sep_timer = SEP_INTERVAL
 			_sep_cache = _get_separation_velocity()
-		velocity.x += _sep_cache.x
-		velocity.z += _sep_cache.z
+	else:
+		_sep_cache = Vector3.ZERO
 
 	# Route through NavigationAgent3D avoidance when actively moving
 	if is_moving and desired_xz.length_squared() > 0.01:
 		nav_agent.velocity = desired_xz
-		# Apply the last computed safe velocity (updated asynchronously via signal)
-		velocity.x = _safe_velocity.x
-		velocity.z = _safe_velocity.z
+		# Lerp toward avoidance-adjusted safe velocity + cached separation for smooth movement
+		var target_vel := Vector3(_safe_velocity.x, 0, _safe_velocity.z) + Vector3(_sep_cache.x, 0, _sep_cache.z)
+		velocity.x = lerpf(velocity.x, target_vel.x, delta * 5.0)
+		velocity.z = lerpf(velocity.z, target_vel.z, delta * 5.0)
 
 	# Skip move_and_slide when stationary on floor to avoid unnecessary physics work
 	if velocity.length_squared() < 0.001 and is_on_floor():
@@ -515,8 +519,14 @@ func _process_movement(delta: float) -> bool:
 	dir.y = 0.0
 	if dir.length_squared() > 0.01:
 		dir = dir.normalized()
-		velocity.x = dir.x * MOVE_SPEED
-		velocity.z = dir.z * MOVE_SPEED
+		var speed_factor: float = 1.0
+		if not _navigating_to_entity:
+			var dist_to_target: float = global_position.distance_to(nav_agent.get_final_position())
+			var arrive_radius: float = 3.0
+			if dist_to_target < arrive_radius:
+				speed_factor = clampf(dist_to_target / arrive_radius, 0.15, 1.0)
+		velocity.x = dir.x * MOVE_SPEED * speed_factor
+		velocity.z = dir.z * MOVE_SPEED * speed_factor
 		_visuals.face_direction(dir)
 		return true
 	return false
@@ -593,6 +603,7 @@ func _on_any_npc_spoke(speaker_id: String, dialogue: String, _target_id: String)
 # --- Actions ---
 
 func navigate_to(target_pos: Vector3) -> void:
+	_navigating_to_entity = false
 	change_state(STATE_MOVING)
 	_nav_started = false
 	_nav_wait_frames = 0
@@ -603,6 +614,7 @@ func navigate_to(target_pos: Vector3) -> void:
 func navigate_to_entity(target_id: String) -> void:
 	var target_node: Node3D = WorldState.get_entity(target_id)
 	if target_node:
+		_navigating_to_entity = true
 		navigate_to(target_node.global_position)
 	elif WorldState.has_location(target_id):
 		var loc: Vector3 = WorldState.get_location(target_id)

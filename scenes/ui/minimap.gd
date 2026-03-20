@@ -1,6 +1,6 @@
 extends Control
 ## Minimap overlay — draws entity dots on a player-centered 2D projection of the world.
-## Toggle with M key.
+## Toggle with M key. Compass button (bottom-right) opens world map.
 
 const MAP_SIZE := 180.0
 const MAP_RADIUS := 30.0  # world units visible around player
@@ -14,6 +14,9 @@ var _timer: float = 0.0
 var _dots: Array = []  # [{pos: Vector2, color: Color, radius: float, is_player: bool}]
 var _zone_label_text: String = "Town"
 var _player_pos := Vector3.ZERO
+
+# Reference to world map panel — set externally via set_world_map()
+var _world_map_panel: Control = null
 
 func _ready() -> void:
 	# Anchor top-right
@@ -30,6 +33,64 @@ func _ready() -> void:
 	offset_bottom = 10 + total_h
 	custom_minimum_size = Vector2(total_w, total_h)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	_build_compass_button()
+
+
+func _build_compass_button() -> void:
+	var compass_btn := Button.new()
+	compass_btn.custom_minimum_size = Vector2(26, 26)
+	compass_btn.tooltip_text = "World Map (W)"
+	compass_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Load the map icon if it exists
+	var icon_tex: Texture2D = load("res://assets/textures/ui/buttons/btn_map.png")
+	if icon_tex:
+		compass_btn.icon = icon_tex
+		compass_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		compass_btn.texture_filter = TEXTURE_FILTER_NEAREST
+
+	# Dark style with gold border to match the panel toggles aesthetic
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.1, 0.1, 0.15, 0.92)
+	normal_style.border_color = Color(0.55, 0.45, 0.2)
+	normal_style.set_border_width_all(1)
+	normal_style.set_corner_radius_all(3)
+	normal_style.content_margin_left = 3
+	normal_style.content_margin_right = 3
+	normal_style.content_margin_top = 3
+	normal_style.content_margin_bottom = 3
+	compass_btn.add_theme_stylebox_override("normal", normal_style)
+
+	var hover_style := normal_style.duplicate() as StyleBoxFlat
+	hover_style.bg_color = Color(0.18, 0.16, 0.22, 0.95)
+	hover_style.border_color = Color(1.0, 0.85, 0.3)
+	compass_btn.add_theme_stylebox_override("hover", hover_style)
+
+	# Position at bottom-right inside the minimap area
+	compass_btn.anchor_left = 1.0
+	compass_btn.anchor_top = 1.0
+	compass_btn.anchor_right = 1.0
+	compass_btn.anchor_bottom = 1.0
+	var btn_size: float = 26.0
+	# offset_bottom anchors from bottom — 22px label area + 2px gap above it
+	compass_btn.offset_left = -(btn_size + 4)
+	compass_btn.offset_right = -4
+	compass_btn.offset_top = -(22 + btn_size + 4)
+	compass_btn.offset_bottom = -(22 + 4)
+
+	compass_btn.pressed.connect(_on_compass_pressed)
+	add_child(compass_btn)
+
+
+func set_world_map(panel: Control) -> void:
+	_world_map_panel = panel
+
+
+func _on_compass_pressed() -> void:
+	if _world_map_panel and _world_map_panel.has_method("toggle"):
+		_world_map_panel.toggle()
+
 
 func _process(delta: float) -> void:
 	_timer -= delta
@@ -168,14 +229,14 @@ func _draw() -> void:
 
 	# Draw non-player dots first, player last
 	for dot in _dots:
-		if dot.is_player:
+		if dot.get("is_player", false):
 			continue
 		if dot.get("is_portal", false):
 			continue
 		draw_circle(dot.pos, dot.radius, dot.color)
 
 	for dot in _dots:
-		if dot.is_player:
+		if dot.get("is_player", false):
 			# Black outline then white fill
 			draw_circle(dot.pos, dot.radius + 1.5, Color.BLACK)
 			draw_circle(dot.pos, dot.radius, Color.WHITE)

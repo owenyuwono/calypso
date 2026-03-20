@@ -1,5 +1,5 @@
 extends Control
-## Toggle button bar for Status and Skills panels.
+## Toggle button bar for Status, Inventory, and Skills panels.
 ## Anchored top-right below the minimap.
 
 var status_panel: Control
@@ -7,7 +7,6 @@ var inventory_panel: Control
 var skill_panel: Control
 var proficiency_panel: Control
 var chat_input: Control
-var world_map_panel: Control
 
 var _buttons: Dictionary = {}  # key -> Button
 var _normal_styles: Dictionary = {}  # key -> StyleBoxFlat
@@ -18,7 +17,6 @@ const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "inventory", "label": "Inv", "hint": "I"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
-	{"key": "map", "label": "Map", "hint": "W"},
 ]
 
 func _ready() -> void:
@@ -27,7 +25,7 @@ func _ready() -> void:
 	anchor_top = 0.0
 	anchor_right = 1.0
 	anchor_bottom = 0.0
-	offset_left = -194
+	offset_left = -152
 	offset_top = 220
 	offset_right = -10
 	offset_bottom = 260
@@ -121,7 +119,6 @@ func _get_panel(key: String) -> Control:
 		"status": return status_panel
 		"inventory": return inventory_panel
 		"skills": return skill_panel
-		"map": return world_map_panel
 	return null
 
 func _is_panel_open(key: String) -> bool:

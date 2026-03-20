@@ -35,9 +35,9 @@ func _ready() -> void:
 	anchor_top = 1.0
 	anchor_bottom = 1.0
 	offset_left = 10
-	offset_right = 410
-	offset_top = -310
-	offset_bottom = -60
+	offset_right = 310
+	offset_top = -220
+	offset_bottom = -50
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Background panel
@@ -58,7 +58,7 @@ func _ready() -> void:
 	_rich_label.bbcode_enabled = true
 	_rich_label.scroll_following = true
 	_rich_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_rich_label.add_theme_font_size_override("normal_font_size", 13)
+	_rich_label.add_theme_font_size_override("normal_font_size", 11)
 	panel.add_child(_rich_label)
 
 	# Connect signals

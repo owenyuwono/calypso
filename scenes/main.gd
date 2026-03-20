@@ -108,7 +108,12 @@ func _ready() -> void:
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.chat_input = chat_input
-		panel_toggles.world_map_panel = $UILayer/WorldMapPanel
+
+	# Wire world map reference to minimap so the compass button can open it
+	var minimap := $UILayer/Minimap
+	var world_map_panel := $UILayer/WorldMapPanel
+	if minimap and world_map_panel:
+		minimap.set_world_map(world_map_panel)
 
 	# Boot ZoneManager — loads first zone and bakes navmesh
 	ZoneManager.setup($ZoneAnchor, player, self)

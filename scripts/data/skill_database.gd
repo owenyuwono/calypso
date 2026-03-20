@@ -4,7 +4,7 @@ extends RefCounted
 const SKILLS: Dictionary = {
 	"bash": {
 		"name": "Bash",
-		"description": "A powerful melee strike.",
+		"description": "Strike with pommel, moderate damage",
 		"type": "melee_attack",
 		"max_level": 5,
 		"synergy": {
@@ -23,7 +23,7 @@ const SKILLS: Dictionary = {
 	},
 	"cleave": {
 		"name": "Cleave",
-		"description": "A wide slash that hits nearby enemies.",
+		"description": "Wide slash hitting all nearby enemies",
 		"type": "aoe_melee",
 		"max_level": 5,
 		"synergy": {
@@ -44,7 +44,7 @@ const SKILLS: Dictionary = {
 	},
 	"rend": {
 		"name": "Rend",
-		"description": "A vicious cut that causes bleeding.",
+		"description": "Deep cut causing bleeding over time",
 		"type": "bleed",
 		"max_level": 5,
 		"synergy": {
@@ -66,7 +66,7 @@ const SKILLS: Dictionary = {
 	},
 	"chop": {
 		"name": "Chop",
-		"description": "A heavy downward chop.",
+		"description": "Heavy overhead chop",
 		"type": "melee_attack",
 		"max_level": 5,
 		"synergy": {
@@ -85,7 +85,7 @@ const SKILLS: Dictionary = {
 	},
 	"whirlwind": {
 		"name": "Whirlwind",
-		"description": "Spin attack hitting all nearby enemies.",
+		"description": "Spinning attack hitting all nearby",
 		"type": "aoe_melee",
 		"max_level": 5,
 		"synergy": {
@@ -106,7 +106,7 @@ const SKILLS: Dictionary = {
 	},
 	"execute": {
 		"name": "Execute",
-		"description": "A devastating blow that pierces armor.",
+		"description": "Devastating blow, ignores some armor",
 		"type": "armor_pierce",
 		"max_level": 5,
 		"synergy": {
@@ -126,7 +126,7 @@ const SKILLS: Dictionary = {
 	},
 	"crush": {
 		"name": "Crush",
-		"description": "A crushing blow.",
+		"description": "Crushing blow dealing heavy damage",
 		"type": "melee_attack",
 		"max_level": 5,
 		"synergy": {
@@ -145,7 +145,7 @@ const SKILLS: Dictionary = {
 	},
 	"shatter": {
 		"name": "Shatter",
-		"description": "Shatters the target's defenses.",
+		"description": "Armor-shattering focused strike",
 		"type": "armor_pierce",
 		"max_level": 5,
 		"synergy": {
@@ -165,7 +165,7 @@ const SKILLS: Dictionary = {
 	},
 	"quake": {
 		"name": "Quake",
-		"description": "Slams the ground, damaging all nearby.",
+		"description": "Earth-shaking strike ignoring armor",
 		"type": "aoe_melee",
 		"max_level": 5,
 		"synergy": {
@@ -186,7 +186,7 @@ const SKILLS: Dictionary = {
 	},
 	"stab": {
 		"name": "Stab",
-		"description": "A quick precise strike.",
+		"description": "Quick precise thrust",
 		"type": "melee_attack",
 		"max_level": 5,
 		"synergy": {
@@ -205,7 +205,7 @@ const SKILLS: Dictionary = {
 	},
 	"lacerate": {
 		"name": "Lacerate",
-		"description": "Slashes that cause deep bleeding.",
+		"description": "Rapid slashes causing bleeding",
 		"type": "bleed",
 		"max_level": 5,
 		"synergy": {
@@ -227,7 +227,7 @@ const SKILLS: Dictionary = {
 	},
 	"backstab": {
 		"name": "Backstab",
-		"description": "A lethal strike that bypasses all armor.",
+		"description": "Armor-piercing surprise attack",
 		"type": "armor_pierce",
 		"max_level": 5,
 		"synergy": {
@@ -247,7 +247,7 @@ const SKILLS: Dictionary = {
 	},
 	"arcane_bolt": {
 		"name": "Arcane Bolt",
-		"description": "A burst of arcane energy.",
+		"description": "Focused magical projectile",
 		"type": "melee_attack",
 		"max_level": 5,
 		"synergy": {
@@ -266,7 +266,7 @@ const SKILLS: Dictionary = {
 	},
 	"flame_burst": {
 		"name": "Flame Burst",
-		"description": "An explosion of flame around the target.",
+		"description": "Fiery explosion hitting nearby foes",
 		"type": "aoe_melee",
 		"max_level": 5,
 		"synergy": {
@@ -287,7 +287,7 @@ const SKILLS: Dictionary = {
 	},
 	"drain": {
 		"name": "Drain",
-		"description": "Dark magic that saps life over time.",
+		"description": "Siphon life force, ignoring defenses",
 		"type": "bleed",
 		"max_level": 5,
 		"synergy": {

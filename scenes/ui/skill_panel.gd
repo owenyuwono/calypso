@@ -6,6 +6,28 @@ extends Control
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 
+
+## Drag source for skill rows. Wraps skill content and provides drag data.
+class SkillDragSource extends PanelContainer:
+	var skill_id: String = ""
+	var skill_name: String = ""
+
+	func _get_drag_data(_at_position: Vector2) -> Variant:
+		var preview := PanelContainer.new()
+		var preview_style := StyleBoxFlat.new()
+		preview_style.bg_color = Color(0.1, 0.09, 0.07, 0.95)
+		UIHelper.set_corner_radius(preview_style, 4)
+		UIHelper.set_border_width(preview_style, 1)
+		preview_style.border_color = UIHelper.COLOR_GOLD
+		preview.add_theme_stylebox_override("panel", preview_style)
+		var label := Label.new()
+		label.text = skill_name
+		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+		preview.add_child(label)
+		set_drag_preview(preview)
+		return {"skill_id": skill_id, "type": "skill_drag"}
+
 const CATEGORY_LABELS: Dictionary = {
 	"weapon": "WEAPON",
 	"attribute": "ATTRIBUTES",
@@ -88,10 +110,18 @@ func _build_ui() -> void:
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	hbox.add_child(right_scroll)
 
+	var right_margin := MarginContainer.new()
+	right_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_margin.add_theme_constant_override("margin_left", 12)
+	right_margin.add_theme_constant_override("margin_right", 12)
+	right_margin.add_theme_constant_override("margin_top", 12)
+	right_margin.add_theme_constant_override("margin_bottom", 12)
+	right_scroll.add_child(right_margin)
+
 	_right_content = VBoxContainer.new()
 	_right_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_right_content.add_theme_constant_override("separation", 6)
-	right_scroll.add_child(_right_content)
+	right_margin.add_child(_right_content)
 
 
 func _input(event: InputEvent) -> void:
@@ -107,6 +137,9 @@ func toggle() -> void:
 	if _is_open:
 		UIHelper.center_panel(_panel)
 		_refresh()
+	else:
+		if _detail_panel:
+			_detail_panel.hide_skill()
 
 
 func is_open() -> bool:
@@ -422,12 +455,29 @@ func _build_skill_row(skill_id: String) -> void:
 	var skill_color: Color = skill.get("color", Color.WHITE)
 	var eff_percent: int = SkillDatabase.get_total_effectiveness_percent(skill_id, _progression)
 
+	# Drag source wrapper — outer container receives drag and hover
+	var drag_source: SkillDragSource = SkillDragSource.new()
+	drag_source.skill_id = skill_id
+	drag_source.skill_name = skill.get("name", skill_id)
+	drag_source.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	drag_source.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var row_default_style: StyleBoxFlat = StyleBoxFlat.new()
+	row_default_style.bg_color = Color(0.12, 0.11, 0.09, 0.0)
+	row_default_style.set_border_width_all(1)
+	row_default_style.border_color = Color(0.0, 0.0, 0.0, 0.0)
+	UIHelper.set_corner_radius(row_default_style, 3)
+	drag_source.add_theme_stylebox_override("panel", row_default_style)
+	drag_source.set_meta("bg_style", row_default_style)
+
+	drag_source.mouse_entered.connect(_on_skill_row_hover.bind(drag_source, skill_id))
+	drag_source.mouse_exited.connect(_on_skill_row_unhover.bind(drag_source, skill_id))
+	_right_content.add_child(drag_source)
+
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	row.mouse_entered.connect(_on_skill_row_hovered.bind(skill_id, row))
-	row.mouse_exited.connect(_on_skill_row_unhovered)
-	_right_content.add_child(row)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	drag_source.add_child(row)
 
 	# Icon (24x24)
 	var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
@@ -450,7 +500,14 @@ func _build_skill_row(skill_id: String) -> void:
 		skill_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(skill_icon)
 
-	# Name
+	# Name + description vertical stack
+	var name_col: VBoxContainer = VBoxContainer.new()
+	name_col.add_theme_constant_override("separation", 1)
+	name_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(name_col)
+
 	var name_label: Label = Label.new()
 	name_label.text = skill.get("name", skill_id)
 	name_label.add_theme_font_size_override("font_size", 14)
@@ -458,27 +515,15 @@ func _build_skill_row(skill_id: String) -> void:
 	if eff_percent < 70:
 		name_color = skill_color.lerp(Color(0.5, 0.5, 0.5), 0.5)
 	name_label.add_theme_color_override("font_color", name_color)
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(name_label)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_col.add_child(name_label)
 
-	# Type badge
-	var type_label: Label = Label.new()
-	var skill_type: String = skill.get("type", "melee_attack")
-	match skill_type:
-		"melee_attack":
-			type_label.text = "Single"
-			type_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-		"aoe_melee":
-			type_label.text = "AoE"
-			type_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2))
-		"armor_pierce":
-			type_label.text = "Pierce"
-			type_label.add_theme_color_override("font_color", Color(0.4, 0.6, 1.0))
-		"bleed":
-			type_label.text = "DoT"
-			type_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
-	type_label.add_theme_font_size_override("font_size", 12)
-	row.add_child(type_label)
+	var desc_label: Label = Label.new()
+	desc_label.text = skill.get("description", "")
+	desc_label.add_theme_font_size_override("font_size", 11)
+	desc_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.55))
+	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_col.add_child(desc_label)
 
 	# Effectiveness %
 	var eff_label: Label = Label.new()
@@ -494,22 +539,32 @@ func _build_skill_row(skill_id: String) -> void:
 	else:
 		eff_color = Color(1.0, 0.2, 0.2)
 	eff_label.add_theme_color_override("font_color", eff_color)
+	eff_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	eff_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(eff_label)
 
 
-func _on_skill_row_hovered(skill_id: String, row: Control) -> void:
+func _on_skill_row_hover(drag_source: Control, skill_id: String) -> void:
+	var bg_style: StyleBoxFlat = drag_source.get_meta("bg_style") as StyleBoxFlat
+	if bg_style:
+		bg_style.bg_color = Color(0.18, 0.16, 0.13)
+		bg_style.border_color = Color(0.7, 0.6, 0.3, 0.5)
 	if not _detail_panel:
 		var DetailPanel: GDScript = preload("res://scenes/ui/skill_detail_panel.gd")
 		_detail_panel = DetailPanel.new()
 		_detail_panel.setup(_player)
 		get_tree().root.add_child(_detail_panel)
 	# Position tooltip to the right of the panel
-	var row_global: Vector2 = row.global_position
+	var row_global: Vector2 = drag_source.global_position
 	var anchor_pos: Vector2 = Vector2(_panel.global_position.x + _panel.size.x + 8, row_global.y)
 	_detail_panel.show_skill(skill_id, anchor_pos)
 
 
-func _on_skill_row_unhovered() -> void:
+func _on_skill_row_unhover(drag_source: Control, _skill_id: String) -> void:
+	var bg_style: StyleBoxFlat = drag_source.get_meta("bg_style") as StyleBoxFlat
+	if bg_style:
+		bg_style.bg_color = Color(0.12, 0.11, 0.09, 0.0)
+		bg_style.border_color = Color(0.0, 0.0, 0.0, 0.0)
 	if _detail_panel:
 		_detail_panel.hide_skill()
 

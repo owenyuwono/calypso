@@ -1,27 +1,23 @@
 extends Control
 ## Player inventory panel toggled with Tab.
-## Layout (top to bottom): drag handle, attack type + gold row,
-## EQUIPMENT header, semantic equipment layout (armor left / weapons right),
-## separator, ITEMS header, 5-column inventory grid with scroll.
+## Layout: drag handle (full width), attack type + gold row (full width),
+## then side-by-side: EQUIPMENT section (left) | ITEMS section (right).
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
-const GRID_COLUMNS := 5
+const GRID_COLUMNS := 4
 const MIN_SLOTS := 20
 const CELL_SIZE := 64
-const EQUIP_CELL_SIZE := 56
-const EQUIP_WEAPON_CELL_SIZE := 62
+const EQUIP_CELL_SIZE := 58
 
-# Armor slots: 2 columns × 3 rows (left group)
-const ARMOR_LAYOUT: Array = [
-	["head",   "torso"],
-	["gloves", "legs"],
-	["feet",   "back"],
+# All 8 equipment slots in a single 2-column grid, top to bottom
+const EQUIP_LAYOUT: Array = [
+	["head",     "torso"],
+	["gloves",   "legs"],
+	["feet",     "back"],
+	["main_hand","off_hand"],
 ]
-
-# Weapon slots: single column (right group)
-const WEAPON_LAYOUT: Array = ["main_hand", "off_hand"]
 
 const SLOT_LABELS: Dictionary = {
 	"head": "Head", "torso": "Torso", "main_hand": "Main", "off_hand": "Off",
@@ -62,8 +58,7 @@ const STAT_ICON_MAP: Dictionary = {
 }
 
 var _panel: PanelContainer
-var _equip_armor_grid: GridContainer
-var _equip_weapon_vbox: VBoxContainer
+var _equip_grid: GridContainer
 var _grid: GridContainer
 var _attack_type_label: Label
 var _gold_label: Label
@@ -100,7 +95,7 @@ func _load_slot_icons() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(400, 580)
+	_panel.custom_minimum_size = Vector2(470, 440)
 	var style := UIHelper.create_panel_style()
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
@@ -109,13 +104,13 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", 6)
 	_panel.add_child(vbox)
 
-	# Title bar
+	# Title bar (full width)
 	var drag_handle := DragHandle.new()
 	drag_handle.setup(_panel, "Inventory")
 	drag_handle.close_pressed.connect(_toggle)
 	vbox.add_child(drag_handle)
 
-	# Attack type + gold row
+	# Attack type + gold row (full width)
 	var info_row := HBoxContainer.new()
 	info_row.add_theme_constant_override("separation", 8)
 	vbox.add_child(info_row)
@@ -150,52 +145,65 @@ func _build_ui() -> void:
 	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	gold_hbox.add_child(_gold_label)
 
-	# EQUIPMENT section header
+	# Main body: equipment (left) | separator | items (right)
+	var body_hbox := HBoxContainer.new()
+	body_hbox.add_theme_constant_override("separation", 0)
+	body_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(body_hbox)
+
+	# --- Left: equipment VBox ---
+	var equip_vbox := VBoxContainer.new()
+	equip_vbox.add_theme_constant_override("separation", 6)
+	equip_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	body_hbox.add_child(equip_vbox)
+
 	var equip_header := Label.new()
 	equip_header.text = "EQUIPMENT"
 	equip_header.add_theme_font_size_override("font_size", 11)
 	equip_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
 	equip_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(equip_header)
+	equip_vbox.add_child(equip_header)
 
-	# Equipment layout: armor grid (left) + weapon column (right)
-	var equip_row := HBoxContainer.new()
-	equip_row.add_theme_constant_override("separation", 10)
-	vbox.add_child(equip_row)
+	# Single 2×4 grid for all 8 slots
+	_equip_grid = GridContainer.new()
+	_equip_grid.columns = 2
+	_equip_grid.add_theme_constant_override("h_separation", 6)
+	_equip_grid.add_theme_constant_override("v_separation", 6)
+	equip_vbox.add_child(_equip_grid)
 
-	# Left: armor grid 2×3
-	_equip_armor_grid = GridContainer.new()
-	_equip_armor_grid.columns = 2
-	_equip_armor_grid.add_theme_constant_override("h_separation", 6)
-	_equip_armor_grid.add_theme_constant_override("v_separation", 6)
-	equip_row.add_child(_equip_armor_grid)
+	# Vend button below equipment grid
+	var vend_btn := Button.new()
+	vend_btn.text = "Set Up Shop [V]"
+	vend_btn.add_theme_font_size_override("font_size", 11)
+	vend_btn.custom_minimum_size = Vector2(0, 28)
+	vend_btn.pressed.connect(_on_vend_button_pressed)
+	equip_vbox.add_child(vend_btn)
 
-	# Spacer between groups
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(4, 0)
-	equip_row.add_child(spacer)
+	# --- Vertical separator ---
+	var vsep := VSeparator.new()
+	vsep.add_theme_constant_override("separation", 8)
+	body_hbox.add_child(vsep)
 
-	# Right: weapon vbox
-	_equip_weapon_vbox = VBoxContainer.new()
-	_equip_weapon_vbox.add_theme_constant_override("separation", 6)
-	equip_row.add_child(_equip_weapon_vbox)
+	# --- Right: items VBox ---
+	var items_vbox := VBoxContainer.new()
+	items_vbox.add_theme_constant_override("separation", 6)
+	items_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	items_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_hbox.add_child(items_vbox)
 
-	# Separator
-	vbox.add_child(HSeparator.new())
-
-	# ITEMS section header
 	var items_header := Label.new()
 	items_header.text = "ITEMS"
 	items_header.add_theme_font_size_override("font_size", 11)
 	items_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
 	items_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(items_header)
+	items_vbox.add_child(items_header)
 
 	# Scroll + inventory grid
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 280)
-	vbox.add_child(scroll)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 300)
+	items_vbox.add_child(scroll)
 
 	_grid = GridContainer.new()
 	_grid.columns = GRID_COLUMNS
@@ -203,14 +211,6 @@ func _build_ui() -> void:
 	_grid.add_theme_constant_override("v_separation", 4)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_grid)
-
-	# Vend button
-	var vend_btn := Button.new()
-	vend_btn.text = "Set Up Shop [V]"
-	vend_btn.add_theme_font_size_override("font_size", 13)
-	vend_btn.custom_minimum_size = Vector2(0, 32)
-	vend_btn.pressed.connect(_on_vend_button_pressed)
-	vbox.add_child(vend_btn)
 
 	# Tooltip — child of root Control so it overlays everything
 	_tooltip = PanelContainer.new()
@@ -339,28 +339,17 @@ func _refresh() -> void:
 	var gold: int = _inventory.get_gold_amount()
 	_gold_label.text = "%d" % gold
 
-	# Rebuild armor grid (left)
-	for child in _equip_armor_grid.get_children():
+	# Rebuild unified equipment grid (2×4: all 8 slots)
+	for child in _equip_grid.get_children():
 		child.queue_free()
 
-	for row in ARMOR_LAYOUT:
+	for row in EQUIP_LAYOUT:
 		for slot_name in row:
 			var item_id: String = _equipment.get_slot(slot_name)
 			if item_id.is_empty():
-				_equip_armor_grid.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
+				_equip_grid.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
 			else:
-				_equip_armor_grid.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
-
-	# Rebuild weapon column (right)
-	for child in _equip_weapon_vbox.get_children():
-		child.queue_free()
-
-	for slot_name in WEAPON_LAYOUT:
-		var item_id: String = _equipment.get_slot(slot_name)
-		if item_id.is_empty():
-			_equip_weapon_vbox.add_child(_build_equip_cell_empty(slot_name, EQUIP_WEAPON_CELL_SIZE))
-		else:
-			_equip_weapon_vbox.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_WEAPON_CELL_SIZE))
+				_equip_grid.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
 
 	# Rebuild inventory grid
 	for child in _grid.get_children():

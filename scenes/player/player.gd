@@ -281,9 +281,15 @@ func _physics_process(delta: float) -> void:
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position)
 		dir.y = 0.0
-		dir = dir.normalized()
-		velocity.x = dir.x * SPEED
-		velocity.z = dir.z * SPEED
+		if dir.length_squared() > 0.01:
+			dir = dir.normalized()
+		var dist_to_target: float = global_position.distance_to(nav_agent.get_final_position())
+		var arrive_radius: float = 2.0
+		var speed_factor: float = 1.0
+		if dist_to_target < arrive_radius:
+			speed_factor = clampf(dist_to_target / arrive_radius, 0.15, 1.0)
+		velocity.x = dir.x * SPEED * speed_factor
+		velocity.z = dir.z * SPEED * speed_factor
 		_visuals.face_direction(dir)
 		is_moving = true
 		# Stuck detection: if we haven't moved 0.1 units in 1.5 seconds, abort navigation

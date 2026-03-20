@@ -51,7 +51,7 @@ func process_attack(
 
 	if dist > attack_range:
 		# Out of range — chase target
-		_chase(target_node, move_speed, speed_multiplier)
+		_chase(delta, target_node, move_speed, speed_multiplier)
 
 		# Stuck detection: if no positional progress for 2s, disengage
 		var parent: Node3D = get_parent() as Node3D
@@ -116,7 +116,7 @@ func cancel() -> void:
 
 # --- Private ---
 
-func _chase(target_node: Node3D, move_speed: float, speed_multiplier: float) -> void:
+func _chase(delta: float, target_node: Node3D, move_speed: float, speed_multiplier: float) -> void:
 	# Only update nav target if target moved significantly (avoids nav spam)
 	var target_pos: Vector3 = target_node.global_position
 	if _last_nav_target_pos.distance_to(target_pos) > 1.0:
@@ -131,8 +131,11 @@ func _chase(target_node: Node3D, move_speed: float, speed_multiplier: float) -> 
 			dir.y = 0.0
 			if dir.length_squared() > 0.01:
 				dir = dir.normalized()
-				parent.velocity.x = dir.x * move_speed * speed_multiplier
-				parent.velocity.z = dir.z * move_speed * speed_multiplier
+				var target_vx: float = dir.x * move_speed * speed_multiplier
+				var target_vz: float = dir.z * move_speed * speed_multiplier
+				# Lerp for smooth acceleration into chase rather than snapping velocity
+				parent.velocity.x = lerpf(parent.velocity.x, target_vx, delta * 8.0)
+				parent.velocity.z = lerpf(parent.velocity.z, target_vz, delta * 8.0)
 				_visuals.face_direction(dir)
 				_visuals.play_anim("Running_A")
 

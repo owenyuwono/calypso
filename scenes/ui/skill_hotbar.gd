@@ -3,6 +3,22 @@ extends Control
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
+
+## Drop target for each hotbar slot. Accepts skill_drag data from the skill panel.
+class HotbarDropTarget extends PanelContainer:
+	var slot_index: int = 0
+	var skills_comp: Node = null
+	var hotbar_ref: Node = null  # Reference to the skill_hotbar node for refresh
+
+	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+		return data is Dictionary and data.get("type") == "skill_drag"
+
+	func _drop_data(_at_position: Vector2, data: Variant) -> void:
+		if skills_comp:
+			skills_comp.set_hotbar_slot(slot_index, data.skill_id)
+		if hotbar_ref:
+			hotbar_ref.refresh()
+
 const SLOT_COUNT: int = 5
 const SLOT_SIZE: float = 64.0
 const SLOT_GAP: float = 4.0
@@ -14,6 +30,13 @@ var _player: Node
 
 func set_player(p: Node) -> void:
 	_player = p
+	# Wire drop targets now that player (and skills_comp) is known
+	var skills_comp: Node = p.get_node_or_null("SkillsComponent")
+	for slot in _slots:
+		var drop_target: HotbarDropTarget = slot.panel as HotbarDropTarget
+		if drop_target:
+			drop_target.skills_comp = skills_comp
+			drop_target.hotbar_ref = self
 	refresh()
 
 func _ready() -> void:
@@ -45,9 +68,10 @@ func _build_ui() -> void:
 		_slots.append(slot_data)
 
 func _create_slot(index: int) -> Dictionary:
-	var panel := PanelContainer.new()
+	var panel: HotbarDropTarget = HotbarDropTarget.new()
+	panel.slot_index = index
 	panel.custom_minimum_size = Vector2(SLOT_SIZE, SLOT_SIZE)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.18, 0.9)
@@ -162,7 +186,7 @@ func is_on_cooldown(skill_id: String) -> bool:
 func refresh() -> void:
 	if not _player:
 		return
-	var skills_comp = _player.get_node("SkillsComponent")
+	var skills_comp = _player.get_node_or_null("SkillsComponent")
 	if not skills_comp:
 		return
 	var hotbar: Array = skills_comp.get_hotbar()
