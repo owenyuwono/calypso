@@ -2,8 +2,8 @@
 
 ## Conventions
 - **Engine**: Godot 4.6, GDScript only
-- **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals), TimeManager (24h day cycle: dawn/day/dusk/night phases, `time_phase_changed` signal)
-- **Static utility classes**: ModelHelper (3D models, effects, animation merging), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), FishDatabase (fishing tier data), RecipeDatabase (unified crafting recipes), world builders (see below)
+- **Autoload singletons**: WorldState (registry only), LLMClient (Ollama `/api/chat`, think:false), GameEvents (signals), TimeManager (24h day cycle: dawn/day/dusk/night phases, `time_phase_changed` signal), ZoneManager (zone transitions: async load, fade, nav reset)
+- **Static utility classes**: ModelHelper (3D models, effects, animation merging, `create_toon_material()`, `apply_toon_to_model()`, `create_fallback_mesh()`, `spawn_damage_number()`), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), FishDatabase (fishing tier data), RecipeDatabase (unified crafting recipes), TreeDatabase (tree tier data), ProficiencyDatabase (13 skills, 4 categories, XP formulas), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
@@ -21,11 +21,11 @@ Each entity (player, NPC, monster) owns its state via child Node components:
 - `StatsComponent` — hp, max_hp, atk, def, level, attack_speed, attack_range. **Must set `.name = "StatsComponent"` before `add_child()`**. API: `take_damage()`, `heal()`, `restore_full_hp()`, `is_alive()`, `get_stats_dict()`
 - `InventoryComponent` — items dict + gold. API: `add_item()`, `remove_item()`, `has_item()`, `get_items()`, `add_gold_amount()`, `remove_gold_amount()`, `get_gold_amount()`, `set_gold_amount()`
 - `EquipmentComponent` — 8 slots (head, torso, legs, gloves, feet, back, main_hand, off_hand). Items route to slot via `slot_type` field (fallback: weapon→main_hand, armor→off_hand). Requires InventoryComponent ref. API: `equip()`, `unequip()`, `get_slot(name)`, `get_weapon()`, `get_armor()`, `get_atk_bonus()`, `get_def_bonus()`. Bonuses summed across all slots
-- `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `deal_damage_amount_to_with_pierce(target_id, amount, def_ignore)`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`
+- `CombatComponent` — damage/heal logic. Requires StatsComponent + optional EquipmentComponent. API: `deal_damage_to()`, `deal_damage_amount_to()`, `deal_damage_amount_to_with_pierce(target_id, amount, def_ignore)`, `heal()`, `get_effective_atk()`, `get_effective_def()`, `is_alive()`, `get_attack_speed_multiplier()`, `get_equipped_weapon_type()`
 - `ProgressionComponent` — owns proficiency state `{skill_id: {level, xp}}`. Derives stats from proficiency levels. Requires StatsComponent. API: `grant_proficiency_xp()`, `get_proficiency_level()`, `get_proficiency_xp()`, `get_total_level()`, `get_proficiencies()`
 - `SkillsComponent` — active skills (no skill points). Skills unlock via proficiency milestones. API: `unlock_skill()`, `grant_skill_xp()`, `has_skill()`, `get_skill_level()`, `set_hotbar_slot()`, `get_hotbar()`
 - `VendingComponent` — vending state, listings, buy/sell. **Must set `.name = "VendingComponent"` before `add_child()`**. API: `start_vending()`, `stop_vending()`, `is_vending()`, `get_listings()`, `get_shop_title()`, `buy_from()`
-- `PerceptionComponent` — Area3D-based spatial awareness (radius 25). Tracks nearby entities via `body_entered`/`body_exited` signals on collision layer 9 (bit 8). **Area3D must be parented to entity Node3D, not the component Node.** API: `get_perception(radius)`, `get_nearby(radius)`, `get_nearby_locations(radius)`, `is_tracking(id)`, `get_distance_to(id)`
+- `PerceptionComponent` — Area3D-based spatial awareness (radius 15). Tracks nearby entities via `body_entered`/`body_exited` signals on collision layer 9 (bit 8). **Area3D must be parented to entity Node3D, not the component Node.** API: `get_perception(radius)`, `get_nearby(radius)`, `is_tracking(id)`, `get_distance_to(id)`
 - `AutoAttackComponent` — signal-based auto-attack shared by all entities. Requires visuals + combat + nav_agent. Emits `attack_landed(target_id, damage, target_pos)` and `target_lost()`. `process_attack()` handles chase + stuck detection
 - `StaminaComponent` — self-managing stamina for combat/movement. Drains 0.5/sec combat, 0.15/sec movement. Regens 3.0/sec at rest spots when idle. API: `get_stamina()`, `get_stamina_percent()`, `drain_flat()`. Signal: `stamina_changed`
 - `NpcIdentity` — personality, mood (emotion + energy with decay), opinions, schedule, backstory. Loaded from NpcIdentityDatabase. API: `setup()`, `shift_mood()`
@@ -37,6 +37,7 @@ Components sync state back to `WorldState.entity_data` via `_sync()` (bridge lay
 - **Registry** (6): `register_entity`, `unregister_entity`, `get_entity`, `get_entity_data`, `set_entity_data`, `get_entity_id_for_node`
 - **Locations** (3): `register_location`, `get_location`, `has_location`
 - **Convenience** (1): `is_alive(id)` — looks up entity's StatsComponent
+- `tree_entities` dict for cached tree registry (O(1) lookup)
 
 Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods back to WorldState. Use `PerceptionComponent` for spatial queries. Access components directly via the entity node.
 
@@ -51,8 +52,8 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - `DragHandle` for draggable panel title bars with close buttons
 - Direction checks: always `dir.length_squared() > 0.01` before normalizing
 - UI panels receive player node via `set_player(player)` from `main._ready()`, then read components directly
-- **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment
-- **NPC navigation**: NavigationAgent3D with avoidance enabled (radius 0.5, neighbor_distance 5.0, max_neighbors 5). Uses `velocity_computed` signal for avoidance-adjusted movement. Personal space 3.5m with separation force 3.5 (applied to other NPCs and player). Area-based arrival: patrol/rest destinations use 15m arrival radius (NPCs don't pile up at exact center points). Location navigation adds ±4m random offset. Patrol/retreat/rest destinations spread across districts (MarketDistrict, NobleQuarter, ParkGardens, CityGate) — TownSquare removed to prevent fountain convergence
+- **NPC behavior**: Goal-driven with trait-influenced decisions. `npc_behavior.gd` evaluates every 1s: survival → goal completion → goal execution. Traits: boldness (risk tolerance), generosity (cooperation), sociability (chat), curiosity (unused). Smart target selection: generous NPCs avoid contested monsters, help retreating allies; selfish NPCs steal kills. Combat tracker in `npc_base.gd` tracks damage dealt/taken for mid-fight threat assessment. Goals include: `chop_wood`, `buy_from_vendor`, `tend_shop`. Night pressure: cautious NPCs (boldness < 0.4) return to town at night
+- **NPC navigation**: NavigationAgent3D with avoidance enabled (radius 0.5, neighbor_distance 5.0, max_neighbors 5). Uses `velocity_computed` signal for avoidance-adjusted movement. Personal space 1.5m with separation force 1.5 (applied to other NPCs and player). Area-based arrival: patrol/rest destinations use 15m arrival radius (NPCs don't pile up at exact center points). Location navigation adds ±4m random offset. Patrol/retreat/rest destinations spread across districts (MarketDistrict, NobleQuarter, ParkGardens, CityGate) — TownSquare removed to prevent fountain convergence
 - **Event-driven LLM**: NPCs only consult LLM on significant events (goal_completed, combat_outcome, low_resources, idle_timeout, player/NPC chat), not on timers. Event cooldowns prevent spam. Scripted behavior handles ~95% of decisions
 - **NPC scaling**: `NpcGenerator` creates 50+ procedural NPCs (5 archetypes: warrior/mage/rogue/ranger/merchant, ~200 name pool, tiered loadouts). `game_world.gd` spawns them at world init
 - **Entity LOD**: Distance-based in `npc_base.gd` and `monster_base.gd`. Levels: 0 (<30m, full + separation), 1 (30-60m, skip separation), 2 (>60m, skip animations). 0.5s staggered checks. Dead/thinking always process
@@ -68,10 +69,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - Vend sign interaction: player raycast detects sign via `"vend_sign"` group, `_hovered_vend_sign` / `_pending_vend_sign_click` flags route to shop panel
 
 ## NPC AI Systems
-- **NpcBrain** (`scenes/npcs/npc_brain.gd`): Event-driven LLM decision loop. Triggers on: player_chat, npc_chat, goal_completed, combat_outcome, low_resources, idle_timeout. Per-event cooldowns (2-60s). Conversation hold blocks decisions during active chat. Canned greetings fallback when LLM disabled
+- **NpcBrain** (`scenes/npcs/npc_brain.gd`): Event-driven LLM decision loop. Triggers on: player_chat, npc_chat, goal_completed, combat_outcome, low_resources, idle_timeout, significant_discovery, social_trigger, memory_extraction. Per-event cooldowns (2-60s). Conversation hold blocks decisions during active chat. Canned greetings fallback when LLM disabled. Constants: `CHAT_RANGE: 8m`, `READING_DELAY: 3s`, `POST_SPEECH_COOLDOWN: 5-10s`
 - **NpcMemory** (`scenes/npcs/npc_memory.gd`): Scored memory array (max 20, lowest evicted). Sources: witnessed (1.0 confidence), heard_from (0.7), rumor (0.4). Stores conversation history per partner + area chat log + goals history
 - **NpcSocial** (`scenes/npcs/npc_social.gd`): Proximity-based social chat (12m range, 15-45s cooldown). 8 intents: ask_question, share_story, brag, complain, warn, gossip, joke, ask_advice. Candidates sorted by relationship tier
-- **NpcTraits** (`scripts/data/npc_traits.gd`): Personality axes (0.0-1.0): boldness (retreat threshold), sociability (chat cooldown), generosity (trade willingness), curiosity (goal switching). 11 trait profiles mapping to weapon types + starting proficiencies
+- **NpcTraits** (`scripts/data/npc_traits.gd`): Personality axes (0.0-1.0): boldness (retreat threshold), sociability (chat cooldown), generosity (trade willingness), curiosity (goal switching). 12 trait profiles mapping to weapon types + starting proficiencies
 
 ## Conversation System
 - **ConversationManager** (`scripts/conversation/conversation_manager.gd`): Instantiated in `game_world.gd` (not autoload). Manages multi-party conversations with turn selection, cooldowns, silence counting
@@ -87,6 +88,14 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **StatusPanel** (`scenes/ui/status_panel.gd`): Character stats panel (C key) — name, level, HP/ATK/DEF/Speed/Range stats with icons
 - **PlayerHUD** (`scenes/ui/player_hud.gd`): Top-left compact panel showing HP + stamina bars only. Time panel (single line) positioned left of minimap
 - **Panel toggles**: Top-right button bar aligned with minimap (`offset_left = -194`): Status [C] | Inv [I] | Skills [S] | Map [W]
+- **ProficiencyPanel** (`scenes/ui/proficiency_panel.gd`): RuneScape-style skill list, P key toggle
+- **ShopPanel** (`scenes/ui/shop_panel.gd`): Shopping interface for vendors
+- **NpcInfoPanel** (`scenes/ui/npc_info_panel.gd`): NPC stats, traits, memories, relationships
+- **VendSetupPanel** (`scenes/ui/vend_setup_panel.gd`): Player vending shop config, V key
+- **SkillHotbar** (`scenes/ui/skill_hotbar.gd`): Active skill hotbar display
+- **WorldMapPanel** (`scenes/ui/world_map_panel.gd`): World map UI
+- **Minimap** (`scenes/ui/minimap.gd`): Minimap display
+- **LoadingScreen** (`scenes/ui/loading_screen.gd`): Zone transition loading screen
 - **Icon pipeline**: `scripts/tools/generate_icon.py` — generates icons via Gemini API (gemini-3.1-flash-image-preview), auto-removes backgrounds. Green-screen keying for transparent icons. Full icon spec in `docs/UI.md`
 - **Proficiency icon pipeline**: Generate on green screen → crop 35px border → key out green + despill → composite on category base (`subjects/v1/red|green|yellow|grey.png`) → final icons at `assets/textures/ui/proficiencies/`. Bases generated programmatically (PIL: gradient + vignette + themed texture overlay + bevel, 512x512, rounded corners)
 
@@ -100,7 +109,7 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **Signals**: `proficiency_xp_gained(entity_id, skill_id, amount, new_xp)`, `proficiency_level_up(entity_id, skill_id, new_level)`, `skill_learned(entity_id, skill_id)`, `skill_used(entity_id, skill_id, target_id)`
 
 ## Active Skill System
-- **SkillDatabase** (`scripts/data/skill_database.gd`): Static class defining 16 skills across 5 weapon types. Each skill has `required_proficiency` (weapon + level), `damage_multiplier`, `cooldown`, `max_level` (5), `animation`, `color`
+- **SkillDatabase** (`scripts/data/skill_database.gd`): Static class defining 16 skills across 5 weapon types. Each skill has `required_proficiency` (weapon + level), `damage_multiplier`, `cooldown`, `max_level` (5), `animation`, `color`, `synergy` field with `primary` (weapon requirement) and `secondary` bonuses. Methods: `get_synergy_bonuses()`, `get_total_effectiveness_percent()`
 - **Weapon skills**: Sword (Bash, Cleave, Rend), Axe (Chop, Whirlwind, Execute), Mace (Crush, Shatter, Quake), Dagger (Stab, Lacerate, Backstab), Staff (Arcane Bolt, Flame Burst, Drain)
 - **Skill types**: `melee_attack` (single-target), `aoe_melee` (AoE via PerceptionComponent), `armor_pierce` (ignores % DEF), `bleed` (initial hit + damage-over-time ticks)
 - **SkillEffectResolver** (`scripts/skills/skill_effect_resolver.gd`): Stateless static class. `resolve_skill_hit()` dispatches by type, returns `Array[{target_id, damage}]`. `process_bleeds()` ticks active bleeds each frame
@@ -160,6 +169,3 @@ Static utility classes for procedural world construction (one-shot builders, no 
 - **CraftingPanel** (`scenes/ui/crafting_panel.gd`): Two-column UI (recipe list + detail). Filters recipes by station's skill_id. Shows input availability (green/red), craft button (disabled if requirements unmet). On craft: removes inputs, adds outputs, grants proficiency XP. `open(skill_id, station_name)`, `set_player(player)`
 - **Recipes**: 5 cooking (cooked fish, stew, soup), 5 smithing (ingots, weapons), 4 crafting (bandage, potion, armor, dagger)
 - **Items**: Fish (sardine/trout/salmon), ingots (copper/iron/gold), cooked food (5 consumables with heal), crafted goods (bandage, leather armor, bone dagger)
-
-## Project Structure Notes
-- **Stale directories**: `content/`, `features/`, `inference/` are old branch copies — NOT the active project. The active project root is `/home/owenyuwono/Work/Ventures/arcadia/`
