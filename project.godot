@@ -25,6 +25,7 @@ LLMClient="*res://autoloads/llm_client.gd"
 GameEvents="*res://autoloads/game_events.gd"
 TimeManager="*res://autoloads/time_manager.gd"
 ZoneManager="*res://autoloads/zone_manager.gd"
+AudioManager="*res://autoloads/audio_manager.gd"
 
 [display]
 
