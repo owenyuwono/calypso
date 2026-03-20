@@ -86,7 +86,8 @@ var _equipment: Node
 var _combat: Node
 var _progression: Node
 var _auto_attack: Node
-var _npc_skills: Node = null
+var _npc_input: Node = null
+var _skills_comp: Node = null
 var _perception: Node
 var _audio: Node = null
 
@@ -197,6 +198,7 @@ func _ready() -> void:
 	skills_comp.name = "SkillsComponent"
 	add_child(skills_comp)
 	skills_comp.setup({}, ["", "", "", "", ""])
+	_skills_comp = skills_comp
 
 	var vc_node := VendingComponent.new()
 	vc_node.name = "VendingComponent"
@@ -231,9 +233,12 @@ func _ready() -> void:
 	perception_comp.setup()
 	_perception = perception_comp
 
-	_npc_skills = preload("res://scenes/npcs/npc_skills.gd").new()
-	add_child(_npc_skills)
-	_npc_skills.setup(self, _combat, skills_comp, perception_comp, _visuals, _auto_attack)
+	skills_comp.setup_execution(_combat, _stats, _progression, _visuals, _perception, _auto_attack)
+
+	_npc_input = preload("res://scripts/components/npc_input_component.gd").new()
+	_npc_input.name = "NPCInputComponent"
+	add_child(_npc_input)
+	_npc_input.setup(self, _combat, skills_comp, perception_comp)
 
 	nav_agent.navigation_finished.connect(_on_navigation_finished)
 	nav_agent.velocity_computed.connect(_on_velocity_computed)
@@ -553,11 +558,12 @@ func _process_movement(delta: float) -> bool:
 
 func _process_combat(delta: float) -> bool:
 	# Try to use a skill before falling through to auto-attack
-	if _npc_skills and not _npc_skills.is_skill_active():
-		_npc_skills.try_use_skill(combat_target)
+	if _npc_input and not _npc_input.is_skill_active():
+		_npc_input.try_use_skill(combat_target)
 
-	# While a skill hit is pending, hold position and let npc_skills resolve it
-	if _npc_skills and _npc_skills.is_skill_active():
+	# While a skill hit is pending, tick it and hold position
+	if _skills_comp and _skills_comp.is_skill_pending():
+		_skills_comp.tick_pending_hit(delta)
 		return false
 
 	var attack_range: float = _stats.attack_range
