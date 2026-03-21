@@ -174,6 +174,11 @@ func spawn_miss_number(target_pos: Vector3 = Vector3.ZERO) -> void:
 	var parent: Node3D = get_parent()
 	ModelHelper.spawn_text_number(parent, "MISS", Color(0.8, 0.8, 0.8), parent.global_position, target_pos)
 
+func spawn_styled_damage_number(target_id: String, damage: int, hit_type: String, is_crit: bool, target_pos: Vector3) -> void:
+	var parent: Node3D = get_parent()
+	var attacker_pos: Vector3 = parent.global_position if parent else target_pos
+	ModelHelper.spawn_styled_damage_number(parent, target_id, damage, hit_type, is_crit, attacker_pos, target_pos)
+
 func flash_target(target_id: String) -> void:
 	var target_node: Node = WorldState.get_entity(target_id)
 	ModelHelper.flash_target(target_node)

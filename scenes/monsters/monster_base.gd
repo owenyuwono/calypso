@@ -409,7 +409,6 @@ func _process_attacking(delta: float) -> void:
 		state = "aggro"
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
-	_visuals.spawn_damage_number(target_id, damage, Color(1, 0.2, 0.2), target_pos)
 	_visuals.flash_target(target_id)
 	if _audio:
 		_audio.play_oneshot("combat_hit_generic")

@@ -265,7 +265,7 @@ func _process(delta: float) -> void:
 			var damage: int = result.get("damage", 0)
 			var target_entity: Node3D = WorldState.get_entity(target_id)
 			if target_entity and is_instance_valid(target_entity):
-				_visuals.spawn_damage_number(target_id, damage, Color(1, 0.3, 0.3), target_entity.global_position)
+				_visuals.spawn_styled_damage_number(target_id, damage, "normal", false, target_entity.global_position)
 				_visuals.flash_target(target_id)
 
 
@@ -284,7 +284,6 @@ func _execute_skill_hit() -> void:
 		return
 
 	var skill_level: int = get_skill_level(_pending_skill_id)
-	var skill_color: Color = skill_data.get("color", Color(1, 1, 1))
 
 	var effectiveness_data: Dictionary = {}
 	if _progression:
@@ -318,7 +317,7 @@ func _execute_skill_hit() -> void:
 			if _stats:
 				_stats.take_damage(self_damage)
 			_visuals.flash_hit()
-			_visuals.spawn_damage_number(entity_id, self_damage, Color.RED, get_parent().global_position)
+			_visuals.spawn_styled_damage_number(entity_id, self_damage, "fatal", false, get_parent().global_position)
 			GameEvents.skill_backfired.emit(entity_id, _pending_skill_id, self_damage)
 			continue
 
@@ -327,12 +326,14 @@ func _execute_skill_hit() -> void:
 		var hit_node: Node3D = WorldState.get_entity(hit_target_id)
 		var hit_pos: Vector3 = hit_node.global_position if hit_node else get_parent().global_position
 
+		var result_hit_type: String = result.get("hit_type", "normal")
+		var result_is_crit: bool = result.get("is_crit", false)
+
 		if result.get("is_miss", false):
-			_visuals.spawn_miss_number(hit_pos)
+			_visuals.spawn_styled_damage_number(hit_target_id, 0, "miss", false, hit_pos)
 			continue
 
-		var number_color: Color = Color(1.0, 0.9, 0.0) if result.get("is_crit", false) else skill_color
-		_visuals.spawn_damage_number(hit_target_id, hit_damage, number_color, hit_pos)
+		_visuals.spawn_styled_damage_number(hit_target_id, hit_damage, result_hit_type, result_is_crit, hit_pos)
 		_visuals.flash_target(hit_target_id)
 
 		# DEX XP: 2 per hit landed

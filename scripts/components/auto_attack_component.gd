@@ -150,7 +150,7 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Hit check
 	if not _combat.roll_hit(target_id):
 		GameEvents.attack_missed.emit(target_id, attacker_id)
-		_visuals.spawn_miss_number(target_pos)
+		_visuals.spawn_styled_damage_number(target_id, 0, "miss", false, target_pos)
 		return
 
 	# Calculate damage manually so we can apply crit multiplier before dealing
@@ -166,4 +166,6 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 
 	# Apply and emit
 	_combat.apply_flat_damage_to(target_id, damage)
+	# Spawn styled damage number here so crit info is available
+	_visuals.spawn_styled_damage_number(target_id, damage, "normal", crit_result["is_crit"], target_pos)
 	attack_landed.emit(target_id, damage, target_pos)

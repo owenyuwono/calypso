@@ -81,7 +81,7 @@ static func resolve_skill_hit(
 		var would_be_damage: int = floori(raw_atk * multiplier)
 		var self_damage: int = maxi(1, floori(would_be_damage * self_harm_pct))
 		# SkillsComponent handles the actual HP deduction for self-harm entries.
-		results.append({"target_id": attacker_id, "damage": self_damage, "is_crit": false, "is_miss": false, "self_harm": true})
+		results.append({"target_id": attacker_id, "damage": self_damage, "is_crit": false, "is_miss": false, "hit_type": "normal", "self_harm": true})
 
 	return results
 
@@ -101,16 +101,18 @@ static func resolve_melee_attack(
 	# Hit/miss check
 	if not combat.roll_hit(target_id):
 		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true}]
+		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
-	var final_damage: int = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var final_damage: int = calc["damage"]
+	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
 	var is_crit: bool = crit_result["is_crit"]
 	if is_crit:
 		final_damage = maxi(1, int(final_damage * crit_result["multiplier"]))
 
 	combat.apply_flat_damage_to(target_id, final_damage)
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
 
 
 static func resolve_aoe(
@@ -132,15 +134,17 @@ static func resolve_aoe(
 	if WorldState.is_alive(target_id):
 		if not combat.roll_hit(target_id):
 			GameEvents.attack_missed.emit(target_id, attacker_id)
-			results.append({"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true})
+			results.append({"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
 		else:
-			var primary_damage: int = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+			var primary_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+			var primary_damage: int = primary_calc["damage"]
+			var primary_hit_type: String = primary_calc["hit_type"]
 			var crit_result: Dictionary = combat.roll_crit()
 			var is_crit: bool = crit_result["is_crit"]
 			if is_crit:
 				primary_damage = maxi(1, int(primary_damage * crit_result["multiplier"]))
 			combat.apply_flat_damage_to(target_id, primary_damage)
-			results.append({"target_id": target_id, "damage": primary_damage, "is_crit": is_crit, "is_miss": false})
+			results.append({"target_id": target_id, "damage": primary_damage, "is_crit": is_crit, "is_miss": false, "hit_type": primary_hit_type})
 
 	# Determine AoE center
 	var aoe_center: Vector3 = attacker_pos
@@ -179,15 +183,17 @@ static func resolve_aoe(
 
 		if not combat.roll_hit(eid):
 			GameEvents.attack_missed.emit(eid, attacker_id)
-			results.append({"target_id": eid, "damage": 0, "is_crit": false, "is_miss": true})
+			results.append({"target_id": eid, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
 		else:
-			var splash_damage: int = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data)
+			var splash_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data)
+			var splash_damage: int = splash_calc["damage"]
+			var splash_hit_type: String = splash_calc["hit_type"]
 			var crit_result: Dictionary = combat.roll_crit()
 			var is_crit: bool = crit_result["is_crit"]
 			if is_crit:
 				splash_damage = maxi(1, int(splash_damage * crit_result["multiplier"]))
 			combat.apply_flat_damage_to(eid, splash_damage)
-			results.append({"target_id": eid, "damage": splash_damage, "is_crit": is_crit, "is_miss": false})
+			results.append({"target_id": eid, "damage": splash_damage, "is_crit": is_crit, "is_miss": false, "hit_type": splash_hit_type})
 
 	return results
 
@@ -207,20 +213,22 @@ static func resolve_armor_pierce(
 	# Hit/miss check
 	if not combat.roll_hit(target_id):
 		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true}]
+		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
 	var bonuses: Dictionary = effectiveness_data.get("synergy_bonuses", {})
 	var pierce_bonus: float = bonuses.get("pierce_bonus", 0.0)
 	var effective_pierce: float = clampf(skill_data.get("def_ignore_percent", 0.0) + pierce_bonus, 0.0, 1.0)
 
-	var final_damage: int = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, effective_pierce)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, effective_pierce)
+	var final_damage: int = calc["damage"]
+	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
 	var is_crit: bool = crit_result["is_crit"]
 	if is_crit:
 		final_damage = maxi(1, int(final_damage * crit_result["multiplier"]))
 
 	combat.apply_flat_damage_to(target_id, final_damage)
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
 
 
 static func resolve_bleed(
@@ -241,9 +249,11 @@ static func resolve_bleed(
 	# Hit/miss check
 	if not combat.roll_hit(target_id):
 		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true}]
+		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
-	var final_damage: int = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var final_damage: int = calc["damage"]
+	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
 	var is_crit: bool = crit_result["is_crit"]
 	if is_crit:
@@ -269,7 +279,7 @@ static func resolve_bleed(
 		"tick_interval": tick_interval,
 	}
 
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
 
 
 static func process_bleeds(active_bleeds: Dictionary, delta: float) -> Array:
@@ -292,7 +302,7 @@ static func process_bleeds(active_bleeds: Dictionary, delta: float) -> Array:
 			var damage_per_tick: int = bleed.get("damage_per_tick", 1)
 			if combat and is_instance_valid(combat):
 				var tick_damage: int = combat.apply_flat_damage_to(target_id, damage_per_tick)
-				results.append({"target_id": target_id, "damage": tick_damage, "is_crit": false, "is_miss": false})
+				results.append({"target_id": target_id, "damage": tick_damage, "is_crit": false, "is_miss": false, "hit_type": "normal"})
 				# If the tick killed the target, remove bleed immediately this frame
 				if not WorldState.is_alive(target_id):
 					to_remove.append(target_id)
@@ -344,10 +354,11 @@ static func _calc_damage(
 		target_id: String,
 		effectiveness_data: Dictionary,
 		def_ignore: float = 0.0
-) -> int:
+) -> Dictionary:
 	## Full damage pipeline: ATK/MATK → multiplier → effectiveness → DEF → element → phys_type → min 1.
 	## def_ignore (0.0–1.0) reduces effective DEF before subtraction (armor_pierce use case).
 	## Crit is NOT applied here — callers apply it after this returns.
+	## Returns {damage: int, hit_type: String}.
 	var damage_category: String = skill_data.get("damage_category", "physical")
 	var element = skill_data.get("element")  # String or null
 
@@ -395,7 +406,22 @@ static func _calc_damage(
 		var armor_type: String = _get_target_armor_type(target_id)
 		phys_type_mod = get_phys_type_modifier(phys_type, armor_type)
 
-	return maxi(1, int(after_def * element_mod * phys_type_mod))
+	# Hit type derived from combined resistance modifier
+	var combined_mod: float = element_mod * phys_type_mod
+	var hit_type: String = "normal"
+	if combined_mod >= 2.0:
+		hit_type = "fatal"
+	elif combined_mod >= 1.5:
+		hit_type = "weak"
+	elif combined_mod <= 0.0:
+		hit_type = "immune"
+	elif combined_mod <= 0.5:
+		hit_type = "resist"
+
+	# Immune targets take 0 damage
+	var final_damage: int = 0 if hit_type == "immune" else maxi(1, int(after_def * combined_mod))
+
+	return {"damage": final_damage, "hit_type": hit_type}
 
 
 static func _apply_effectiveness(raw_damage: int, effectiveness_data: Dictionary) -> int:
