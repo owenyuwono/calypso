@@ -53,22 +53,23 @@ CATEGORY_BASE = {
 # Proficiency definitions
 # ---------------------------------------------------------------------------
 PROMPT_TEMPLATE = (
-    "RPG proficiency icon, {description}, "
-    "gold metallic tint, simple clean silhouette, subtle shading, "
-    "monochrome gold, emblem style, "
-    "no text, no letters, no frame, no border, no medallion, no oval, "
-    "no circle background, no badge, "
-    "just the object floating on plain bright green background, centered"
+    "Game UI icon of {description}, "
+    "warm pale gold metallic emblem, subtle gold tint, "
+    "smooth gradient from light warm gold to slightly darker gold, "
+    "very thin subtle outline, soft edges, opaque filled shape, "
+    "like a luxury car badge, compact square composition, "
+    "no text, no letters, no frame, no background shape, "
+    "just the warm gold metallic symbol on plain bright green background, centered"
 )
 
 # (prof_id, category, prompt_description, tolerance)
 PROFICIENCIES = [
-    ("str",   "attribute", "A clenched fist, muscular arm flexing", 40),
-    ("int",   "attribute", "An open spell book with glowing arcane runes", 40),
-    ("dex",   "attribute", "A crosshair target with an arrow hitting bullseye", 40),
-    ("wis",   "attribute", "A glowing third eye symbol, mystical", 40),
-    ("bow",   "weapon",    "A recurve bow with arrow nocked, ready to fire", 40),
-    ("spear", "weapon",    "A spear pointing upward with a small pennant flag", 40),
+    ("str",   "attribute", "a raised clenched fist, compact stylized logo", 40),
+    ("int",   "attribute", "an open book with a star above it, compact badge shape", 40),
+    ("dex",   "attribute", "a single elegant feather quill, compact badge", 40),
+    ("wis",   "attribute", "an eye with rays above it, compact badge shape", 40),
+    ("bow",   "weapon",    "a bow with arrow, compact side view badge", 40),
+    ("spear", "weapon",    "a single spear with pointed tip, diagonal, compact badge", 40),
 ]
 
 # ---------------------------------------------------------------------------
