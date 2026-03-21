@@ -246,9 +246,25 @@ func _build_proficiency_section(vbox: VBoxContainer) -> void:
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(header)
 
-	# Build rows per category in fixed order
-	for category in _CATEGORY_ORDER:
-		_build_category_row(vbox, category)
+	# 2-column layout: weapon+attribute left, gathering+production right
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 12)
+	vbox.add_child(columns)
+
+	var left_col := VBoxContainer.new()
+	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.add_theme_constant_override("separation", 2)
+	columns.add_child(left_col)
+
+	var right_col := VBoxContainer.new()
+	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.add_theme_constant_override("separation", 2)
+	columns.add_child(right_col)
+
+	_build_category_row(left_col, "weapon")
+	_build_category_row(left_col, "attribute")
+	_build_category_row(right_col, "gathering")
+	_build_category_row(right_col, "production")
 
 func _build_category_row(vbox: VBoxContainer, category: String) -> void:
 	# Category label
