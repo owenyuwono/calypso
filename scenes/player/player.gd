@@ -151,6 +151,9 @@ func _ready() -> void:
 	add_child(_progression)
 	_progression.setup(_stats, {}, _equipment)
 
+	# DEBUG: Override stats for testing combat mechanics — remove when done
+	_progression.set_debug_overrides({"evasion": 50, "crit_rate": 50, "accuracy": 50})
+
 	_combat = CombatComponent.new()
 	_combat.name = "CombatComponent"
 	add_child(_combat)

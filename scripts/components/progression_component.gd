@@ -8,6 +8,7 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 var _stats: Node      # StatsComponent ref
 var _equipment: Node  # EquipmentComponent ref (optional — for active weapon type)
 var _proficiencies: Dictionary = {}  # skill_id -> {level: int, xp: int}
+var _debug_overrides: Dictionary = {}
 
 func setup(stats_component: Node, initial_proficiencies: Dictionary = {}, equipment_component: Node = null) -> void:
 	_stats = stats_component
@@ -75,6 +76,10 @@ func get_total_level() -> int:
 func get_proficiencies() -> Dictionary:
 	return _proficiencies
 
+func set_debug_overrides(overrides: Dictionary) -> void:
+	_debug_overrides = overrides
+	_recalculate_stats()
+
 func _recalculate_stats() -> void:
 	## Derive stats from proficiency levels. Call after any proficiency level change.
 	if not _stats:
@@ -131,6 +136,11 @@ func _recalculate_stats() -> void:
 
 	# Total level = sum of all proficiency levels
 	_stats.level = get_total_level()
+
+	# Apply debug overrides
+	for key in _debug_overrides:
+		_stats.set(key, _debug_overrides[key])
+
 	_stats._sync()
 
 func _get_active_weapon_proficiency_level() -> int:
