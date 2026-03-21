@@ -150,7 +150,9 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Hit check
 	if not _combat.roll_hit(target_id):
 		GameEvents.attack_missed.emit(target_id, attacker_id)
-		_visuals.spawn_styled_damage_number(target_id, 0, "miss", false, target_pos)
+		# Red if we (player) miss, white if enemy misses
+		var miss_color: Color = Color(1, 0.3, 0.3) if attacker_id == "player" else Color.WHITE
+		_visuals.spawn_styled_damage_number(target_id, 0, "miss", false, target_pos, miss_color)
 		return
 
 	# Calculate damage manually so we can apply crit multiplier before dealing
