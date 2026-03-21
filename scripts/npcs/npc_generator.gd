@@ -35,7 +35,7 @@ const ARCHETYPES: Dictionary = {
 	},
 	"ranger": {
 		"weight": 15,
-		"weapon_pref": "axe",
+		"weapon_pref": "bow",
 		"boldness_range": [0.4, 0.8],
 		"generosity_range": [0.3, 0.7],
 		"sociability_range": [0.3, 0.6],
@@ -129,6 +129,16 @@ const WEAPON_TIERS: Dictionary = {
 		"poor": "basic_staff",
 		"average": "iron_staff",
 		"wealthy": "steel_staff",
+	},
+	"bow": {
+		"poor": "basic_bow",
+		"average": "iron_bow",
+		"wealthy": "steel_bow",
+	},
+	"spear": {
+		"poor": "basic_spear",
+		"average": "iron_spear",
+		"wealthy": "steel_spear",
 	},
 }
 
