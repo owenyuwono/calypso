@@ -70,6 +70,8 @@ func _process(delta: float) -> void:
 	var effective_delta: float = delta * 2.0
 
 	# Detect combat → non-combat transition to emit combat_outcome
+	if not "current_state" in npc:
+		return
 	var in_combat: bool = npc.current_state == "combat"
 	if _was_in_combat and not in_combat and npc.current_state != "dead":
 		_was_in_combat = false
