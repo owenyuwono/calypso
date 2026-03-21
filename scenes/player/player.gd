@@ -916,7 +916,6 @@ func _on_vending_stopped(eid: String) -> void:
 		_visuals.hide_vend_sign()
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
-	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
 	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
 	var target_data: Dictionary = WorldState.get_entity_data(target_id)

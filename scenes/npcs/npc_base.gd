@@ -600,7 +600,6 @@ func _process_combat(delta: float) -> bool:
 	return result.get("is_moving", false)
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
-	_visuals.spawn_damage_number(target_id, damage, Color(1, 1, 1), target_pos)
 	_visuals.flash_target(target_id)
 	if _audio:
 		var weapon_type: String = ""
