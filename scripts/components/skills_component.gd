@@ -331,7 +331,6 @@ func _execute_skill_hit() -> void:
 
 		if result.get("is_miss", false):
 			# Red if player's skill misses, white if NPC/monster skill misses us
-			var entity_id: String = WorldState.get_entity_id_for_node(get_parent())
 			var miss_color: Color = Color(1, 0.3, 0.3) if entity_id == "player" else Color.WHITE
 			_visuals.spawn_styled_damage_number(hit_target_id, 0, "miss", false, hit_pos, miss_color)
 			continue
