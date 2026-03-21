@@ -71,7 +71,7 @@ func _ready() -> void:
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
 func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(300, 0), toggle)
+	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(520, 0), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
 
@@ -95,89 +95,110 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# --- Offensive section ---
-	_add_section_header(vbox, "Offensive")
+	# Two-column stats area
+	var stats_columns := HBoxContainer.new()
+	stats_columns.add_theme_constant_override("separation", 8)
+	vbox.add_child(stats_columns)
+
+	# --- Left column: Offensive + Defensive ---
+	var left_col := VBoxContainer.new()
+	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.add_theme_constant_override("separation", 2)
+	stats_columns.add_child(left_col)
+
+	_add_column_header(left_col, "Offensive")
 
 	var atk_row := _create_stat_row("ATK", true)
 	_atk_value = atk_row.value
 	_atk_bonus = atk_row.bonus
-	vbox.add_child(atk_row.container)
+	left_col.add_child(atk_row.container)
 
 	var matk_row := _create_stat_row("MATK", true)
 	_matk_value = matk_row.value
 	_matk_bonus = matk_row.bonus
-	vbox.add_child(matk_row.container)
+	left_col.add_child(matk_row.container)
 
 	var acc_row := _create_stat_row("Accuracy", false)
 	_accuracy_value = acc_row.value
-	vbox.add_child(acc_row.container)
+	left_col.add_child(acc_row.container)
 
 	var crit_row := _create_stat_row("Crit Rate", false)
 	_crit_rate_value = crit_row.value
-	vbox.add_child(crit_row.container)
+	left_col.add_child(crit_row.container)
 
 	var critdmg_row := _create_stat_row("Crit Dmg", false)
 	_crit_dmg_value = critdmg_row.value
-	vbox.add_child(critdmg_row.container)
+	left_col.add_child(critdmg_row.container)
 
-	# --- Defensive section ---
-	_add_section_header(vbox, "Defensive")
+	left_col.add_child(HSeparator.new())
+	_add_column_header(left_col, "Defensive")
 
 	var hp_row := _create_stat_row("HP", false)
 	_hp_value = hp_row.value
-	vbox.add_child(hp_row.container)
+	left_col.add_child(hp_row.container)
 
 	var def_row := _create_stat_row("DEF", true)
 	_def_value = def_row.value
 	_def_bonus = def_row.bonus
-	vbox.add_child(def_row.container)
+	left_col.add_child(def_row.container)
 
 	var mdef_row := _create_stat_row("MDEF", true)
 	_mdef_value = mdef_row.value
 	_mdef_bonus = mdef_row.bonus
-	vbox.add_child(mdef_row.container)
+	left_col.add_child(mdef_row.container)
 
 	var eva_row := _create_stat_row("Evasion", false)
 	_evasion_value = eva_row.value
-	vbox.add_child(eva_row.container)
+	left_col.add_child(eva_row.container)
 
-	# --- Speed section ---
-	_add_section_header(vbox, "Speed")
+	# Column divider
+	stats_columns.add_child(VSeparator.new())
+
+	# --- Right column: Speed + Resource ---
+	var right_col := VBoxContainer.new()
+	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.add_theme_constant_override("separation", 2)
+	stats_columns.add_child(right_col)
+
+	_add_column_header(right_col, "Speed")
 
 	var aspd_row := _create_stat_row("Atk Speed", false)
 	_atk_speed_value = aspd_row.value
-	vbox.add_child(aspd_row.container)
+	right_col.add_child(aspd_row.container)
 
 	var mspd_row := _create_stat_row("Move Spd", false)
 	_move_speed_value = mspd_row.value
-	vbox.add_child(mspd_row.container)
+	right_col.add_child(mspd_row.container)
 
 	var cspd_row := _create_stat_row("Cast Spd", false)
 	_cast_speed_value = cspd_row.value
-	vbox.add_child(cspd_row.container)
+	right_col.add_child(cspd_row.container)
 
-	# --- Resource section ---
-	_add_section_header(vbox, "Resource")
+	right_col.add_child(HSeparator.new())
+	_add_column_header(right_col, "Resource")
 
 	var stamina_row := _create_stat_row("Stamina", false)
 	_stamina_value = stamina_row.value
-	vbox.add_child(stamina_row.container)
+	right_col.add_child(stamina_row.container)
 
 	var hpregen_row := _create_stat_row("HP Regen", false)
 	_hp_regen_value = hpregen_row.value
-	vbox.add_child(hpregen_row.container)
+	right_col.add_child(hpregen_row.container)
 
 	var cdr_row := _create_stat_row("CDR", false)
 	_cdr_value = cdr_row.value
-	vbox.add_child(cdr_row.container)
+	right_col.add_child(cdr_row.container)
 
-	# Proficiency section
+	# Proficiency section — full width below columns
 	vbox.add_child(HSeparator.new())
 	_build_proficiency_section(vbox)
 
 func _add_section_header(vbox: VBoxContainer, title: String) -> void:
-	var sep := HSeparator.new()
-	vbox.add_child(sep)
+	vbox.add_child(HSeparator.new())
+	_add_column_header(vbox, title)
+
+# Header without a leading separator — used for the first section at the top of a column.
+func _add_column_header(vbox: VBoxContainer, title: String) -> void:
 	var header := Label.new()
 	header.text = title
 	header.add_theme_font_size_override("font_size", 13)

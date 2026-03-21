@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://lnue0saei5h0"
-path="res://.godot/imported/constitution_raw.png-21fd9190af947f6df5d84b7089249868.ctex"
+path="res://.godot/imported/con_raw.png-21fd9190af947f6df5d84b7089249868.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/textures/ui/proficiencies/subjects/v1/icons/constitution_raw.png"
-dest_files=["res://.godot/imported/constitution_raw.png-21fd9190af947f6df5d84b7089249868.ctex"]
+source_file="res://assets/textures/ui/proficiencies/subjects/v1/icons/con_raw.png"
+dest_files=["res://.godot/imported/con_raw.png-21fd9190af947f6df5d84b7089249868.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://devfwkf5hvk0b"
-path="res://.godot/imported/constitution.png-cfed4b9677e5a771b0e6e6a279c7b5d2.ctex"
+uid="uid://ck257uefoatgw"
+path="res://.godot/imported/con.png-feda629252b241fd821b1b879a60cadd.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/textures/ui/proficiencies/subjects/v1/icons/constitution.png"
-dest_files=["res://.godot/imported/constitution.png-cfed4b9677e5a771b0e6e6a279c7b5d2.ctex"]
+source_file="res://assets/textures/ui/proficiencies/con.png"
+dest_files=["res://.godot/imported/con.png-feda629252b241fd821b1b879a60cadd.ctex"]
 
 [params]
 

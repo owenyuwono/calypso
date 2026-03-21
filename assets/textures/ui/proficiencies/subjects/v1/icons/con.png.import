@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dg1awqpkbmcy1"
-path="res://.godot/imported/agility.png-cee328e5efd7f3b63600f864319a8c3d.ctex"
+uid="uid://devfwkf5hvk0b"
+path="res://.godot/imported/con.png-cfed4b9677e5a771b0e6e6a279c7b5d2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/textures/ui/proficiencies/subjects/v1/icons/agility.png"
-dest_files=["res://.godot/imported/agility.png-cee328e5efd7f3b63600f864319a8c3d.ctex"]
+source_file="res://assets/textures/ui/proficiencies/subjects/v1/icons/con.png"
+dest_files=["res://.godot/imported/con.png-cfed4b9677e5a771b0e6e6a279c7b5d2.ctex"]
 
 [params]
 
