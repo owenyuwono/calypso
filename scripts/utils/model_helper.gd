@@ -301,7 +301,7 @@ static func spawn_text_number(caller: Node, text: String, color: Color, attacker
 ## Spawn a styled floating damage number above a target entity.
 ## hit_type: "normal" | "crit" | "weak" | "fatal" | "resist" | "immune" | "miss"
 ## is_crit: whether the hit was a critical strike (affects style selection)
-static func spawn_styled_damage_number(caller: Node, target_id: String, damage: int, hit_type: String, is_crit: bool, attacker_pos: Vector3, target_pos: Vector3) -> void:
+static func spawn_styled_damage_number(caller: Node, target_id: String, damage: int, hit_type: String, is_crit: bool, attacker_pos: Vector3, target_pos: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
 	# Same culling logic as spawn_damage_number (30m from player)
 	const CULL_DISTANCE_SQ: float = 900.0  # 30m^2
 	var player_node: Node = WorldState.get_entity("player")
@@ -325,7 +325,7 @@ static func spawn_styled_damage_number(caller: Node, target_id: String, damage: 
 			direction = direction.normalized()
 	var spawn_offset := direction * 1.0 if direction.length_squared() > 0.01 else Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
 	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
-	dmg.setup_styled(damage, hit_type, is_crit, direction)
+	dmg.setup_styled(damage, hit_type, is_crit, direction, color_override)
 
 ## Flash-hit the target entity (calls its flash_hit() method if available).
 static func flash_target(target_node: Node) -> void:

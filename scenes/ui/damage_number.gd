@@ -67,7 +67,7 @@ func setup_text(text: String, color: Color = Color(1, 1, 1), direction: Vector3 
 	_start_pos = position
 	_setup_drift(direction)
 
-func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vector3) -> void:
+func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
 	# Determine effective style
 	if hit_type == "miss":
 		_style = "miss"
@@ -87,16 +87,15 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		_label.text = "MISS"
 	elif _style == "immune":
 		_label.text = "IMMUNE"
-	elif _style == "crit":
-		_label.text = str(damage) + "!"
-	elif _style == "fatal":
-		_label.text = str(damage) + "!!"
 	else:
 		_label.text = str(damage)
 
 	# Apply label style (Label3D uses direct properties, not theme overrides)
 	_label.font_size = style["size"]
-	_label.modulate = style["color"]
+	if color_override.r >= 0:
+		_label.modulate = color_override
+	else:
+		_label.modulate = style["color"]
 	_label.outline_modulate = style["outline"]
 	_label.outline_size = 6 if _style in ["crit", "fatal"] else 4
 
@@ -135,25 +134,15 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		var tween: Tween = create_tween()
 		tween.tween_property(self, "scale", Vector3.ONE, 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
-	# Wobble for miss
-	if _style == "miss":
-		_is_wobble = true
-
 	_setup_drift(direction)
 
 func _add_fx_effects() -> void:
 	match _style:
 		"crit":
-			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.01), 0.8, 0.3)
+			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.01), 0.8, -1.0)
 		"fatal":
-			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.01), 0.8, 0.3)
+			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.01), 0.8, -1.0)
 			_add_sprite_fx("sparks", Vector3(0, 0, -0.005), 0.5, 0.4)
-			# Shake effect on label
-			var tween: Tween = create_tween()
-			tween.tween_property(_label, "position:x", 3.0, 0.05)
-			tween.tween_property(_label, "position:x", -3.0, 0.05)
-			tween.tween_property(_label, "position:x", 2.0, 0.05)
-			tween.tween_property(_label, "position:x", 0.0, 0.05)
 		"weak":
 			_add_sprite_fx("chevron_up", Vector3(0.4, 0.1, 0), 0.25, -1.0)
 		"resist":
