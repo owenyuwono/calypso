@@ -13,6 +13,8 @@ const MONSTERS: Dictionary = {
 		"wander_radius": 5.0,
 		"model_scene": "res://assets/models/characters/Slime.glb",
 		"model_scale": 0.7,
+		"element": "earth",
+		"resistances": {"slash": "neutral", "pierce": "resist", "blunt": "weak", "fire": "weak", "ice": "neutral", "lightning": "neutral", "earth": "resist", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
 	},
 	"wolf": {
 		"name": "Wolf",
@@ -28,6 +30,8 @@ const MONSTERS: Dictionary = {
 		"model_anim_paths": {
 			"Walking_A": "res://assets/models/characters/wolf_walk.glb",
 		},
+		"element": "neutral",
+		"resistances": {"slash": "neutral", "pierce": "neutral", "blunt": "neutral", "fire": "weak", "ice": "resist", "lightning": "neutral", "earth": "neutral", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
 	},
 	"goblin": {
 		"name": "Goblin",
@@ -42,6 +46,8 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Skeleton_Minion.glb",
 		"model_scale": 0.5,
 		"model_tint": Color(0.1, 0.3, 0.05, 0.25),
+		"element": "earth",
+		"resistances": {"slash": "neutral", "pierce": "neutral", "blunt": "neutral", "fire": "weak", "ice": "neutral", "lightning": "neutral", "earth": "resist", "light": "neutral", "dark": "weak", "arcane": "neutral"},
 	},
 	"skeleton": {
 		"name": "Skeleton",
@@ -54,6 +60,8 @@ const MONSTERS: Dictionary = {
 		"wander_radius": 5.0,
 		"model_scene": "res://assets/models/characters/Skeleton_Warrior.glb",
 		"model_scale": 0.7,
+		"element": "dark",
+		"resistances": {"slash": "resist", "pierce": "resist", "blunt": "weak", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "fatal", "dark": "immune", "arcane": "neutral"},
 	},
 	"dark_mage": {
 		"name": "Dark Mage",
@@ -67,8 +75,25 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Skeleton_Mage.glb",
 		"model_scale": 0.7,
 		"model_tint": Color(0.2, 0.05, 0.3, 0.15),
+		"element": "dark",
+		"resistances": {"slash": "resist", "pierce": "resist", "blunt": "weak", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "fatal", "dark": "immune", "arcane": "neutral"},
 	},
+}
+
+const RESISTANCE_MULTIPLIERS: Dictionary = {
+	"fatal": 2.0,
+	"weak": 1.5,
+	"neutral": 1.0,
+	"resist": 0.5,
+	"immune": 0.0,
 }
 
 static func get_monster(type_id: String) -> Dictionary:
 	return MONSTERS.get(type_id, {})
+
+static func get_resistance_modifier(monster_type: String, damage_type: String) -> float:
+	var monster = MONSTERS.get(monster_type)
+	if not monster or not monster.has("resistances"):
+		return 1.0
+	var level = monster.resistances.get(damage_type, "neutral")
+	return RESISTANCE_MULTIPLIERS.get(level, 1.0)

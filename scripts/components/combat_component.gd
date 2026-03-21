@@ -39,6 +39,37 @@ func get_effective_def() -> int:
 			base += floori(def_bonus * penalty.stat_mult)
 	return base
 
+func get_effective_matk() -> int:
+	var base: int = _stats.matk
+	if _equipment:
+		base += _equipment.get_matk_bonus()
+	return base
+
+func get_effective_mdef() -> int:
+	var base: int = _stats.mdef
+	if _equipment:
+		base += _equipment.get_mdef_bonus()
+	return base
+
+func get_armor_type() -> String:
+	return _equipment.get_armor_type() if _equipment else "light"
+
+func roll_hit(target_id: String) -> bool:
+	var target_node: Node = WorldState.get_entity(target_id)
+	if not target_node:
+		return true  # Can't find target, assume hit
+	var target_stats: Node = target_node.get_node_or_null("StatsComponent")
+	if not target_stats:
+		return true
+	var target_evasion: int = target_stats.evasion
+	var hit_chance: int = clampi(_stats.accuracy - target_evasion, 5, 100)
+	return randf() * 100.0 < hit_chance
+
+func roll_crit() -> Dictionary:
+	var is_crit: bool = randf() < (_stats.crit_rate / 100.0)
+	var multiplier: float = _stats.crit_damage / 100.0
+	return {"is_crit": is_crit, "multiplier": multiplier}
+
 func get_attack_speed_multiplier() -> float:
 	## Returns the speed multiplier for the equipped weapon (penalty-adjusted).
 	if not _equipment:
@@ -60,6 +91,16 @@ func get_equipped_weapon_type() -> String:
 		return "mace"
 	var item: Dictionary = ItemDatabase.get_item(weapon_id)
 	return item.get("weapon_type", "mace")
+
+func get_equipped_phys_type() -> String:
+	## Returns the phys_type of the equipped weapon, or "blunt" for unarmed.
+	if not _equipment:
+		return "blunt"
+	var weapon_id: String = _equipment.get_weapon()
+	if weapon_id.is_empty():
+		return "blunt"
+	var item: Dictionary = ItemDatabase.get_item(weapon_id)
+	return item.get("phys_type", "blunt")
 
 func _get_item_penalty(item_id: String) -> Dictionary:
 	## Calculate penalty for using an item above your proficiency level.
@@ -113,6 +154,16 @@ func deal_damage_amount_to_with_pierce(target_id: String, amount: int, def_ignor
 	var damage: int = maxi(amount - reduced_def, 1)
 	_apply_damage_to(target_id, damage)
 	return damage
+
+func apply_flat_damage_to(target_id: String, amount: int) -> int:
+	## Applies a pre-computed damage amount directly, bypassing DEF calculation.
+	## Used by SkillEffectResolver after it has resolved the full damage pipeline.
+	var target_entity = WorldState.get_entity(target_id)
+	if not target_entity or not is_instance_valid(target_entity):
+		return 0
+	var clamped: int = maxi(1, amount)
+	_apply_damage_to(target_id, clamped)
+	return clamped
 
 func heal(amount: int) -> int:
 	var healed: int = _stats.heal(amount)

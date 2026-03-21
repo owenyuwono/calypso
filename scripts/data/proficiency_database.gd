@@ -5,6 +5,9 @@ const MAX_LEVEL: int = 10
 
 const CATEGORIES: Array = ["weapon", "attribute", "gathering", "production"]
 
+# Attribute display order within the attribute category
+const ATTRIBUTE_ORDER: Array = ["str", "con", "agi", "int", "dex", "wis"]
+
 const SKILLS: Dictionary = {
 	# Weapon skills — XP per hit dealt with that weapon type
 	"sword": {
@@ -32,16 +35,46 @@ const SKILLS: Dictionary = {
 		"category": "weapon",
 		"description": "Magical damage with staves. Levels up by fighting with staves.",
 	},
+	"bow": {
+		"name": "Bow",
+		"category": "weapon",
+		"description": "Ranged physical combat. Levels up by dealing damage with bow.",
+	},
+	"spear": {
+		"name": "Spear",
+		"category": "weapon",
+		"description": "Extended melee reach. Levels up by dealing damage with spear.",
+	},
 	# Attribute skills
-	"constitution": {
+	"str": {
+		"name": "Strength",
+		"category": "attribute",
+		"description": "Raw physical power. Muscles trained through combat. Levels up by dealing physical damage.",
+	},
+	"con": {
 		"name": "Constitution",
 		"category": "attribute",
-		"description": "Endurance and vitality. Levels up by taking hits in combat.",
+		"description": "Toughness. Bodies hardened by punishment. Levels up by taking damage.",
 	},
-	"agility": {
+	"agi": {
 		"name": "Agility",
 		"category": "attribute",
-		"description": "Speed and mobility. Levels up by traveling distances.",
+		"description": "Reflexes. Trained by surviving danger. Levels up by dodging attacks and combat movement.",
+	},
+	"int": {
+		"name": "Intelligence",
+		"category": "attribute",
+		"description": "Arcane knowledge. Power through understanding. Levels up by dealing magical damage.",
+	},
+	"dex": {
+		"name": "Dexterity",
+		"category": "attribute",
+		"description": "Precision. Eyes and hands trained by practice. Levels up by landing hits.",
+	},
+	"wis": {
+		"name": "Wisdom",
+		"category": "attribute",
+		"description": "Mental discipline. Focus sharpened through practice. Levels up by using skills.",
 	},
 	# Gathering skills — XP per gather action (future)
 	"mining": {

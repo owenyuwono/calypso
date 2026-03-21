@@ -5,14 +5,18 @@ const NpcScene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
 
 const GENERATED_NPC_COUNT: int = 25
 
-# Maps NpcGenerator archetype IDs to NpcTraits profile strings.
-const ARCHETYPE_TO_PROFILE: Dictionary = {
-	"warrior":  "bold_warrior",
-	"mage":     "cautious_mage",
-	"rogue":    "sly_rogue",
-	"ranger":   "stoic_knight",
-	"merchant": "merchant",
+# Maps NpcGenerator archetype IDs to the pool of valid NpcTraits profile strings.
+const ARCHETYPE_PROFILES: Dictionary = {
+	"warrior":  ["bold_warrior", "stern_guardian", "wild_berserker", "stoic_knight"],
+	"mage":     ["cautious_mage", "devout_cleric", "gentle_healer"],
+	"rogue":    ["sly_rogue", "charming_bard", "shadow_stalker"],
+	"ranger":   ["keen_archer"],
+	"merchant": ["merchant"],
 }
+
+func _pick_profile(archetype: String) -> String:
+	var profiles: Array = ARCHETYPE_PROFILES.get(archetype, ["earnest_apprentice"])
+	return profiles.pick_random()
 
 # Character model paths by model name token.
 const MODEL_PATHS: Dictionary = {
@@ -223,7 +227,9 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 
 	$NPCs.add_child(npc)
 	# Set trait_profile after _ready() so npc_behavior reads it correctly at runtime.
-	npc.trait_profile = ARCHETYPE_TO_PROFILE.get(archetype, "bold_warrior")
+	# Prefer the loadout's own trait_profile if NpcGenerator already assigned one.
+	var loadout_profile: String = loadout.get("trait_profile", "")
+	npc.trait_profile = loadout_profile if loadout_profile != "" else _pick_profile(archetype)
 	npc.global_position = _pick_generated_npc_spawn_pos(loadout.get("default_goal", "idle"))
 
 	npc.initialize_from_loadout(loadout)

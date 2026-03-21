@@ -26,7 +26,15 @@ func setup(damage: int, color: Color = Color(1, 1, 1), direction: Vector3 = Vect
 	_label.text = str(damage)
 	_label.modulate = color
 	_start_pos = position
+	_setup_drift(direction)
 
+func setup_text(text: String, color: Color = Color(1, 1, 1), direction: Vector3 = Vector3.ZERO) -> void:
+	_label.text = text
+	_label.modulate = color
+	_start_pos = position
+	_setup_drift(direction)
+
+func _setup_drift(direction: Vector3) -> void:
 	# Compute drift direction (XZ plane) with slight randomness
 	_drift = direction
 	if _drift.length_squared() < 0.01:

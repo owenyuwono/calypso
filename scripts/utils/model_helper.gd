@@ -272,6 +272,32 @@ static func spawn_damage_number(caller: Node, target_id: String, damage: int, co
 	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
 	dmg.setup(damage, color, direction)
 
+## Spawn a floating text label (e.g. "MISS") above a position.
+## caller is needed because static functions can't call get_tree().
+static func spawn_text_number(caller: Node, text: String, color: Color, attacker_pos: Vector3, target_pos: Vector3) -> void:
+	const CULL_DISTANCE_SQ: float = 900.0  # 30m^2
+	var player_node: Node = WorldState.get_entity("player")
+	if player_node and is_instance_valid(player_node):
+		var player_pos: Vector3 = player_node.global_position
+		var attacker_in_range: bool = attacker_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
+		var target_in_range: bool = target_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
+		if not attacker_in_range and not target_in_range:
+			return
+	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
+	if not dmg_scene:
+		return
+	var dmg := dmg_scene.instantiate()
+	caller.get_tree().current_scene.add_child(dmg)
+	var direction := Vector3.ZERO
+	if attacker_pos.length_squared() > 0.01:
+		direction = target_pos - attacker_pos
+		direction.y = 0
+		if direction.length_squared() > 0.01:
+			direction = direction.normalized()
+	var spawn_offset := direction * 1.0 if direction.length_squared() > 0.01 else Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
+	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
+	dmg.setup_text(text, color, direction)
+
 ## Flash-hit the target entity (calls its flash_hit() method if available).
 static func flash_target(target_node: Node) -> void:
 	if not target_node or not is_instance_valid(target_node):

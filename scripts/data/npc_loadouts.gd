@@ -18,7 +18,7 @@ const LOADOUTS: Dictionary = {
 		"default_goal": "idle",
 	},
 	"bjorn": {
-		"trait_profile": "boisterous_brawler",
+		"trait_profile": "wild_berserker",
 		"items": {"healing_potion": 3},
 		"equip": [],
 		"gold": 80,
@@ -39,14 +39,14 @@ const LOADOUTS: Dictionary = {
 		"default_goal": "hunt_field",
 	},
 	"mira": {
-		"trait_profile": "cheerful_scholar",
+		"trait_profile": "devout_cleric",
 		"items": {"healing_potion": 3},
 		"equip": [],
 		"gold": 60,
 		"default_goal": "idle",
 	},
 	"dusk": {
-		"trait_profile": "mysterious_loner",
+		"trait_profile": "shadow_stalker",
 		"items": {"healing_potion": 2},
 		"equip": [],
 		"gold": 50,
