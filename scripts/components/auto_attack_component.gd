@@ -145,5 +145,25 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 		target_lost.emit()
 		return
 	var target_pos: Vector3 = target_node.global_position if is_instance_valid(target_node) else Vector3.ZERO
-	var damage: int = _combat.deal_damage_to(target_id)
+	var attacker_id: String = _get_entity_id()
+
+	# Hit check
+	if not _combat.roll_hit(target_id):
+		GameEvents.attack_missed.emit(target_id, attacker_id)
+		_visuals.spawn_miss_number(target_pos)
+		return
+
+	# Calculate damage manually so we can apply crit multiplier before dealing
+	var target_combat: Node = target_node.get_node_or_null("CombatComponent") if is_instance_valid(target_node) else null
+	var atk: int = _combat.get_effective_atk()
+	var def: int = target_combat.get_effective_def() if target_combat else 0
+	var damage: int = maxi(1, atk - def)
+
+	# Crit check
+	var crit_result: Dictionary = _combat.roll_crit()
+	if crit_result["is_crit"]:
+		damage = maxi(1, int(damage * crit_result["multiplier"]))
+
+	# Apply and emit
+	_combat.apply_flat_damage_to(target_id, damage)
 	attack_landed.emit(target_id, damage, target_pos)
