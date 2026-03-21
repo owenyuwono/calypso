@@ -139,9 +139,9 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 func _add_fx_effects() -> void:
 	match _style:
 		"crit":
-			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.01), 0.8, -1.0)
+			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.05), 1.0, -1.0)
 		"fatal":
-			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.01), 0.8, -1.0)
+			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.05), 1.0, -1.0)
 			_add_sprite_fx("sparks", Vector3(0, 0, -0.005), 0.5, 0.4)
 		"weak":
 			_add_sprite_fx("chevron_up", Vector3(0.4, 0.1, 0), 0.25, -1.0)
@@ -160,6 +160,17 @@ func _add_sprite_fx(texture_key: String, offset: Vector3, sprite_scale: float, f
 	sprite.pixel_size = 0.01
 	sprite.position = offset
 	sprite.scale = Vector3.ONE * sprite_scale
+	# Starburst textures are on black bg — use additive blending so black = invisible
+	if texture_key.begins_with("starburst"):
+		sprite.render_priority = -1
+		var mat := StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.no_depth_test = true
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		mat.albedo_texture = sprite.texture
+		sprite.material_override = mat
 	add_child(sprite)
 
 	if fade_duration > 0:
