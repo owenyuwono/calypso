@@ -14,7 +14,7 @@ const DRIFT_DISTANCE := 2.0
 # Styled system
 const HIT_STYLES: Dictionary = {
 	"normal":  {"color": Color(1, 1, 1),         "outline": Color(0, 0, 0),       "size": 64, "duration": 1.0},
-	"crit":    {"color": Color(1, 0.85, 0.0),    "outline": Color(0.8, 0.2, 0.0), "size": 96, "duration": 1.5},
+	"crit":    {"color": Color(1, 1, 1),          "outline": Color(0, 0, 0),       "size": 96, "duration": 1.5},
 	"weak":    {"color": Color(1, 0.55, 0.1),    "outline": Color(0, 0, 0),       "size": 72, "duration": 1.0},
 	"fatal":   {"color": Color(1, 0.15, 0.0),    "outline": Color(1, 0.8, 0.0),   "size": 96, "duration": 1.5},
 	"resist":  {"color": Color(0.55, 0.65, 0.8), "outline": Color(0, 0, 0),       "size": 44, "duration": 0.8},
@@ -139,9 +139,9 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 func _add_fx_effects() -> void:
 	match _style:
 		"crit":
-			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.05), 1.0, -1.0)
+			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.05), 3.0, -1.0)
 		"fatal":
-			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.05), 1.0, -1.0)
+			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.05), 3.0, -1.0)
 			_add_sprite_fx("sparks", Vector3(0, 0, -0.005), 0.5, 0.4)
 		"weak":
 			_add_sprite_fx("chevron_up", Vector3(0.4, 0.1, 0), 0.25, -1.0)
