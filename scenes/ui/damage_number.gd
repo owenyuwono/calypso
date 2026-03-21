@@ -94,11 +94,11 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 	else:
 		_label.text = str(damage)
 
-	# Apply label style
-	_label.add_theme_font_size_override("font_size", style["size"])
-	_label.add_theme_color_override("font_color", style["color"])
-	_label.add_theme_color_override("font_outline_color", style["outline"])
-	_label.add_theme_constant_override("outline_size", 6 if _style in ["crit", "fatal"] else 4)
+	# Apply label style (Label3D uses direct properties, not theme overrides)
+	_label.font_size = style["size"]
+	_label.modulate = style["color"]
+	_label.outline_modulate = style["outline"]
+	_label.outline_size = 6 if _style in ["crit", "fatal"] else 4
 
 	# Per-style motion parameters
 	_duration = style["duration"]
