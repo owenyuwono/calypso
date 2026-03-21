@@ -142,6 +142,8 @@ func setup_hp_bar(y_offset: float = 1.8, entity_name: String = "") -> void:
 	_hp_bar = ModelHelper.create_hp_bar(get_parent(), y_offset)
 	if _hp_bar and not entity_name.is_empty() and _hp_bar.has_method("set_entity_name"):
 		_hp_bar.set_entity_name(entity_name)
+	if _hp_bar:
+		_hp_bar.visible = false
 
 func update_hp_bar(hp: int, max_hp: int) -> void:
 	ModelHelper.update_entity_hp_bar(_hp_bar, hp, max_hp)

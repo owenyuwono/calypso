@@ -433,6 +433,9 @@ func _drop_aggro() -> void:
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
 		_stagger_timer = 0.3
+		# Update HP bar on damage
+		if _visuals and _stats:
+			_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, true)
 
 func _on_entity_died(entity_id: String, killer_id: String) -> void:
 	if entity_id == monster_id:

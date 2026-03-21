@@ -6,7 +6,19 @@ const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd"
 const _STAT_ICONS: Dictionary = {
 	"HP": "res://assets/textures/ui/stats/stat_hp.png",
 	"ATK": "res://assets/textures/ui/stats/stat_atk.png",
+	"MATK": "res://assets/textures/ui/stats/stat_matk.png",
 	"DEF": "res://assets/textures/ui/stats/stat_def.png",
+	"MDEF": "res://assets/textures/ui/stats/stat_mdef.png",
+	"Accuracy": "res://assets/textures/ui/stats/stat_accuracy.png",
+	"Evasion": "res://assets/textures/ui/stats/stat_evasion.png",
+	"Crit Rate": "res://assets/textures/ui/stats/stat_crit_rate.png",
+	"Crit Dmg": "res://assets/textures/ui/stats/stat_crit_dmg.png",
+	"Atk Speed": "res://assets/textures/ui/stats/stat_atk_speed.png",
+	"Move Spd": "res://assets/textures/ui/stats/stat_move_spd.png",
+	"Cast Spd": "res://assets/textures/ui/stats/stat_cast_spd.png",
+	"Stamina": "res://assets/textures/ui/stats/stat_stamina.png",
+	"HP Regen": "res://assets/textures/ui/stats/stat_hp_regen.png",
+	"CDR": "res://assets/textures/ui/stats/stat_cdr.png",
 }
 
 # Proficiency display order within each category
