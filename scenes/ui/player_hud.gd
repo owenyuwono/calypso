@@ -39,17 +39,10 @@ func _build_ui() -> void:
 	var hp_row := HBoxContainer.new()
 	vbox.add_child(hp_row)
 
-	var hp_header := HBoxContainer.new()
-	hp_header.custom_minimum_size = Vector2(32, 0)
-	hp_header.add_theme_constant_override("separation", 2)
-	hp_row.add_child(hp_header)
-
 	var hp_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/stat_hp.png", Vector2(16, 16))
 	if hp_icon:
-		hp_header.add_child(hp_icon)
-
-	var hp_title: Label = UIHelper.create_label("HP", 13, Color(1, 0.3, 0.3))
-	hp_header.add_child(hp_title)
+		hp_icon.custom_minimum_size = Vector2(20, 0)
+		hp_row.add_child(hp_icon)
 
 	_hp_bar = _create_styled_bar(
 		Color(0.85, 0.15, 0.15), Color(0.3, 0.05, 0.05),
@@ -65,9 +58,10 @@ func _build_ui() -> void:
 	var sta_row := HBoxContainer.new()
 	vbox.add_child(sta_row)
 
-	var sta_title: Label = UIHelper.create_label("STA", 13, Color(0.2, 0.75, 0.5))
-	sta_title.custom_minimum_size = Vector2(32, 0)
-	sta_row.add_child(sta_title)
+	var sta_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/stat_stamina.png", Vector2(16, 16))
+	if sta_icon:
+		sta_icon.custom_minimum_size = Vector2(20, 0)
+		sta_row.add_child(sta_icon)
 
 	_sta_bar = _create_styled_bar(
 		Color(0.15, 0.65, 0.4), Color(0.05, 0.15, 0.1),
