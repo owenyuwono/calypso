@@ -33,8 +33,8 @@ const LOADOUTS: Dictionary = {
 	},
 	"thane": {
 		"trait_profile": "stoic_knight",
-		"items": {"healing_potion": 2},
-		"equip": [],
+		"items": {"basic_spear": 1, "healing_potion": 2},
+		"equip": ["basic_spear"],
 		"gold": 70,
 		"default_goal": "hunt_field",
 	},
@@ -67,6 +67,7 @@ const LOADOUTS: Dictionary = {
 			"basic_mace": 3, "iron_mace": 2,
 			"basic_dagger": 3, "iron_dagger": 2,
 			"basic_staff": 3, "iron_staff": 2,
+			"basic_bow": 3, "basic_spear": 3,
 		},
 		"equip": ["iron_sword"],
 		"gold": 500,

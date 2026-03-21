@@ -34,6 +34,18 @@ const ITEMS: Dictionary = {
 	"steel_staff":    {"name": "Steel Staff",    "type": "weapon", "slot_type": "main_hand", "weapon_type": "staff", "phys_type": "blunt", "value": 400,  "atk_bonus": 15, "matk_bonus": 15, "required_skill": "staff", "required_level": 5},
 	"mithril_staff":  {"name": "Mithril Staff",  "type": "weapon", "slot_type": "main_hand", "weapon_type": "staff", "phys_type": "blunt", "value": 800,  "atk_bonus": 20, "matk_bonus": 20, "required_skill": "staff", "required_level": 7},
 	"dragon_staff":   {"name": "Dragon Staff",   "type": "weapon", "slot_type": "main_hand", "weapon_type": "staff", "phys_type": "blunt", "value": 1500, "atk_bonus": 25, "matk_bonus": 25, "required_skill": "staff", "required_level": 9},
+	# Bows (required_skill: "bow", phys_type: "pierce", lower atk_bonus since ranged)
+	"basic_bow":    {"name": "Basic Bow",    "type": "weapon", "slot_type": "main_hand", "weapon_type": "bow", "phys_type": "pierce", "value": 50,   "atk_bonus": 4,  "required_skill": "bow", "required_level": 1},
+	"iron_bow":     {"name": "Iron Bow",     "type": "weapon", "slot_type": "main_hand", "weapon_type": "bow", "phys_type": "pierce", "value": 150,  "atk_bonus": 8,  "required_skill": "bow", "required_level": 3},
+	"steel_bow":    {"name": "Steel Bow",    "type": "weapon", "slot_type": "main_hand", "weapon_type": "bow", "phys_type": "pierce", "value": 400,  "atk_bonus": 12, "required_skill": "bow", "required_level": 5},
+	"mithril_bow":  {"name": "Mithril Bow",  "type": "weapon", "slot_type": "main_hand", "weapon_type": "bow", "phys_type": "pierce", "value": 800,  "atk_bonus": 16, "required_skill": "bow", "required_level": 7},
+	"dragon_bow":   {"name": "Dragon Bow",   "type": "weapon", "slot_type": "main_hand", "weapon_type": "bow", "phys_type": "pierce", "value": 1500, "atk_bonus": 20, "required_skill": "bow", "required_level": 9},
+	# Spears (required_skill: "spear", phys_type: "pierce", attack_range: 3.0 for extended reach)
+	"basic_spear":   {"name": "Basic Spear",   "type": "weapon", "slot_type": "main_hand", "weapon_type": "spear", "phys_type": "pierce", "value": 50,   "atk_bonus": 5,  "attack_range": 3.0, "required_skill": "spear", "required_level": 1},
+	"iron_spear":    {"name": "Iron Spear",    "type": "weapon", "slot_type": "main_hand", "weapon_type": "spear", "phys_type": "pierce", "value": 150,  "atk_bonus": 10, "attack_range": 3.0, "required_skill": "spear", "required_level": 3},
+	"steel_spear":   {"name": "Steel Spear",   "type": "weapon", "slot_type": "main_hand", "weapon_type": "spear", "phys_type": "pierce", "value": 400,  "atk_bonus": 15, "attack_range": 3.0, "required_skill": "spear", "required_level": 5},
+	"mithril_spear": {"name": "Mithril Spear", "type": "weapon", "slot_type": "main_hand", "weapon_type": "spear", "phys_type": "pierce", "value": 800,  "atk_bonus": 20, "attack_range": 3.0, "required_skill": "spear", "required_level": 7},
+	"dragon_spear":  {"name": "Dragon Spear",  "type": "weapon", "slot_type": "main_hand", "weapon_type": "spear", "phys_type": "pierce", "value": 1500, "atk_bonus": 25, "attack_range": 3.0, "required_skill": "spear", "required_level": 9},
 	# Shields (type: "armor", required_skill: "con")
 	"basic_shield":   {"name": "Basic Shield",   "type": "armor", "slot_type": "off_hand", "value": 50,   "def_bonus": 3,  "mdef_bonus": 0, "required_skill": "con", "required_level": 1},
 	"iron_shield":    {"name": "Iron Shield",    "type": "armor", "slot_type": "off_hand", "value": 150,  "def_bonus": 6,  "mdef_bonus": 0, "required_skill": "con", "required_level": 3},
