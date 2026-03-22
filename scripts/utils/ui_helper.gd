@@ -10,7 +10,7 @@ const COLOR_DISABLED := Color(0.5, 0.5, 0.5)
 
 const GAME_FONT: FontFile = preload("res://assets/fonts/Philosopher-Regular.ttf")
 const GAME_FONT_BOLD: FontFile = preload("res://assets/fonts/Philosopher-Bold.ttf")
-const GAME_FONT_DISPLAY: FontFile = preload("res://assets/fonts/Marcellus-Regular.ttf")
+const GAME_FONT_DISPLAY: FontFile = preload("res://assets/fonts/Philosopher-Regular.ttf")
 
 static func center_panel(panel: PanelContainer) -> void:
 	panel.anchor_left = 0.0
