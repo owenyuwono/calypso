@@ -32,6 +32,10 @@ AudioManager="*res://autoloads/audio_manager.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 
+[gui]
+
+theme/custom_font="res://assets/fonts/Nunito-Regular.ttf"
+
 [input]
 
 interact={

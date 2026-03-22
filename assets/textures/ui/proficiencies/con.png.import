@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ck257uefoatgw"
-path="res://.godot/imported/con.png-feda629252b241fd821b1b879a60cadd.ctex"
+path="res://.godot/imported/con.png-c4c0eb0172afe994f7c4cca65557cbfd.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/textures/ui/proficiencies/con.png"
-dest_files=["res://.godot/imported/con.png-feda629252b241fd821b1b879a60cadd.ctex"]
+dest_files=["res://.godot/imported/con.png-c4c0eb0172afe994f7c4cca65557cbfd.ctex"]
 
 [params]
 
