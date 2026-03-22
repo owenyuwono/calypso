@@ -100,10 +100,6 @@ toggle_settings={
 ]
 }
 
-[gui]
-
-theme/custom_font="res://assets/fonts/Philosopher-Regular.ttf"
-
 [rendering]
 
 textures/default_filters/anisotropic_filtering_level=0
