@@ -55,9 +55,6 @@ signal conversation_participant_joined(conversation_id: String, entity_id: Strin
 signal conversation_participant_left(conversation_id: String, entity_id: String)
 signal conversation_turn_added(conversation_id: String, speaker_id: String, dialogue: String, action: String)
 
-# Information / Opinion
-signal fact_learned(entity_id: String, fact_content: String, source: String)
-signal opinion_formed(entity_id: String, topic: String, stance: String)
 
 # NPC event-driven LLM triggers
 signal npc_event_triggered(npc_id: String, event_type: String, context: Dictionary)

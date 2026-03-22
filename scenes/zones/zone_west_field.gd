@@ -35,7 +35,7 @@ func _ready() -> void:
 	_connect_rock_signals($NavigationRegion3D)
 
 	# Create zone portals
-	_create_portals()
+	TerrainHelpers.create_portals(self, zone_id)
 	_spawn_ambient_emitters()
 
 	# Bake navmesh after environment is ready
@@ -91,10 +91,6 @@ func _west_field_terrain_rules() -> Array:
 		{"type": "circle", "center": Vector2(-130, -20), "radius": 8.0, "channel": 1, "falloff": 2.0, "noise_perturb": 0.25},
 		{"type": "circle", "center": Vector2(-140, -25), "radius": 5.0, "channel": 1, "falloff": 1.5, "noise_perturb": 0.25},
 	]
-
-
-func _create_portals() -> void:
-	TerrainHelpers.create_portals(self, zone_id)
 
 
 func _spawn_ambient_emitters() -> void:

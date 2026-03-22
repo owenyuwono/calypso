@@ -105,19 +105,3 @@ static func create_style_box(bg_color: Color, border_color: Color = Color.TRANSP
 	set_corner_radius(style, corner_radius)
 	set_border_width(style, border_width)
 	return style
-
-## Creates a gold display row (coin icon + amount label).
-## Returns {"container": HBoxContainer, "label": Label}.
-static func create_gold_display(gold: int = 0) -> Dictionary:
-	var container := HBoxContainer.new()
-	container.add_theme_constant_override("separation", 4)
-
-	var icon: TextureRect = create_icon("res://assets/textures/ui/stats/gold_coin.png", Vector2(16, 16))
-	if icon != null:
-		container.add_child(icon)
-
-	var label: Label = create_label(str(gold), 14, COLOR_GOLD)
-	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	container.add_child(label)
-
-	return {"container": container, "label": label}

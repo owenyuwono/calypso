@@ -33,7 +33,7 @@ func _ready() -> void:
 	FieldBuilder.decorate_east_biomes(_ctx)
 	_connect_rock_signals($NavigationRegion3D)
 	_spawn_fishing_spots(_ctx)
-	_create_portals()
+	TerrainHelpers.create_portals(self, zone_id)
 	_spawn_ambient_emitters()
 
 	# Bake navmesh — emit zone_ready after bake so ZoneManager can await it
@@ -100,10 +100,6 @@ func _spawn_fishing_spots(ctx: WorldBuilderContext) -> void:
 	AssetSpawner.spawn_fishing_spot(ctx, Vector3(108.0, 0.0, 28.0), "medium")
 	# Deep spot at the far east end (high-level content)
 	AssetSpawner.spawn_fishing_spot(ctx, Vector3(138.0, 0.0, -5.0), "deep")
-
-
-func _create_portals() -> void:
-	TerrainHelpers.create_portals(self, zone_id)
 
 
 func _spawn_ambient_emitters() -> void:

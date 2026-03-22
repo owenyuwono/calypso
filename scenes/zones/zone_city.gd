@@ -29,7 +29,7 @@ func _ready() -> void:
 	CityBuilderClass.build_all_districts(ctx)
 
 	# Portals — requires ZoneDatabase autoload (may not be present yet)
-	_create_portals()
+	TerrainHelpers.create_portals(self, zone_id)
 
 	# Bake navmesh; emit zone_ready after bake
 	await get_tree().create_timer(0.5).timeout
@@ -247,7 +247,3 @@ func _city_terrain_rules() -> Array:
 	]
 
 
-# --- Portals -----------------------------------------------------------------
-
-func _create_portals() -> void:
-	TerrainHelpers.create_portals(self, zone_id)

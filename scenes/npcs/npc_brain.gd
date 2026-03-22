@@ -548,7 +548,6 @@ func _handle_extract_response(response: Dictionary) -> void:
 		elif fact.begins_with("- "):
 			fact = fact.substr(2).strip_edges()
 		memory.add_memory(fact, "heard_from:conversation", "medium")
-		GameEvents.fact_learned.emit(npc.npc_id, fact, "conversation")
 
 func _handle_fuzzy_response(response: Dictionary) -> void:
 	pass  # Future: update memory's fuzzy_text field
@@ -588,7 +587,6 @@ func _handle_opinion_response(response: Dictionary) -> void:
 	}
 
 	_identity.add_opinion(opinion)
-	GameEvents.opinion_formed.emit(npc.npc_id, topic, stance)
 
 func _handle_impression_response(response: Dictionary, partner_id: String) -> void:
 	if not _relationship or partner_id.is_empty():
