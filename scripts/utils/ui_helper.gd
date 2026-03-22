@@ -8,8 +8,9 @@ const COLOR_HEADER := Color(1, 0.9, 0.6)
 const COLOR_EQUIPMENT := Color(0.7, 0.85, 1.0)
 const COLOR_DISABLED := Color(0.5, 0.5, 0.5)
 
-const GAME_FONT: FontFile = preload("res://assets/fonts/Cinzel-Regular.ttf")
-const GAME_FONT_BOLD: FontFile = preload("res://assets/fonts/Cinzel-Bold.ttf")
+const GAME_FONT: FontFile = preload("res://assets/fonts/Philosopher-Regular.ttf")
+const GAME_FONT_BOLD: FontFile = preload("res://assets/fonts/Philosopher-Bold.ttf")
+const GAME_FONT_DISPLAY: FontFile = preload("res://assets/fonts/Marcellus-Regular.ttf")
 
 static func center_panel(panel: PanelContainer) -> void:
 	panel.anchor_left = 0.0
