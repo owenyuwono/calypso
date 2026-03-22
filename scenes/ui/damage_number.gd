@@ -65,7 +65,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"fatal":
 			# Icon only, no number
 			_label.visible = false
-			_add_icon("fatal", Vector3.ZERO, 1.5)
+			_add_icon("fatal", Vector3.ZERO, 1.0)
 			_duration = 1.2
 			_rise_time = 0.2
 			_jump_height = 1.5
@@ -73,7 +73,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"immune":
 			# Icon only, no number
 			_label.visible = false
-			_add_icon("immune", Vector3.ZERO, 1.5)
+			_add_icon("immune", Vector3.ZERO, 1.0)
 			_duration = 1.0
 			_rise_time = 0.15
 			_jump_height = 1.0
@@ -84,7 +84,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 			_label.font_size = 72 if not is_crit else 96
 			_label.modulate = COLOR_YELLOW if is_crit else COLOR_ORANGE
 			_label.outline_size = 6
-			_add_icon("weak", Vector3(0, 0.5, 0), 0.8)
+			_add_icon("weak", Vector3(-0.7, 0, 0), 0.5)
 			_duration = 1.0
 			_rise_time = 0.2
 			_jump_height = 1.5
@@ -97,7 +97,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 			_label.font_size = 44 if not is_crit else 72
 			_label.modulate = COLOR_YELLOW if is_crit else COLOR_GRAY
 			_label.outline_size = 4
-			_add_icon("resist", Vector3(0, 0.4, 0), 0.7)
+			_add_icon("resist", Vector3(-0.6, 0, 0), 0.45)
 			_duration = 0.8
 			_rise_time = 0.15
 			_jump_height = 0.8
@@ -145,19 +145,11 @@ func _add_icon(icon_key: String, offset: Vector3, icon_scale: float) -> void:
 	var sprite := Sprite3D.new()
 	sprite.texture = load(path)
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.transparent = true
 	sprite.no_depth_test = true
 	sprite.pixel_size = 0.01
 	sprite.position = offset
 	sprite.scale = Vector3.ONE * icon_scale
-	# Icons are on black bg — additive blending
-	var mat := StandardMaterial3D.new()
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.no_depth_test = true
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	mat.albedo_texture = sprite.texture
-	sprite.material_override = mat
 	add_child(sprite)
 
 func _do_pop_scale() -> void:
@@ -199,7 +191,11 @@ func _process(delta: float) -> void:
 	# Fade out in the fall phase
 	if _time > _rise_time:
 		var fade_t := clampf((_time - _rise_time) / (_duration - _rise_time), 0.0, 1.0)
-		_label.modulate.a = 1.0 - fade_t
+		var alpha := 1.0 - fade_t
+		_label.modulate.a = alpha
+		for child in get_children():
+			if child is Sprite3D:
+				child.modulate.a = alpha
 
 	if _time >= _duration:
 		queue_free()
