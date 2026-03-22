@@ -80,7 +80,7 @@ const MONSTERS: Dictionary = {
 	},
 	"dummy_normal": {
 		"name": "Normal Dummy",
-		"hp": 200, "atk": 0, "def": 0,
+		"hp": 99999999999, "atk": 0, "def": 0,
 		"xp": 0, "gold": 0,
 		"proficiency_xp": 0,
 		"drops": [],
@@ -94,7 +94,7 @@ const MONSTERS: Dictionary = {
 	},
 	"dummy_weak": {
 		"name": "Weak Dummy",
-		"hp": 200, "atk": 0, "def": 0,
+		"hp": 99999999999, "atk": 0, "def": 0,
 		"xp": 0, "gold": 0,
 		"proficiency_xp": 0,
 		"drops": [],
@@ -108,7 +108,7 @@ const MONSTERS: Dictionary = {
 	},
 	"dummy_fatal": {
 		"name": "Fatal Dummy",
-		"hp": 200, "atk": 0, "def": 0,
+		"hp": 99999999999, "atk": 0, "def": 0,
 		"xp": 0, "gold": 0,
 		"proficiency_xp": 0,
 		"drops": [],
@@ -122,7 +122,7 @@ const MONSTERS: Dictionary = {
 	},
 	"dummy_resist": {
 		"name": "Resist Dummy",
-		"hp": 200, "atk": 0, "def": 0,
+		"hp": 99999999999, "atk": 0, "def": 0,
 		"xp": 0, "gold": 0,
 		"proficiency_xp": 0,
 		"drops": [],
@@ -136,7 +136,7 @@ const MONSTERS: Dictionary = {
 	},
 	"dummy_immune": {
 		"name": "Immune Dummy",
-		"hp": 200, "atk": 0, "def": 0,
+		"hp": 99999999999, "atk": 0, "def": 0,
 		"xp": 0, "gold": 0,
 		"proficiency_xp": 0,
 		"drops": [],
