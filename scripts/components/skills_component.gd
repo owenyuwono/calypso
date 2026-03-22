@@ -317,7 +317,7 @@ func _execute_skill_hit() -> void:
 			if _stats:
 				_stats.take_damage(self_damage)
 			_visuals.flash_hit()
-			_visuals.spawn_styled_damage_number(entity_id, self_damage, "fatal", false, get_parent().global_position)
+			_visuals.spawn_styled_damage_number(entity_id, self_damage, "weak", false, get_parent().global_position)
 			GameEvents.skill_backfired.emit(entity_id, _pending_skill_id, self_damage)
 			continue
 

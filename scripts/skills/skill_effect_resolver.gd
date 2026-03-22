@@ -409,17 +409,12 @@ static func _calc_damage(
 	# Hit type derived from combined resistance modifier
 	var combined_mod: float = element_mod * phys_type_mod
 	var hit_type: String = "normal"
-	if combined_mod >= 2.0:
-		hit_type = "fatal"
-	elif combined_mod >= 1.5:
+	if combined_mod >= 1.5:
 		hit_type = "weak"
-	elif combined_mod <= 0.0:
-		hit_type = "immune"
-	elif combined_mod <= 0.5:
+	elif combined_mod <= 0.5 and combined_mod > 0.0:
 		hit_type = "resist"
 
-	# Immune targets take 0 damage
-	var final_damage: int = 0 if hit_type == "immune" else maxi(1, int(after_def * combined_mod))
+	var final_damage: int = maxi(1, int(after_def * combined_mod)) if combined_mod > 0.0 else 0
 
 	return {"damage": final_damage, "hit_type": hit_type}
 
