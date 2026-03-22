@@ -11,30 +11,20 @@ var _jump_height: float = 1.5
 var _fall_depth: float = 0.5
 const DRIFT_DISTANCE := 2.0
 
-# Styled system
-const HIT_STYLES: Dictionary = {
-	"normal":  {"color": Color(1, 1, 1),         "outline": Color(0, 0, 0),       "size": 64, "duration": 1.0},
-	"crit":    {"color": Color(1, 1, 1),          "outline": Color(0, 0, 0),       "size": 96, "duration": 1.5},
-	"weak":    {"color": Color(1, 0.55, 0.1),    "outline": Color(0, 0, 0),       "size": 72, "duration": 1.0},
-	"fatal":   {"color": Color(1, 0.15, 0.0),    "outline": Color(1, 0.8, 0.0),   "size": 96, "duration": 1.5},
-	"resist":  {"color": Color(0.55, 0.65, 0.8), "outline": Color(0, 0, 0),       "size": 44, "duration": 0.8},
-	"immune":  {"color": Color(0.35, 0.35, 0.4), "outline": Color(0, 0, 0),       "size": 44, "duration": 0.6},
-	"miss":    {"color": Color(0.5, 0.5, 0.5),   "outline": Color(0, 0, 0),       "size": 40, "duration": 0.5},
-}
+# Styled damage number system
+const COLOR_WHITE := Color(1, 1, 1)
+const COLOR_YELLOW := Color(1, 0.85, 0.0)
+const COLOR_ORANGE := Color(1, 0.45, 0.1)
+const COLOR_GRAY := Color(0.6, 0.6, 0.6)
 
-const FX_TEXTURES: Dictionary = {
-	"starburst_gold": "res://assets/textures/ui/fx/starburst_gold.png",
-	"starburst_red":  "res://assets/textures/ui/fx/starburst_red.png",
-	"sparks":         "res://assets/textures/ui/fx/sparks.png",
-	"chevron_up":     "res://assets/textures/ui/fx/chevron_up.png",
-	"chevron_down":   "res://assets/textures/ui/fx/chevron_down.png",
-	"shield_flash":   "res://assets/textures/ui/fx/shield_flash.png",
-	"ring_flash":     "res://assets/textures/ui/fx/ring_flash.png",
+const HIT_ICONS: Dictionary = {
+	"weak":   "res://assets/textures/ui/fx/icon_weak.png",
+	"fatal":  "res://assets/textures/ui/fx/icon_fatal.png",
+	"resist": "res://assets/textures/ui/fx/icon_resist.png",
+	"immune": "res://assets/textures/ui/fx/icon_immune.png",
 }
 
 var _style: String = "normal"
-var _is_wobble: bool = false
-var _wobble_time: float = 0.0
 
 func _ready() -> void:
 	_label = Label3D.new()
@@ -68,117 +58,112 @@ func setup_text(text: String, color: Color = Color(1, 1, 1), direction: Vector3 
 	_setup_drift(direction)
 
 func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
-	# Determine effective style
-	if hit_type == "miss":
-		_style = "miss"
-	elif hit_type == "immune":
-		_style = "immune"
-	elif is_crit and (hit_type == "normal" or hit_type == "weak"):
-		_style = "crit"
-	elif hit_type == "fatal" or (is_crit and hit_type == "fatal"):
-		_style = "fatal"
-	else:
-		_style = hit_type
+	_style = hit_type
 
-	var style: Dictionary = HIT_STYLES.get(_style, HIT_STYLES["normal"])
-
-	# Set text
-	if _style == "miss":
-		_label.text = "MISS"
-	elif _style == "immune":
-		_label.text = "IMMUNE"
-	else:
-		_label.text = str(damage)
-
-	# Apply label style (Label3D uses direct properties, not theme overrides)
-	_label.font_size = style["size"]
-	if color_override.r >= 0:
-		_label.modulate = color_override
-	else:
-		_label.modulate = style["color"]
-	_label.outline_modulate = style["outline"]
-	_label.outline_size = 6 if _style in ["crit", "fatal"] else 4
-
-	# Per-style motion parameters
-	_duration = style["duration"]
-	match _style:
-		"resist":
-			_rise_time = 0.15
-			_jump_height = 0.8
-			_fall_depth = 0.8
-		"immune":
-			_rise_time = 0.1
-			_jump_height = 0.5
-			_fall_depth = 0.5
-		"miss":
-			_rise_time = 0.1
-			_jump_height = 0.4
-			_fall_depth = 0.2
-		"crit", "fatal":
-			_rise_time = 0.25
-			_jump_height = 2.0
-			_fall_depth = 0.6
-		_:
+	# Determine what to show based on hit_type
+	match hit_type:
+		"fatal":
+			# Icon only, no number
+			_label.visible = false
+			_add_icon("fatal", Vector3.ZERO, 1.5)
+			_duration = 1.2
 			_rise_time = 0.2
 			_jump_height = 1.5
 			_fall_depth = 0.5
+		"immune":
+			# Icon only, no number
+			_label.visible = false
+			_add_icon("immune", Vector3.ZERO, 1.5)
+			_duration = 1.0
+			_rise_time = 0.15
+			_jump_height = 1.0
+			_fall_depth = 0.4
+		"weak":
+			# Icon + number
+			_label.text = str(damage)
+			_label.font_size = 72 if not is_crit else 96
+			_label.modulate = COLOR_YELLOW if is_crit else COLOR_ORANGE
+			_label.outline_size = 6
+			_add_icon("weak", Vector3(0, 0.5, 0), 0.8)
+			_duration = 1.0
+			_rise_time = 0.2
+			_jump_height = 1.5
+			_fall_depth = 0.5
+			if is_crit:
+				_do_pop_scale()
+		"resist":
+			# Icon + number
+			_label.text = str(damage)
+			_label.font_size = 44 if not is_crit else 72
+			_label.modulate = COLOR_YELLOW if is_crit else COLOR_GRAY
+			_label.outline_size = 4
+			_add_icon("resist", Vector3(0, 0.4, 0), 0.7)
+			_duration = 0.8
+			_rise_time = 0.15
+			_jump_height = 0.8
+			_fall_depth = 0.6
+			if is_crit:
+				_do_pop_scale()
+		"miss":
+			# Text only
+			_label.text = "MISS"
+			_label.font_size = 40
+			_label.modulate = color_override if color_override.r >= 0 else COLOR_GRAY
+			_label.outline_size = 4
+			_duration = 0.5
+			_rise_time = 0.1
+			_jump_height = 0.4
+			_fall_depth = 0.2
+		_:
+			# Normal or crit — number only
+			_label.text = str(damage)
+			if is_crit:
+				_label.font_size = 96
+				_label.modulate = COLOR_YELLOW
+				_label.outline_size = 6
+				_duration = 1.5
+				_rise_time = 0.25
+				_jump_height = 2.0
+				_fall_depth = 0.6
+				_do_pop_scale()
+			else:
+				_label.font_size = 64
+				_label.modulate = COLOR_WHITE
+				_label.outline_size = 4
+				_duration = 1.0
+				_rise_time = 0.2
+				_jump_height = 1.5
+				_fall_depth = 0.5
 
 	_start_pos = position
-
-	# Add FX graphics before animating
-	_add_fx_effects()
-
-	# Pop-scale for crit/fatal
-	if _style in ["crit", "fatal"]:
-		scale = Vector3(2.0, 2.0, 2.0)
-		var tween: Tween = create_tween()
-		tween.tween_property(self, "scale", Vector3.ONE, 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-
 	_setup_drift(direction)
 
-func _add_fx_effects() -> void:
-	match _style:
-		"crit":
-			_add_sprite_fx("starburst_gold", Vector3(0, 0, -0.05), 3.0, -1.0)
-		"fatal":
-			_add_sprite_fx("starburst_red", Vector3(0, 0, -0.05), 3.0, -1.0)
-			_add_sprite_fx("sparks", Vector3(0, 0, -0.005), 0.5, 0.4)
-		"weak":
-			_add_sprite_fx("chevron_up", Vector3(0.4, 0.1, 0), 0.25, -1.0)
-		"resist":
-			_add_sprite_fx("chevron_down", Vector3(0.4, -0.1, 0), 0.25, -1.0)
-
-func _add_sprite_fx(texture_key: String, offset: Vector3, sprite_scale: float, fade_duration: float) -> void:
-	var path: String = FX_TEXTURES.get(texture_key, "")
+func _add_icon(icon_key: String, offset: Vector3, icon_scale: float) -> void:
+	var path: String = HIT_ICONS.get(icon_key, "")
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return
 	var sprite := Sprite3D.new()
 	sprite.texture = load(path)
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.transparent = true
 	sprite.no_depth_test = true
 	sprite.pixel_size = 0.01
 	sprite.position = offset
-	sprite.scale = Vector3.ONE * sprite_scale
-	# Starburst textures are on black bg — use additive blending so black = invisible
-	if texture_key.begins_with("starburst"):
-		sprite.render_priority = -1
-		var mat := StandardMaterial3D.new()
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.no_depth_test = true
-		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-		mat.albedo_texture = sprite.texture
-		sprite.material_override = mat
+	sprite.scale = Vector3.ONE * icon_scale
+	# Icons are on black bg — additive blending
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.albedo_texture = sprite.texture
+	sprite.material_override = mat
 	add_child(sprite)
 
-	if fade_duration > 0:
-		# Scale up and fade out
-		var tween: Tween = create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(sprite, "scale", Vector3.ONE * sprite_scale * 1.5, fade_duration)
-		tween.tween_property(sprite, "modulate:a", 0.0, fade_duration)
+func _do_pop_scale() -> void:
+	scale = Vector3(2.0, 2.0, 2.0)
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "scale", Vector3.ONE, 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 func _setup_drift(direction: Vector3) -> void:
 	# Compute drift direction (XZ plane) with slight randomness
@@ -193,11 +178,6 @@ func _process(delta: float) -> void:
 	if not _label:
 		return
 	_time += delta
-
-	# Wobble for miss style
-	if _is_wobble:
-		_wobble_time += delta * 15.0
-		_label.position.x = sin(_wobble_time) * 2.0
 
 	# XZ drift: linear outward
 	var t_total := clampf(_time / _duration, 0.0, 1.0)
