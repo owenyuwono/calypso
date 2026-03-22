@@ -9,6 +9,8 @@ var _audio_cache: Dictionary = {}
 
 
 func _ready() -> void:
+	# Start muted — player can raise volume in settings
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), -80.0)
 	for i in UI_POOL_SIZE:
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.bus = &"UI"
