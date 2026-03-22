@@ -288,6 +288,9 @@ func _capture_spawn_point() -> void:
 	spawn_point = global_position
 
 func _process_idle(delta: float) -> void:
+	if _base_aggro_range <= 0.0 and _wander_radius <= 0.0:
+		return  # Passive monster — stand in place, no aggro, no wander
+
 	_wander_timer -= delta
 	if _wander_timer <= 0.0:
 		_start_wander()
@@ -298,6 +301,10 @@ func _process_idle(delta: float) -> void:
 		_check_aggro()
 
 func _start_wander() -> void:
+	if _wander_radius <= 0.0:
+		_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+		return  # No wander radius — stay in place
+
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
 	var offset := Vector3(
 		randf_range(-_wander_radius, _wander_radius),
@@ -341,12 +348,15 @@ func _process_wander_movement() -> bool:
 		_visuals.face_direction(dir)
 
 	# Throttled aggro check while wandering
-	if _aggro_check_timer <= 0.0:
+	if _aggro_check_timer <= 0.0 and _base_aggro_range > 0.0:
 		_aggro_check_timer = 1.0
 		_check_aggro()
 	return true
 
 func _check_aggro() -> void:
+	if _base_aggro_range <= 0.0:
+		return  # Passive monster — never aggro
+
 	var nearby: Array = _perception.get_nearby(_aggro_range)
 	for entry in nearby:
 		if entry.id == monster_id:
