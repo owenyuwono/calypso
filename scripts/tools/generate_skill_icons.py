@@ -85,6 +85,15 @@ SKILLS = [
     ("lacerate",  "dot_physical",  "Two crossing slash marks forming an X", 40),
     # dot_magic
     ("drain",     "dot_magic",     "Spiral tendrils converging to a center point", 40),
+    # single_physical (bow/spear)
+    ("aimed_shot",     "single_physical", "A bow with a single arrow drawn back, small targeting crosshair at the arrowhead", 40),
+    ("piercing_arrow", "single_physical", "An arrow piercing cleanly through a metal plate", 40),
+    ("thrust",         "single_physical", "A spear tip thrusting forward with small speed lines", 40),
+    # aoe_physical (bow/spear)
+    ("volley",         "aoe_physical",    "Multiple arrows raining downward in a spread pattern", 40),
+    ("sweep",          "aoe_physical",    "A spear sweeping in a wide horizontal arc with a motion trail", 40),
+    # dot_physical (spear)
+    ("impale",         "dot_physical",    "A spear tip embedded deep with small blood drops dripping", 40),
 ]
 
 # ---------------------------------------------------------------------------
