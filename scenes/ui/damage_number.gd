@@ -14,14 +14,11 @@ const DRIFT_DISTANCE := 2.0
 # Styled damage number system
 const COLOR_WHITE := Color(1, 1, 1)
 const COLOR_YELLOW := Color(1, 0.85, 0.0)
-const COLOR_ORANGE := Color(1, 0.45, 0.1)
 const COLOR_GRAY := Color(0.6, 0.6, 0.6)
 
 const HIT_ICONS: Dictionary = {
 	"weak":   "res://assets/textures/ui/fx/icon_weak.png",
-	"fatal":  "res://assets/textures/ui/fx/icon_fatal.png",
 	"resist": "res://assets/textures/ui/fx/icon_resist.png",
-	"immune": "res://assets/textures/ui/fx/icon_immune.png",
 }
 
 var _style: String = "normal"
@@ -61,28 +58,14 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 	_style = hit_type
 
 	# Determine what to show based on hit_type
+	# Text color: white (normal) or yellow (crit) — hit_type only adds icon
+	var text_color: Color = COLOR_YELLOW if is_crit else COLOR_WHITE
 	match hit_type:
-		"fatal":
-			# Icon only, no number
-			_label.visible = false
-			_add_icon("fatal", Vector3.ZERO, 1.0)
-			_duration = 1.2
-			_rise_time = 0.2
-			_jump_height = 1.5
-			_fall_depth = 0.5
-		"immune":
-			# Icon only, no number
-			_label.visible = false
-			_add_icon("immune", Vector3.ZERO, 1.0)
-			_duration = 1.0
-			_rise_time = 0.15
-			_jump_height = 1.0
-			_fall_depth = 0.4
 		"weak":
 			# Icon + number
 			_label.text = str(damage)
-			_label.font_size = 72 if not is_crit else 96
-			_label.modulate = COLOR_YELLOW if is_crit else COLOR_ORANGE
+			_label.font_size = 96 if is_crit else 72
+			_label.modulate = text_color
 			_label.outline_size = 6
 			_add_icon("weak", Vector3(-0.7, 0, 0), 0.5)
 			_duration = 1.0
@@ -94,8 +77,8 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"resist":
 			# Icon + number
 			_label.text = str(damage)
-			_label.font_size = 44 if not is_crit else 72
-			_label.modulate = COLOR_YELLOW if is_crit else COLOR_GRAY
+			_label.font_size = 72 if is_crit else 44
+			_label.modulate = text_color
 			_label.outline_size = 4
 			_add_icon("resist", Vector3(-0.6, 0, 0), 0.45)
 			_duration = 0.8

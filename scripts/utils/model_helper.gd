@@ -299,7 +299,7 @@ static func spawn_text_number(caller: Node, text: String, color: Color, attacker
 	dmg.setup_text(text, color, direction)
 
 ## Spawn a styled floating damage number above a target entity.
-## hit_type: "normal" | "crit" | "weak" | "fatal" | "resist" | "immune" | "miss"
+## hit_type: "normal" | "weak" | "resist" | "miss"
 ## is_crit: whether the hit was a critical strike (affects style selection)
 static func spawn_styled_damage_number(caller: Node, target_id: String, damage: int, hit_type: String, is_crit: bool, attacker_pos: Vector3, target_pos: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
 	# Same culling logic as spawn_damage_number (30m from player)

@@ -180,24 +180,20 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Combine modifiers and determine hit_type
 	var combined_mod: float = phys_mod * resist_mod
 	var hit_type: String = "normal"
-	if combined_mod >= 2.0:
-		hit_type = "fatal"
-	elif combined_mod >= 1.5:
+	if combined_mod >= 1.5:
 		hit_type = "weak"
-	elif combined_mod <= 0.0:
-		hit_type = "immune"
-	elif combined_mod <= 0.5:
+	elif combined_mod <= 0.5 and combined_mod > 0.0:
 		hit_type = "resist"
 
-	var damage: int = maxi(1, int(raw_damage * combined_mod)) if hit_type != "immune" else 0
+	var damage: int = maxi(1, int(raw_damage * combined_mod)) if combined_mod > 0.0 else 0
 
-	# Crit check (no crit on immune)
+	# Crit check (no crit on 0 damage)
 	var crit_result: Dictionary = _combat.roll_crit()
-	if crit_result["is_crit"] and hit_type != "immune":
+	if crit_result["is_crit"] and damage > 0:
 		damage = maxi(1, int(damage * crit_result["multiplier"]))
 
 	# Apply and emit
 	if damage > 0:
 		_combat.apply_flat_damage_to(target_id, damage)
-	_visuals.spawn_styled_damage_number(target_id, damage, hit_type, crit_result["is_crit"] and hit_type != "immune", target_pos)
+	_visuals.spawn_styled_damage_number(target_id, damage, hit_type, crit_result["is_crit"] and damage > 0, target_pos)
 	attack_landed.emit(target_id, damage, target_pos)
