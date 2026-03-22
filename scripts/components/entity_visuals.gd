@@ -231,6 +231,7 @@ func show_vend_sign(title: String) -> void:
 
 	# Label3D in front of the panel
 	var label := Label3D.new()
+	label.font = UIHelper.GAME_FONT
 	label.text = "[SHOP] " + title
 	label.font_size = 48
 	label.position = Vector3(0, 0, -0.02)

@@ -30,6 +30,7 @@ func _ready() -> void:
 func _build_bar() -> void:
 	# Name label
 	_name_label = Label3D.new()
+	_name_label.font = UIHelper.GAME_FONT
 	_name_label.font_size = 48
 	_name_label.outline_size = 8
 	_name_label.modulate = Color(1.0, 1.0, 0.85)

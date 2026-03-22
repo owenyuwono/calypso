@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/npcs/npc_base.gd" id="1_script"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_action_executor.gd" id="2_executor"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scenes/npcs/npc_brain.gd" id="4_brain"]
 [ext_resource type="PackedScene" path="res://scenes/ui/dialogue_bubble.tscn" id="5_bubble"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_behavior.gd" id="6_behavior"]
+[ext_resource type="FontFile" path="res://assets/fonts/Nunito-Regular.ttf" id="7_nunito_font"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.3
@@ -37,6 +38,7 @@ script = ExtResource("6_behavior")
 [node name="NameLabel" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0)
 billboard = 1
+font = ExtResource("7_nunito_font")
 font_size = 56
 outline_size = 14
 modulate = Color(1, 1, 0.8, 1)

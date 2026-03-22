@@ -46,6 +46,7 @@ func _build_ui() -> void:
 	_content.add_theme_font_size_override("normal_font_size", 13)
 	_content.add_theme_font_size_override("bold_font_size", 13)
 	_content.add_theme_font_size_override("italics_font_size", 13)
+	_content.add_theme_font_override("bold_font", UIHelper.GAME_FONT_BOLD)
 	scroll.add_child(_content)
 
 	_refresh_timer = Timer.new()

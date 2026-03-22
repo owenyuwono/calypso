@@ -25,6 +25,7 @@ var _style: String = "normal"
 
 func _ready() -> void:
 	_label = Label3D.new()
+	_label.font = UIHelper.GAME_FONT
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.pixel_size = 0.01
 	_label.font_size = 64
