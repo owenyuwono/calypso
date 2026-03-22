@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/zones/zone_city.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/monsters/monster_spawner.gd" id="2_spawner"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
 parsed_geometry_type = 0
@@ -101,3 +102,41 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -1)
 
 [node name="TownInn" type="Marker3D" parent="LocationMarkers"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 8)
+
+; === TRAINING DUMMIES (plaza north row, z=8, x=-8..8) ===
+[node name="TrainingDummies" type="Node3D" parent="."]
+
+[node name="DummyNormal" type="Node3D" parent="TrainingDummies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 8)
+script = ExtResource("2_spawner")
+monster_type = "dummy_normal"
+spawn_count = 1
+spawn_radius = 0.0
+
+[node name="DummyWeak" type="Node3D" parent="TrainingDummies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, 8)
+script = ExtResource("2_spawner")
+monster_type = "dummy_weak"
+spawn_count = 1
+spawn_radius = 0.0
+
+[node name="DummyFatal" type="Node3D" parent="TrainingDummies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+script = ExtResource("2_spawner")
+monster_type = "dummy_fatal"
+spawn_count = 1
+spawn_radius = 0.0
+
+[node name="DummyResist" type="Node3D" parent="TrainingDummies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 8)
+script = ExtResource("2_spawner")
+monster_type = "dummy_resist"
+spawn_count = 1
+spawn_radius = 0.0
+
+[node name="DummyImmune" type="Node3D" parent="TrainingDummies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 8)
+script = ExtResource("2_spawner")
+monster_type = "dummy_immune"
+spawn_count = 1
+spawn_radius = 0.0
