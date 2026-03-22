@@ -7,6 +7,8 @@ extends BaseComponent
 signal attack_landed(target_id: String, damage: int, target_pos: Vector3)
 signal target_lost()
 
+const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
+
 const ATTACK_ANIM: String = "1H_Melee_Attack_Chop"
 
 var _visuals: Node          # EntityVisuals ref
@@ -155,19 +157,47 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 		_visuals.spawn_styled_damage_number(target_id, 0, "miss", false, target_pos, miss_color)
 		return
 
-	# Calculate damage manually so we can apply crit multiplier before dealing
+	# Calculate damage with phys_type resistance
 	var target_combat: Node = target_node.get_node_or_null("CombatComponent") if is_instance_valid(target_node) else null
 	var atk: int = _combat.get_effective_atk()
 	var def: int = target_combat.get_effective_def() if target_combat else 0
-	var damage: int = maxi(1, atk - def)
+	var raw_damage: float = maxf(1.0, atk - def)
 
-	# Crit check
+	# Physical type modifier (weapon phys_type vs target armor type)
+	var phys_type: String = _combat.get_equipped_phys_type()
+	var armor_type: String = target_combat.get_armor_type() if target_combat else "light"
+	var phys_mod: float = SkillEffectResolver.get_phys_type_modifier(phys_type, armor_type)
+
+	# Element resistance (auto-attacks use target's resistances for phys_type)
+	var target_resistances: Dictionary = {}
+	var entity_data: Dictionary = WorldState.get_entity_data(target_id)
+	if entity_data.has("resistances"):
+		target_resistances = entity_data["resistances"]
+	var resist_mod: float = 1.0
+	if target_resistances.has(phys_type):
+		resist_mod = SkillEffectResolver.RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
+
+	# Combine modifiers and determine hit_type
+	var combined_mod: float = phys_mod * resist_mod
+	var hit_type: String = "normal"
+	if combined_mod >= 2.0:
+		hit_type = "fatal"
+	elif combined_mod >= 1.5:
+		hit_type = "weak"
+	elif combined_mod <= 0.0:
+		hit_type = "immune"
+	elif combined_mod <= 0.5:
+		hit_type = "resist"
+
+	var damage: int = maxi(1, int(raw_damage * combined_mod)) if hit_type != "immune" else 0
+
+	# Crit check (no crit on immune)
 	var crit_result: Dictionary = _combat.roll_crit()
-	if crit_result["is_crit"]:
+	if crit_result["is_crit"] and hit_type != "immune":
 		damage = maxi(1, int(damage * crit_result["multiplier"]))
 
 	# Apply and emit
-	_combat.apply_flat_damage_to(target_id, damage)
-	# Spawn styled damage number here so crit info is available
-	_visuals.spawn_styled_damage_number(target_id, damage, "normal", crit_result["is_crit"], target_pos)
+	if damage > 0:
+		_combat.apply_flat_damage_to(target_id, damage)
+	_visuals.spawn_styled_damage_number(target_id, damage, hit_type, crit_result["is_crit"] and hit_type != "immune", target_pos)
 	attack_landed.emit(target_id, damage, target_pos)
