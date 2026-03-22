@@ -28,7 +28,7 @@ func _ready() -> void:
 	_label.font = UIHelper.GAME_FONT
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.pixel_size = 0.01
-	_label.font_size = 64
+	_label.font_size = 48
 	_label.outline_size = 6
 	_label.modulate = Color(1, 1, 1, 1)
 	_label.outline_modulate = Color(0, 0, 0, 1)
@@ -65,7 +65,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"weak":
 			# Icon + number
 			_label.text = str(damage)
-			_label.font_size = 96 if is_crit else 72
+			_label.font_size = 72 if is_crit else 56
 			_label.modulate = text_color
 			_label.outline_size = 6
 			_add_icon("weak", Vector3(-0.7, 0, 0), 0.5)
@@ -78,7 +78,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"resist":
 			# Icon + number
 			_label.text = str(damage)
-			_label.font_size = 72 if is_crit else 44
+			_label.font_size = 56 if is_crit else 36
 			_label.modulate = text_color
 			_label.outline_size = 4
 			_add_icon("resist", Vector3(-0.6, 0, 0), 0.45)
@@ -91,7 +91,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 		"miss":
 			# Text only
 			_label.text = "MISS"
-			_label.font_size = 40
+			_label.font_size = 32
 			_label.modulate = color_override if color_override.r >= 0 else COLOR_GRAY
 			_label.outline_size = 4
 			_duration = 0.5
@@ -102,7 +102,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 			# Normal or crit — number only
 			_label.text = str(damage)
 			if is_crit:
-				_label.font_size = 96
+				_label.font_size = 72
 				_label.modulate = COLOR_YELLOW
 				_label.outline_size = 6
 				_duration = 1.5
@@ -111,7 +111,7 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 				_fall_depth = 0.6
 				_do_pop_scale()
 			else:
-				_label.font_size = 64
+				_label.font_size = 48
 				_label.modulate = COLOR_WHITE
 				_label.outline_size = 4
 				_duration = 1.0

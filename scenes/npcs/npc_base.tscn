@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scenes/npcs/npc_brain.gd" id="4_brain"]
 [ext_resource type="PackedScene" path="res://scenes/ui/dialogue_bubble.tscn" id="5_bubble"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_behavior.gd" id="6_behavior"]
-[ext_resource type="FontFile" path="res://assets/fonts/Nunito-Regular.ttf" id="7_nunito_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/Cinzel-Regular.ttf" id="7_nunito_font"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.3
