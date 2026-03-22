@@ -74,6 +74,7 @@ func _build_visual() -> void:
 
 func _build_label() -> void:
 	_label = Label3D.new()
+	_label.font = UIHelper.GAME_FONT
 	_label.text = _get_display_name()
 	_label.font_size = 32
 	_label.pixel_size = 0.01
