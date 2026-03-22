@@ -104,7 +104,7 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Slime.glb",
 		"model_scale": 0.7,
 		"element": "neutral",
-		"resistances": {"slash": "weak", "pierce": "neutral", "blunt": "neutral", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
+		"resistances": {"slash": "weak", "pierce": "weak", "blunt": "weak", "fire": "weak", "ice": "weak", "lightning": "weak", "earth": "weak", "light": "weak", "dark": "weak", "arcane": "weak"},
 	},
 	"dummy_fatal": {
 		"name": "Fatal Dummy",
@@ -118,7 +118,7 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Slime.glb",
 		"model_scale": 0.7,
 		"element": "neutral",
-		"resistances": {"slash": "fatal", "pierce": "neutral", "blunt": "neutral", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
+		"resistances": {"slash": "fatal", "pierce": "fatal", "blunt": "fatal", "fire": "fatal", "ice": "fatal", "lightning": "fatal", "earth": "fatal", "light": "fatal", "dark": "fatal", "arcane": "fatal"},
 	},
 	"dummy_resist": {
 		"name": "Resist Dummy",
@@ -132,7 +132,7 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Slime.glb",
 		"model_scale": 0.7,
 		"element": "neutral",
-		"resistances": {"slash": "resist", "pierce": "neutral", "blunt": "neutral", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
+		"resistances": {"slash": "resist", "pierce": "resist", "blunt": "resist", "fire": "resist", "ice": "resist", "lightning": "resist", "earth": "resist", "light": "resist", "dark": "resist", "arcane": "resist"},
 	},
 	"dummy_immune": {
 		"name": "Immune Dummy",
@@ -146,7 +146,7 @@ const MONSTERS: Dictionary = {
 		"model_scene": "res://assets/models/characters/Slime.glb",
 		"model_scale": 0.7,
 		"element": "neutral",
-		"resistances": {"slash": "immune", "pierce": "neutral", "blunt": "neutral", "fire": "neutral", "ice": "neutral", "lightning": "neutral", "earth": "neutral", "light": "neutral", "dark": "neutral", "arcane": "neutral"},
+		"resistances": {"slash": "immune", "pierce": "immune", "blunt": "immune", "fire": "immune", "ice": "immune", "lightning": "immune", "earth": "immune", "light": "immune", "dark": "immune", "arcane": "immune"},
 	},
 }
 
