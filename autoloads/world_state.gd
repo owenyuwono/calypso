@@ -3,6 +3,12 @@ extends Node
 
 # Entity registry: id -> Node3D reference
 var entities: Dictionary = {}
+
+func _ready() -> void:
+	# Set project-wide default font (done in code so it loads after import system)
+	var theme := Theme.new()
+	theme.default_font = UIHelper.GAME_FONT
+	ThemeDB.get_project_theme().default_font = UIHelper.GAME_FONT
 # Reverse lookup: Node3D -> entity id
 var _node_to_id: Dictionary = {}
 # Location markers: id -> Vector3 position
