@@ -34,7 +34,7 @@ window/size/viewport_height=720
 
 [gui]
 
-theme/custom_font="res://assets/fonts/Nunito-Regular.ttf"
+theme/custom_font="res://assets/fonts/Cinzel-Regular.ttf"
 
 [input]
 
