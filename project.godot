@@ -102,7 +102,7 @@ toggle_settings={
 
 [gui]
 
-theme/custom_font="res://assets/fonts/Cinzel-Regular.ttf"
+theme/custom_font="res://assets/fonts/Philosopher-Regular.ttf"
 
 [rendering]
 

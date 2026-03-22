@@ -86,7 +86,7 @@ func _build_visual() -> void:
 
 func _build_label() -> void:
 	var label := Label3D.new()
-	label.font = UIHelper.GAME_FONT
+	label.font = UIHelper.GAME_FONT_DISPLAY
 	label.text = station_name
 	label.position = Vector3(0.0, 1.8, 0.0)
 	label.pixel_size = 0.007
