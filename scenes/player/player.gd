@@ -83,11 +83,10 @@ var _player_input: Node
 var shop_panel: Control
 var inventory_panel: Control
 var status_panel: Control
-var chat_input: Control
 var skill_hotbar: Control
 var skill_panel: Control
 var npc_info_panel: Control
-var vend_setup_panel: Control
+var dialogue_panel: Node
 var crafting_panel: Control
 var interior_manager: Node
 
@@ -99,11 +98,6 @@ var _click_marker_tween: Tween
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
 
-
-# Conversation awareness
-var _nearby_conversation_id: String = ""
-var _conv_manager: Node = null
-var _conv_scan_timer: float = 0.0
 
 func _exit_tree() -> void:
 	if _cursor_manager:
@@ -230,8 +224,6 @@ func _ready() -> void:
 
 	_last_position = global_position
 
-	_conv_manager = get_tree().get_first_node_in_group("conversation_manager")
-
 func _setup_click_marker() -> void:
 	_click_marker = MeshInstance3D.new()
 	var torus := TorusMesh.new()
@@ -257,25 +249,6 @@ func _setup_dialogue_bubble() -> void:
 	add_child(_dialogue_bubble)
 	_dialogue_bubble.position = Vector3(0, 2.2, 0)
 
-func show_chat(text: String) -> void:
-	_show_bubble(text)
-	# Proximity: auto-target nearest NPC if within range
-	_send_to_nearby_npc(text)
-
-func _send_to_nearby_npc(text: String) -> void:
-	var nearby: Array = _perception.get_nearby(INTERACT_RANGE)
-	for entry in nearby:
-		if entry.id == "player":
-			continue
-		var data := WorldState.get_entity_data(entry.id)
-		var etype: String = data.get("type", "")
-		if etype == "npc":
-			_send_message_to_npc(text, entry.id, entry.node)
-			return
-
-func _show_bubble(text: String) -> void:
-	if _dialogue_bubble:
-		_dialogue_bubble.show_dialogue(text)
 
 func _physics_process(delta: float) -> void:
 	if _is_dead:
@@ -381,34 +354,6 @@ func _physics_process(delta: float) -> void:
 			_audio.stop_footsteps()
 	_was_moving = is_moving
 
-
-func _process(delta: float) -> void:
-	if _is_dead:
-		return
-
-	_conv_scan_timer += delta
-	if _conv_scan_timer < 0.5:
-		return
-	_conv_scan_timer = 0.0
-
-	# Scan for nearby active conversations to allow the player to join
-	if _conv_manager:
-		_nearby_conversation_id = _conv_manager.find_nearby_conversation(global_position, 15.0)
-
-		# Auto-leave if all conversation participants moved out of range
-		var player_conv_id: String = _conv_manager.entity_to_conversation.get("player", "")
-		if not player_conv_id.is_empty() and _conv_manager.active_conversations.has(player_conv_id):
-			var player_state: ConversationState = _conv_manager.active_conversations[player_conv_id]
-			var all_far: bool = true
-			for pid in player_state.participant_ids:
-				if pid == "player":
-					continue
-				var entity: Node = WorldState.get_entity(pid)
-				if entity and global_position.distance_to(entity.global_position) < 15.0:
-					all_far = false
-					break
-			if all_far:
-				_conv_manager.leave_conversation(player_conv_id, "player")
 
 func _process_combat(delta: float) -> bool:
 	var attack_range: float = _stats.attack_range
@@ -587,13 +532,18 @@ func _on_arrived() -> void:
 			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
 			if vending_comp and vending_comp.is_vending():
 				_open_shop(_interact_target)
+		elif dialogue_panel and target_node and is_instance_valid(target_node):
+			dialogue_panel.open_dialogue(_interact_target, target_node)
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
 		_hover.clear_ring()
 	elif etype == "interior_npc":
-		var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
-		if vending_comp and vending_comp.is_vending():
-			_open_shop(_interact_target)
+		if dialogue_panel and target_node and is_instance_valid(target_node):
+			dialogue_panel.open_dialogue(_interact_target, target_node)
+		else:
+			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
+			if vending_comp and vending_comp.is_vending():
+				_open_shop(_interact_target)
 		_hover.clear_ring()
 	elif etype == "crafting_station":
 		if crafting_panel and target_node and is_instance_valid(target_node):
@@ -611,6 +561,10 @@ func _on_arrived() -> void:
 
 func _input(event: InputEvent) -> void:
 	if _is_dead:
+		return
+	if event.is_action_pressed("ui_cancel") and dialogue_panel and dialogue_panel.visible:
+		dialogue_panel.close_dialogue()
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_cancel") and interior_manager and interior_manager.is_inside():
 		interior_manager.exit_interior()
@@ -637,25 +591,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-	if event.is_action_pressed("chat_submit"):
-		if chat_input and not chat_input.is_open() and not _is_ui_open():
-			chat_input.open()
-			get_viewport().set_input_as_handled()
-			return
 
 	if event.is_action_pressed("interact"):
-		if _conv_manager:
-			var player_conv_id: String = _conv_manager.entity_to_conversation.get("player", "")
-			if not player_conv_id.is_empty():
-				# Player is in a conversation — E key leaves it
-				_conv_manager.leave_conversation(player_conv_id, "player")
-				get_viewport().set_input_as_handled()
-				return
-			elif not _nearby_conversation_id.is_empty():
-				# Nearby conversation exists — E key joins it
-				_conv_manager.join_conversation(_nearby_conversation_id, "player")
-				get_viewport().set_input_as_handled()
-				return
 		_interact_with_nearest()
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -859,12 +796,6 @@ func _command_npc_follow(npc_node: Node3D) -> void:
 	if npc_node.has_method("set_goal"):
 		npc_node.set_goal("follow_player")
 
-func _send_message_to_npc(text: String, npc_id: String, npc_node: Node3D) -> void:
-	GameEvents.npc_spoke.emit("player", text, npc_id)
-	var brain: Node = npc_node.get_node_or_null("NPCBrain")
-	if brain and brain.has_method("request_reactive_response"):
-		brain.request_reactive_response("player", text)
-
 func _open_shop(shop_id: String) -> void:
 	if shop_panel:
 		var vendor_node := WorldState.get_entity(shop_id)
@@ -886,7 +817,9 @@ func stop_vending() -> void:
 		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
-	for panel in [shop_panel, inventory_panel, status_panel, chat_input, skill_panel, vend_setup_panel, crafting_panel]:
+	if dialogue_panel and dialogue_panel.visible:
+		return true
+	for panel in [shop_panel, inventory_panel, status_panel, skill_panel, crafting_panel]:
 		if panel and panel.is_open():
 			return true
 	return false

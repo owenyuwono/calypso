@@ -2,6 +2,8 @@ extends BaseComponent
 ## Component that owns vending state for an entity (player-run shop).
 ## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
 
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
+
 var _vending: bool = false
 var _shop_title: String = ""
 var _listings: Dictionary = {}  # {item_id: {count: int, price: int}}
@@ -80,6 +82,30 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 		stop_vending()
 
 	return true
+
+func refresh_listings(inventory: Node, equipment: Node) -> void:
+	_listings.clear()
+	if not inventory:
+		return
+	var items: Dictionary = inventory.get_items()
+	for item_id: String in items:
+		var count: int = items[item_id]
+		if count <= 0:
+			continue
+		var item_data: Dictionary = ItemDatabase.get_item(item_id)
+		var base_value: int = item_data.get("value", 10)
+		var price: int = int(base_value * 0.8)
+		_listings[item_id] = {"count": count, "price": maxi(1, price)}
+	_sync()
+
+func add_listing(item_id: String, count: int, price: int) -> void:
+	if not _vending:
+		return
+	if _listings.has(item_id):
+		_listings[item_id]["count"] += count
+	else:
+		_listings[item_id] = {"count": count, "price": price}
+	_sync()
 
 func _sync() -> void:
 	var eid: String = _get_entity_id()

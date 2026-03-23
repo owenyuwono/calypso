@@ -6,7 +6,6 @@ extends Node
 const HOVER_RAY_LENGTH: float = 100.0
 const TOOLTIP_OFFSET: Vector2 = Vector2(16, 16)
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
-const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 
 var _player: Node3D
 var _cursor_manager: RefCounted
@@ -293,13 +292,13 @@ func _process_hover() -> void:
 			_cursor_manager.set_cursor("click")
 		elif entity_type == "npc":
 			var npc_node := WorldState.get_entity(_hovered_entity_id)
-			var tooltip_lines: Array = [display_name + "  Lv.%d" % data.get("level", 1)]
+			var tooltip_lines: Array = ["Talk to " + display_name + "  Lv.%d" % data.get("level", 1)]
 			if npc_node and is_instance_valid(npc_node) and "trait_profile" in npc_node:
 				var trait_summary: String = NpcTraitHelpers.get_trait_summary(npc_node.trait_profile)
 				if not trait_summary.is_empty():
 					tooltip_lines.append(trait_summary)
 			var goal: String = data.get("goal", "idle")
-			tooltip_lines.append(PromptBuilder.get_activity_description(goal))
+			tooltip_lines.append(goal.capitalize().replace("_", " "))
 			if npc_node and is_instance_valid(npc_node) and "current_mood" in npc_node:
 				var mood: String = npc_node.current_mood
 				if not mood.is_empty() and mood != "neutral":
@@ -322,6 +321,7 @@ func _process_hover() -> void:
 				display_name += " (%s)" % tier.capitalize()
 			_cursor_manager.set_cursor("click")
 		elif entity_type == "interior_npc":
+			display_name = "Talk to " + display_name
 			_cursor_manager.set_cursor("talk")
 		elif entity_type == "door":
 			var interior_name: String = data.get("interior_name", "Interior")

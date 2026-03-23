@@ -1,5 +1,5 @@
 extends CharacterBody3D
-## NPC base — state machine, navigation, perception, combat, and LLM brain integration.
+## NPC base — state machine, navigation, perception, and combat.
 ## Uses KayKit 3D character models with overlay-based visual effects.
 
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
@@ -96,7 +96,6 @@ var _stamina: Node = null
 
 # Cached sub-node references (set after children are added in _ready)
 var _vending_comp: Node
-var _brain: Node
 var _behavior_node: Node
 var _memory: Node
 
@@ -277,7 +276,6 @@ func _ready() -> void:
 
 	# Cache sub-node lookups — all children added above
 	_vending_comp = get_node_or_null("VendingComponent")
-	_brain = get_node_or_null("NPCBrain")
 	_behavior_node = get_node_or_null("NPCBehavior")
 	_memory = get_node_or_null("NPCMemory")
 
@@ -365,11 +363,9 @@ func _set_zone_active(active: bool) -> void:
 		if _perception:
 			_perception.set_process(true)
 			_perception.set_physics_process(true)
-		# Resume child behavior/brain processing
+		# Resume child behavior processing
 		if _behavior_node:
 			_behavior_node.set_process(true)
-		if _brain:
-			_brain.set_process(true)
 	else:
 		visible = false
 		set_physics_process(false)
@@ -377,12 +373,10 @@ func _set_zone_active(active: bool) -> void:
 		if _perception:
 			_perception.set_process(false)
 			_perception.set_physics_process(false)
-		# Pause child behavior/brain and reset action state to prevent deadlock
+		# Pause child behavior and reset action state to prevent deadlock
 		if _behavior_node:
 			_behavior_node.set_process(false)
 			_behavior_node._action_in_progress = false
-		if _brain:
-			_brain.set_process(false)
 
 func _update_lod() -> void:
 	if not _zone_active:
@@ -857,6 +851,18 @@ func initialize_from_loadout(loadout: Dictionary) -> void:
 
 	# Re-init proficiencies and skills (trait_profile is set after _ready)
 	late_init_skills()
+
+	# Merge loadout proficiency seeds on top of trait profile baseline
+	var extra_profs: Dictionary = loadout.get("proficiencies", {})
+	for skill_id in extra_profs:
+		var target_level: int = extra_profs[skill_id]
+		var current_level: int = _progression.get_proficiency_level(skill_id)
+		if current_level < target_level:
+			# Grant exactly enough XP to reach target_level (sum of level * 50 per step)
+			var xp_needed: int = 0
+			for l in range(current_level, target_level):
+				xp_needed += l * 50
+			_progression.grant_proficiency_xp(skill_id, xp_needed)
 
 ## Re-initialize proficiency levels and unlock skills based on current trait_profile.
 ## Must be called AFTER trait_profile is set (which happens after _ready()).

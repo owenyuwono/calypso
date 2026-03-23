@@ -4,11 +4,11 @@ extends Node
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
+const RecipeDatabase = preload("res://scripts/data/recipe_database.gd")
 
 const VALID_GOALS: Array = [
-	"hunt_field", "buy_potions", "sell_loot",
-	"buy_weapon", "buy_armor", "follow_player", "return_to_town", "patrol", "idle", "rest",
-	"vend", "buy_from_vendor", "tend_shop", "chop_wood"
+	"hunt_field", "follow_player", "return_to_town", "patrol", "idle", "rest",
+	"chop_wood", "craft_items", "vend"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -19,16 +19,11 @@ const PATROL_SPOTS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens", "C
 const TOWN_DESTINATIONS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens", "CityGate"]
 const REST_SPOTS: Array = ["MarketDistrict", "NobleQuarter", "ParkGardens"]
 
-const POTION_STOCK_TARGET: int = 3
-const POTION_RESTOCK_THRESHOLD: int = 2
-const POTION_BUY_GOLD_MIN: int = 40
-
 var default_goal: String = "patrol"
 
 var npc: CharacterBody3D
 var memory: Node
 var executor: Node
-var brain: Node
 var _social: Node  # NpcSocial child node
 
 var _behavior_timer: float = 0.0
@@ -46,15 +41,12 @@ func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
-	brain = npc.get_node("NPCBrain")
 	# Stagger behavior ticks so 50+ NPCs don't all evaluate on the same frame
 	_behavior_timer = randf_range(0.0, TICK_INTERVAL)
 	_social = preload("res://scenes/npcs/npc_social.gd").new()
 	_social.name = "NpcSocial"
 	add_child(_social)
-	_social.setup(npc, brain, memory)
-
-	LLMClient.request_completed.connect(_on_shop_title_response)
+	_social.setup(npc, memory)
 
 	GameEvents.npc_action_completed.connect(
 		func(n_id: String, action: String, success: bool) -> void:
@@ -69,14 +61,12 @@ func _process(delta: float) -> void:
 		return
 	var effective_delta: float = delta * 2.0
 
-	# Detect combat → non-combat transition to emit combat_outcome
+	# Detect combat → non-combat transition
 	if not "current_state" in npc:
 		return
 	var in_combat: bool = npc.current_state == "combat"
 	if _was_in_combat and not in_combat and npc.current_state != "dead":
 		_was_in_combat = false
-		var outcome: String = "fled" if npc.current_goal == "return_to_town" else "won"
-		_emit_npc_event("combat_outcome", {"result": outcome})
 	elif in_combat:
 		_was_in_combat = true
 
@@ -88,14 +78,8 @@ func _process(delta: float) -> void:
 		return
 	if not npc._stats.is_alive():
 		return
-	if brain and brain.is_busy():
-		return
 
-	# Track idle time and fire idle_timeout event
 	_idle_timer += effective_delta
-	if _idle_timer >= 60.0:
-		_idle_timer = 0.0
-		_emit_npc_event("idle_timeout", {})
 
 	_behavior_timer += effective_delta
 	if _behavior_timer >= TICK_INTERVAL:
@@ -173,9 +157,6 @@ func _check_survival() -> bool:
 
 	# Retreat if HP low and no potions and not in town
 	if hp_pct < retreat_threshold and potion_count == 0 and not _is_in_town():
-		# Notify LLM if critically low — HP < 30%
-		if hp_pct < 0.30:
-			_emit_npc_event("low_resources", {"hp_percent": hp_pct})
 		npc.set_goal("return_to_town")
 		_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 		return true
@@ -200,91 +181,53 @@ func _check_survival() -> bool:
 
 func _check_goal_completion() -> bool:
 	match npc.current_goal:
-		"buy_potions":
-			var potion_count: int = npc._inventory.get_item_count("healing_potion")
-			var gold: int = npc._inventory.gold
-			if potion_count >= POTION_STOCK_TARGET or gold < 20:
-				var completed: String = npc.current_goal
-				npc.set_goal(default_goal)
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
-				return true
-		"sell_loot":
-			if NpcTradeHelper.get_first_material(npc._inventory).is_empty():
-				var completed: String = npc.current_goal
-				# Check for weapon/armor upgrade opportunity
-				var upgrade := NpcTradeHelper.get_best_upgrade("weapon", npc._equipment, npc._inventory)
-				if not upgrade.is_empty():
-					npc.set_goal("buy_weapon")
-					_emit_npc_event("goal_completed", {"completed_goal": completed})
-					return true
-				upgrade = NpcTradeHelper.get_best_upgrade("armor", npc._equipment, npc._inventory)
-				if not upgrade.is_empty():
-					npc.set_goal("buy_armor")
-					_emit_npc_event("goal_completed", {"completed_goal": completed})
-					return true
-				npc.set_goal(default_goal)
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
-				return true
-		"buy_weapon", "buy_armor":
-			# These complete in _execute_goal when purchase done or can't afford
-			pass
 		"rest":
 			var rest_stamina_comp = npc.get_node_or_null("StaminaComponent")
 			if rest_stamina_comp and rest_stamina_comp.get_stamina_percent() >= 0.8:
-				var completed: String = npc.current_goal
 				npc.set_goal(default_goal)
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
 				return true
 		"return_to_town":
 			if _is_in_town():
-				var completed: String = npc.current_goal
 				# Check if stamina is low — transition to rest goal
 				var rtt_stamina_comp = npc.get_node_or_null("StaminaComponent")
 				if rtt_stamina_comp and rtt_stamina_comp.get_stamina_percent() < 0.5:
 					npc.set_goal("rest")
-					_emit_npc_event("goal_completed", {"completed_goal": completed})
 					return true
 				var hp: int = npc._stats.hp
 				var max_hp: int = npc._stats.max_hp
 				if float(hp) / float(max_hp) >= 0.7:
-					if _should_restock_potions() and _can_afford_potions():
-						npc.set_goal("buy_potions")
-					else:
-						npc.set_goal(default_goal)
-					_emit_npc_event("goal_completed", {"completed_goal": completed})
+					npc.set_goal(default_goal)
 					return true
 		"hunt_field":
-			# Sell loot if inventory has enough materials
-			if _get_total_material_count() >= 5:
-				var completed: String = npc.current_goal
-				npc.set_goal("sell_loot")
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
-				return true
-			# Restock potions if out and can afford
-			if npc._inventory.get_item_count("healing_potion") == 0 and _can_afford_potions():
-				var completed: String = npc.current_goal
-				npc.set_goal("buy_potions")
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
-				return true
-		"chop_wood":
-			# Sell logs if carrying enough (any wood material type)
-			var wood_count: int = npc._inventory.get_item_count("log") + npc._inventory.get_item_count("oak_log") + npc._inventory.get_item_count("ancient_log")
-			if wood_count >= 5:
-				var completed: String = npc.current_goal
-				npc.set_goal("sell_loot")
-				_emit_npc_event("goal_completed", {"completed_goal": completed})
-				return true
-		"vend":
-			# Vending NPCs stay in vend goal — never complete
-			# If VendingComponent stopped (e.g. sold out), restart it
-			var vc: Node = npc.get_node_or_null("VendingComponent")
-			if vc and not vc.is_vending():
-				# Listings may be exhausted — stay on vend goal so _execute_vend rebuilds them
-				pass
-			return false
-		"buy_from_vendor":
-			# Completes in _execute_goal once purchase attempt is done
+			# No materials-to-sell transition — just keep hunting
 			pass
+		"chop_wood":
+			# Sell logs removed — just keep chopping
+			pass
+		"craft_items":
+			# Complete when no more craftable recipes — simplified without NpcEconomyHelper
+			var progression: Node = npc.get_node_or_null("ProgressionComponent")
+			if not progression:
+				npc.set_goal(default_goal)
+				return true
+			# Check if inventory has crafting inputs for any recipe
+			var found_recipe: bool = false
+			for skill_id in ["cooking", "smithing", "crafting"]:
+				for recipe_id in RecipeDatabase.get_recipes_for_skill(skill_id):
+					var recipe: Dictionary = RecipeDatabase.get_recipe(recipe_id)
+					var can_craft: bool = true
+					for input_id in recipe.get("inputs", {}):
+						if npc._inventory.get_item_count(input_id) < recipe["inputs"][input_id]:
+							can_craft = false
+							break
+					if can_craft:
+						found_recipe = true
+						break
+				if found_recipe:
+					break
+			if not found_recipe:
+				npc.set_goal(default_goal)
+				return true
 	return false
 
 # =============================================================================
@@ -295,14 +238,6 @@ func _execute_goal() -> void:
 	match npc.current_goal:
 		"hunt_field":
 			_execute_hunt()
-		"buy_potions":
-			_execute_buy_potions()
-		"sell_loot":
-			_execute_sell_loot()
-		"buy_weapon":
-			_execute_buy_equipment("weapon")
-		"buy_armor":
-			_execute_buy_equipment("armor")
 		"follow_player":
 			_execute_follow_player()
 		"return_to_town":
@@ -313,14 +248,12 @@ func _execute_goal() -> void:
 			_execute_rest()
 		"idle":
 			_execute_idle()
-		"vend":
-			_execute_vend()
-		"buy_from_vendor":
-			_execute_buy_from_vendor()
-		"tend_shop":
-			_execute_tend_shop()
 		"chop_wood":
 			_execute_chop_wood()
+		"craft_items":
+			_execute_craft()
+		"vend":
+			_execute_vend()
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
@@ -390,147 +323,6 @@ func _execute_chop_wood() -> void:
 
 	npc.last_thought = "Chopping %s" % target_tree.get("name", target_tree["id"])
 	_do_action("chop_tree", target_tree["id"])
-
-func _execute_buy_potions() -> void:
-	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, "healing_potion")
-	if vendor_id.is_empty():
-		npc.last_thought = "No vendor selling potions nearby"
-		_do_action("wait", "")
-		return
-	if _is_near_entity(vendor_id, 4.0):
-		_do_action_with_data("buy_item", vendor_id, {"item_id": "healing_potion", "count": 1})
-	else:
-		npc.last_thought = "Going to %s for potions" % vendor_id
-		_do_action("move_to", vendor_id)
-
-func _execute_sell_loot() -> void:
-	var material_id := NpcTradeHelper.get_first_material(npc._inventory)
-	if material_id.is_empty():
-		# Nothing to sell, transition handled by _check_goal_completion
-		npc.set_goal(default_goal)
-		return
-
-	# Sell to any vending NPC (they accept gold in return for items)
-	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position)
-	if vendor_id.is_empty():
-		npc.last_thought = "No vendor to sell loot to"
-		_do_action("wait", "")
-		return
-	if _is_near_entity(vendor_id, 4.0):
-		var count: int = npc._inventory.get_item_count(material_id)
-		_do_action_with_data("sell_item", vendor_id, {"item_id": material_id, "count": count})
-	else:
-		npc.last_thought = "Going to vendor to sell loot"
-		_do_action("move_to", vendor_id)
-
-func _execute_buy_equipment(slot: String) -> void:
-	var upgrade_id := NpcTradeHelper.get_best_upgrade(slot, npc._equipment, npc._inventory)
-	if upgrade_id.is_empty():
-		npc.set_goal(default_goal)
-		return
-
-	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, upgrade_id)
-	if vendor_id.is_empty():
-		npc.last_thought = "No vendor selling %s upgrade" % slot
-		npc.set_goal(default_goal)
-		return
-	if _is_near_entity(vendor_id, 4.0):
-		_do_action_with_data("buy_item", vendor_id, {"item_id": upgrade_id, "count": 1})
-		# After buying, equip it — the action_completed callback will handle transition
-		npc.set_goal(default_goal)
-	else:
-		npc.last_thought = "Going to %s for %s upgrade" % [vendor_id, slot]
-		_do_action("move_to", vendor_id)
-
-var _cached_shop_title: String = ""
-var _shop_title_pending: bool = false
-
-func _execute_vend() -> void:
-	var vending_comp: Node = npc.get_node_or_null("VendingComponent")
-	if not vending_comp:
-		_do_action("wait", "")
-		return
-	if vending_comp.is_vending():
-		_do_action("wait", "")
-		return
-	if _shop_title_pending:
-		# Waiting for LLM to name the shop — don't open yet
-		npc.last_thought = "Thinking of a shop name..."
-		_do_action("wait", "")
-		return
-	var listings := NpcTradeHelper.build_vend_listings(npc._inventory, npc._equipment)
-	if listings.is_empty():
-		npc.last_thought = "Nothing to sell"
-		_do_action("wait", "")
-		return
-	if _cached_shop_title != "":
-		# Already have a name — open immediately
-		vending_comp.start_vending(_cached_shop_title, listings)
-		npc.last_thought = "Opening shop: %s" % _cached_shop_title
-		_do_action("wait", "")
-		return
-	# First time — request creative name from LLM, don't open yet
-	var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
-	var item_names: Array = []
-	for item_id in listings:
-		var item_data: Dictionary = ItemDatabase.ITEMS.get(item_id, {})
-		item_names.append(item_data.get("name", item_id))
-	var personality: String = WorldState.get_entity_data(npc.npc_id).get("personality", "")
-	var prompt_text: String = "You are %s, a shopkeeper in a medieval fantasy town. %s\nYou sell: %s\nInvent a short, creative shop name (2-4 words max). Reply with ONLY the shop name, nothing else." % [npc_name, personality, ", ".join(item_names)]
-	var messages: Array = [{"role": "user", "content": prompt_text}]
-	var req_id: String = "shop_title_%s" % npc.npc_id
-	_shop_title_pending = true
-	npc.last_thought = "Thinking of a shop name..."
-	LLMClient.send_chat(req_id, messages, {}, 5)
-	_do_action("wait", "")
-
-func _on_shop_title_response(req_id: String, response: Dictionary) -> void:
-	if not req_id.begins_with("shop_title_"):
-		return
-	var target_npc_id: String = req_id.substr(11)
-	if target_npc_id != npc.npc_id:
-		return
-	_shop_title_pending = false
-	var content: String = response.get("message", {}).get("content", "").strip_edges()
-	# Clean up quotes
-	content = content.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
-	if content.is_empty() or content.length() > 40:
-		# Fallback if LLM gave bad output
-		var npc_name: String = WorldState.get_entity_data(npc.npc_id).get("name", npc.npc_id)
-		content = "%s's Shop" % npc_name
-	_cached_shop_title = content
-
-func _execute_buy_from_vendor() -> void:
-	# Fallback: buy healing potions if affordable, otherwise look for weapon upgrades
-	var target_item: String = ""
-	var gold: int = npc._inventory.gold
-	var potion_count: int = npc._inventory.get_item_count("healing_potion")
-	if potion_count < 2 and gold >= 20:
-		target_item = "healing_potion"
-	else:
-		var upgrade_w := NpcTradeHelper.get_best_upgrade("weapon", npc._equipment, npc._inventory)
-		var upgrade_a := NpcTradeHelper.get_best_upgrade("armor", npc._equipment, npc._inventory)
-		if not upgrade_w.is_empty():
-			target_item = upgrade_w
-		elif not upgrade_a.is_empty():
-			target_item = upgrade_a
-
-	if target_item.is_empty():
-		npc.set_goal(default_goal)
-		return
-
-	var vendor_id := NpcTradeHelper.find_vendor(npc.npc_id, npc.global_position, target_item)
-	if vendor_id.is_empty():
-		npc.last_thought = "No vendor selling %s" % target_item
-		npc.set_goal(default_goal)
-		return
-
-	if _is_near_entity(vendor_id, 4.0):
-		_do_action_with_data("buy_item", vendor_id, {"item_id": target_item, "count": 1})
-		npc.set_goal(default_goal)
-	else:
-		npc.last_thought = "Going to %s to buy %s" % [vendor_id, target_item]
-		_do_action("move_to", vendor_id)
 
 var _follow_timer: float = 0.0
 const FOLLOW_TIMEOUT: float = 120.0  # Stop following after 2 minutes
@@ -625,27 +417,8 @@ func _execute_patrol() -> void:
 	npc.last_thought = "Patrolling to %s" % spot
 	_do_action("move_to", spot)
 
-func _execute_tend_shop() -> void:
-	var identity: Node = npc.get_node_or_null("NpcIdentity")
-	if not identity:
-		_do_action("wait", "")
-		return
-
-	var current_hour: int = int(TimeManager.get_game_hour())
-	var sched_goal: Dictionary = identity.resolve_schedule_goal(current_hour)
-	var shop_location: String = sched_goal.get("location", "")
-
-	if shop_location.is_empty() or _is_near_location(shop_location, 3.0):
-		npc.last_thought = "Tending my shop"
-		_do_action("wait", "")
-	else:
-		npc.last_thought = "Heading to shop"
-		_do_action("move_to", shop_location)
-
-
 func _execute_idle() -> void:
 	# NPCs with idle goal should find something purposeful to do
-	var inv: Node = npc.get_node_or_null("InventoryComponent")
 	var stats: Node = npc.get_node_or_null("StatsComponent")
 
 	# Low HP → return to town
@@ -655,35 +428,32 @@ func _execute_idle() -> void:
 			npc.set_goal("return_to_town")
 			return
 
-	# Has materials → sell them
-	if _get_total_material_count() > 0:
-		npc.set_goal("sell_loot")
-		return
-
-	# Needs potions and has gold → buy potions
-	if inv:
-		var potion_count: int = inv.get_items().get("healing_potion", 0)
-		var gold: int = inv.get_gold_amount()
-		if potion_count < 2 and gold >= 20:
-			npc.set_goal("buy_potions")
-			return
-
-	# In the field zone with woodcutting proficiency → chop wood (lower priority than combat/trade)
+	# In the field zone with woodcutting proficiency → chop wood
 	var in_field: bool = absf(npc.global_position.x) > 70.0
 	if in_field and npc._progression.get_proficiency_level("woodcutting") > 0:
 		var perception: Dictionary = _perception.get_perception() if _perception else {}
 		var trees: Array = perception.get("trees", [])
-		var has_harvestable_tree: bool = false
 		for t in trees:
 			if t.get("harvestable", false):
-				has_harvestable_tree = true
-				break
-		if has_harvestable_tree:
-			npc.set_goal("chop_wood")
-			return
+				npc.set_goal("chop_wood")
+				return
 
 	# Fallback → patrol town
 	npc.set_goal("patrol")
+
+func _execute_vend() -> void:
+	var vending: Node = npc.get_node_or_null("VendingComponent")
+	if not vending:
+		return
+	if vending.is_vending():
+		return  # Already vending, just idle
+	var inv: Node = npc.get_node_or_null("InventoryComponent")
+	var equip: Node = npc.get_node_or_null("EquipmentComponent")
+	vending.refresh_listings(inv, equip)
+	var npc_name: String = npc.get("npc_name")
+	if npc_name == null or npc_name.is_empty():
+		npc_name = "Shop"
+	vending.start_vending(npc_name + "'s Shop", {})
 
 # =============================================================================
 # Action Dispatchers
@@ -857,14 +627,59 @@ func _get_total_material_count() -> int:
 			total += inv[item_id]
 	return total
 
-func _should_restock_potions() -> bool:
-	return npc._inventory.get_item_count("healing_potion") < POTION_RESTOCK_THRESHOLD
+func _is_near_position(pos: Vector3, range: float) -> bool:
+	return npc.global_position.distance_to(pos) <= range
 
-func _can_afford_potions() -> bool:
-	return npc._inventory.gold >= POTION_BUY_GOLD_MIN
+func _execute_craft() -> void:
+	var progression: Node = npc.get_node_or_null("ProgressionComponent")
+	if not progression:
+		npc.set_goal(default_goal)
+		return
 
-## Emit a significant NPC event to both the brain and the GameEvents signal bus.
-func _emit_npc_event(event_type: String, context: Dictionary) -> void:
-	if brain:
-		brain.on_significant_event(event_type, context)
-	GameEvents.npc_event_triggered.emit(npc.npc_id, event_type, context)
+	# Find best craftable recipe across all craft skills
+	var best_recipe_id: String = ""
+	var best_skill: String = ""
+	for skill_id in ["cooking", "smithing", "crafting"]:
+		for recipe_id in RecipeDatabase.get_recipes_for_skill(skill_id):
+			var recipe: Dictionary = RecipeDatabase.get_recipe(recipe_id)
+			var req_level: int = recipe.get("required_level", 1)
+			if progression.get_proficiency_level(skill_id) < req_level:
+				continue
+			var can_craft: bool = true
+			for input_id in recipe.get("inputs", {}):
+				if npc._inventory.get_item_count(input_id) < recipe["inputs"][input_id]:
+					can_craft = false
+					break
+			if can_craft:
+				best_recipe_id = recipe_id
+				best_skill = skill_id
+				break
+		if not best_recipe_id.is_empty():
+			break
+
+	if best_recipe_id.is_empty():
+		npc.set_goal(default_goal)
+		return
+
+	# Find nearest crafting station of the right type
+	var station: Node = _find_nearest_crafting_station(best_skill)
+	if not station:
+		npc.last_thought = "No crafting station nearby"
+		npc.set_goal(default_goal)
+		return
+
+	# Dispatch craft action — executor handles navigation internally
+	var recipe: Dictionary = RecipeDatabase.get_recipe(best_recipe_id)
+	npc.last_thought = "Going to craft %s" % recipe.get("name", best_recipe_id)
+	_do_action_with_data("craft_at_station", station._entity_id, {"recipe_id": best_recipe_id})
+
+func _find_nearest_crafting_station(skill_id: String) -> Node:
+	var best: Node = null
+	var best_dist: float = INF
+	for node in get_tree().get_nodes_in_group("crafting_stations"):
+		if node.get("station_type") == skill_id:
+			var dist: float = npc.global_position.distance_to(node.global_position)
+			if dist < best_dist:
+				best_dist = dist
+				best = node
+	return best

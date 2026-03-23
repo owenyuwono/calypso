@@ -1,8 +1,6 @@
 extends Node
 ## NPC memory — scored memory array, conversation history, key memories, and relationships.
 
-const ItemDatabase = preload("res://scripts/data/item_database.gd")
-
 # ---------------------------------------------------------------------------
 # Memory constants
 # ---------------------------------------------------------------------------
@@ -30,7 +28,6 @@ const MAX_RECENT_TOPICS: int = 3
 
 var _npc_id: String = ""
 var _memory_counter: int = 0
-var _perception: Node
 
 func _ready() -> void:
 	_npc_id = get_parent().npc_id
@@ -148,25 +145,6 @@ func _make_fuzzy(fact: String) -> String:
 	var half: int = words.size() / 2
 	return " ".join(words.slice(0, half)) + "... (faded memory)"
 
-func get_memories_for_prompt(limit: int = 10) -> String:
-	if memories.is_empty():
-		return ""
-	var sorted: Array = memories.duplicate()
-	sorted.sort_custom(func(a, b): return score_memory(a) > score_memory(b))
-	var top: Array = sorted.slice(0, mini(limit, sorted.size()))
-	var lines: Array = []
-	for mem in top:
-		var text: String = mem["fuzzy_text"] if mem["fuzzy"] and not mem["fuzzy_text"].is_empty() else mem["fact"]
-		var source: String = mem.get("source", SOURCE_WITNESSED)
-		var told_by: String = mem.get("told_by", "")
-		var prefix: String = ""
-		if source == "told_by" and not told_by.is_empty():
-			prefix = "You heard from %s that " % told_by
-		elif source == "rumor":
-			prefix = "There's a rumor that "
-		lines.append("[%s] %s%s" % [mem["importance"], prefix, text])
-	return "\n".join(lines)
-
 func get_facts_about(topic: String) -> Array:
 	var result: Array = []
 	for mem in memories:
@@ -228,122 +206,6 @@ func get_key_memories_summary(max_count: int = 3) -> String:
 	for mem in top:
 		lines.append("- %s" % mem["fact"])
 	return "Key memories:\n" + "\n".join(lines)
-
-# =============================================================================
-# Chat Facts — structured data for grounded conversation
-# =============================================================================
-
-func gather_chat_facts(target_id: String) -> Array:
-	var facts: Array = []
-
-	# High-importance memories (replaces old key_memories loop)
-	for mem in memories:
-		if mem["importance"] == IMPORTANCE_HIGH:
-			facts.append({"topic": mem["fact"].to_lower(), "fact": mem["fact"], "weight": 2.0})
-		elif mem["importance"] == IMPORTANCE_MEDIUM:
-			facts.append({"topic": mem["fact"].to_lower(), "fact": mem["fact"], "weight": 1.0})
-
-	# Own state
-	var npc_node := get_parent()
-	var hp: int = npc_node._stats.hp
-	var max_hp: int = npc_node._stats.max_hp
-	var hp_pct: float = float(hp) / float(max_hp)
-	var gold: int = npc_node._inventory.gold
-	var level: int = npc_node._stats.level
-	var equipment: Dictionary = npc_node._equipment.get_equipment()
-	var weapon_id: String = equipment.get("main_hand", "")
-	var armor_id: String = equipment.get("off_hand", "")
-	var potion_count: int = npc_node._inventory.get_item_count("healing_potion")
-
-	if hp_pct < 0.5:
-		facts.append({"topic": "being injured", "fact": "You are at %d/%d HP" % [hp, max_hp], "weight": 2.5})
-	if weapon_id.is_empty():
-		facts.append({"topic": "needing a weapon", "fact": "You have no weapon equipped", "weight": 2.0})
-	else:
-		var wname := ItemDatabase.get_item_name(weapon_id)
-		facts.append({"topic": "your %s" % wname.to_lower(), "fact": "You have a %s equipped" % wname, "weight": 1.0})
-	if not armor_id.is_empty():
-		var aname := ItemDatabase.get_item_name(armor_id)
-		facts.append({"topic": "your %s" % aname.to_lower(), "fact": "You have %s equipped" % aname, "weight": 0.8})
-	if potion_count > 0:
-		facts.append({"topic": "your healing potions", "fact": "You have %d healing potion%s" % [potion_count, "s" if potion_count != 1 else ""], "weight": 1.0})
-	else:
-		facts.append({"topic": "running out of potions", "fact": "You have no healing potions left", "weight": 1.5})
-
-	var goal: String = npc_node.current_goal if npc_node else "idle"
-	var activity := _goal_to_fact(goal, gold)
-	if not activity.is_empty():
-		facts.append(activity)
-
-	# Target state
-	if not target_id.is_empty():
-		var target_node = WorldState.get_entity(target_id)
-		if target_node and is_instance_valid(target_node):
-			var tstats = target_node.get_node_or_null("StatsComponent")
-			var tequip = target_node.get_node_or_null("EquipmentComponent")
-			var tname: String = target_node.npc_name if "npc_name" in target_node else target_id
-			if tstats:
-				var tlevel: int = tstats.level
-				var thp: int = tstats.hp
-				var tmax_hp: int = tstats.max_hp
-				var thp_pct: float = float(thp) / float(tmax_hp)
-				if thp_pct < 0.5:
-					facts.append({"topic": "%s looking rough" % tname, "fact": "%s is at %d/%d HP" % [tname, thp, tmax_hp], "weight": 2.0})
-				if tlevel > level:
-					facts.append({"topic": "%s's level" % tname, "fact": "%s is level %d (higher than you)" % [tname, tlevel], "weight": 1.5})
-			if tequip:
-				var tweapon: String = tequip.get_equipment().get("weapon", "")
-				if not tweapon.is_empty():
-					var twname := ItemDatabase.get_item_name(tweapon)
-					facts.append({"topic": "%s's %s" % [tname, twname.to_lower()], "fact": "%s is using a %s" % [tname, twname], "weight": 1.0})
-
-	# Relationship with target (via RelationshipComponent)
-	var rel_comp_facts = get_parent().get_node_or_null("RelationshipComponent")
-	if rel_comp_facts and not target_id.is_empty():
-		var shared_combat_count: int = rel_comp_facts.get_event_count(target_id, "shared_combat")
-		if shared_combat_count > 0:
-			var partner_node = WorldState.get_entity(target_id)
-			var tname: String = partner_node.npc_name if partner_node and "npc_name" in partner_node else target_id
-			facts.append({"topic": "fighting alongside %s" % tname, "fact": "You fought together %d time%s" % [shared_combat_count, "s" if shared_combat_count != 1 else ""], "weight": 1.5})
-
-	# Stamina awareness
-	var stamina_comp = get_parent().get_node_or_null("StaminaComponent")
-	if stamina_comp:
-		var sta_pct: float = stamina_comp.get_stamina_percent()
-		if sta_pct < 0.3:
-			facts.append({"topic": "being tired", "fact": "You are exhausted (stamina at %d%%)" % int(sta_pct * 100), "weight": 2.5})
-		elif sta_pct < 0.5:
-			facts.append({"topic": "getting tired", "fact": "You are getting tired (stamina at %d%%)" % int(sta_pct * 100), "weight": 1.5})
-
-	# Time-of-day awareness
-	if TimeManager.is_night():
-		facts.append({"topic": "nighttime", "fact": "It is nighttime and the field is more dangerous", "weight": 1.5})
-
-	# Nearby monsters
-	if not _perception:
-		_perception = get_parent().get_node_or_null("PerceptionComponent")
-	var perception: Dictionary = _perception.get_perception() if _perception else {}
-	var monsters: Array = perception.get("monsters", [])
-	if not monsters.is_empty():
-		var mname: String = monsters[0].get("name", "a monster")
-		facts.append({"topic": "the %s nearby" % mname.to_lower(), "fact": "There is a %s nearby" % mname, "weight": 1.5})
-
-	return facts
-
-func _goal_to_fact(goal: String, gold: int) -> Dictionary:
-	match goal:
-		"hunt_field":
-			return {"topic": "how the hunting is going", "fact": "You are hunting in the field", "weight": 1.0}
-		"buy_potions":
-			return {"topic": "stocking up on potions", "fact": "You are buying potions", "weight": 1.0}
-		"sell_loot":
-			return {"topic": "selling your loot", "fact": "You are selling loot at the shop", "weight": 1.0}
-		"rest":
-			return {"topic": "resting", "fact": "You are resting to recover stamina", "weight": 1.0}
-		"idle":
-			return {"topic": "how things are going", "fact": "You are resting in town with %d gold" % gold, "weight": 0.5}
-		_:
-			return {}
 
 # =============================================================================
 # Signal Handlers
@@ -495,9 +357,6 @@ func get_recent_observations(count: int = 10) -> Array:
 
 func get_summary() -> String:
 	var parts: Array = []
-	var mem_text: String = get_memories_for_prompt(5)
-	if not mem_text.is_empty():
-		parts.append("Recent memories:\n" + mem_text)
 	if not goals_history.is_empty():
 		parts.append("Goal history: " + ", ".join(goals_history.slice(-3)))
 	var km_summary: String = get_key_memories_summary(3)

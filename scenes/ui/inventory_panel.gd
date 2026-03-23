@@ -167,14 +167,6 @@ func _build_ui() -> void:
 	_gold_label.text = "0"
 	gold_hbox.add_child(_gold_label)
 
-	# Vend button below gold
-	var vend_btn := Button.new()
-	vend_btn.text = "Set Up Shop [V]"
-	vend_btn.add_theme_font_size_override("font_size", 11)
-	vend_btn.custom_minimum_size = Vector2(0, 26)
-	vend_btn.pressed.connect(_on_vend_button_pressed)
-	equip_vbox.add_child(vend_btn)
-
 	# --- Vertical separator ---
 	var vsep := VSeparator.new()
 	body_hbox.add_child(vsep)
@@ -271,10 +263,6 @@ func set_player(p: Node) -> void:
 		_equipment = _player.get_node_or_null("EquipmentComponent")
 		_combat = _player.get_node_or_null("CombatComponent")
 		_stats = _player.get_node_or_null("StatsComponent")
-
-func _on_vend_button_pressed() -> void:
-	if _player and _player.vend_setup_panel:
-		_player.vend_setup_panel._toggle()
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_inventory"):

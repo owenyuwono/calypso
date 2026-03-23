@@ -4,7 +4,6 @@ extends Control
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const NpcTraits = preload("res://scripts/data/npc_traits.gd")
 const DragHandle = preload("res://scripts/utils/drag_handle.gd")
-const PromptBuilder = preload("res://scripts/llm/prompt_builder.gd")
 
 var _panel: PanelContainer
 var _drag_handle: PanelContainer
@@ -121,7 +120,7 @@ func _refresh() -> void:
 	if not mood.is_empty() and mood != "neutral":
 		text += "  [color=%s]%s[/color]" % [_mood_color(mood), mood]
 	text += "\n"
-	text += "Activity: %s\n" % PromptBuilder.get_activity_description(goal)
+	text += "Activity: %s\n" % goal.capitalize().replace("_", " ")
 
 	# Action + thought
 	var action: String = node.current_action if "current_action" in node else ""

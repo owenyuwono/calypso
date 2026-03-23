@@ -7,7 +7,6 @@ var inventory_panel: Control
 var skill_panel: Control
 var proficiency_panel: Control
 var settings_panel: Control
-var chat_input: Control
 
 var _buttons: Dictionary = {}  # key -> Button
 var _normal_styles: Dictionary = {}  # key -> StyleBoxFlat
@@ -103,15 +102,12 @@ func _ready() -> void:
 	add_child(timer)
 
 func _update_button_states() -> void:
-	var chatting: bool = chat_input != null and chat_input.is_open()
-
 	for key in _buttons:
 		var btn: Button = _buttons[key]
-		btn.disabled = chatting
 
 		# Toggle between cached style instances — no allocation
 		var panel_open := _is_panel_open(key)
-		if panel_open and not chatting:
+		if panel_open:
 			btn.add_theme_stylebox_override("normal", _active_styles[key])
 		else:
 			btn.add_theme_stylebox_override("normal", _normal_styles[key])

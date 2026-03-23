@@ -3,7 +3,6 @@
 [ext_resource type="Script" path="res://scenes/npcs/npc_base.gd" id="1_script"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_action_executor.gd" id="2_executor"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_memory.gd" id="3_memory"]
-[ext_resource type="Script" path="res://scenes/npcs/npc_brain.gd" id="4_brain"]
 [ext_resource type="PackedScene" path="res://scenes/ui/dialogue_bubble.tscn" id="5_bubble"]
 [ext_resource type="Script" path="res://scenes/npcs/npc_behavior.gd" id="6_behavior"]
 [ext_resource type="FontFile" path="res://assets/fonts/Marcellus-Regular.ttf" id="7_nunito_font"]
@@ -28,9 +27,6 @@ script = ExtResource("2_executor")
 
 [node name="NPCMemory" type="Node" parent="."]
 script = ExtResource("3_memory")
-
-[node name="NPCBrain" type="Node" parent="."]
-script = ExtResource("4_brain")
 
 [node name="NPCBehavior" type="Node" parent="."]
 script = ExtResource("6_behavior")

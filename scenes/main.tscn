@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scenes/camera/isometric_camera.gd" id="4_camera"]
@@ -6,17 +6,14 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="7_shop"]
 [ext_resource type="Script" path="res://scenes/main.gd" id="8_main"]
-[ext_resource type="PackedScene" path="res://scenes/ui/chat_input.tscn" id="9_chat"]
 [ext_resource type="PackedScene" path="res://scenes/ui/status_panel.tscn" id="10_status"]
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_hotbar.tscn" id="11_skill_hotbar"]
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_panel.tscn" id="12_skill_panel"]
 [ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="13_minimap"]
-[ext_resource type="PackedScene" path="res://scenes/ui/chat_log.tscn" id="14_chatlog"]
 [ext_resource type="Script" path="res://scenes/ui/panel_toggles.gd" id="15_panel_toggles"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_info_panel.tscn" id="16_npc_info"]
 [ext_resource type="Script" path="res://scenes/ui/proficiency_panel.gd" id="17_prof_panel"]
 [ext_resource type="Script" path="res://scenes/ui/world_map_panel.gd" id="18_world_map"]
-[ext_resource type="Script" path="res://scenes/ui/vend_setup_panel.gd" id="19_vend_setup"]
 [ext_resource type="Script" path="res://scenes/ui/crafting_panel.gd" id="20_crafting_panel"]
 [ext_resource type="PackedScene" path="res://scenes/ui/settings_panel.tscn" id="21_settings_panel"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/npc_base.tscn" id="20_npc"]
@@ -156,10 +153,6 @@ target_path = NodePath("../Player")
 
 [node name="ShopPanel" parent="UILayer" instance=ExtResource("7_shop")]
 
-[node name="ChatInput" parent="UILayer" instance=ExtResource("9_chat")]
-
-[node name="ChatLog" parent="UILayer" instance=ExtResource("14_chatlog")]
-
 [node name="Minimap" parent="UILayer" instance=ExtResource("13_minimap")]
 
 [node name="SkillHotbar" parent="UILayer" instance=ExtResource("11_skill_hotbar")]
@@ -176,14 +169,6 @@ script = ExtResource("17_prof_panel")
 
 [node name="WorldMapPanel" type="Control" parent="UILayer"]
 script = ExtResource("18_world_map")
-
-[node name="VendSetupPanel" type="Control" parent="UILayer"]
-script = ExtResource("19_vend_setup")
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
 
 [node name="CraftingPanel" type="Control" parent="UILayer"]
 script = ExtResource("20_crafting_panel")

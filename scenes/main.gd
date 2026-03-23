@@ -41,11 +41,6 @@ var interior_manager: InteriorManager
 func _ready() -> void:
 	_setup_fps_counter()
 
-	# Instantiate ConversationManager — NPCBehavior/NPCBrain find it via group "conversation_manager"
-	var conversation_manager: Node = ConversationManager.new()
-	conversation_manager.name = "ConversationManager"
-	add_child(conversation_manager)
-
 	# Day/night lighting cycle — persists across zone transitions
 	var DayNightCycle: GDScript = preload("res://scripts/world/day_night_cycle.gd")
 	var day_night: Node3D = DayNightCycle.new()
@@ -56,7 +51,6 @@ func _ready() -> void:
 	var shop_panel := $UILayer/ShopPanel
 	var inventory_panel := $UILayer/InventoryPanel
 	var status_panel := $UILayer/StatusPanel
-	var chat_input := $UILayer/ChatInput
 	var skill_hotbar := $UILayer/SkillHotbar
 	var skill_panel := $UILayer/SkillPanel
 
@@ -66,9 +60,6 @@ func _ready() -> void:
 		player.inventory_panel = inventory_panel
 	if player and status_panel:
 		player.status_panel = status_panel
-	if player and chat_input:
-		player.chat_input = chat_input
-		chat_input.message_sent.connect(player.show_chat)
 	if player and skill_hotbar:
 		player.skill_hotbar = skill_hotbar
 	if player and skill_panel:
@@ -78,14 +69,32 @@ func _ready() -> void:
 	if player and npc_info_panel:
 		player.npc_info_panel = npc_info_panel
 
+	var dialogue_panel: PanelContainer = PanelContainer.new()
+	dialogue_panel.set_script(preload("res://scenes/ui/dialogue_panel.gd"))
+	dialogue_panel.name = "DialoguePanel"
+	dialogue_panel.visible = false
+	$UILayer.add_child(dialogue_panel)
+	if player:
+		dialogue_panel.set_player(player)
+		player.dialogue_panel = dialogue_panel
+	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:
+		if npc_node and is_instance_valid(npc_node):
+			var vending: Node = npc_node.get_node_or_null("VendingComponent")
+			if vending:
+				if not vending.is_vending():
+					var inv: Node = npc_node.get_node_or_null("InventoryComponent")
+					var equip: Node = npc_node.get_node_or_null("EquipmentComponent")
+					vending.refresh_listings(inv, equip)
+					var nname: String = npc_node.get("npc_name") if "npc_name" in npc_node else "Shop"
+					if nname == null or nname.is_empty():
+						nname = "Shop"
+					vending.start_vending(nname + "'s Shop", {})
+				shop_panel.open_shop(npc_node)
+	)
+
 	var proficiency_panel := $UILayer/ProficiencyPanel
 	if player and proficiency_panel:
 		proficiency_panel.set_player(player)
-
-	var vend_setup_panel := $UILayer/VendSetupPanel
-	if player and vend_setup_panel:
-		vend_setup_panel.set_player(player)
-		player.vend_setup_panel = vend_setup_panel
 
 	var crafting_panel := $UILayer/CraftingPanel
 	if player and crafting_panel:
@@ -111,10 +120,6 @@ func _ready() -> void:
 	if player and skill_panel:
 		skill_panel.set_player(player)
 
-	var chat_log := $UILayer/ChatLog
-	if player and chat_log:
-		chat_log.set_player(player)
-
 	var panel_toggles := $UILayer/PanelToggles
 	if panel_toggles:
 		panel_toggles.status_panel = status_panel
@@ -122,7 +127,6 @@ func _ready() -> void:
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.settings_panel = settings_panel
-		panel_toggles.chat_input = chat_input
 
 	# Wire world map reference to minimap so the compass button can open it
 	var minimap := $UILayer/Minimap
@@ -196,11 +200,6 @@ func _setup_adventurer_npcs() -> void:
 		if gold != -1:
 			inventory.set_gold_amount(gold)
 
-		var brain: Node = npc.get_node_or_null("NPCBrain")
-		if brain:
-			brain.set_use_llm(false)
-			brain.set_use_llm_chat(true)
-
 		var goal: String = loadout["default_goal"]
 		var behavior: Node = npc.get_node_or_null("NPCBehavior")
 		if behavior:
@@ -242,11 +241,6 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 
 	npc.initialize_from_loadout(loadout)
 
-	var brain: Node = npc.get_node_or_null("NPCBrain")
-	if brain:
-		brain.set_use_llm(true)
-		brain.set_use_llm_chat(true)
-
 func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
 	# Merchants stay in the city. Others split 50/50 between city and east field.
 	if goal == "vend":
@@ -277,7 +271,6 @@ func _setup_fps_counter() -> void:
 	$UILayer.add_child(_fps_label)
 
 func _process(delta: float) -> void:
-	NpcTradeHelper.tick_vendor_cache(delta)
 	if _fps_label:
 		var fps: int = Engine.get_frames_per_second()
 		var tris: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
