@@ -278,6 +278,7 @@ func _create_choice_button(label_text: String) -> Button:
 	btn.text = "  " + label_text + "  "
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, 32)
 	btn.add_theme_font_override("font", UIHelper.GAME_FONT)
 	btn.add_theme_font_size_override("font_size", 13)
 	btn.add_theme_color_override("font_color", Color(0.85, 0.82, 0.7))

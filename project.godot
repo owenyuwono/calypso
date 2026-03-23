@@ -34,6 +34,7 @@ window/size/viewport_height=720
 [gui]
 
 theme/custom_font="res://assets/fonts/Marcellus-Regular.ttf"
+timers/tooltip_delay_sec=0.1
 
 [input]
 

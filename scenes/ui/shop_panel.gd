@@ -273,6 +273,7 @@ func _create_item_cell(item_id: String, count: int, price: int, is_cart: bool) -
 	container.add_theme_stylebox_override("panel", bg_style)
 
 	container.tooltip_text = "%s\n%dg each" % [item_name, price]
+	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	# Letter label centered
 	var letter_label := Label.new()
