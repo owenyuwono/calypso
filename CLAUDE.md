@@ -4,13 +4,13 @@
 - **Engine**: Godot 4.6, GDScript only
 - **Fonts**: Marcellus-Regular for body text (`GAME_FONT`, `GAME_FONT_BOLD`, project default). Philosopher-Bold for display/titles (`GAME_FONT_DISPLAY`). Set in `project.godot` + `UIHelper` constants
 - **Autoload singletons**: WorldState (registry only), GameEvents (signals), TimeManager (24h day cycle: dawn/day/dusk/night phases, `time_phase_changed` signal), ZoneManager (zone transitions: async load, fade, nav reset), AudioManager (UI SFX pool + master mute on startup)
-- **Static utility classes**: ModelHelper (3D models, effects, animation merging, `create_toon_material()`, `apply_toon_to_model()`, `create_fallback_mesh()`, `spawn_damage_number()`), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), DialogueDatabase (scripted dialogue + canned greetings), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), FishDatabase (fishing tier data), RecipeDatabase (unified crafting recipes), TreeDatabase (tree tier data), ProficiencyDatabase (19 skills, 4 categories, XP formulas), SfxDatabase (audio SFX key→path/volume/pitch mapping), MonsterDatabase (monster type definitions: stats, model, resistances), ItemDatabase (item definitions: weapons, armor, consumables), LevelData (base player stats), ZoneDatabase (zone metadata + portal connections), InteriorDatabase (building_type → interior scene mapping), world builders (see below)
+- **Static utility classes**: ModelHelper (3D models, effects, animation merging, `create_toon_material()`, `apply_toon_to_model()`, `create_fallback_mesh()`, `spawn_damage_number()`), UIHelper (panel styles, UI helpers), NpcLoadouts (NPC starting data), NpcGenerator (procedural NPC creation), NpcTraits (personality axes + trait profiles), NpcIdentityDatabase (named NPC identity data), DialogueDatabase (scripted dialogue + canned greetings), QuestDatabase (static quest definitions + conditions/rewards), GossipSystem (fact propagation), SkillDatabase (skill definitions), SkillEffectResolver (skill damage resolution), OreDatabase (mining tier data), FishDatabase (fishing tier data), RecipeDatabase (unified crafting recipes), TreeDatabase (tree tier data), ProficiencyDatabase (19 skills, 4 categories, XP formulas), SfxDatabase (audio SFX key→path/volume/pitch mapping), MonsterDatabase (monster type definitions: stats, model, resistances), ItemDatabase (item definitions: weapons, armor, consumables), LevelData (base player stats), ZoneDatabase (zone metadata + portal connections), InteriorDatabase (building_type → interior scene mapping), world builders (see below)
 - **Composition nodes**: EntityVisuals (visual state: model, overlay, animations, HP bar) + AudioComponent (per-entity positional audio: footsteps, presence, combat loops, one-shot SFX) + AutoAttackComponent (signal-based auto-attack shared by all entities) + PerceptionComponent (Area3D-based spatial awareness per entity) + entity components (stats, inventory, equipment, combat, progression, skills) for all entities
 - **Duck typing**: Component vars declared as `Node`, called with duck-typed method calls. Use `var x: int = node.method()` (not `:=`) when return type can't be inferred
 - **State machines**: String-based states (idle/thinking/moving/combat/dead)
 - **Inventory**: Count-based Dictionary {item_type_id: count}, not arrays
 - **No automated tests**: Verify manually in editor (panels, combat, minimap, world map, chat)
-- **Input**: Left-click move/attack/interact/open dialogue (click NPC), E interact, I inventory, C status, S skills, P proficiencies, 1-5 hotbar, Esc close/settings
+- **Input**: Left-click move/attack/interact/open dialogue (click NPC), E interact, I inventory, C status, S skills, P proficiencies, J quest log, 1-5 hotbar, Esc close/settings
 
 ## Coding Principles
 - **SOLID**: Single responsibility per script/node. Open for extension (signals, composition). Depend on interfaces (duck typing), not concrete types
@@ -60,12 +60,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **Dynamic HP bars**: Show on combat entry or damage, hide on combat exit + full HP. Driven by entity combat state via `update_hp_bar_combat()`
 - **Vicinity chat log**: Combat/speech messages filtered to 30m from player. System/level-up messages always show
 - **Gossip system**: `GossipSystem` propagates facts between NPCs during social chat. Memories have gossip metadata (source: witnessed/told_by/rumor, spread_count, original_source). 15% distortion per retelling, `spread_count >= 4` becomes rumor. Gossip affects relationships
-- **Collision layers**: Layer 1 = physics, Layer 6 = vend signs, Layer 9 (bit 8) = entity perception (PerceptionComponent detection)
+- **Collision layers**: Layer 1 = physics, Layer 9 (bit 8) = entity perception (PerceptionComponent detection)
 - `NpcLoadouts.LOADOUTS` — static Dictionary of hardcoded NPC starting data (7 named adventurers + 2 shop NPCs). Merchant NPCs use `default_goal: "vend"` to auto-start vending on spawn
 - `NpcGenerator.generate_npcs(count)` — procedural NPC creation for scaling. Returns array of loadout dicts matching NpcLoadouts format. `npc_base.gd:initialize_from_loadout()` applies generated data
 - Merchant vending: any entity can vend from inventory via VendingComponent — no fixed shop NPCs
-- Vend sign: `_visuals.show_vend_sign()` / `hide_vend_sign()` — StaticBody3D (layer 6) + opaque panel quad + Label3D + white border quad (hover). Click sign to shop, click NPC body for info/chat
-- Vend sign interaction: player raycast detects sign via `"vend_sign"` group, `_hovered_vend_sign` / `_pending_vend_sign_click` flags route to shop panel
 
 ## NPC Systems
 - **NpcTraits** (`scripts/data/npc_traits.gd`): Personality axes (0.0-1.0): boldness (retreat threshold), sociability (chat cooldown), generosity (trade willingness), curiosity (goal switching). 13 trait profiles: 6-attribute starting proficiencies (str/con/agi/int/dex/wis) + weapon type. Profiles: bold_warrior, cautious_mage, sly_rogue, stern_guardian, gentle_healer, charming_bard, wild_berserker, stoic_knight, keen_archer, earnest_apprentice, devout_cleric, shadow_stalker, merchant
@@ -75,7 +73,8 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 
 ## Dialogue System
 - **DialogueDatabase** (`scripts/data/dialogue_database.gd`): Static class with DIALOGUES dict for 9 named NPCs + GENERIC_GREETINGS by archetype/mood. Condition system: relationship tier gates, time of day, mood, player inventory. Methods: `get_dialogue_entry()`, `get_node()`, `has_dialogue()`, `get_generic_greeting()`, `evaluate_condition()`
-- **DialoguePanel** (`scenes/ui/dialogue_panel.gd`): Bottom-screen JRPG-style dialogue box. Full width, anchored to bottom. NPC name + text + horizontal choice buttons. Signal: `trade_requested(npc_node)`. Special actions: `"trade"` opens ShopPanel, `"info"` opens NpcInfoPanel. Click NPC body → opens DialoguePanel. Escape closes.
+- **DialoguePanel** (`scenes/ui/dialogue_panel.gd`): Bottom-screen JRPG-style dialogue box. Full width, anchored to bottom. NPC name + text + horizontal choice buttons. Signal: `trade_requested(npc_node)`. Special actions: `"trade"` opens ShopPanel, `"info"` opens NpcInfoPanel. Quest actions: `"quest_accept:id"`, `"quest_complete:id"`. Trade action keeps dialogue open with "Buy (Xg)" + "Close Shop" choices; buy button updates dynamically via `cart_changed` signal; parting words shown on shop close. Click NPC body → opens DialoguePanel. Escape closes.
+- Dialogue conditions: `"quest:id:not_started"`, `"quest:id:active"`, `"quest:id:completable"`, `"quest:id:completed"`, `"flag:name"`
 
 ## Indoor Rooms System
 - **InteriorDatabase** (`scripts/data/interior_database.gd`): Maps building_type to interior scene path, name, spawn_offset, loading_art
@@ -84,6 +83,11 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **InteriorNpc** (`scenes/interiors/interior_npc.gd`): Lightweight StaticBody3D NPC for interiors. No AI brain. VendingComponent for shops. Canned greetings.
 - **DoorTrigger** (`scripts/world/door_trigger.gd`): Clickable StaticBody3D on buildings with interiors. Group `"door"`, registered with WorldState as type `"door"`
 
+## Quest System
+- **QuestDatabase** (`scripts/data/quest_database.gd`): Static quest definitions with objectives (gather, kill, deliver, talk_to, craft), rewards (gold, items, proficiency XP), prerequisites. 4 sample quests for Bjorn, Lyra, Kael, Mira
+- **QuestComponent** (`scripts/components/quest_component.gd`): Player quest state tracking. Binary (active/completed). Auto-tracks gather objectives via `item_looted` signal, kill objectives via `entity_died`. API: `accept_quest()`, `try_complete_quest()`, `check_condition()`, `set_flag()`, `has_flag()`
+- **QuestLogPanel** (`scenes/ui/quest_log_panel.gd`): Quest journal UI, J key toggle. Shows active quests with objective checklists (progress/target), completed quests dimmed
+
 ## UI Systems
 - **DialogueBubble** (`scenes/ui/dialogue_bubble.gd`): 3D speech bubble via SubViewport + Sprite3D. Queue-based, 4s default duration, word-wrap at 600px
 - **DialoguePanel** (`scenes/ui/dialogue_panel.gd`): Bottom-screen JRPG-style dialogue box. Full width, anchored to bottom. NPC name + text + horizontal choice buttons. Signal: `trade_requested(npc_node)`. Special actions: `"trade"` opens ShopPanel, `"info"` opens NpcInfoPanel.
@@ -91,9 +95,10 @@ Do NOT add inventory/gold/equipment/combat/progression/skills/spatial methods ba
 - **SkillPanel** (`scenes/ui/skill_panel.gd`): Two-level UI — proficiency grid overview (19 buttons with icons + XP fill, left-aligned, content-sized) → drill-down detail with icon + skills + hotbar assignment. Both S and P keys toggle. Category dividers: `——— Weapon ———` style with full-width separators
 - **StatusPanel** (`scenes/ui/status_panel.gd`): Character stats panel (C key) — 2-column layout: Offensive (ATK/MATK/Accuracy/CritRate/CritDmg) + Defensive (HP/DEF/MDEF/Evasion) left, Speed (AtkSpd/MoveSpd/CastSpd) + Resource (Stamina/HPRegen/CDR) right. Proficiency icons in 2-column grid below.
 - **PlayerHUD** (`scenes/ui/player_hud.gd`): Top-left compact panel showing HP + stamina bars only. Time panel (single line) positioned left of minimap
-- **Panel toggles**: Top-right button bar aligned with minimap (`offset_left = -194`): Status [C] | Inv [I] | Skills [S] | Map [W]
+- **Panel toggles**: Top-right button bar aligned with minimap (`offset_left = -194`): Status [C] | Inv [I] | Skills [S] | Quests [J] | Map [W]
 - **ProficiencyPanel** (`scenes/ui/proficiency_panel.gd`): RuneScape-style skill list, P key toggle
-- **ShopPanel** (`scenes/ui/shop_panel.gd`): Shopping interface for vendors
+- **ShopPanel** (`scenes/ui/shop_panel.gd`): Two-column grid layout. Left: vendor wares as colored icon grid (type-colored squares, 52×52). Right: cart. Click wares to add to cart, click cart to remove. Hover shows name + price. Total at bottom-right. No title bar, no drag. Buy/Close handled by dialogue panel choices. Signals: `shop_closed`, `cart_changed(total)`. API: `purchase_cart()`, `get_cart_total()`, `clear_cart()`
+- **QuestLogPanel** (`scenes/ui/quest_log_panel.gd`): Quest journal UI, J key toggle. Shows active quests with objective checklists (progress/target), completed quests dimmed
 - **NpcInfoPanel** (`scenes/ui/npc_info_panel.gd`): NPC stats, traits, memories, relationships
 - **SkillHotbar** (`scenes/ui/skill_hotbar.gd`): Active skill hotbar display
 - **WorldMapPanel** (`scenes/ui/world_map_panel.gd`): World map UI
