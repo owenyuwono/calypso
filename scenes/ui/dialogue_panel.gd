@@ -1,9 +1,8 @@
 extends PanelContainer
-## Dialogue tree panel — displays scripted NPC dialogue with branching choices.
-## Opened by player.gd on NPC left-click. Emits trade_requested to main.gd for shop routing.
+## Dialogue panel — bottom-of-screen JRPG-style dialogue box.
+## Full width, fixed height, anchored to bottom. NPC name + text + choices.
 
 const DialogueDatabase = preload("res://scripts/data/dialogue_database.gd")
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 signal trade_requested(npc_node: Node)
 
@@ -12,12 +11,10 @@ var _npc_id: String = ""
 var _npc_node: Node = null
 var _current_node_id: String = ""
 
-var _drag_handle: PanelContainer
 var _npc_name_label: Label
 var _dialogue_text: Label
-var _choices_container: VBoxContainer
+var _choices_container: HBoxContainer
 
-# Archetype lookup by trait profile prefix for generic greetings.
 const PROFILE_TO_ARCHETYPE: Dictionary = {
 	"bold_warrior": "warrior",
 	"stern_guardian": "warrior",
@@ -37,49 +34,64 @@ const PROFILE_TO_ARCHETYPE: Dictionary = {
 
 func _ready() -> void:
 	visible = false
-	custom_minimum_size = Vector2(500, 350)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Anchor to bottom, full width, fixed height
+	anchor_left = 0.0
+	anchor_right = 1.0
+	anchor_top = 1.0
+	anchor_bottom = 1.0
+	offset_left = 40
+	offset_right = -40
+	offset_top = -180
+	offset_bottom = -20
+
 	add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	_build_ui()
 
 
 func _build_ui() -> void:
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(margin)
+
 	var main_vbox := VBoxContainer.new()
-	main_vbox.add_theme_constant_override("separation", 8)
-	add_child(main_vbox)
+	main_vbox.add_theme_constant_override("separation", 6)
+	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(main_vbox)
 
-	_drag_handle = DragHandle.new()
-	_drag_handle.setup(self, "Conversation")
-	_drag_handle.close_pressed.connect(close_dialogue)
-	main_vbox.add_child(_drag_handle)
-
-	# NPC name — gold, display font
+	# NPC name — gold, display font, top-left
 	_npc_name_label = Label.new()
 	_npc_name_label.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
-	_npc_name_label.add_theme_font_size_override("font_size", 20)
+	_npc_name_label.add_theme_font_size_override("font_size", 18)
 	_npc_name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	_npc_name_label.add_theme_constant_override("outline_size", 0)
-	_npc_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(_npc_name_label)
 
-	# Dialogue text — body font, word-wrapped
+	# Dialogue text — body font, word-wrapped, fills available space
 	_dialogue_text = Label.new()
 	_dialogue_text.add_theme_font_override("font", UIHelper.GAME_FONT)
 	_dialogue_text.add_theme_font_size_override("font_size", 14)
-	_dialogue_text.add_theme_color_override("font_color", Color(0.9, 0.87, 0.8))
+	_dialogue_text.add_theme_color_override("font_color", Color(0.92, 0.89, 0.82))
 	_dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dialogue_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_dialogue_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_dialogue_text.custom_minimum_size = Vector2(0, 80)
 	main_vbox.add_child(_dialogue_text)
 
 	# Separator
 	var sep := HSeparator.new()
-	sep.add_theme_constant_override("separation", 6)
+	sep.add_theme_constant_override("separation", 4)
+	sep.add_theme_stylebox_override("separator", _make_separator_style())
 	main_vbox.add_child(sep)
 
-	# Choice buttons container
-	_choices_container = VBoxContainer.new()
-	_choices_container.add_theme_constant_override("separation", 4)
+	# Choice buttons — horizontal row at bottom
+	_choices_container = HBoxContainer.new()
+	_choices_container.add_theme_constant_override("separation", 12)
 	_choices_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(_choices_container)
 
@@ -94,7 +106,6 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 	var npc_name: String = npc_node.npc_name if "npc_name" in npc_node else npc_id
 	_npc_name_label.text = npc_name
-	_drag_handle.set_title("Conversation")
 
 	var entry_node_id: String = DialogueDatabase.get_dialogue_entry(npc_id)
 	if not entry_node_id.is_empty():
@@ -104,7 +115,6 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 	visible = true
 	AudioManager.play_ui_sfx("ui_panel_open")
-	UIHelper.center_panel(self)
 
 
 func close_dialogue() -> void:
@@ -139,7 +149,6 @@ func _show_node(node_id: String) -> void:
 		btn.pressed.connect(_on_choice_pressed.bind(next_node, action))
 		_choices_container.add_child(btn)
 
-	# Fallback: no choices were added — add a close button
 	if _choices_container.get_child_count() == 0:
 		var btn := _create_choice_button("Goodbye.")
 		btn.pressed.connect(close_dialogue)
@@ -199,14 +208,39 @@ func _clear_choices() -> void:
 
 func _create_choice_button(label_text: String) -> Button:
 	var btn := Button.new()
-	btn.text = label_text
-	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.text = "  " + label_text + "  "
+	btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	btn.add_theme_font_override("font", UIHelper.GAME_FONT)
 	btn.add_theme_font_size_override("font_size", 13)
-	btn.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
+	btn.add_theme_color_override("font_color", Color(0.85, 0.82, 0.7))
 	btn.add_theme_color_override("font_hover_color", UIHelper.COLOR_GOLD)
+	btn.add_theme_color_override("font_pressed_color", Color(1.0, 0.95, 0.7))
+
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.15, 0.12, 0.08, 0.6)
+	normal_style.border_color = Color(0.6, 0.5, 0.3, 0.4)
+	normal_style.set_border_width_all(1)
+	normal_style.set_corner_radius_all(3)
+	normal_style.set_content_margin_all(6)
+	btn.add_theme_stylebox_override("normal", normal_style)
+
+	var hover_style := normal_style.duplicate()
+	hover_style.bg_color = Color(0.25, 0.2, 0.12, 0.8)
+	hover_style.border_color = UIHelper.COLOR_GOLD
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+	var pressed_style := normal_style.duplicate()
+	pressed_style.bg_color = Color(0.3, 0.25, 0.15, 0.9)
+	btn.add_theme_stylebox_override("pressed", pressed_style)
+
 	return btn
+
+
+func _make_separator_style() -> StyleBoxLine:
+	var style := StyleBoxLine.new()
+	style.color = Color(0.6, 0.5, 0.3, 0.3)
+	style.thickness = 1
+	return style
 
 
 func _get_archetype(npc_node: Node) -> String:
