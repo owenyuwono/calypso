@@ -64,16 +64,11 @@ func _build_ui() -> void:
 	wares_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	left_col.add_child(wares_label)
 
-	var wares_scroll := ScrollContainer.new()
-	wares_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wares_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_col.add_child(wares_scroll)
-
 	_wares_grid = GridContainer.new()
 	_wares_grid.columns = GRID_COLUMNS
 	_wares_grid.add_theme_constant_override("h_separation", 4)
 	_wares_grid.add_theme_constant_override("v_separation", 4)
-	wares_scroll.add_child(_wares_grid)
+	left_col.add_child(_wares_grid)
 
 	# --- Separator ---
 	var sep := VSeparator.new()
@@ -94,16 +89,11 @@ func _build_ui() -> void:
 	cart_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	right_col.add_child(cart_label)
 
-	var cart_scroll := ScrollContainer.new()
-	cart_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cart_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_col.add_child(cart_scroll)
-
 	_cart_grid = GridContainer.new()
 	_cart_grid.columns = GRID_COLUMNS
 	_cart_grid.add_theme_constant_override("h_separation", 4)
 	_cart_grid.add_theme_constant_override("v_separation", 4)
-	cart_scroll.add_child(_cart_grid)
+	right_col.add_child(_cart_grid)
 
 	_total_label = Label.new()
 	_total_label.text = "Total: 0g"
