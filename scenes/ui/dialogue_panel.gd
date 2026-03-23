@@ -1,6 +1,7 @@
 extends PanelContainer
 ## Dialogue panel — bottom-of-screen JRPG-style dialogue box.
-## Full width, fixed height, anchored to bottom. NPC name + text + choices.
+## Full width, fixed height, anchored to bottom. NPC name + text only.
+## Choices float as a sibling VBoxContainer on the right, above the dialogue box (Stardew Valley style).
 
 const DialogueDatabase = preload("res://scripts/data/dialogue_database.gd")
 
@@ -13,7 +14,7 @@ var _current_node_id: String = ""
 
 var _npc_name_label: Label
 var _dialogue_text: Label
-var _choices_container: HBoxContainer
+var _choices_container: VBoxContainer
 
 const PROFILE_TO_ARCHETYPE: Dictionary = {
 	"bold_warrior": "warrior",
@@ -48,6 +49,7 @@ func _ready() -> void:
 
 	add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	_build_ui()
+	_build_choices_container()
 
 
 func _build_ui() -> void:
@@ -83,17 +85,30 @@ func _build_ui() -> void:
 	_dialogue_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(_dialogue_text)
 
-	# Separator
-	var sep := HSeparator.new()
-	sep.add_theme_constant_override("separation", 4)
-	sep.add_theme_stylebox_override("separator", _make_separator_style())
-	main_vbox.add_child(sep)
 
-	# Choice buttons — horizontal row at bottom
-	_choices_container = HBoxContainer.new()
-	_choices_container.add_theme_constant_override("separation", 12)
-	_choices_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(_choices_container)
+func _build_choices_container() -> void:
+	# Sibling of the dialogue panel in UILayer — floats right, above the dialogue box
+	_choices_container = VBoxContainer.new()
+	_choices_container.name = "DialogueChoices"
+	_choices_container.visible = false
+	_choices_container.add_theme_constant_override("separation", 6)
+
+	# Anchor to bottom-right, growing upward
+	_choices_container.anchor_left = 1.0
+	_choices_container.anchor_right = 1.0
+	_choices_container.anchor_top = 1.0
+	_choices_container.anchor_bottom = 1.0
+
+	# Right side, above the dialogue box (dialogue box top is at offset_top = -180)
+	_choices_container.offset_right = -40    # match dialogue panel right margin
+	_choices_container.offset_left = -220    # ~180px wide
+	_choices_container.offset_bottom = -185  # 5px gap above dialogue box top
+	_choices_container.offset_top = -400     # enough room for several choices
+
+	_choices_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_choices_container.grow_vertical = Control.GROW_DIRECTION_BEGIN  # grow upward
+
+	get_parent().add_child(_choices_container)
 
 
 func set_player(player: Node) -> void:
@@ -114,11 +129,14 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 		_show_generic_greeting(npc_node)
 
 	visible = true
+	_choices_container.visible = true
 	AudioManager.play_ui_sfx("ui_panel_open")
 
 
 func close_dialogue() -> void:
 	visible = false
+	_choices_container.visible = false
+	_clear_choices()
 	AudioManager.play_ui_sfx("ui_panel_close")
 	_npc_id = ""
 	_npc_node = null
@@ -189,6 +207,23 @@ func _on_choice_pressed(next_node, action: String) -> void:
 
 
 func _execute_action(action: String) -> void:
+	if action.begins_with("quest_accept:"):
+		var quest_id: String = action.substr(13)
+		var quest_comp: Node = _player.get_node_or_null("QuestComponent")
+		if quest_comp:
+			quest_comp.accept_quest(quest_id)
+		close_dialogue()
+		return
+
+	if action.begins_with("quest_complete:"):
+		var quest_id: String = action.substr(15)
+		var quest_comp: Node = _player.get_node_or_null("QuestComponent")
+		if quest_comp:
+			var rewards: Dictionary = quest_comp.try_complete_quest(quest_id)
+			_apply_rewards(rewards)
+		close_dialogue()
+		return
+
 	match action:
 		"trade":
 			close_dialogue()
@@ -200,6 +235,24 @@ func _execute_action(action: String) -> void:
 			close_dialogue()
 
 
+func _apply_rewards(rewards: Dictionary) -> void:
+	if rewards.is_empty():
+		return
+	var inv: Node = _player.get_node_or_null("InventoryComponent")
+	if inv:
+		var gold: int = rewards.get("gold", 0)
+		if gold > 0:
+			inv.add_gold_amount(gold)
+		var items: Dictionary = rewards.get("items", {})
+		for item_id: String in items:
+			inv.add_item(item_id, items[item_id])
+	var prog: Node = _player.get_node_or_null("ProgressionComponent")
+	if prog:
+		var xp: Dictionary = rewards.get("proficiency_xp", {})
+		for prof_id: String in xp:
+			prog.grant_proficiency_xp(prof_id, xp[prof_id])
+
+
 func _clear_choices() -> void:
 	for child in _choices_container.get_children():
 		_choices_container.remove_child(child)
@@ -209,7 +262,8 @@ func _clear_choices() -> void:
 func _create_choice_button(label_text: String) -> Button:
 	var btn := Button.new()
 	btn.text = "  " + label_text + "  "
-	btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.add_theme_font_override("font", UIHelper.GAME_FONT)
 	btn.add_theme_font_size_override("font_size", 13)
 	btn.add_theme_color_override("font_color", Color(0.85, 0.82, 0.7))
@@ -217,15 +271,15 @@ func _create_choice_button(label_text: String) -> Button:
 	btn.add_theme_color_override("font_pressed_color", Color(1.0, 0.95, 0.7))
 
 	var normal_style := StyleBoxFlat.new()
-	normal_style.bg_color = Color(0.15, 0.12, 0.08, 0.6)
-	normal_style.border_color = Color(0.6, 0.5, 0.3, 0.4)
+	normal_style.bg_color = Color(0.15, 0.12, 0.08, 0.85)
+	normal_style.border_color = Color(0.6, 0.5, 0.3, 0.5)
 	normal_style.set_border_width_all(1)
 	normal_style.set_corner_radius_all(3)
-	normal_style.set_content_margin_all(6)
+	normal_style.set_content_margin_all(8)
 	btn.add_theme_stylebox_override("normal", normal_style)
 
 	var hover_style := normal_style.duplicate()
-	hover_style.bg_color = Color(0.25, 0.2, 0.12, 0.8)
+	hover_style.bg_color = Color(0.25, 0.2, 0.12, 0.95)
 	hover_style.border_color = UIHelper.COLOR_GOLD
 	btn.add_theme_stylebox_override("hover", hover_style)
 
@@ -234,13 +288,6 @@ func _create_choice_button(label_text: String) -> Button:
 	btn.add_theme_stylebox_override("pressed", pressed_style)
 
 	return btn
-
-
-func _make_separator_style() -> StyleBoxLine:
-	var style := StyleBoxLine.new()
-	style.color = Color(0.6, 0.5, 0.3, 0.3)
-	style.thickness = 1
-	return style
 
 
 func _get_archetype(npc_node: Node) -> String:
@@ -261,6 +308,11 @@ func _get_mood(npc_node: Node) -> String:
 		"sad", "afraid", "tired": return "sad"
 		"angry": return "angry"
 	return "neutral"
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(_choices_container):
+		_choices_container.queue_free()
 
 
 func _input(event: InputEvent) -> void:

@@ -11,7 +11,35 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about the fields.", "next": "fields_info"},
 				{"text": "Hunt together?", "next": "hunt_together", "condition": "relationship >= friendly"},
+				{"text": "About those wolves...", "next": "kael_quest_offer", "condition": "quest:field_patrol:not_started"},
+				{"text": "Any progress on the wolves?", "next": "kael_quest_progress", "condition": "quest:field_patrol:active"},
+				{"text": "I've dealt with the wolves.", "next": "kael_quest_complete", "condition": "quest:field_patrol:completable"},
 				{"text": "Just passing through.", "next": null},
+			],
+		},
+		"kael_quest_offer": {
+			"text": "Wolves have been threatening travelers on the road east of town. I can't patrol everywhere at once. Help me deal with 2 of them and I'll make it worth your while.",
+			"choices": [
+				{"text": "I'll handle it.", "next": null, "action": "quest_accept:field_patrol"},
+				{"text": "Not right now.", "next": null},
+			],
+		},
+		"kael_quest_progress": {
+			"text": "The wolves are still a problem. Travelers won't use that road until we clear them out. Two wolves — that's all I need.",
+			"choices": [
+				{"text": "I'm working on it.", "next": null},
+			],
+		},
+		"kael_quest_complete": {
+			"text": "The roads are safer now. Well done, friend. You've done the city a real service.",
+			"choices": [
+				{"text": "Happy to help.", "next": null, "action": "quest_complete:field_patrol"},
+			],
+		},
+		"kael_quest_done": {
+			"text": "Thanks to you, the east road is safe again. Travelers can pass without worry.",
+			"choices": [
+				{"text": "Good to hear. See you out there.", "next": null},
 			],
 		},
 		"fields_info": {
@@ -44,7 +72,35 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about magic.", "next": "magic_theory"},
 				{"text": "Any dangers I should know about?", "next": "field_dangers"},
+				{"text": "About your research...", "next": "lyra_quest_offer", "condition": "quest:arcane_study:not_started"},
+				{"text": "How's the slime study going?", "next": "lyra_quest_progress", "condition": "quest:arcane_study:active"},
+				{"text": "I have data from the slimes.", "next": "lyra_quest_complete", "condition": "quest:arcane_study:completable"},
 				{"text": "Sorry to interrupt. Goodbye.", "next": null},
+			],
+		},
+		"lyra_quest_offer": {
+			"text": "I'm studying slime essence and its elemental properties. Could you defeat 3 slimes for my research? The combat data would be invaluable.",
+			"choices": [
+				{"text": "I'll help with your research.", "next": null, "action": "quest_accept:arcane_study"},
+				{"text": "Not right now.", "next": null},
+			],
+		},
+		"lyra_quest_progress": {
+			"text": "How's the slime hunting going? I need data from 3 slimes. Take care to note any elemental reactions — that's the part that interests me.",
+			"choices": [
+				{"text": "Still working on it.", "next": null},
+			],
+		},
+		"lyra_quest_complete": {
+			"text": "Excellent research data! The sample size is sufficient. Let me reward you for your contribution to the study.",
+			"choices": [
+				{"text": "Glad I could help.", "next": null, "action": "quest_complete:arcane_study"},
+			],
+		},
+		"lyra_quest_done": {
+			"text": "The data you gathered confirmed my hypothesis about slime lightning affinity. Fascinating. Thank you.",
+			"choices": [
+				{"text": "Anytime. Goodbye, Lyra.", "next": null},
 			],
 		},
 		"magic_theory": {
@@ -96,7 +152,35 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Let me see what you have.", "next": null, "action": "trade"},
 				{"text": "Tell me about your weapons.", "next": "weapons_talk"},
+				{"text": "About that ore...", "next": "bjorn_quest_offer", "condition": "quest:miners_request:not_started"},
+				{"text": "I have the ore.", "next": "bjorn_quest_complete", "condition": "quest:miners_request:completable"},
+				{"text": "About the ore...", "next": "bjorn_quest_progress", "condition": "quest:miners_request:active"},
 				{"text": "Maybe later.", "next": null},
+			],
+		},
+		"bjorn_quest_offer": {
+			"text": "I need copper ore for my forge. My current supply ran dry and I've got blades to finish. Can you bring me 5 pieces? I'll pay well for it.",
+			"choices": [
+				{"text": "I'll get you the ore.", "next": null, "action": "quest_accept:miners_request"},
+				{"text": "Not right now.", "next": null},
+			],
+		},
+		"bjorn_quest_progress": {
+			"text": "Still working on that ore? I need 5 copper pieces. The forge is cold without good material — don't leave me waiting too long!",
+			"choices": [
+				{"text": "I'm on it.", "next": null},
+			],
+		},
+		"bjorn_quest_complete": {
+			"text": "You have the ore! HAHA! Hand it over — my forge is hungry!",
+			"choices": [
+				{"text": "Here you go.", "next": null, "action": "quest_complete:miners_request"},
+			],
+		},
+		"bjorn_quest_done": {
+			"text": "Thanks for the ore. My forge is busy now! If you need a blade, you know where to find me.",
+			"choices": [
+				{"text": "Good luck with the forge.", "next": null},
 			],
 		},
 		"weapons_talk": {
@@ -192,7 +276,35 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about healing and crafting.", "next": "healing_crafting"},
 				{"text": "Any advice for staying alive out there?", "next": "survival_advice"},
+				{"text": "About those sardines...", "next": "mira_quest_offer", "condition": "quest:healers_herbs:not_started"},
+				{"text": "I still need to get the sardines.", "next": "mira_quest_progress", "condition": "quest:healers_herbs:active"},
+				{"text": "I have the cooked sardine.", "next": "mira_quest_complete", "condition": "quest:healers_herbs:completable"},
 				{"text": "I'm fine, but thanks.", "next": null},
+			],
+		},
+		"mira_quest_offer": {
+			"text": "I need cooked sardines for my remedies — they have restorative properties when prepared correctly. Can you catch 3 sardines and cook one for me? The fishing spots near the field should have them.",
+			"choices": [
+				{"text": "I'll get them for you.", "next": null, "action": "quest_accept:healers_herbs"},
+				{"text": "Not right now.", "next": null},
+			],
+		},
+		"mira_quest_progress": {
+			"text": "I still need those sardines. Catch 3 from a fishing spot and cook one at the cooking station. The remedy won't work without them.",
+			"choices": [
+				{"text": "I'll keep looking.", "next": null},
+			],
+		},
+		"mira_quest_complete": {
+			"text": "Perfect! These will make excellent medicine. Thank you so much — the people who need this remedy will be grateful.",
+			"choices": [
+				{"text": "Happy to help.", "next": null, "action": "quest_complete:healers_herbs"},
+			],
+		},
+		"mira_quest_done": {
+			"text": "The remedies are coming along wonderfully thanks to those sardines. Come back if you need any healing advice!",
+			"choices": [
+				{"text": "Take care, Mira.", "next": null},
 			],
 		},
 		"healing_crafting": {
@@ -491,5 +603,28 @@ static func evaluate_condition(condition: String, player: Node, npc: Node) -> bo
 		if not inv:
 			return false
 		return inv.has_item(item_id)
+
+	# quest:quest_id:state — check quest progress
+	# States: not_started, active, completed, completable
+	if condition.begins_with("quest:"):
+		var parts: Array = condition.split(":")
+		if parts.size() >= 3:
+			var quest_id: String = parts[1]
+			var state: String = parts[2]
+			var quest_comp: Node = player.get_node_or_null("QuestComponent")
+			if not quest_comp:
+				return false
+			match state:
+				"not_started": return not quest_comp.is_quest_active(quest_id) and not quest_comp.is_quest_completed(quest_id)
+				"active": return quest_comp.is_quest_active(quest_id)
+				"completed": return quest_comp.is_quest_completed(quest_id)
+				"completable": return quest_comp.is_quest_completable(quest_id)
+		return false
+
+	# flag:flag_name — check boolean flag
+	if condition.begins_with("flag:"):
+		var flag_name: String = condition.substr(5)
+		var quest_comp: Node = player.get_node_or_null("QuestComponent")
+		return quest_comp and quest_comp.has_flag(flag_name)
 
 	return true

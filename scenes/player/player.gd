@@ -74,6 +74,7 @@ var _skills_comp: Node
 var _auto_attack: Node
 var _perception: Node
 var _stamina: Node
+var _quest_comp: Node
 
 # Child subsystem nodes
 var _hover: Node
@@ -88,6 +89,7 @@ var skill_panel: Control
 var npc_info_panel: Control
 var dialogue_panel: Node
 var crafting_panel: Control
+var quest_log_panel: Node
 var interior_manager: Node
 
 # Click marker (reused single instance)
@@ -186,6 +188,11 @@ func _ready() -> void:
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 	_stamina = stamina_comp
+
+	var quest_comp: Node = QuestComponent.new()
+	quest_comp.name = "QuestComponent"
+	add_child(quest_comp)
+	_quest_comp = quest_comp
 
 	var perception_comp := PerceptionComponent.new()
 	perception_comp.name = "PerceptionComponent"
@@ -592,6 +599,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 
+	if event.is_action_pressed("toggle_quest_log"):
+		if quest_log_panel:
+			quest_log_panel._toggle()
+
 	if event.is_action_pressed("interact"):
 		_interact_with_nearest()
 
@@ -818,6 +829,8 @@ func stop_vending() -> void:
 
 func _is_ui_open() -> bool:
 	if dialogue_panel and dialogue_panel.visible:
+		return true
+	if quest_log_panel and quest_log_panel.visible:
 		return true
 	for panel in [shop_panel, inventory_panel, status_panel, skill_panel, crafting_panel]:
 		if panel and panel.is_open():

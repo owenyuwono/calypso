@@ -52,3 +52,8 @@ signal memory_added(entity_id: String, fact: String, importance: String)
 # Relationships
 signal relationship_tier_changed(entity_id: String, partner_id: String, old_tier: String, new_tier: String)
 
+# Quest
+signal quest_accepted(entity_id: String, quest_id: String)
+signal quest_objective_updated(entity_id: String, quest_id: String, objective_idx: int, progress: int)
+signal quest_completed(entity_id: String, quest_id: String, rewards: Dictionary)
+

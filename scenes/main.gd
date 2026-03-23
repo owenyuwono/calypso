@@ -92,6 +92,15 @@ func _ready() -> void:
 				shop_panel.open_shop(npc_node)
 	)
 
+	var quest_log_panel: Control = Control.new()
+	quest_log_panel.set_script(preload("res://scenes/ui/quest_log_panel.gd"))
+	quest_log_panel.name = "QuestLogPanel"
+	quest_log_panel.visible = false
+	$UILayer.add_child(quest_log_panel)
+	if player:
+		quest_log_panel.set_player(player)
+		player.quest_log_panel = quest_log_panel
+
 	var proficiency_panel := $UILayer/ProficiencyPanel
 	if player and proficiency_panel:
 		proficiency_panel.set_player(player)
