@@ -1,13 +1,29 @@
 extends Control
-## Shop UI — simple item list panel. No title bar, no drag, no gold display.
-## Buy/Close actions are handled by dialogue panel choices, not shop buttons.
+## Shop UI — two-column grid with cart. Left: vendor wares. Right: cart with total.
+## No title bar, no drag handle. Buy/Close driven by dialogue panel choices.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 signal shop_closed
+signal cart_changed(total: int)
+
+const CELL_SIZE := 52
+const GRID_COLUMNS := 4
+
+# Type → background color for item cells
+const TYPE_COLORS := {
+	"consumable": Color(0.3, 0.55, 0.3),
+	"material":   Color(0.5, 0.4, 0.25),
+	"weapon":     Color(0.55, 0.3, 0.3),
+	"armor":      Color(0.3, 0.35, 0.55),
+}
+const TYPE_COLOR_DEFAULT := Color(0.4, 0.4, 0.4)
 
 var _panel: PanelContainer
-var _shop_list: VBoxContainer
+var _wares_grid: GridContainer
+var _cart_grid: GridContainer
+var _total_label: Label
+var _cart: Dictionary = {}  # {item_id: count}
 var _is_open: bool = false
 var _player: Node
 var _vendor: Node = null
@@ -20,10 +36,8 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(300, 280)
-
-	var style := UIHelper.create_panel_style()
-	_panel.add_theme_stylebox_override("panel", style)
+	_panel.custom_minimum_size = Vector2(480, 300)
+	_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -33,16 +47,74 @@ func _build_ui() -> void:
 	margin.add_theme_constant_override("margin_bottom", 10)
 	_panel.add_child(margin)
 
-	var shop_scroll := ScrollContainer.new()
-	shop_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	shop_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(shop_scroll)
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 0)
+	margin.add_child(hbox)
 
-	_shop_list = VBoxContainer.new()
-	_shop_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_shop_list.add_theme_constant_override("separation", 4)
-	shop_scroll.add_child(_shop_list)
+	# --- Left column: Wares ---
+	var left_col := VBoxContainer.new()
+	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.add_theme_constant_override("separation", 6)
+	hbox.add_child(left_col)
 
+	var wares_label := Label.new()
+	wares_label.text = "Wares"
+	wares_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	wares_label.add_theme_font_size_override("font_size", 12)
+	wares_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	left_col.add_child(wares_label)
+
+	var wares_scroll := ScrollContainer.new()
+	wares_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wares_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.add_child(wares_scroll)
+
+	_wares_grid = GridContainer.new()
+	_wares_grid.columns = GRID_COLUMNS
+	_wares_grid.add_theme_constant_override("h_separation", 4)
+	_wares_grid.add_theme_constant_override("v_separation", 4)
+	wares_scroll.add_child(_wares_grid)
+
+	# --- Separator ---
+	var sep := VSeparator.new()
+	sep.add_theme_constant_override("separation", 12)
+	sep.add_theme_color_override("color", Color(0.5, 0.45, 0.3, 0.6))
+	hbox.add_child(sep)
+
+	# --- Right column: Cart ---
+	var right_col := VBoxContainer.new()
+	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.add_theme_constant_override("separation", 6)
+	hbox.add_child(right_col)
+
+	var cart_label := Label.new()
+	cart_label.text = "Your Cart"
+	cart_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	cart_label.add_theme_font_size_override("font_size", 12)
+	cart_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	right_col.add_child(cart_label)
+
+	var cart_scroll := ScrollContainer.new()
+	cart_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cart_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.add_child(cart_scroll)
+
+	_cart_grid = GridContainer.new()
+	_cart_grid.columns = GRID_COLUMNS
+	_cart_grid.add_theme_constant_override("h_separation", 4)
+	_cart_grid.add_theme_constant_override("v_separation", 4)
+	cart_scroll.add_child(_cart_grid)
+
+	_total_label = Label.new()
+	_total_label.text = "Total: 0g"
+	_total_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	_total_label.add_theme_font_size_override("font_size", 13)
+	_total_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	_total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	right_col.add_child(_total_label)
+
+
+# --- Public API ---
 
 func set_player(p: Node) -> void:
 	_player = p
@@ -50,17 +122,20 @@ func set_player(p: Node) -> void:
 
 func open_shop(vendor: Node) -> void:
 	_vendor = vendor
+	_cart.clear()
 	_is_open = true
 	visible = true
 	AudioManager.play_ui_sfx("ui_panel_open")
 	UIHelper.center_panel(_panel)
-	_refresh()
+	_refresh_wares()
+	_refresh_cart()
 
 
 func close_shop() -> void:
 	_is_open = false
 	visible = false
 	_vendor = null
+	_cart.clear()
 	shop_closed.emit()
 
 
@@ -68,93 +143,183 @@ func is_open() -> bool:
 	return _is_open
 
 
-func _refresh() -> void:
-	for child in _shop_list.get_children():
+func get_cart() -> Dictionary:
+	return _cart
+
+
+func get_cart_total() -> int:
+	if not _vendor:
+		return 0
+	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
+	if not vending_comp:
+		return 0
+	var listings: Dictionary = vending_comp.get_listings()
+	var total: int = 0
+	for item_id: String in _cart:
+		var listing: Dictionary = listings.get(item_id, {})
+		var price: int = listing.get("price", 0)
+		total += price * _cart[item_id]
+	return total
+
+
+func clear_cart() -> void:
+	_cart.clear()
+	_refresh_cart()
+	_update_total()
+	cart_changed.emit(0)
+
+
+func purchase_cart() -> bool:
+	if not _vendor or not _player:
+		return false
+	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
+	if not vending_comp:
+		return false
+
+	var purchased_any: bool = false
+	for item_id: String in _cart.duplicate():
+		var count: int = _cart[item_id]
+		var ok: bool = vending_comp.buy_from(_player, item_id, count)
+		if ok:
+			purchased_any = true
+
+	if purchased_any:
+		AudioManager.play_ui_sfx("ui_buy_sell")
+
+	_cart.clear()
+	_refresh_wares()
+	_refresh_cart()
+	return purchased_any
+
+
+# --- Cart operations ---
+
+func _add_to_cart(item_id: String) -> void:
+	if not _vendor:
+		return
+	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
+	if not vending_comp:
+		return
+	var listings: Dictionary = vending_comp.get_listings()
+	var listing: Dictionary = listings.get(item_id, {})
+	var available_stock: int = listing.get("count", 0)
+	var already_in_cart: int = _cart.get(item_id, 0)
+	if already_in_cart >= available_stock:
+		return
+	_cart[item_id] = already_in_cart + 1
+	_refresh_cart()
+	_update_total()
+	cart_changed.emit(get_cart_total())
+
+
+func _remove_from_cart(item_id: String) -> void:
+	if not _cart.has(item_id):
+		return
+	_cart[item_id] -= 1
+	if _cart[item_id] <= 0:
+		_cart.erase(item_id)
+	_refresh_cart()
+	_update_total()
+	cart_changed.emit(get_cart_total())
+
+
+# --- Refresh helpers ---
+
+func _refresh_wares() -> void:
+	for child in _wares_grid.get_children():
 		child.queue_free()
 
-	if not _player or not _vendor:
+	if not _vendor:
 		return
-
-	var inv_comp: Node = _player.get_node_or_null("InventoryComponent")
-	if not inv_comp:
-		return
-
 	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
 	if not vending_comp:
 		return
 
 	var listings: Dictionary = vending_comp.get_listings()
-	var player_gold: int = inv_comp.get_gold_amount()
-
 	for item_id: String in listings:
 		var listing: Dictionary = listings[item_id]
-		var count: int = listing.get("count", 0)
-		var price: int = listing.get("price", 0)
-		if count <= 0:
+		if listing.get("count", 0) <= 0:
 			continue
-
-		var item_data: Dictionary = ItemDatabase.get_item(item_id)
-		var item_name: String = item_data.get("name", item_id)
-
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		_shop_list.add_child(row)
-
-		# Item name
-		var name_label := Label.new()
-		name_label.text = item_name
-		name_label.add_theme_font_override("font", UIHelper.GAME_FONT)
-		name_label.add_theme_font_size_override("font_size", 13)
-		name_label.add_theme_color_override("font_color", Color(0.9, 0.87, 0.8))
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_label)
-
-		# Stock count
-		var count_label := Label.new()
-		count_label.text = "x%d" % count
-		count_label.add_theme_font_override("font", UIHelper.GAME_FONT)
-		count_label.add_theme_font_size_override("font_size", 13)
-		count_label.add_theme_color_override("font_color", Color(0.7, 0.65, 0.55))
-		count_label.custom_minimum_size = Vector2(35, 0)
-		row.add_child(count_label)
-
-		# Price
-		var price_label := Label.new()
-		price_label.text = "%dg" % price
-		price_label.add_theme_font_override("font", UIHelper.GAME_FONT)
-		price_label.add_theme_font_size_override("font_size", 13)
-		price_label.custom_minimum_size = Vector2(40, 0)
-		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		if player_gold >= price:
-			price_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-		else:
-			price_label.add_theme_color_override("font_color", Color(0.5, 0.4, 0.3))
-		row.add_child(price_label)
-
-		# Buy button
-		var btn := Button.new()
-		btn.text = "Buy"
-		btn.disabled = player_gold < price or count <= 0
-		btn.add_theme_font_override("font", UIHelper.GAME_FONT)
-		btn.add_theme_font_size_override("font_size", 12)
-		btn.pressed.connect(_buy_item.bind(item_id))
-		row.add_child(btn)
-
-	if listings.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = "No items available."
-		empty_label.add_theme_font_override("font", UIHelper.GAME_FONT)
-		empty_label.add_theme_font_size_override("font_size", 13)
-		empty_label.add_theme_color_override("font_color", Color(0.5, 0.45, 0.4))
-		_shop_list.add_child(empty_label)
+		var cell: Control = _create_item_cell(item_id, listing.get("count", 0), listing.get("price", 0), false)
+		_wares_grid.add_child(cell)
 
 
-func _buy_item(item_id: String) -> void:
-	if not _vendor or not _player:
+func _refresh_cart() -> void:
+	for child in _cart_grid.get_children():
+		child.queue_free()
+
+	if not _vendor:
 		return
 	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
 	if not vending_comp:
 		return
-	vending_comp.buy_from(_player, item_id, 1)
-	AudioManager.play_ui_sfx("ui_buy_sell")
-	_refresh()
+	var listings: Dictionary = vending_comp.get_listings()
+
+	for item_id: String in _cart:
+		var listing: Dictionary = listings.get(item_id, {})
+		var price: int = listing.get("price", 0)
+		var cell: Control = _create_item_cell(item_id, _cart[item_id], price, true)
+		_cart_grid.add_child(cell)
+
+
+func _update_total() -> void:
+	_total_label.text = "Total: %dg" % get_cart_total()
+
+
+# --- Cell builder ---
+
+func _create_item_cell(item_id: String, count: int, price: int, is_cart: bool) -> Control:
+	var item_data: Dictionary = ItemDatabase.get_item(item_id)
+	var item_name: String = item_data.get("name", item_id)
+	var item_type: String = item_data.get("type", "")
+
+	var bg_color: Color = TYPE_COLORS.get(item_type, TYPE_COLOR_DEFAULT)
+
+	# Outer container sized to CELL_SIZE
+	var container := Panel.new()
+	container.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+
+	var bg_style := UIHelper.create_style_box(bg_color, Color(0.8, 0.7, 0.5, 0.5), 3, 1)
+	container.add_theme_stylebox_override("panel", bg_style)
+
+	container.tooltip_text = "%s\n%dg each" % [item_name, price]
+
+	# Letter label centered
+	var letter_label := Label.new()
+	letter_label.text = item_name.left(1).to_upper()
+	letter_label.add_theme_font_override("font", UIHelper.GAME_FONT_BOLD)
+	letter_label.add_theme_font_size_override("font_size", 18)
+	letter_label.add_theme_color_override("font_color", Color.WHITE)
+	letter_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	letter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(letter_label)
+
+	# Count label bottom-right
+	var count_label := Label.new()
+	count_label.text = "x%d" % count
+	count_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	count_label.add_theme_font_size_override("font_size", 11)
+	count_label.add_theme_color_override("font_color", Color(1, 1, 0.8))
+	count_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	count_label.offset_left = -28
+	count_label.offset_top = -16
+	count_label.offset_right = -2
+	count_label.offset_bottom = -2
+	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(count_label)
+
+	# Click handler
+	if is_cart:
+		container.gui_input.connect(_on_cell_input.bind(item_id, true))
+	else:
+		container.gui_input.connect(_on_cell_input.bind(item_id, false))
+
+	return container
+
+
+func _on_cell_input(event: InputEvent, item_id: String, is_cart: bool) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_cart:
+			_remove_from_cart(item_id)
+		else:
+			_add_to_cart(item_id)

@@ -112,6 +112,7 @@ func _build_choices_container() -> void:
 
 
 var _shop_panel: Node
+var _buy_button: Button = null
 
 func set_player(player: Node) -> void:
 	_player = player
@@ -120,6 +121,8 @@ func set_shop_panel(shop: Node) -> void:
 	_shop_panel = shop
 	if _shop_panel and _shop_panel.has_signal("shop_closed"):
 		_shop_panel.shop_closed.connect(_on_shop_closed)
+	if _shop_panel and _shop_panel.has_signal("cart_changed"):
+		_shop_panel.cart_changed.connect(_on_cart_changed)
 
 
 func open_dialogue(npc_id: String, npc_node: Node) -> void:
@@ -141,6 +144,9 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 
 func close_dialogue() -> void:
+	if _shop_panel and _shop_panel.has_signal("cart_changed") and _shop_panel.cart_changed.is_connected(_on_cart_changed):
+		_shop_panel.cart_changed.disconnect(_on_cart_changed)
+	_buy_button = null
 	visible = false
 	_choices_container.visible = false
 	_clear_choices()
@@ -233,13 +239,8 @@ func _execute_action(action: String) -> void:
 
 	match action:
 		"trade":
-			# Keep dialogue open — show browsing text + Close Shop choice
 			_dialogue_text.text = "Take your time browsing..."
-			_clear_choices()
-			var close_btn := _create_choice_button("Close Shop")
-			close_btn.pressed.connect(_close_shop)
-			_choices_container.add_child(close_btn)
-			_choices_container.visible = true
+			_show_trade_choices()
 			if _npc_node and is_instance_valid(_npc_node):
 				trade_requested.emit(_npc_node)
 		"info":
@@ -321,6 +322,39 @@ func _get_mood(npc_node: Node) -> String:
 		"sad", "afraid", "tired": return "sad"
 		"angry": return "angry"
 	return "neutral"
+
+
+func _show_trade_choices() -> void:
+	_clear_choices()
+
+	var total: int = _shop_panel.get_cart_total() if _shop_panel else 0
+	_buy_button = _create_choice_button("Buy (%dg)" % total)
+	_buy_button.disabled = total <= 0
+	_buy_button.pressed.connect(_on_buy_pressed)
+	_choices_container.add_child(_buy_button)
+
+	var close_btn := _create_choice_button("Close Shop")
+	close_btn.pressed.connect(_close_shop)
+	_choices_container.add_child(close_btn)
+
+	_choices_container.visible = true
+
+
+func _on_buy_pressed() -> void:
+	if _shop_panel and _shop_panel.purchase_cart():
+		AudioManager.play_ui_sfx("ui_buy_sell")
+		_show_trade_choices()
+
+
+func _on_cart_changed(total: int) -> void:
+	if not (_buy_button and is_instance_valid(_buy_button)):
+		return
+	_buy_button.text = "  Buy (%dg)  " % total
+	_buy_button.disabled = total <= 0
+	if total > 0 and _player:
+		var inv: Node = _player.get_node_or_null("InventoryComponent")
+		if inv and inv.get_gold_amount() < total:
+			_buy_button.disabled = true
 
 
 func _close_shop() -> void:
