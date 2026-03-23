@@ -51,7 +51,6 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_respawned.connect(_on_entity_respawned)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-	GameEvents.conversation_started.connect(_on_conversation_started)
 
 
 func setup(data: Dictionary) -> void:
@@ -151,14 +150,6 @@ func _on_proficiency_level_up(entity_id: String, _skill_id: String, _new_level: 
 	if entity_id != _get_entity_id():
 		return
 	shift_mood("excited", "energetic")
-
-
-func _on_conversation_started(_conversation_id: String, participant_ids: Array) -> void:
-	if "player" not in participant_ids:
-		return
-	if _get_entity_id() not in participant_ids:
-		return
-	shift_mood("excited", "")
 
 
 # --- Trait API ---
