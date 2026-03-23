@@ -43,6 +43,11 @@ func _ready() -> void:
 	if player:
 		dialogue_panel.set_player(player)
 		dialogue_panel.set_shop_panel(shop_panel)
+		dialogue_panel.set_hud_elements([
+			$UILayer/PlayerHUD,
+			$UILayer/Minimap,
+			$UILayer/PanelToggles,
+		])
 		player.dialogue_panel = dialogue_panel
 	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:
 		if npc_node and is_instance_valid(npc_node):

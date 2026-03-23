@@ -113,9 +113,13 @@ func _build_choices_container() -> void:
 
 var _shop_panel: Node
 var _buy_button: Button = null
+var _hud_elements: Array = []  # nodes to hide when dialogue is open
 
 func set_player(player: Node) -> void:
 	_player = player
+
+func set_hud_elements(elements: Array) -> void:
+	_hud_elements = elements
 
 func set_shop_panel(shop: Node) -> void:
 	_shop_panel = shop
@@ -140,6 +144,9 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 	visible = true
 	_choices_container.visible = true
+	for elem in _hud_elements:
+		if elem and is_instance_valid(elem):
+			elem.visible = false
 	AudioManager.play_ui_sfx("ui_panel_open")
 
 
@@ -150,6 +157,9 @@ func close_dialogue() -> void:
 	visible = false
 	_choices_container.visible = false
 	_clear_choices()
+	for elem in _hud_elements:
+		if elem and is_instance_valid(elem):
+			elem.visible = true
 	AudioManager.play_ui_sfx("ui_panel_close")
 	_npc_id = ""
 	_npc_node = null
