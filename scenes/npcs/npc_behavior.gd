@@ -416,28 +416,8 @@ func _execute_patrol() -> void:
 	_do_action("move_to", spot)
 
 func _execute_idle() -> void:
-	# NPCs with idle goal should find something purposeful to do
-	var stats: Node = npc.get_node_or_null("StatsComponent")
-
-	# Low HP → return to town
-	if stats:
-		var hp_pct: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 1.0
-		if hp_pct < 0.7:
-			npc.set_goal("return_to_town")
-			return
-
-	# In the field zone with woodcutting proficiency → chop wood
-	var in_field: bool = absf(npc.global_position.x) > 70.0
-	if in_field and npc._progression.get_proficiency_level("woodcutting") > 0:
-		var perception: Dictionary = _perception.get_perception() if _perception else {}
-		var trees: Array = perception.get("trees", [])
-		for t in trees:
-			if t.get("harvestable", false):
-				npc.set_goal("chop_wood")
-				return
-
-	# Fallback → patrol town
-	npc.set_goal("patrol")
+	# Idle NPCs stay put — do nothing
+	pass
 
 # =============================================================================
 # Action Dispatchers
