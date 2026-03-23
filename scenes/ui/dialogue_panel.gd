@@ -14,6 +14,7 @@ var _current_node_id: String = ""
 
 var _npc_name_label: Label
 var _dialogue_text: Label
+var _portrait: TextureRect
 var _choices_container: VBoxContainer
 
 const PROFILE_TO_ARCHETYPE: Dictionary = {
@@ -62,18 +63,34 @@ func _build_ui() -> void:
 	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(margin)
 
-	var main_vbox := VBoxContainer.new()
-	main_vbox.add_theme_constant_override("separation", 6)
-	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(main_vbox)
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 14)
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(hbox)
 
-	# NPC name — gold, display font, top-left
+	# Portrait — left side
+	_portrait = TextureRect.new()
+	_portrait.custom_minimum_size = Vector2(100, 0)
+	_portrait.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_portrait.visible = false
+	hbox.add_child(_portrait)
+
+	# Right side — name + text
+	var text_vbox := VBoxContainer.new()
+	text_vbox.add_theme_constant_override("separation", 6)
+	text_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hbox.add_child(text_vbox)
+
+	# NPC name — gold, display font
 	_npc_name_label = Label.new()
 	_npc_name_label.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
 	_npc_name_label.add_theme_font_size_override("font_size", 18)
 	_npc_name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	main_vbox.add_child(_npc_name_label)
+	text_vbox.add_child(_npc_name_label)
 
 	# Dialogue text — body font, word-wrapped, fills available space
 	_dialogue_text = Label.new()
@@ -83,7 +100,7 @@ func _build_ui() -> void:
 	_dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dialogue_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_dialogue_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(_dialogue_text)
+	text_vbox.add_child(_dialogue_text)
 
 
 func _build_choices_container() -> void:
@@ -135,6 +152,15 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 	var npc_name: String = npc_node.npc_name if "npc_name" in npc_node else npc_id
 	_npc_name_label.text = npc_name
+
+	# Load portrait if it exists
+	var portrait_path: String = "res://assets/textures/ui/portraits/%s.png" % npc_id
+	if ResourceLoader.exists(portrait_path):
+		_portrait.texture = load(portrait_path)
+		_portrait.visible = true
+	else:
+		_portrait.texture = null
+		_portrait.visible = false
 
 	var entry_node_id: String = DialogueDatabase.get_dialogue_entry(npc_id)
 	if not entry_node_id.is_empty():
