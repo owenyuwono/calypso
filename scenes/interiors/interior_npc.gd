@@ -121,7 +121,7 @@ func _setup_vending() -> void:
 	_vending.name = "VendingComponent"
 	add_child(_vending)
 	var shop_title: String = npc_name + "'s " + ("Inn" if npc_role == "innkeeper" else "Shop")
-	_vending.start_vending(shop_title, {})
+	_vending.setup_shop(shop_title)
 
 
 func _face_entrance() -> void:

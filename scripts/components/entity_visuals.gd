@@ -10,7 +10,6 @@ var _overlay_material: StandardMaterial3D
 var _anim_player: AnimationPlayer
 var _current_anim: String = ""
 var _hp_bar: Node3D
-var _vend_sign: StaticBody3D
 
 # --- Setup ---
 
@@ -182,80 +181,6 @@ func spawn_styled_damage_number(target_id: String, damage: int, hit_type: String
 func flash_target(target_id: String) -> void:
 	var target_node: Node = WorldState.get_entity(target_id)
 	ModelHelper.flash_target(target_node)
-
-# --- Vend Sign ---
-
-func show_vend_sign(title: String) -> void:
-	hide_vend_sign()
-
-	# StaticBody3D container — clickable by player raycast
-	_vend_sign = StaticBody3D.new()
-	_vend_sign.name = "VendSign"
-	_vend_sign.position = Vector3(0, 2.8, 0)
-	_vend_sign.collision_layer = 1 << 5
-	_vend_sign.collision_mask = 0
-	_vend_sign.add_to_group("vend_sign")
-
-	# White border quad — behind panel, hidden by default, shown on hover
-	var border := MeshInstance3D.new()
-	border.name = "Border"
-	var border_quad := QuadMesh.new()
-	border_quad.size = Vector2(3.14, 0.94)
-	border.mesh = border_quad
-	border.position = Vector3(0, 0, 0.01)
-	var border_mat := StandardMaterial3D.new()
-	border_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.9)
-	border_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	border_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	border_mat.no_depth_test = true
-	border_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	border_mat.render_priority = -1
-	border.material_override = border_mat
-	border.visible = false
-	_vend_sign.add_child(border)
-
-	# Background panel — opaque, draws on top of border
-	var panel := MeshInstance3D.new()
-	panel.name = "Panel"
-	var quad := QuadMesh.new()
-	quad.size = Vector2(3.0, 0.8)
-	panel.mesh = quad
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.15, 0.1, 0.0, 1.0)
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	mat.no_depth_test = true
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.render_priority = 0
-	panel.material_override = mat
-	_vend_sign.add_child(panel)
-
-	# Label3D in front of the panel
-	var label := Label3D.new()
-	label.font = UIHelper.GAME_FONT_DISPLAY
-	label.text = "[SHOP] " + title
-	label.font_size = 48
-	label.position = Vector3(0, 0, -0.02)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.outline_size = 12
-	label.modulate = Color(1.0, 0.9, 0.2)
-	label.outline_modulate = Color(0, 0, 0)
-	label.no_depth_test = true
-	label.render_priority = 1
-	_vend_sign.add_child(label)
-
-	# Collision shape for raycast detection — matches panel size
-	var col_shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(3.0, 0.8, 2.0)
-	col_shape.shape = box
-	_vend_sign.add_child(col_shape)
-
-	get_parent().add_child(_vend_sign)
-
-func hide_vend_sign() -> void:
-	if _vend_sign:
-		_vend_sign.queue_free()
-		_vend_sign = null
 
 # --- Accessors ---
 

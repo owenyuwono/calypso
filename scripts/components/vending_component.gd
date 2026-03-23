@@ -4,30 +4,11 @@ extends BaseComponent
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
-var _vending: bool = false
 var _shop_title: String = ""
 var _listings: Dictionary = {}  # {item_id: {count: int, price: int}}
 
-func start_vending(title: String, listings: Dictionary) -> void:
-	_vending = true
+func setup_shop(title: String) -> void:
 	_shop_title = title
-	_listings = listings.duplicate(true)
-	_sync()
-	var eid: String = _get_entity_id()
-	if not eid.is_empty():
-		GameEvents.vending_started.emit(eid, _shop_title)
-
-func stop_vending() -> void:
-	var eid: String = _get_entity_id()
-	_vending = false
-	_shop_title = ""
-	_listings = {}
-	_sync()
-	if not eid.is_empty():
-		GameEvents.vending_stopped.emit(eid)
-
-func is_vending() -> bool:
-	return _vending
 
 func get_listings() -> Dictionary:
 	return _listings
@@ -36,8 +17,6 @@ func get_shop_title() -> String:
 	return _shop_title
 
 func buy_from(buyer: Node, item_id: String, count: int) -> bool:
-	if not _vending:
-		return false
 	if not _listings.has(item_id):
 		return false
 
@@ -78,9 +57,6 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 	var buyer_id: String = WorldState.get_entity_id_for_node(buyer)
 	GameEvents.item_purchased.emit(buyer_id, item_id, total_cost)
 
-	if _listings.is_empty():
-		stop_vending()
-
 	return true
 
 func refresh_listings(inventory: Node, equipment: Node) -> void:
@@ -99,8 +75,6 @@ func refresh_listings(inventory: Node, equipment: Node) -> void:
 	_sync()
 
 func add_listing(item_id: String, count: int, price: int) -> void:
-	if not _vending:
-		return
 	if _listings.has(item_id):
 		_listings[item_id]["count"] += count
 	else:
@@ -111,6 +85,5 @@ func _sync() -> void:
 	var eid: String = _get_entity_id()
 	if eid.is_empty():
 		return
-	WorldState.set_entity_data(eid, "vending", _vending)
 	WorldState.set_entity_data(eid, "shop_title", _shop_title)
 	WorldState.set_entity_data(eid, "listings", _listings)

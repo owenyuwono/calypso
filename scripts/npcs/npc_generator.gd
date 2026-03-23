@@ -10,7 +10,8 @@ const ARCHETYPES: Dictionary = {
 		"generosity_range": [0.2, 0.8],
 		"sociability_range": [0.3, 0.7],
 		"curiosity_range": [0.2, 0.6],
-		"default_goal": "hunt",
+		"default_goal": "hunt_field",
+		"crafting_proficiencies": {"smithing": 2},
 		"models": ["Knight", "Barbarian"],
 	},
 	"mage": {
@@ -20,7 +21,8 @@ const ARCHETYPES: Dictionary = {
 		"generosity_range": [0.3, 0.9],
 		"sociability_range": [0.4, 0.8],
 		"curiosity_range": [0.5, 0.9],
-		"default_goal": "hunt",
+		"default_goal": "hunt_field",
+		"crafting_proficiencies": {"crafting": 2},
 		"models": ["Mage"],
 	},
 	"rogue": {
@@ -30,7 +32,8 @@ const ARCHETYPES: Dictionary = {
 		"generosity_range": [0.1, 0.5],
 		"sociability_range": [0.2, 0.6],
 		"curiosity_range": [0.4, 0.8],
-		"default_goal": "hunt",
+		"default_goal": "hunt_field",
+		"crafting_proficiencies": {},
 		"models": ["Rogue"],
 	},
 	"ranger": {
@@ -40,7 +43,8 @@ const ARCHETYPES: Dictionary = {
 		"generosity_range": [0.3, 0.7],
 		"sociability_range": [0.3, 0.6],
 		"curiosity_range": [0.6, 1.0],
-		"default_goal": "hunt",
+		"default_goal": "hunt_field",
+		"crafting_proficiencies": {},
 		"models": ["Knight", "Barbarian"],
 	},
 	"merchant": {
@@ -50,7 +54,8 @@ const ARCHETYPES: Dictionary = {
 		"generosity_range": [0.4, 0.9],
 		"sociability_range": [0.6, 1.0],
 		"curiosity_range": [0.3, 0.6],
-		"default_goal": "vend",
+		"default_goal": "idle",
+		"crafting_proficiencies": {"cooking": 2, "crafting": 2},
 		"models": ["Rogue", "Mage"],
 	},
 }
@@ -186,6 +191,7 @@ static func generate_npc(used_names: Array) -> Dictionary:
 		"sociability": _rand_range(archetype["sociability_range"][0], archetype["sociability_range"][1]),
 		"curiosity": _rand_range(archetype["curiosity_range"][0], archetype["curiosity_range"][1]),
 		"default_goal": archetype["default_goal"],
+		"proficiencies": archetype["crafting_proficiencies"],
 		"items": loadout["items"],
 		"equip": loadout["equip"],
 		"gold": loadout["gold"],

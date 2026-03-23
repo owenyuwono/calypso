@@ -91,8 +91,6 @@ func close_shop() -> void:
 	visible = false
 	AudioManager.play_ui_sfx("ui_panel_close")
 	_vendor = null
-	if _player and _player.has_method("stop_vending"):
-		_player.stop_vending()
 
 func _refresh() -> void:
 	for child in _shop_list.get_children():

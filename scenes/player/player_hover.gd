@@ -1,6 +1,6 @@
 extends Node
-## Handles all hover/raycast logic: entity highlight, vend sign highlight,
-## tooltip display, cursor updates, and hover ring management.
+## Handles all hover/raycast logic: entity highlight, tooltip display,
+## cursor updates, and hover ring management.
 ## Call setup(player) from player._ready() after adding as child.
 
 const HOVER_RAY_LENGTH: float = 100.0
@@ -27,11 +27,6 @@ var _tooltip_panel: PanelContainer
 # Hover state
 var _hovered_entity_id: String = ""
 var _hover_timer: float = 0.0
-
-# Vend sign state (read by player.gd for click routing)
-var hovered_vend_sign: bool = false
-var hovered_vend_sign_owner_id: String = ""
-var pending_vend_sign_click: bool = false
 
 
 func setup(player: Node3D, cursor_manager: RefCounted) -> void:
@@ -193,19 +188,10 @@ func _process_hover() -> void:
 	var result := space.intersect_ray(query)
 
 	var new_entity_id: String = ""
-	var prev_vend_sign: bool = hovered_vend_sign
-	var prev_vend_sign_owner: String = hovered_vend_sign_owner_id
-	hovered_vend_sign = false
-	hovered_vend_sign_owner_id = ""
 
 	if result:
 		var collider: Node = result.collider
-		if collider.is_in_group("vend_sign"):
-			# Hovered a vend sign — find the owner entity
-			hovered_vend_sign = true
-			var owner_entity: Node3D = collider.get_parent()
-			hovered_vend_sign_owner_id = WorldState.get_entity_id_for_node(owner_entity)
-		elif collider is Node3D:
+		if collider is Node3D:
 			# Walk up the parent chain to find the registered entity —
 			# raycast may hit a child node (e.g. PerceptionArea) rather than the root.
 			var check_node: Node = collider
@@ -242,40 +228,6 @@ func _process_hover() -> void:
 		else:
 			_hover_ring.visible = false
 			_hover_ring_target_id = ""
-
-	# Highlight / unhighlight vend sign border
-	if prev_vend_sign and not hovered_vend_sign and not prev_vend_sign_owner.is_empty():
-		var prev_owner := WorldState.get_entity(prev_vend_sign_owner)
-		if prev_owner and is_instance_valid(prev_owner):
-			var sign_node: Node = prev_owner.get_node_or_null("VendSign")
-			if sign_node:
-				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
-				if border:
-					border.visible = false
-	if hovered_vend_sign and not hovered_vend_sign_owner_id.is_empty():
-		var cur_owner := WorldState.get_entity(hovered_vend_sign_owner_id)
-		if cur_owner and is_instance_valid(cur_owner):
-			var sign_node: Node = cur_owner.get_node_or_null("VendSign")
-			if sign_node:
-				var border: MeshInstance3D = sign_node.get_node_or_null("Border")
-				if border:
-					border.visible = true
-
-	# Vend sign hover — show shop tooltip
-	if hovered_vend_sign and not hovered_vend_sign_owner_id.is_empty():
-		var mouse_pos_for_tooltip := get_viewport().get_mouse_position()
-		var owner_node := WorldState.get_entity(hovered_vend_sign_owner_id)
-		var vending_comp: Node = owner_node.get_node_or_null("VendingComponent") if owner_node and is_instance_valid(owner_node) else null
-		if vending_comp and vending_comp.is_vending():
-			var shop_title: String = vending_comp.get_shop_title()
-			_tooltip_label.text = shop_title if not shop_title.is_empty() else "[Shop]"
-			_tooltip_panel.visible = true
-			_tooltip_panel.position = mouse_pos_for_tooltip + TOOLTIP_OFFSET
-			_cursor_manager.set_cursor("talk")
-		else:
-			_tooltip_panel.visible = false
-			_cursor_manager.set_cursor("default")
-		return  # Skip normal entity tooltip handling
 
 	# Update tooltip, cursor, and hover ring
 	if _hovered_entity_id != "":

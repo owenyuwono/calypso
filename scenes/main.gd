@@ -79,17 +79,7 @@ func _ready() -> void:
 		player.dialogue_panel = dialogue_panel
 	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:
 		if npc_node and is_instance_valid(npc_node):
-			var vending: Node = npc_node.get_node_or_null("VendingComponent")
-			if vending:
-				if not vending.is_vending():
-					var inv: Node = npc_node.get_node_or_null("InventoryComponent")
-					var equip: Node = npc_node.get_node_or_null("EquipmentComponent")
-					vending.refresh_listings(inv, equip)
-					var nname: String = npc_node.get("npc_name") if "npc_name" in npc_node else "Shop"
-					if nname == null or nname.is_empty():
-						nname = "Shop"
-					vending.start_vending(nname + "'s Shop", {})
-				shop_panel.open_shop(npc_node)
+			shop_panel.open_shop(npc_node)
 	)
 
 	var quest_log_panel: Control = Control.new()
@@ -218,6 +208,14 @@ func _setup_adventurer_npcs() -> void:
 		# Re-init proficiencies + skills (trait_profile was empty during _ready)
 		npc.late_init_skills()
 
+		# Merchant shop: populate inventory immediately so shop is always open
+		if npc.trait_profile == "merchant":
+			var vending: Node = npc.get_node_or_null("VendingComponent")
+			if vending:
+				var nname: String = npc.npc_name if not npc.npc_name.is_empty() else "Shop"
+				vending.setup_shop(nname + "'s Shop")
+				vending.refresh_listings(inventory, npc.get_node_or_null("EquipmentComponent"))
+
 func _spawn_generated_npcs() -> void:
 	var loadouts: Array = NpcGenerator.generate_npcs(GENERATED_NPC_COUNT)
 	for loadout in loadouts:
@@ -246,13 +244,13 @@ func _spawn_generated_npc(loadout: Dictionary) -> void:
 	# Prefer the loadout's own trait_profile if NpcGenerator already assigned one.
 	var loadout_profile: String = loadout.get("trait_profile", "")
 	npc.trait_profile = loadout_profile if loadout_profile != "" else _pick_profile(archetype)
-	npc.global_position = _pick_generated_npc_spawn_pos(loadout.get("default_goal", "idle"))
+	npc.global_position = _pick_generated_npc_spawn_pos(archetype)
 
 	npc.initialize_from_loadout(loadout)
 
-func _pick_generated_npc_spawn_pos(goal: String) -> Vector3:
+func _pick_generated_npc_spawn_pos(archetype: String) -> Vector3:
 	# Merchants stay in the city. Others split 50/50 between city and east field.
-	if goal == "vend":
+	if archetype == "merchant":
 		var x: float = randf_range(-60.0, 60.0)
 		var z: float = randf_range(-40.0, 40.0)
 		return Vector3(x, 1.0, z)

@@ -23,10 +23,6 @@ signal item_looted(entity_id: String, item_id: String, count: int)
 signal item_purchased(buyer_id: String, item_id: String, cost: int)
 signal item_sold(seller_id: String, item_id: String, revenue: int)
 
-# Vending
-signal vending_started(entity_id: String, shop_title: String)
-signal vending_stopped(entity_id: String)
-
 # Interiors
 signal entered_interior(building_type: String)
 signal exited_interior()

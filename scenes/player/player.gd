@@ -19,7 +19,6 @@ const CombatComponent = preload("res://scripts/components/combat_component.gd")
 const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
 const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
-const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
@@ -37,9 +36,6 @@ var _interact_target: String = ""
 var _stuck_timer: float = 0.0
 var _last_nav_pos: Vector3 = Vector3.ZERO
 var _was_moving: bool = false
-
-# Vending
-var _is_vending: bool = false
 
 # Combat
 var _attack_target: String = ""
@@ -178,10 +174,6 @@ func _ready() -> void:
 	stats["hotbar"] = ["", "", "", "", ""]
 	WorldState.register_entity("player", self, stats)
 
-	var _vending_comp := VendingComponent.new()
-	_vending_comp.name = "VendingComponent"
-	add_child(_vending_comp)
-
 	# Add StaminaComponent
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
 	stamina_comp.name = "StaminaComponent"
@@ -225,8 +217,6 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-	GameEvents.vending_started.connect(_on_vending_started)
-	GameEvents.vending_stopped.connect(_on_vending_stopped)
 	GameEvents.attack_missed.connect(_on_attack_missed)
 
 	_last_position = global_position
@@ -272,7 +262,7 @@ func _physics_process(delta: float) -> void:
 
 	var is_moving := false
 
-	if _is_vending or _is_ui_open():
+	if _is_ui_open():
 		_stop_navigation()
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
@@ -534,12 +524,7 @@ func _on_arrived() -> void:
 		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
 			target_node.pickup("player")
 	elif etype == "npc":
-		if _hover.pending_vend_sign_click:
-			_hover.pending_vend_sign_click = false
-			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
-			if vending_comp and vending_comp.is_vending():
-				_open_shop(_interact_target)
-		elif dialogue_panel and target_node and is_instance_valid(target_node):
+		if dialogue_panel and target_node and is_instance_valid(target_node):
 			dialogue_panel.open_dialogue(_interact_target, target_node)
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
@@ -549,7 +534,7 @@ func _on_arrived() -> void:
 			dialogue_panel.open_dialogue(_interact_target, target_node)
 		else:
 			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
-			if vending_comp and vending_comp.is_vending():
+			if vending_comp and vending_comp.get_listings().size() > 0:
 				_open_shop(_interact_target)
 		_hover.clear_ring()
 	elif etype == "crafting_station":
@@ -582,15 +567,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
 
-	if _is_vending:
-		if event.is_action_pressed("ui_cancel"):
-			if shop_panel and shop_panel.is_open():
-				shop_panel.close_shop()
-			else:
-				stop_vending()
-			get_viewport().set_input_as_handled()
-		return
-
 	if not _is_ui_open():
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
@@ -613,21 +589,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_handle_left_click()
 
 func _handle_left_click() -> void:
-	# Vend sign click — walk to vendor NPC, then open shop
-	if _hover.hovered_vend_sign and not _hover.hovered_vend_sign_owner_id.is_empty() and _hover.hovered_vend_sign_owner_id != "player":
-		_cancel_attack()
-		_cancel_harvest()
-		_interact_target = _hover.hovered_vend_sign_owner_id
-		_hover.pending_vend_sign_click = true
-		var target_node := WorldState.get_entity(_hover.hovered_vend_sign_owner_id)
-		if target_node and is_instance_valid(target_node):
-			var dist := global_position.distance_to(target_node.global_position)
-			if dist <= INTERACT_RANGE:
-				_on_arrived()
-				return
-			_navigate_to(target_node.global_position)
-		return
-
 	var hovered_entity_id: String = _hover.get_hovered_entity_id()
 	if not hovered_entity_id.is_empty():
 		var data := WorldState.get_entity_data(hovered_entity_id)
@@ -797,7 +758,7 @@ func _interact_with_nearest() -> void:
 		var etype: String = data.get("type", "")
 		if etype == "npc":
 			var vending_comp: Node = entry.node.get_node_or_null("VendingComponent") if entry.node else null
-			if vending_comp and vending_comp.is_vending():
+			if vending_comp and vending_comp.get_listings().size() > 0:
 				_open_shop(entry.id)
 				return
 			_command_npc_follow(entry.node)
@@ -815,17 +776,10 @@ func _open_shop(shop_id: String) -> void:
 			shop_panel.open_shop(vendor_node)
 
 func enter_vending_state() -> void:
-	_is_vending = true
 	_cancel_attack()
 	_cancel_harvest()
 	_stop_navigation()
 	velocity = Vector3.ZERO
-
-func stop_vending() -> void:
-	_is_vending = false
-	var vending_comp: Node = get_node_or_null("VendingComponent")
-	if vending_comp and vending_comp.is_vending():
-		vending_comp.stop_vending()
 
 func _is_ui_open() -> bool:
 	if dialogue_panel and dialogue_panel.visible:
@@ -847,7 +801,6 @@ func _on_entity_died(eid: String, _killer_id: String) -> void:
 	_die()
 
 func _die() -> void:
-	stop_vending()
 	_is_dead = true
 	_cancel_attack()
 	_cancel_harvest()
@@ -905,14 +858,6 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 func _on_proficiency_level_up(eid: String, _skill_id: String, _new_level: int) -> void:
 	if eid != "player":
 		return
-
-func _on_vending_started(eid: String, shop_title: String) -> void:
-	if eid == entity_id:
-		_visuals.show_vend_sign(shop_title)
-
-func _on_vending_stopped(eid: String) -> void:
-	if eid == entity_id:
-		_visuals.hide_vend_sign()
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.flash_target(target_id)

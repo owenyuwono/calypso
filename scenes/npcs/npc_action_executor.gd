@@ -2,6 +2,7 @@ extends Node
 ## Translates LLM action decisions into game mechanics for adventurer NPCs.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const RecipeDatabase = preload("res://scripts/data/recipe_database.gd")
 
 const SELL_PRICE_RATIO: float = 0.5
 
@@ -33,6 +34,8 @@ func execute(action: String, target: String, dialogue: String = "", action_data:
 			_do_pickup_loot(target)
 		"chop_tree":
 			_do_chop_tree(target)
+		"craft_at_station":
+			_do_craft_at_station(target, action_data)
 		_:
 			push_warning("NPCActionExecutor: Unknown action '%s'" % action)
 			npc.change_state("failed")
@@ -155,7 +158,7 @@ func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
 
 	var cost: int = 0
 	var vending_comp: Node = vendor_node.get_node_or_null("VendingComponent")
-	if vending_comp and vending_comp.is_vending():
+	if vending_comp and vending_comp.get_listings().size() > 0:
 		# Buy via VendingComponent — handles gold transfer and inventory on both sides
 		var success: bool = vending_comp.buy_from(npc, item_id, count)
 		if not success:
@@ -362,6 +365,90 @@ func _do_chop_tree(tree_id: String) -> void:
 	GameEvents.npc_action_completed.emit(npc.npc_id, "chop_tree", true)
 	if npc.current_state == "interacting":
 		npc.change_state("idle")
+
+const CRAFT_RANGE: float = 3.0
+
+func _do_craft_at_station(station_id: String, action_data: Dictionary) -> void:
+	var station_node: Node3D = WorldState.get_entity(station_id)
+	if not station_node or not is_instance_valid(station_node):
+		_fail("craft_at_station", "Station '%s' not found" % station_id)
+		return
+
+	var recipe_id: String = action_data.get("recipe_id", "")
+	if recipe_id.is_empty():
+		_fail("craft_at_station", "No recipe_id in action_data")
+		return
+
+	var recipe: Dictionary = RecipeDatabase.get_recipe(recipe_id)
+	if recipe.is_empty():
+		_fail("craft_at_station", "Unknown recipe '%s'" % recipe_id)
+		return
+
+	# Navigate to station (offset from center to avoid NavMesh obstacle)
+	var approach_pos: Vector3 = _get_approach_pos(npc.global_position, station_node.global_position, 2.0)
+	var close_enough: bool = await _approach_position(station_node, approach_pos, CRAFT_RANGE)
+	if not close_enough:
+		_fail("craft_at_station", "Station '%s' unreachable" % station_id)
+		return
+
+	# Verify still valid after approach
+	if not is_instance_valid(station_node):
+		_fail("craft_at_station", "Station '%s' freed during approach" % station_id)
+		return
+
+	# Verify NPC has all required inputs before starting
+	var inputs: Dictionary = recipe.get("inputs", {})
+	for item_id in inputs:
+		var needed: int = inputs[item_id]
+		if not npc._inventory.has_item(item_id, needed):
+			_fail("craft_at_station", "Missing input '%s' x%d for recipe '%s'" % [item_id, needed, recipe_id])
+			return
+
+	npc.change_state("interacting")
+	npc._visuals.play_anim("Idle")
+
+	# Wait for craft_time
+	var craft_time: float = recipe.get("craft_time", 2.0)
+	await get_tree().create_timer(craft_time).timeout
+
+	# Guard: NPC may have been interrupted (combat, death, goal change)
+	if npc.current_state == "dead":
+		GameEvents.npc_action_completed.emit(npc.npc_id, "craft_at_station", false)
+		return
+
+	# Re-verify inputs after the wait — may have been consumed elsewhere
+	for item_id in inputs:
+		var needed: int = inputs[item_id]
+		if not npc._inventory.has_item(item_id, needed):
+			_fail("craft_at_station", "Inputs lost during craft wait for recipe '%s'" % recipe_id)
+			return
+
+	# Consume inputs
+	for item_id in inputs:
+		npc._inventory.remove_item(item_id, inputs[item_id])
+
+	# Add outputs
+	var outputs: Dictionary = recipe.get("outputs", {})
+	for item_id in outputs:
+		npc._inventory.add_item(item_id, outputs[item_id])
+
+	# Grant proficiency XP
+	var progression: Node = npc.get_node_or_null("ProgressionComponent")
+	if progression:
+		progression.grant_proficiency_xp(recipe.get("skill_id", ""), recipe.get("xp", 0))
+
+	# Play craft SFX
+	if npc._audio:
+		npc._audio.play_oneshot("ui_craft_complete")
+
+	var recipe_name: String = recipe.get("name", recipe_id)
+	npc.last_thought = "Crafted %s" % recipe_name
+	_add_npc_memory("Crafted %s at station" % recipe_name)
+
+	GameEvents.npc_action_completed.emit(npc.npc_id, "craft_at_station", true)
+	if npc.current_state == "interacting":
+		npc.change_state("idle")
+
 
 func _add_npc_memory(fact: String, importance: String = "medium", emotional: bool = false, topic: String = "") -> void:
 	var memory_node: Node = npc.get_node_or_null("NPCMemory")

@@ -71,14 +71,14 @@ const LOADOUTS: Dictionary = {
 		},
 		"equip": ["iron_sword"],
 		"gold": 500,
-		"default_goal": "vend",
+		"default_goal": "idle",
 	},
 	"elara": {
 		"trait_profile": "merchant",
 		"items": {"healing_potion": 20},
 		"equip": [],
 		"gold": 300,
-		"default_goal": "vend",
+		"default_goal": "idle",
 	},
 	"finn": {
 		"trait_profile": "charming_bard",

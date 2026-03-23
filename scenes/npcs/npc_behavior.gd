@@ -8,7 +8,7 @@ const RecipeDatabase = preload("res://scripts/data/recipe_database.gd")
 
 const VALID_GOALS: Array = [
 	"hunt_field", "follow_player", "return_to_town", "patrol", "idle", "rest",
-	"chop_wood", "craft_items", "vend"
+	"chop_wood", "craft_items"
 ]
 
 const TICK_INTERVAL: float = 1.0
@@ -252,8 +252,6 @@ func _execute_goal() -> void:
 			_execute_chop_wood()
 		"craft_items":
 			_execute_craft()
-		"vend":
-			_execute_vend()
 
 func _execute_hunt() -> void:
 	# Look for nearby alive monsters
@@ -440,20 +438,6 @@ func _execute_idle() -> void:
 
 	# Fallback → patrol town
 	npc.set_goal("patrol")
-
-func _execute_vend() -> void:
-	var vending: Node = npc.get_node_or_null("VendingComponent")
-	if not vending:
-		return
-	if vending.is_vending():
-		return  # Already vending, just idle
-	var inv: Node = npc.get_node_or_null("InventoryComponent")
-	var equip: Node = npc.get_node_or_null("EquipmentComponent")
-	vending.refresh_listings(inv, equip)
-	var npc_name: String = npc.get("npc_name")
-	if npc_name == null or npc_name.is_empty():
-		npc_name = "Shop"
-	vending.start_vending(npc_name + "'s Shop", {})
 
 # =============================================================================
 # Action Dispatchers

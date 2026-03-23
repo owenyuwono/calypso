@@ -266,8 +266,6 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
-	GameEvents.vending_started.connect(_on_vending_started)
-	GameEvents.vending_stopped.connect(_on_vending_stopped)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 	GameEvents.attack_missed.connect(_on_attack_missed)
 
@@ -432,14 +430,6 @@ func _physics_process(delta: float) -> void:
 		_stagger_timer -= delta
 		velocity = Vector3.ZERO
 		move_and_slide()
-		return
-
-	# Don't move while vending
-	if _vending_comp and _vending_comp.is_vending():
-		velocity = Vector3.ZERO
-		if _current_anim != "Idle":
-			_current_anim = "Idle"
-			_visuals.play_anim("Idle")
 		return
 
 	if not is_on_floor():
@@ -721,8 +711,6 @@ func _on_entity_died(entity_id: String, killer_id: String) -> void:
 		change_state(STATE_IDLE)
 
 func _die() -> void:
-	if _vending_comp and _vending_comp.is_vending():
-		_vending_comp.stop_vending()
 	change_state(STATE_DEAD)
 	combat_target = ""
 	_combat_tracker = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
@@ -781,20 +769,11 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		if current_state != STATE_DEAD:
 			_stagger_timer = 0.3
 		# Fight back if not already in combat
-		var is_vending: bool = _vending_comp != null and _vending_comp.is_vending()
-		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "" and not is_vending:
+		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
 			enter_combat(attacker_id)
 
 func _on_entity_healed(_entity_id: String, _amount: int, _current_hp: int) -> void:
 	pass  # NPC HP bar is never shown
-
-func _on_vending_started(eid: String, shop_title: String) -> void:
-	if eid == npc_id:
-		_visuals.show_vend_sign(shop_title)
-
-func _on_vending_stopped(eid: String) -> void:
-	if eid == npc_id:
-		_visuals.hide_vend_sign()
 
 func _on_proficiency_level_up(leveled_entity_id: String, _prof_id: String, _new_level: int) -> void:
 	if leveled_entity_id != entity_id:
@@ -851,6 +830,14 @@ func initialize_from_loadout(loadout: Dictionary) -> void:
 
 	# Re-init proficiencies and skills (trait_profile is set after _ready)
 	late_init_skills()
+
+	# Merchant shop: populate inventory immediately so shop is always open
+	var loadout_goal: String = loadout.get("default_goal", "")
+	if loadout_goal == "vend" or loadout.get("archetype", "") == "merchant":
+		if _vending_comp:
+			var shop_name: String = npc_name if not npc_name.is_empty() else "Shop"
+			_vending_comp.setup_shop(shop_name + "'s Shop")
+			_vending_comp.refresh_listings(_inventory, _equipment)
 
 	# Merge loadout proficiency seeds on top of trait profile baseline
 	var extra_profs: Dictionary = loadout.get("proficiencies", {})
