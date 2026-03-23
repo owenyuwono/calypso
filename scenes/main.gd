@@ -1,39 +1,5 @@
 extends Node3D
-## Main scene — wires up UI panel references to the player, spawns NPCs, and boots ZoneManager.
-
-const NpcScene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
-
-const GENERATED_NPC_COUNT: int = 25
-
-# Maps NpcGenerator archetype IDs to the pool of valid NpcTraits profile strings.
-const ARCHETYPE_PROFILES: Dictionary = {
-	"warrior":  ["bold_warrior", "stern_guardian", "wild_berserker", "stoic_knight"],
-	"mage":     ["cautious_mage", "devout_cleric", "gentle_healer"],
-	"rogue":    ["sly_rogue", "charming_bard", "shadow_stalker"],
-	"ranger":   ["keen_archer"],
-	"merchant": ["merchant"],
-}
-
-func _pick_profile(archetype: String) -> String:
-	var profiles: Array = ARCHETYPE_PROFILES.get(archetype, ["earnest_apprentice"])
-	return profiles.pick_random()
-
-# Character model paths by model name token.
-const MODEL_PATHS: Dictionary = {
-	"Knight":    "res://assets/models/characters/Knight.glb",
-	"Barbarian": "res://assets/models/characters/Barbarian.glb",
-	"Mage":      "res://assets/models/characters/Mage.glb",
-	"Rogue":     "res://assets/models/characters/Rogue.glb",
-}
-
-# Distinct npc_color per archetype so NPCs are visually distinguishable in bulk.
-const ARCHETYPE_COLORS: Dictionary = {
-	"warrior":  Color(0.2, 0.3, 0.7, 1.0),
-	"mage":     Color(0.5, 0.1, 0.6, 1.0),
-	"rogue":    Color(0.1, 0.5, 0.4, 1.0),
-	"ranger":   Color(0.2, 0.5, 0.2, 1.0),
-	"merchant": Color(0.7, 0.5, 0.1, 1.0),
-}
+## Main scene — wires up UI panel references to the player, spawns the merchant NPC, and boots ZoneManager.
 
 var _fps_label: Label
 var interior_manager: InteriorManager
@@ -143,20 +109,14 @@ func _ready() -> void:
 	interior_manager.setup(player, $ZoneAnchor, ZoneManager.get_loading_screen())
 	player.interior_manager = interior_manager
 
-	# Spawn NPCs + apply loadouts once the first zone's navmesh is ready
-	# (matches original game_world.gd flow where NPCs spawned inside _on_navmesh_baked)
+	# Spawn merchant once the first zone's navmesh is ready
 	ZoneManager.zone_load_completed.connect(_on_first_zone_ready, CONNECT_ONE_SHOT)
 
 	ZoneManager.load_zone("city", Vector3(8, 1, 3))
 
 func _on_first_zone_ready(zone_id: String) -> void:
-	_spawn_generated_npcs()
-	_setup_adventurer_npcs()
-	# Assign nav map to all NPCs so their NavigationAgent3D uses the zone's navmesh
-	# (NPCs are under Main/NPCs, not under the zone's NavigationRegion3D)
+	_spawn_merchant()
 	_assign_npc_nav_map()
-	# NPCs missed the initial zone_changed signal (they didn't exist yet).
-	# Evaluate zone status now so out-of-zone NPCs go dormant immediately.
 	_evaluate_npc_zones(zone_id)
 
 func _assign_npc_nav_map() -> void:
@@ -177,94 +137,29 @@ func _evaluate_npc_zones(current_zone_id: String) -> void:
 		if npc.has_method("_on_zone_changed"):
 			npc._on_zone_changed("", current_zone_id)
 
-func _setup_adventurer_npcs() -> void:
-	for npc_id in NpcLoadouts.LOADOUTS:
-		var loadout: Dictionary = NpcLoadouts.LOADOUTS[npc_id]
-		var npc_name: String = npc_id.capitalize()
-		var npc: Node3D = $NPCs.get_node_or_null(npc_name)
-		if not npc:
-			continue
-
-		npc.trait_profile = loadout["trait_profile"]
-
-		var inventory: Node = npc.get_node("InventoryComponent")
-		for item_id in loadout["items"]:
-			inventory.add_item(item_id, loadout["items"][item_id])
-
-		var equipment: Node = npc.get_node("EquipmentComponent")
-		for item_id in loadout["equip"]:
-			equipment.equip(item_id)
-
-		var gold: int = loadout["gold"]
-		if gold != -1:
-			inventory.set_gold_amount(gold)
-
-		var goal: String = loadout["default_goal"]
-		var behavior: Node = npc.get_node_or_null("NPCBehavior")
-		if behavior:
-			behavior.default_goal = goal
-		npc.set_goal(goal)
-
-		# Re-init proficiencies + skills (trait_profile was empty during _ready)
-		npc.late_init_skills()
-
-		# Merchant shop: populate inventory immediately so shop is always open
-		if npc.trait_profile == "merchant":
-			var vending: Node = npc.get_node_or_null("VendingComponent")
-			if vending:
-				var nname: String = npc.npc_name if not npc.npc_name.is_empty() else "Shop"
-				vending.setup_shop(nname + "'s Shop")
-				vending.refresh_listings(inventory, npc.get_node_or_null("EquipmentComponent"))
-
-func _spawn_generated_npcs() -> void:
-	var loadouts: Array = NpcGenerator.generate_npcs(GENERATED_NPC_COUNT)
-	for loadout in loadouts:
-		_spawn_generated_npc(loadout)
-
-func _spawn_generated_npc(loadout: Dictionary) -> void:
-	var npc_name: String = loadout.get("name", "Adventurer")
-	var npc_id: String = "gen_" + npc_name.to_lower()
-	var archetype: String = loadout.get("archetype", "warrior")
-	var model_token: String = loadout.get("model", "Knight")
-
-	var npc: CharacterBody3D = NpcScene.instantiate()
-	# Set export vars before add_child so _ready() uses them for visuals/components.
-	# trait_profile is intentionally left empty here (as with hardcoded NPCs) so _ready()
-	# does not pre-equip a weapon — initialize_from_loadout applies the real loadout after.
-	npc.npc_id = npc_id
-	npc.npc_name = npc_name
-	npc.model_path = MODEL_PATHS.get(model_token, "res://assets/models/characters/Knight.glb")
+func _spawn_merchant() -> void:
+	var npc_scene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
+	var npc: Node3D = npc_scene.instantiate()
+	npc.npc_id = "alden"
+	npc.npc_name = "Alden"
+	npc.npc_color = Color(0.6, 0.45, 0.3)
+	npc.model_path = "res://assets/models/characters/Barbarian.glb"
 	npc.model_scale = 0.7
-	npc.npc_color = ARCHETYPE_COLORS.get(archetype, Color(0.5, 0.5, 0.5, 1.0))
-	npc.starting_goal = loadout.get("default_goal", "idle")
-	npc.personality = ""
-
+	npc.trait_profile = "merchant"
 	$NPCs.add_child(npc)
-	# Set trait_profile after _ready() so npc_behavior reads it correctly at runtime.
-	# Prefer the loadout's own trait_profile if NpcGenerator already assigned one.
-	var loadout_profile: String = loadout.get("trait_profile", "")
-	npc.trait_profile = loadout_profile if loadout_profile != "" else _pick_profile(archetype)
-	npc.global_position = _pick_generated_npc_spawn_pos(archetype)
+	npc.global_position = Vector3(5, 1, 5)
 
-	npc.initialize_from_loadout(loadout)
-
-func _pick_generated_npc_spawn_pos(archetype: String) -> Vector3:
-	# Merchants stay in the city. Others split 50/50 between city and east field.
-	if archetype == "merchant":
-		var x: float = randf_range(-60.0, 60.0)
-		var z: float = randf_range(-40.0, 40.0)
-		return Vector3(x, 1.0, z)
-	var roll: float = randf()
-	if roll < 0.5:
-		# City
-		var x: float = randf_range(-60.0, 60.0)
-		var z: float = randf_range(-40.0, 40.0)
-		return Vector3(x, 1.0, z)
-	else:
-		# East field
-		var x: float = randf_range(80.0, 140.0)
-		var z: float = randf_range(-30.0, 30.0)
-		return Vector3(x, 1.0, z)
+	npc.initialize_from_loadout({
+		"default_goal": "idle",
+		"items": {
+			"healing_potion": 20,
+			"bandage": 15,
+			"cooked_sardine": 10,
+			"cooked_trout": 5,
+			"fish_stew": 5,
+		},
+		"gold": 500,
+	})
 
 func _setup_fps_counter() -> void:
 	_fps_label = Label.new()

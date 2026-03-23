@@ -422,6 +422,24 @@ const DIALOGUES: Dictionary = {
 			],
 		},
 	},
+
+	"alden": {
+		"greeting": {
+			"text": "Welcome, traveler! I have potions and supplies for your adventures.",
+			"choices": [
+				{"text": "What do you have?", "next": null, "action": "trade"},
+				{"text": "Tell me about this town.", "next": "alden_town_info"},
+				{"text": "Goodbye.", "next": null},
+			],
+		},
+		"alden_town_info": {
+			"text": "This is the city of Arcadia. To the east and west lie the fields — dangerous, but rich with resources. Be sure to stock up before heading out!",
+			"choices": [
+				{"text": "I'll take some supplies.", "next": null, "action": "trade"},
+				{"text": "Thanks for the tip.", "next": null},
+			],
+		},
+	},
 }
 
 ## Generic greeting pools per archetype and mood.
