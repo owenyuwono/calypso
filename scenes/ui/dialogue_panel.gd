@@ -111,8 +111,15 @@ func _build_choices_container() -> void:
 	get_parent().add_child(_choices_container)
 
 
+var _shop_panel: Node
+
 func set_player(player: Node) -> void:
 	_player = player
+
+func set_shop_panel(shop: Node) -> void:
+	_shop_panel = shop
+	if _shop_panel and _shop_panel.has_signal("shop_closed"):
+		_shop_panel.shop_closed.connect(_on_shop_closed)
 
 
 func open_dialogue(npc_id: String, npc_node: Node) -> void:
@@ -226,7 +233,13 @@ func _execute_action(action: String) -> void:
 
 	match action:
 		"trade":
-			close_dialogue()
+			# Keep dialogue open — show browsing text + Close Shop choice
+			_dialogue_text.text = "Take your time browsing..."
+			_clear_choices()
+			var close_btn := _create_choice_button("Close Shop")
+			close_btn.pressed.connect(_close_shop)
+			_choices_container.add_child(close_btn)
+			_choices_container.visible = true
 			if _npc_node and is_instance_valid(_npc_node):
 				trade_requested.emit(_npc_node)
 		"info":
@@ -310,6 +323,31 @@ func _get_mood(npc_node: Node) -> String:
 	return "neutral"
 
 
+func _close_shop() -> void:
+	if _shop_panel and _shop_panel.is_open():
+		_shop_panel.close_shop()
+
+
+const PARTING_WORDS: Array = [
+	"Thanks for your business! Stay safe out there.",
+	"Come back anytime you need supplies!",
+	"Good luck on your adventures, friend!",
+	"May your travels be prosperous!",
+	"Safe journeys, traveler!",
+]
+
+func _on_shop_closed() -> void:
+	if not visible or _npc_id.is_empty():
+		return
+	# Show parting words with a goodbye choice
+	_dialogue_text.text = PARTING_WORDS[randi() % PARTING_WORDS.size()]
+	_clear_choices()
+	var btn := _create_choice_button("Farewell.")
+	btn.pressed.connect(close_dialogue)
+	_choices_container.add_child(btn)
+	_choices_container.visible = true
+
+
 func _exit_tree() -> void:
 	if is_instance_valid(_choices_container):
 		_choices_container.queue_free()
@@ -317,5 +355,8 @@ func _exit_tree() -> void:
 
 func _input(event: InputEvent) -> void:
 	if visible and event.is_action_pressed("ui_cancel"):
+		# Don't close dialogue while shop is open — shop handles its own Escape
+		if _shop_panel and _shop_panel.is_open():
+			return
 		close_dialogue()
 		get_viewport().set_input_as_handled()

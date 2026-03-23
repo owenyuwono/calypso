@@ -42,6 +42,7 @@ func _ready() -> void:
 	$UILayer.add_child(dialogue_panel)
 	if player:
 		dialogue_panel.set_player(player)
+		dialogue_panel.set_shop_panel(shop_panel)
 		player.dialogue_panel = dialogue_panel
 	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:
 		if npc_node and is_instance_valid(npc_node):

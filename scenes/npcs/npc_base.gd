@@ -831,9 +831,8 @@ func initialize_from_loadout(loadout: Dictionary) -> void:
 	# Re-init proficiencies and skills (trait_profile is set after _ready)
 	late_init_skills()
 
-	# Merchant shop: populate inventory immediately so shop is always open
-	var loadout_goal: String = loadout.get("default_goal", "")
-	if loadout_goal == "vend" or loadout.get("archetype", "") == "merchant":
+	# Merchant shop: populate inventory immediately so shop is always open via dialogue
+	if loadout.get("archetype", "") == "merchant" or trait_profile == "merchant":
 		if _vending_comp:
 			var shop_name: String = npc_name if not npc_name.is_empty() else "Shop"
 			_vending_comp.setup_shop(shop_name + "'s Shop")
