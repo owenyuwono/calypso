@@ -50,6 +50,7 @@ func _ready() -> void:
 
 	add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	_build_ui()
+	_build_portrait()
 	_build_choices_container()
 
 
@@ -63,34 +64,18 @@ func _build_ui() -> void:
 	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(margin)
 
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 14)
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(hbox)
-
-	# Portrait — left side
-	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(100, 0)
-	_portrait.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
-	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_portrait.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_portrait.visible = false
-	hbox.add_child(_portrait)
-
-	# Right side — name + text
-	var text_vbox := VBoxContainer.new()
-	text_vbox.add_theme_constant_override("separation", 6)
-	text_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	hbox.add_child(text_vbox)
+	var main_vbox := VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 6)
+	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(main_vbox)
 
 	# NPC name — gold, display font
 	_npc_name_label = Label.new()
 	_npc_name_label.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
 	_npc_name_label.add_theme_font_size_override("font_size", 18)
 	_npc_name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	text_vbox.add_child(_npc_name_label)
+	main_vbox.add_child(_npc_name_label)
 
 	# Dialogue text — body font, word-wrapped, fills available space
 	_dialogue_text = Label.new()
@@ -100,7 +85,30 @@ func _build_ui() -> void:
 	_dialogue_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dialogue_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_dialogue_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	text_vbox.add_child(_dialogue_text)
+	main_vbox.add_child(_dialogue_text)
+
+
+func _build_portrait() -> void:
+	# Sibling floating above the dialogue box, left side
+	_portrait = TextureRect.new()
+	_portrait.name = "DialoguePortrait"
+	_portrait.visible = false
+	_portrait.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+	# Position: left side, above dialogue box
+	_portrait.anchor_left = 0.0
+	_portrait.anchor_right = 0.0
+	_portrait.anchor_top = 1.0
+	_portrait.anchor_bottom = 1.0
+	_portrait.offset_left = 40       # match dialogue panel left margin
+	_portrait.offset_right = 180     # ~140px wide
+	_portrait.offset_bottom = -185   # just above dialogue box top (-180) with 5px gap
+	_portrait.offset_top = -420      # ~235px tall for portrait
+
+	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	get_parent().add_child(_portrait)
 
 
 func _build_choices_container() -> void:
@@ -182,6 +190,7 @@ func close_dialogue() -> void:
 	_buy_button = null
 	visible = false
 	_choices_container.visible = false
+	_portrait.visible = false
 	_clear_choices()
 	for elem in _hud_elements:
 		if elem and is_instance_valid(elem):
@@ -422,6 +431,8 @@ func _on_shop_closed() -> void:
 func _exit_tree() -> void:
 	if is_instance_valid(_choices_container):
 		_choices_container.queue_free()
+	if is_instance_valid(_portrait):
+		_portrait.queue_free()
 
 
 func _input(event: InputEvent) -> void:
