@@ -146,9 +146,9 @@ func _evaluate_npc_zones(current_zone_id: String) -> void:
 func _spawn_merchant() -> void:
 	var npc_scene: PackedScene = preload("res://scenes/npcs/npc_base.tscn")
 	var npc: Node3D = npc_scene.instantiate()
-	npc.npc_id = "alden"
-	npc.npc_name = "Alden"
-	npc.npc_color = Color(0.6, 0.45, 0.3)
+	npc.npc_id = "celine"
+	npc.npc_name = "Celine"
+	npc.npc_color = Color(0.5, 0.6, 0.45)
 	npc.model_path = "res://assets/models/characters/Barbarian.glb"
 	npc.model_scale = 0.7
 	npc.trait_profile = "merchant"
@@ -160,9 +160,6 @@ func _spawn_merchant() -> void:
 		"items": {
 			"healing_potion": 20,
 			"bandage": 15,
-			"cooked_sardine": 10,
-			"cooked_trout": 5,
-			"fish_stew": 5,
 		},
 		"gold": 500,
 	})

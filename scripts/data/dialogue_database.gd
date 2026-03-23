@@ -423,20 +423,42 @@ const DIALOGUES: Dictionary = {
 		},
 	},
 
-	"alden": {
+	"celine": {
 		"greeting": {
-			"text": "Welcome, traveler! I have potions and supplies for your adventures.",
+			"text": "Need something? I've got potions, bandages — all made fresh. What do you need?",
 			"choices": [
 				{"text": "What do you have?", "next": null, "action": "trade"},
-				{"text": "Tell me about this town.", "next": "alden_town_info"},
-				{"text": "Goodbye.", "next": null},
+				{"text": "How's business?", "next": "celine_business"},
+				{"text": "Tell me about yourself.", "next": "celine_about"},
+				{"text": "Never mind.", "next": null},
 			],
 		},
-		"alden_town_info": {
-			"text": "This is the city of Arcadia. To the east and west lie the fields — dangerous, but rich with resources. Be sure to stock up before heading out!",
+		"celine_business": {
+			"text": "Could be better. Slime jelly's the base for most of my potions, and adventurers know it. They charge what they like. If you ever come across some, I'd pay fair for it.",
 			"choices": [
-				{"text": "I'll take some supplies.", "next": null, "action": "trade"},
-				{"text": "Thanks for the tip.", "next": null},
+				{"text": "I'll keep that in mind.", "next": null},
+				{"text": "Let me see your stock.", "next": null, "action": "trade"},
+			],
+		},
+		"celine_about": {
+			"text": "Not much to tell. I'm from the coast. My mother was an apothecary — taught me everything I know. I came here three years ago to start fresh. The fountain's good for foot traffic, and adventurers always need potions.",
+			"choices": [
+				{"text": "What happened to your mother's shop?", "next": "celine_mother"},
+				{"text": "Sounds like a good setup.", "next": null},
+			],
+		},
+		"celine_mother": {
+			"text": "Fire. A mislabelled solvent. Gone in an hour. She... didn't have it in her to start over. But I did.",
+			"choices": [
+				{"text": "I'm sorry.", "next": "celine_resolve"},
+				{"text": "That's tough.", "next": "celine_resolve"},
+			],
+		},
+		"celine_resolve": {
+			"text": "Don't be. I'm here now, and my potions are better than hers ever were. Don't tell her I said that.",
+			"choices": [
+				{"text": "[Smile] Your secret's safe.", "next": null},
+				{"text": "Let me buy something.", "next": null, "action": "trade"},
 			],
 		},
 	},
