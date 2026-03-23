@@ -321,6 +321,12 @@ func _process_hover() -> void:
 			if not tier.is_empty():
 				display_name += " (%s)" % tier.capitalize()
 			_cursor_manager.set_cursor("click")
+		elif entity_type == "interior_npc":
+			_cursor_manager.set_cursor("talk")
+		elif entity_type == "door":
+			var interior_name: String = data.get("interior_name", "Interior")
+			display_name = "Enter %s" % interior_name
+			_cursor_manager.set_cursor("click")
 		else:
 			_cursor_manager.set_cursor("default")
 		_tooltip_label.text = display_name

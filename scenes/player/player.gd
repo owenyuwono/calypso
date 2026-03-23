@@ -89,6 +89,7 @@ var skill_panel: Control
 var npc_info_panel: Control
 var vend_setup_panel: Control
 var crafting_panel: Control
+var interior_manager: Node
 
 # Click marker (reused single instance)
 var _click_marker: MeshInstance3D
@@ -109,6 +110,7 @@ func _exit_tree() -> void:
 		_cursor_manager.cleanup()
 
 func _ready() -> void:
+	add_to_group("player")
 	collision_layer |= (1 << 8)
 
 	_visuals = EntityVisuals.new()
@@ -337,8 +339,8 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
-	# Safety teleport if fallen off the world
-	if global_position.y < -10.0:
+	# Safety teleport if fallen off the world (skip when inside an interior at Y=-50)
+	if global_position.y < -10.0 and not (interior_manager and interior_manager.is_inside()):
 		global_position = Vector3(0.0, 2.0, 0.0)
 		velocity = Vector3.ZERO
 
@@ -588,14 +590,32 @@ func _on_arrived() -> void:
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
 			npc_info_panel.show_npc(_interact_target)
 		_hover.clear_ring()
+	elif etype == "interior_npc":
+		var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
+		if vending_comp and vending_comp.is_vending():
+			_open_shop(_interact_target)
+		_hover.clear_ring()
 	elif etype == "crafting_station":
 		if crafting_panel and target_node and is_instance_valid(target_node):
 			var stype: String = data.get("station_type", "")
 			var sname: String = data.get("name", "Crafting")
 			crafting_panel.open(stype, sname)
 		_hover.clear_ring()
+	elif etype == "door":
+		if interior_manager and target_node and is_instance_valid(target_node):
+			var btype: String = data.get("building_type", "")
+			interior_manager.enter_interior(btype, target_node.global_position)
+		_hover.clear_ring()
 
 	_interact_target = ""
+
+func _input(event: InputEvent) -> void:
+	if _is_dead:
+		return
+	if event.is_action_pressed("ui_cancel") and interior_manager and interior_manager.is_inside():
+		interior_manager.exit_interior()
+		get_viewport().set_input_as_handled()
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
@@ -710,6 +730,21 @@ func _handle_left_click() -> void:
 				_navigate_to(target_node.global_position)
 			return
 
+		if etype == "interior_npc":
+			# Click interior NPC: walk to + open shop on arrival
+			_cancel_attack()
+			_cancel_harvest()
+			_interact_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.3, 0.6, 1.0, 0.6))
+			var target_node := WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				var dist := global_position.distance_to(target_node.global_position)
+				if dist <= INTERACT_RANGE:
+					_on_arrived()
+					return
+				_navigate_to(target_node.global_position)
+			return
+
 		if etype == "tree":
 			# Click tree: walk to + chop when in range
 			_cancel_attack()
@@ -756,6 +791,24 @@ func _handle_left_click() -> void:
 					_on_arrived()
 					return
 				_navigate_to(_get_approach_pos(target_node.global_position, 2.0))
+			return
+
+		if etype == "door":
+			# Guard: don't process door clicks while already inside
+			if not interior_manager or interior_manager.is_inside():
+				return
+			# Click door: walk to + enter interior on arrival
+			_cancel_attack()
+			_cancel_harvest()
+			_interact_target = hovered_entity_id
+			_hover.lock_ring(hovered_entity_id, Color(0.9, 0.7, 0.3, 0.6))
+			var target_node: Node = WorldState.get_entity(hovered_entity_id)
+			if target_node and is_instance_valid(target_node):
+				var dist: float = global_position.distance_to(target_node.global_position)
+				if dist <= INTERACT_RANGE:
+					_on_arrived()
+					return
+				_navigate_to(_get_approach_pos(target_node.global_position, 1.5))
 			return
 
 	# Click on ground: move there, cancel target lock, close NPC info

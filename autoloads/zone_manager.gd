@@ -25,6 +25,9 @@ func setup(zone_anchor: Node3D, player: CharacterBody3D, root_node: Node) -> voi
 func get_loaded_zone() -> Node3D:
 	return _loaded_zone
 
+func get_loading_screen() -> Node:
+	return _loading_screen
+
 func is_transitioning() -> bool:
 	return _is_transitioning
 

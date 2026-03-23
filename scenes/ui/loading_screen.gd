@@ -101,12 +101,19 @@ func _build_ui() -> void:
 	content_vbox.add_child(_progress_bar)
 
 func show_loading(zone_id: String) -> void:
-	_zone_name_label.text = ZoneDatabase.get_zone_name(zone_id)
+	var zone_data: Dictionary = ZoneDatabase.get_zone(zone_id)
+	await _show(ZoneDatabase.get_zone_name(zone_id), zone_data.get("loading_art", ""))
+
+
+func show_custom(display_name: String, art_path: String = "") -> void:
+	await _show(display_name, art_path)
+
+
+func _show(display_name: String, art_path: String) -> void:
+	_zone_name_label.text = display_name
 	_progress_bar.value = 0.0
 
-	# Load zone art texture (cached)
-	var zone_data: Dictionary = ZoneDatabase.get_zone(zone_id)
-	var art_path: String = zone_data.get("loading_art", "")
+	# Load art texture (cached)
 	if art_path != "":
 		if _texture_cache.has(art_path):
 			_zone_art.texture = _texture_cache[art_path]

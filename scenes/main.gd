@@ -36,6 +36,7 @@ const ARCHETYPE_COLORS: Dictionary = {
 }
 
 var _fps_label: Label
+var interior_manager: InteriorManager
 
 func _ready() -> void:
 	_setup_fps_counter()
@@ -129,8 +130,15 @@ func _ready() -> void:
 	if minimap and world_map_panel:
 		minimap.set_world_map(world_map_panel)
 
-	# Boot ZoneManager — loads first zone and bakes navmesh
+	# Boot ZoneManager first — it creates the LoadingScreen we share with InteriorManager.
 	ZoneManager.setup($ZoneAnchor, player, self)
+
+	# InteriorManager — handles enter/exit lifecycle for in-zone interior rooms.
+	interior_manager = InteriorManager.new()
+	interior_manager.name = "InteriorManager"
+	add_child(interior_manager)
+	interior_manager.setup(player, $ZoneAnchor, ZoneManager.get_loading_screen())
+	player.interior_manager = interior_manager
 
 	# Spawn NPCs + apply loadouts once the first zone's navmesh is ready
 	# (matches original game_world.gd flow where NPCs spawned inside _on_navmesh_baked)

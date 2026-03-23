@@ -19,6 +19,7 @@ static func build(ctx: WorldBuilderContext) -> void:
 	_build_money_changer(ctx, nav_region, noise, hs)
 	_build_notice_board_shelter(ctx, nav_region, noise, hs)
 	_build_stalls(ctx, nav_region, noise, hs)
+	_build_plaza_inn(ctx, nav_region, noise, hs)
 
 
 static func _build_fountain(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
@@ -184,6 +185,13 @@ static func _create_stall(ctx: WorldBuilderContext, nav_region: Node, noise: Fas
 	stall.add_child(counter)
 
 	nav_region.add_child(stall)
+
+
+static func _build_plaza_inn(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float) -> void:
+	BuildingHelper.create_building(ctx, nav_region,
+		Vector3(15, BuildingHelper.snap_y(noise, 15, -9, hs), -9),
+		Vector3(4.5, 3, 4), Color(0.52, 0.44, 0.35), "peaked", Color(0.38, 0.25, 0.16),
+		0.5, false, true, 0.0, "inn")
 
 
 static func _create_torch(ctx: WorldBuilderContext, nav_region: Node, noise: FastNoiseLite, hs: float, tpos: Vector3) -> void:

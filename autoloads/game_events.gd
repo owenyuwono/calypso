@@ -27,6 +27,10 @@ signal item_sold(seller_id: String, item_id: String, revenue: int)
 signal vending_started(entity_id: String, shop_title: String)
 signal vending_stopped(entity_id: String)
 
+# Interiors
+signal entered_interior(building_type: String)
+signal exited_interior()
+
 # Skills
 signal skill_used(entity_id: String, skill_id: String)
 signal skill_learned(entity_id: String, skill_id: String, new_level: int)
