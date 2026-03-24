@@ -229,7 +229,7 @@ func _build_character_preview() -> TextureRect:
 	_preview_viewport.own_world_3d = true
 
 	var camera := Camera3D.new()
-	camera.projection = Camera3D.PROJECTION_ORTHOGRAPHIC
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 2.5
 	camera.position = Vector3(0, 1.0, 3)
 	camera.look_at(Vector3(0, 0.8, 0))
