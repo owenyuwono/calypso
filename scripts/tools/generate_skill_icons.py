@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Batch generate all 15 skill icons for Arcadia.
+"""Batch generate all 42 skill icons for Arcadia.
 
 Pipeline per skill:
   1. Generate category base (PIL, once per category)
@@ -85,6 +85,30 @@ SKILLS = [
     ("lacerate",  "dot_physical",  "Two crossing slash marks forming an X", 40),
     # dot_magic
     ("drain",     "dot_magic",     "Spiral tendrils converging to a center point", 40),
+    ("life_siphon", "dot_magic",   "dark tendrils draining green life essence", 40),
+    # single_magic (fire/ice/lightning/earth/light/dark/arcane)
+    ("fireball",       "single_magic", "a blazing fireball projectile streaking through air", 40),
+    ("frost_bolt",     "single_magic", "a sharp ice shard projectile, frosted crystal", 40),
+    ("ice_lance",      "single_magic", "a long crystalline ice lance piercing forward", 40),
+    ("spark",          "single_magic", "a crackling electric spark ball", 40),
+    ("thunderbolt",    "single_magic", "a massive thunderbolt striking down", 40),
+    ("stone_shot",     "single_magic", "a jagged stone projectile flying forward", 40),
+    ("boulder_crush",  "single_magic", "a massive boulder slamming down", 40),
+    ("smite",          "single_magic", "a beam of holy light striking from above", 40),
+    ("divine_ray",     "single_magic", "a concentrated beam of divine radiance", 40),
+    ("shadow_bolt",    "single_magic", "a dark shadowy projectile with purple wisps", 40),
+    ("arcane_missile", "single_magic", "a glowing blue arcane energy projectile", 40),
+    ("mana_burst",     "single_magic", "an explosive burst of blue arcane power", 40),
+    # aoe_magic (fire/ice/lightning/earth/light/dark/arcane)
+    ("flame_wave",     "aoe_magic",   "a circular wave of fire expanding outward", 40),
+    ("blizzard",       "aoe_magic",   "a swirling blizzard of ice and snow", 40),
+    ("chain_lightning","aoe_magic",   "forking lightning bolts branching outward", 40),
+    ("earthquake",     "aoe_magic",   "cracking ground with earth shards erupting", 40),
+    ("holy_nova",      "aoe_magic",   "an expanding ring of golden holy energy", 40),
+    ("dark_wave",      "aoe_magic",   "a spreading wave of dark shadow energy", 40),
+    ("arcane_barrage", "aoe_magic",   "a burst of multiple arcane energy orbs", 40),
+    # ignite (dot_magic — fire)
+    ("ignite",         "dot_magic",   "a burning ember with trailing flame sparks", 40),
     # single_physical (bow/spear)
     ("aimed_shot",     "single_physical", "A bow with a single arrow drawn back, small targeting crosshair at the arrowhead", 40),
     ("piercing_arrow", "single_physical", "An arrow piercing cleanly through a metal plate", 40),
