@@ -301,7 +301,7 @@ func _refresh() -> void:
 	_hide_desc()
 	_hide_context_menu()
 
-	if not _is_open or not _player:
+	if not _player:
 		return
 
 	if not _inventory or not _equipment:
