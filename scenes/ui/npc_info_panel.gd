@@ -171,10 +171,10 @@ func _refresh() -> void:
 	# Memories
 	var memory_node = node.get_node_or_null("NPCMemory")
 	if memory_node:
-		var mem_text: String = memory_node.get_memories_for_prompt(5)
+		var mem_text: Array = memory_node.get_recent_observations(5)
 		if not mem_text.is_empty():
 			text += "\n[color=#ffdd88][b]Memories[/b][/color]\n"
-			for line in mem_text.split("\n"):
+			for line in mem_text:
 				if not line.strip_edges().is_empty():
 					text += "  [color=#aaa]%s[/color]\n" % line.strip_edges()
 

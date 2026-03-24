@@ -1,7 +1,7 @@
 extends BaseComponent
 class_name NpcIdentity
-## Owns identity, personality, mood, opinions, schedule, and secrets for an NPC.
-## Loaded from NpcIdentityDatabase. Syncs mood/opinions back to WorldState.entity_data.
+## Owns identity, personality, mood, schedule for an NPC.
+## Loaded from NpcIdentityDatabase. Syncs mood back to WorldState.entity_data.
 
 # --- Identity fields ---
 var npc_id: String = ""
@@ -9,14 +9,6 @@ var npc_name: String = ""
 var age: String = ""
 var occupation: String = ""
 var traits: Dictionary = {}
-var speech_style: String = ""
-var backstory: String = ""
-var likes: Array = []
-var dislikes: Array = []
-var desires: Array = []
-var opinions: Array = []
-var secrets: Array = []
-var tendencies: Dictionary = {}
 
 # --- Mood ---
 var mood_emotion: String = "content"
@@ -58,14 +50,6 @@ func setup(data: Dictionary) -> void:
 	age = data.get("age", "")
 	occupation = data.get("occupation", "")
 	traits = data.get("traits", {}).duplicate()
-	speech_style = data.get("speech_style", "")
-	backstory = data.get("backstory", "")
-	likes = data.get("likes", []).duplicate()
-	dislikes = data.get("dislikes", []).duplicate()
-	desires = data.get("desires", []).duplicate()
-	opinions = data.get("opinions", []).duplicate()
-	secrets = data.get("secrets", []).duplicate()
-	tendencies = data.get("tendencies", {}).duplicate()
 	baseline_emotion = data.get("baseline_emotion", "content")
 	baseline_energy = data.get("baseline_energy", "normal")
 	mood_emotion = baseline_emotion
@@ -158,96 +142,6 @@ func get_trait(trait_name: String, default: float = 0.5) -> float:
 	return float(traits.get(trait_name, default))
 
 
-# --- Prompt accessors ---
-
-func get_personality_prompt() -> String:
-	var parts: Array = []
-	parts.append("Name: %s" % npc_name)
-	parts.append("Age: %s" % age)
-	parts.append("Occupation: %s" % occupation)
-	parts.append("Speech style: %s" % speech_style)
-	parts.append("Backstory: %s" % backstory)
-	if not likes.is_empty():
-		parts.append("Likes: %s" % ", ".join(likes))
-	if not dislikes.is_empty():
-		parts.append("Dislikes: %s" % ", ".join(dislikes))
-	return "\n".join(parts)
-
-
-func get_mood_prompt() -> String:
-	return "Mood: %s, Energy: %s" % [mood_emotion, mood_energy]
-
-
-func get_tendency_prompt() -> String:
-	var lines: Array = []
-	if tendencies.get("exaggerates", false):
-		lines.append("You tend to exaggerate.")
-	if tendencies.get("withholds_from_strangers", false):
-		lines.append("You withhold information from strangers.")
-	var lies_when: String = tendencies.get("lies_when", "never")
-	if lies_when != "never" and not lies_when.is_empty():
-		lines.append("You lie when %s." % lies_when)
-	var avoids: Array = tendencies.get("avoids_topics", [])
-	if not avoids.is_empty():
-		lines.append("You avoid talking about: %s." % ", ".join(avoids))
-	return "\n".join(lines)
-
-
-func get_desires_prompt() -> String:
-	if desires.is_empty():
-		return ""
-	var lines: Array = []
-	for d in desires:
-		lines.append("- %s (intensity: %s)" % [d.get("want", ""), d.get("intensity", "")])
-	return "\n".join(lines)
-
-
-# --- Secret API ---
-
-func get_secrets_for_tier(tier: String, charisma_level: int = 0) -> Array:
-	var effective_tier: String = tier
-	if charisma_level >= 7:
-		var idx: int = RelationshipComponent.TIER_LADDER.find(tier)
-		if idx >= 0 and idx < RelationshipComponent.TIER_LADDER.size() - 1:
-			effective_tier = RelationshipComponent.TIER_LADDER[idx + 1]
-	if effective_tier in ["close", "bonded"]:
-		return secrets.duplicate()
-	return []
-
-
-# --- Opinion API ---
-
-func add_opinion(opinion: Dictionary) -> void:
-	opinions.append(opinion)
-	_sync_opinions()
-
-
-func get_opinions() -> Array:
-	return opinions.duplicate()
-
-
-func get_opinions_for(topic: String, tier: String, charisma_level: int = 0) -> Array:
-	var effective_tier: String = tier
-	if charisma_level >= 7:
-		var idx: int = RelationshipComponent.TIER_LADDER.find(tier)
-		if idx >= 0 and idx < RelationshipComponent.TIER_LADDER.size() - 1:
-			effective_tier = RelationshipComponent.TIER_LADDER[idx + 1]
-	var result: Array = []
-	for op in opinions:
-		if not topic.is_empty() and op.get("topic", "") != topic:
-			continue
-		var share: String = op.get("will_share_with", "anyone")
-		match share:
-			"anyone":
-				result.append(op)
-			"close only":
-				if effective_tier in ["close", "bonded"]:
-					result.append(op)
-			"keeps to self":
-				pass  # never share
-	return result
-
-
 # --- Schedule API ---
 
 func resolve_schedule_goal(hour: int) -> Dictionary:
@@ -277,8 +171,3 @@ func _sync_mood() -> void:
 	WorldState.set_entity_data(eid, "mood_energy", mood_energy)
 
 
-func _sync_opinions() -> void:
-	var eid := _get_entity_id()
-	if eid.is_empty() or not WorldState.entity_data.has(eid):
-		return
-	WorldState.set_entity_data(eid, "opinions", opinions.duplicate())

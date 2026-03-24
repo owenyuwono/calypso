@@ -9,8 +9,6 @@ const IMPORTANCE_HIGH: String = "high"
 const IMPORTANCE_MEDIUM: String = "medium"
 const IMPORTANCE_LOW: String = "low"
 const SOURCE_WITNESSED: String = "witnessed"
-const MAX_CONVERSATION_HISTORY: int = 10
-const MAX_AREA_CHAT_LOG: int = 15
 const MAX_CONVERSATION_TURNS: int = 3
 const CONVERSATION_WINDOW: float = 120.0  # Reset after this gap in seconds
 
@@ -18,9 +16,6 @@ const CONVERSATION_WINDOW: float = 120.0  # Reset after this gap in seconds
 # State
 # ---------------------------------------------------------------------------
 var memories: Array = []  # Array of memory dicts — see add_memory() for schema
-var conversation_history: Dictionary = {}  # partner_id -> Array of {speaker, text}
-var area_chat_log: Array = []  # [{speaker_name: String, text: String}]
-var goals_history: Array = []
 var _conversation_turns: Dictionary = {}  # partner_id -> {count: int, time: float}
 
 var _recent_chat_topics: Array = []  # last N topic strings
@@ -144,48 +139,6 @@ func _make_fuzzy(fact: String) -> String:
 		return "something about " + fact.substr(0, mini(20, fact.length())) + "..."
 	var half: int = words.size() / 2
 	return " ".join(words.slice(0, half)) + "... (faded memory)"
-
-func get_facts_about(topic: String) -> Array:
-	var result: Array = []
-	for mem in memories:
-		if mem["topic"] == topic:
-			result.append(mem)
-	return result
-
-func get_unshared_facts(target_id: String) -> Array:
-	var result: Array = []
-	for mem in memories:
-		if not (target_id in mem["shared_with"]):
-			result.append(mem)
-	return result
-
-func mark_fact_shared(memory_id: String, target_id: String) -> void:
-	for mem in memories:
-		if mem["id"] == memory_id:
-			if not (target_id in mem["shared_with"]):
-				mem["shared_with"].append(target_id)
-			return
-
-## Add a gossip-received memory entry (from GossipSystem.receive_gossip()).
-## gossip_entry must have: fact, importance (float), source, told_by, spread_count, original_source
-func add_gossip_memory(gossip_entry: Dictionary) -> void:
-	var fact: String = gossip_entry.get("fact", "")
-	if fact.is_empty():
-		return
-	# Map float importance back to string label
-	var importance_float: float = gossip_entry.get("importance", 1.0)
-	var importance_label: String = IMPORTANCE_LOW
-	if importance_float >= 2.5:
-		importance_label = IMPORTANCE_HIGH
-	elif importance_float >= 1.5:
-		importance_label = IMPORTANCE_MEDIUM
-	var source_str: String = gossip_entry.get("source", SOURCE_WITNESSED)
-	var told_by: String = gossip_entry.get("told_by", "")
-	var mem: Dictionary = add_memory(fact, source_str, importance_label)
-	# Patch gossip metadata onto the created entry (add_memory may deduplicate)
-	mem["told_by"] = told_by
-	mem["spread_count"] = gossip_entry.get("spread_count", 1)
-	mem["original_source"] = gossip_entry.get("original_source", "")
 
 func has_key_memory_type(type: String) -> bool:
 	for mem in memories:
@@ -314,41 +267,6 @@ func add_recent_topic(topic: String) -> void:
 func is_recent_topic(topic: String) -> bool:
 	return topic in _recent_chat_topics
 
-# =============================================================================
-# Conversations & Area Chat
-# =============================================================================
-
-func add_conversation(partner_id: String, speaker_id: String, text: String) -> void:
-	if not conversation_history.has(partner_id):
-		conversation_history[partner_id] = []
-	conversation_history[partner_id].append({
-		"speaker": speaker_id,
-		"text": text,
-	})
-	if conversation_history[partner_id].size() > MAX_CONVERSATION_HISTORY:
-		conversation_history[partner_id].pop_front()
-
-func get_conversation_with(partner_id: String) -> Array:
-	return conversation_history.get(partner_id, [])
-
-func add_area_chat(speaker_name: String, text: String) -> void:
-	area_chat_log.append({"speaker_name": speaker_name, "text": text})
-	if area_chat_log.size() > MAX_AREA_CHAT_LOG:
-		area_chat_log.pop_front()
-
-func get_area_chat_context(max_count: int = 5) -> String:
-	if area_chat_log.is_empty():
-		return ""
-	var start: int = maxi(0, area_chat_log.size() - max_count)
-	var recent: Array = area_chat_log.slice(start)
-	var lines: Array = []
-	for entry: Dictionary in recent:
-		lines.append("%s: %s" % [entry["speaker_name"], entry["text"]])
-	return "Recent nearby chat:\n" + "\n".join(lines)
-
-func add_goal(goal: String) -> void:
-	goals_history.append(goal)
-
 func get_recent_observations(count: int = 10) -> Array:
 	# DEPRECATED: Returns most recent memories as plain text strings for backward compat.
 	var sorted: Array = memories.duplicate()
@@ -361,8 +279,6 @@ func get_recent_observations(count: int = 10) -> Array:
 
 func get_summary() -> String:
 	var parts: Array = []
-	if not goals_history.is_empty():
-		parts.append("Goal history: " + ", ".join(goals_history.slice(-3)))
 	var km_summary: String = get_key_memories_summary(3)
 	if not km_summary.is_empty():
 		parts.append(km_summary)
