@@ -7,6 +7,12 @@ const DialogueDatabase = preload("res://scripts/data/dialogue_database.gd")
 const GiftDatabase = preload("res://scripts/data/gift_database.gd")
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
+const DIALOGUE_ICON_SHOP: String = "res://assets/textures/ui/dialogue/shop.png"
+const DIALOGUE_ICON_QUEST: String = "res://assets/textures/ui/dialogue/quest.png"
+const DIALOGUE_ICON_CHARISMA: String = "res://assets/textures/ui/dialogue/charisma.png"
+const DIALOGUE_ICON_PERSUASION: String = "res://assets/textures/ui/dialogue/persuasion.png"
+const DIALOGUE_ICON_INTIMIDATION: String = "res://assets/textures/ui/dialogue/intimidation.png"
+
 signal trade_requested(npc_node: Node)
 
 var _player: Node
@@ -315,7 +321,8 @@ func _show_node(node_id: String) -> void:
 			if not DialogueDatabase.evaluate_condition(condition, _player, _npc_node):
 				continue
 
-		var btn := _create_choice_button(choice.get("text", "..."))
+		var icon_path: String = _get_choice_icon(choice)
+		var btn := _create_choice_button(choice.get("text", "..."), icon_path)
 		var next_node = choice.get("next", null)
 		var action: String = choice.get("action", "")
 		btn.pressed.connect(_on_choice_pressed.bind(next_node, action))
@@ -553,9 +560,30 @@ func _clear_choices() -> void:
 		child.queue_free()
 
 
-func _create_choice_button(label_text: String) -> Button:
+func _get_choice_icon(choice: Dictionary) -> String:
+	var action: String = choice.get("action", "")
+	var condition: String = choice.get("condition", "")
+
+	if action == "trade" or action.begins_with("trade"):
+		return DIALOGUE_ICON_SHOP
+	if action.begins_with("quest_accept") or action.begins_with("quest_complete"):
+		return DIALOGUE_ICON_QUEST
+	if action == "persuasion_attempt" or condition.begins_with("proficiency:persuasion"):
+		return DIALOGUE_ICON_PERSUASION
+	if action == "intimidation_attempt" or condition.begins_with("proficiency:intimidation"):
+		return DIALOGUE_ICON_INTIMIDATION
+	if condition.begins_with("proficiency:charisma"):
+		return DIALOGUE_ICON_CHARISMA
+	return ""
+
+
+func _create_choice_button(label_text: String, icon_path: String = "") -> Button:
 	var btn := Button.new()
-	btn.text = "  " + label_text + "  "
+	# When an icon is present the Button node adds its own gap; no leading spaces needed
+	if icon_path.is_empty():
+		btn.text = "  " + label_text + "  "
+	else:
+		btn.text = label_text + "  "
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, 32)
@@ -581,6 +609,12 @@ func _create_choice_button(label_text: String) -> Button:
 	var pressed_style := normal_style.duplicate()
 	pressed_style.bg_color = Color(0.3, 0.25, 0.15, 0.9)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
+
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+		var tex: Texture2D = load(icon_path)
+		btn.icon = tex
+		btn.icon_max_width = 18
+		btn.expand_icon = false
 
 	return btn
 
