@@ -54,7 +54,7 @@ CATEGORY_BASE = {
 
 # Category bases that can be generated programmatically (color RGB)
 GENERATED_BASES = {
-    "magic": (30, 80, 220),
+    "magic": (100, 160, 240),
 }
 
 # ---------------------------------------------------------------------------
