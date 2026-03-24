@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2a2040"/>
+      <stop offset="70%" stop-color="#1e1535"/>
+      <stop offset="100%" stop-color="#15102a"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="30%">
+      <stop offset="0%" stop-color="#ffcc44" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffcc44" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="512" cy="512" r="460" fill="url(#bg)" stroke="#c9a84c" stroke-width="15"/>
+
+  <!-- Warm glow behind star -->
+  <circle cx="512" cy="512" r="358" fill="url(#glow)"/>
+
+  <!-- Compass rose - 4 main points -->
+  <!-- North (brightest) -->
+  <polygon points="512,128 563,435 512,384 461,435" fill="#e8c860"/>
+  <!-- South -->
+  <polygon points="512,896 563,589 512,640 461,589" fill="#c9a84c" opacity="0.7"/>
+  <!-- West -->
+  <polygon points="128,512 435,461 384,512 435,563" fill="#c9a84c" opacity="0.7"/>
+  <!-- East -->
+  <polygon points="896,512 589,461 640,512 589,563" fill="#c9a84c" opacity="0.7"/>
+
+  <!-- Diagonal accent points -->
+  <!-- NE -->
+  <polygon points="732,292 589,450 614,424" fill="#c9a84c" opacity="0.35"/>
+  <!-- SW -->
+  <polygon points="292,732 435,574 410,600" fill="#c9a84c" opacity="0.35"/>
+  <!-- NW -->
+  <polygon points="292,292 435,450 410,424" fill="#c9a84c" opacity="0.35"/>
+  <!-- SE -->
+  <polygon points="732,732 589,574 614,600" fill="#c9a84c" opacity="0.35"/>
+
+  <!-- Center jewel -->
+  <circle cx="512" cy="512" r="61" fill="#e8c860"/>
+  <circle cx="512" cy="512" r="36" fill="#fff8e0" opacity="0.7"/>
+  <circle cx="512" cy="512" r="15" fill="#ffffff" opacity="0.9"/>
+
+  <!-- Scattered ambient stars -->
+  <circle cx="282" cy="215" r="10" fill="#fff8e0" opacity="0.5"/>
+  <circle cx="778" cy="282" r="8" fill="#fff8e0" opacity="0.4"/>
+  <circle cx="215" cy="691" r="8" fill="#fff8e0" opacity="0.3"/>
+  <circle cx="809" cy="757" r="10" fill="#fff8e0" opacity="0.4"/>
+  <circle cx="358" cy="809" r="5" fill="#fff8e0" opacity="0.3"/>
+  <circle cx="717" cy="194" r="5" fill="#fff8e0" opacity="0.35"/>
+</svg>
