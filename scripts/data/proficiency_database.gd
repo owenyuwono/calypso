@@ -3,7 +3,7 @@ extends RefCounted
 
 const MAX_LEVEL: int = 10
 
-const CATEGORIES: Array = ["weapon", "attribute", "gathering", "production", "social"]
+const CATEGORIES: Array = ["weapon", "attribute", "magic", "gathering", "production", "social"]
 
 # Attribute display order within the attribute category
 const ATTRIBUTE_ORDER: Array = ["str", "con", "agi", "int", "dex", "wis"]
@@ -92,6 +92,42 @@ const SKILLS: Dictionary = {
 		"category": "gathering",
 		"description": "Catching fish from bodies of water. Levels up by fishing.",
 	},
+	# Magic skills — XP per magical hit with that element
+	"fire": {
+		"name": "Fire Magic",
+		"category": "magic",
+		"description": "Mastery of fire spells. Increases fire damage.",
+	},
+	"ice": {
+		"name": "Ice Magic",
+		"category": "magic",
+		"description": "Mastery of ice spells. Increases ice damage.",
+	},
+	"lightning": {
+		"name": "Lightning Magic",
+		"category": "magic",
+		"description": "Mastery of lightning spells. Increases lightning damage.",
+	},
+	"earth": {
+		"name": "Earth Magic",
+		"category": "magic",
+		"description": "Mastery of earth spells. Increases earth damage.",
+	},
+	"light": {
+		"name": "Light Magic",
+		"category": "magic",
+		"description": "Mastery of holy spells. Increases light damage.",
+	},
+	"dark": {
+		"name": "Dark Magic",
+		"category": "magic",
+		"description": "Mastery of dark spells. Increases dark damage.",
+	},
+	"arcane": {
+		"name": "Arcane Magic",
+		"category": "magic",
+		"description": "Mastery of arcane spells. Increases arcane damage.",
+	},
 	# Production skills — XP per craft action (future)
 	"smithing": {
 		"name": "Smithing",
@@ -149,5 +185,7 @@ static func get_skills_by_category(category: String) -> Dictionary:
 static func get_default_proficiencies() -> Dictionary:
 	var result: Dictionary = {}
 	for skill_id in SKILLS:
-		result[skill_id] = {"level": 1, "xp": 0}
+		var skill: Dictionary = SKILLS[skill_id]
+		var starting_level: int = 0 if skill.get("category") == "magic" else 1
+		result[skill_id] = {"level": starting_level, "xp": 0}
 	return result

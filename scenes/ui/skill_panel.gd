@@ -37,6 +37,7 @@ const CATEGORY_LABELS: Dictionary = {
 	"attribute": "ATTRIBUTES",
 	"gathering": "GATHERING",
 	"production": "PRODUCTION",
+	"magic": "MAGIC",
 	"social": "SOCIAL",
 }
 
@@ -368,7 +369,7 @@ func _build_right_content(prof_id: String) -> void:
 
 	# --- Skills or description ---
 	var category: String = prof_def.get("category", "")
-	if category == "weapon":
+	if category == "weapon" or category == "magic":
 		_build_weapon_skills_section(prof_id)
 	else:
 		var desc_label: Label = UIHelper.create_label(prof_def.get("description", ""), 12, Color(0.6, 0.6, 0.6))

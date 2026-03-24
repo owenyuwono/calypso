@@ -23,7 +23,7 @@ const PROFILES: Dictionary = {
 	"cautious_mage": {
 		"boldness": 0.2, "sociability": 0.4, "generosity": 0.6, "curiosity": 0.7,
 		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 3, "str": 1, "con": 1, "agi": 1, "int": 3, "dex": 1, "wis": 3},
+		"starting_proficiencies": {"staff": 3, "str": 1, "con": 1, "agi": 1, "int": 3, "dex": 1, "wis": 3, "arcane": 2, "fire": 1},
 	},
 	"sly_rogue": {
 		"boldness": 0.5, "sociability": 0.8, "generosity": 0.2, "curiosity": 0.6,
@@ -43,12 +43,12 @@ const PROFILES: Dictionary = {
 	"gentle_healer": {
 		"boldness": 0.15, "sociability": 0.75, "generosity": 0.95, "curiosity": 0.5,
 		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 2, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3},
+		"starting_proficiencies": {"staff": 2, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3, "light": 2, "arcane": 1},
 	},
 	"charming_bard": {
 		"boldness": 0.45, "sociability": 0.95, "generosity": 0.55, "curiosity": 0.8,
 		"weapon_type": "dagger",
-		"starting_proficiencies": {"dagger": 2, "str": 1, "con": 1, "agi": 2, "int": 2, "dex": 2, "wis": 2},
+		"starting_proficiencies": {"dagger": 2, "str": 1, "con": 1, "agi": 2, "int": 2, "dex": 2, "wis": 2, "arcane": 1, "lightning": 1},
 	},
 	"wild_berserker": {
 		"boldness": 0.75, "sociability": 0.9, "generosity": 0.6, "curiosity": 0.4,
@@ -63,12 +63,12 @@ const PROFILES: Dictionary = {
 	"earnest_apprentice": {
 		"boldness": 0.5, "sociability": 0.6, "generosity": 0.7, "curiosity": 0.55,
 		"weapon_type": "mace",
-		"starting_proficiencies": {"mace": 2, "str": 2, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 2},
+		"starting_proficiencies": {"mace": 2, "str": 2, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 2, "fire": 1},
 	},
 	"devout_cleric": {
 		"boldness": 0.4, "sociability": 0.85, "generosity": 0.8, "curiosity": 0.9,
 		"weapon_type": "staff",
-		"starting_proficiencies": {"staff": 3, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3},
+		"starting_proficiencies": {"staff": 3, "str": 1, "con": 2, "agi": 1, "int": 2, "dex": 1, "wis": 3, "light": 2, "dark": 1},
 	},
 	"shadow_stalker": {
 		"boldness": 0.55, "sociability": 0.15, "generosity": 0.3, "curiosity": 0.5,

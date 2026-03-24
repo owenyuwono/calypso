@@ -6,6 +6,7 @@ extends Node
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 
 const GLOBAL_COOLDOWN: float = 4.0
+const MAGIC_PROFICIENCIES: Array = ["fire", "ice", "lightning", "earth", "light", "dark", "arcane"]
 
 var _entity: Node = null
 var _combat: Node = null
@@ -94,6 +95,46 @@ func _pick_best_skill(target_id: String) -> String:
 			if multiplier > best_single_multiplier:
 				best_single_multiplier = multiplier
 				best_single_id = skill_id
+
+	# Second pass: magic proficiency skills (fire/ice/lightning/earth/light/dark/arcane)
+	# These have synergy.primary.skill set to an element proficiency, not a weapon type
+	var progression: Node = _entity.get_node_or_null("ProgressionComponent")
+	if progression:
+		for skill_id in SkillDatabase.SKILLS:
+			var skill_data: Dictionary = SkillDatabase.SKILLS[skill_id]
+
+			if not _skills_comp.has_skill(skill_id):
+				continue
+
+			var skill_level: int = _skills_comp.get_skill_level(skill_id)
+			if skill_level <= 0:
+				continue
+
+			if _skills_comp.is_on_cooldown(skill_id):
+				continue
+
+			if not skill_data.has("synergy"):
+				continue
+
+			var primary_skill: String = skill_data.synergy.primary.get("skill", "")
+			if primary_skill not in MAGIC_PROFICIENCIES:
+				continue
+
+			var required_level: int = skill_data.synergy.primary.get("level", 1)
+			if progression.get_proficiency_level(primary_skill) < required_level:
+				continue
+
+			var skill_type: String = skill_data.get("type", "")
+			var multiplier: float = SkillDatabase.get_effective_multiplier(skill_id, skill_level)
+
+			if skill_type == "aoe_melee":
+				if multiplier > best_aoe_multiplier:
+					best_aoe_multiplier = multiplier
+					best_aoe_id = skill_id
+			else:
+				if multiplier > best_single_multiplier:
+					best_single_multiplier = multiplier
+					best_single_id = skill_id
 
 	# Prefer AoE when multiple enemies are nearby
 	if nearby_enemy_count >= 2 and not best_aoe_id.is_empty():
