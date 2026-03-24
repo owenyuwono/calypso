@@ -612,8 +612,9 @@ func _create_choice_button(label_text: String, icon_path: String = "") -> Button
 
 	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
 		var tex: Texture2D = load(icon_path)
-		btn.icon = tex
-		btn.icon_max_width = 18
+		var img: Image = tex.get_image()
+		img.resize(18, 18, Image.INTERPOLATE_LANCZOS)
+		btn.icon = ImageTexture.create_from_image(img)
 		btn.expand_icon = false
 
 	return btn
