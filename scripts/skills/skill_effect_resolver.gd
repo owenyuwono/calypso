@@ -103,7 +103,7 @@ static func resolve_melee_attack(
 		GameEvents.attack_missed.emit(target_id, attacker_id)
 		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
-	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
 	var final_damage: int = calc["damage"]
 	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
@@ -136,7 +136,7 @@ static func resolve_aoe(
 			GameEvents.attack_missed.emit(target_id, attacker_id)
 			results.append({"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
 		else:
-			var primary_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+			var primary_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
 			var primary_damage: int = primary_calc["damage"]
 			var primary_hit_type: String = primary_calc["hit_type"]
 			var crit_result: Dictionary = combat.roll_crit()
@@ -185,7 +185,7 @@ static func resolve_aoe(
 			GameEvents.attack_missed.emit(eid, attacker_id)
 			results.append({"target_id": eid, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
 		else:
-			var splash_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data)
+			var splash_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data, 0.0, attacker_id)
 			var splash_damage: int = splash_calc["damage"]
 			var splash_hit_type: String = splash_calc["hit_type"]
 			var crit_result: Dictionary = combat.roll_crit()
@@ -219,7 +219,7 @@ static func resolve_armor_pierce(
 	var pierce_bonus: float = bonuses.get("pierce_bonus", 0.0)
 	var effective_pierce: float = clampf(skill_data.get("def_ignore_percent", 0.0) + pierce_bonus, 0.0, 1.0)
 
-	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, effective_pierce)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, effective_pierce, attacker_id)
 	var final_damage: int = calc["damage"]
 	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
@@ -251,7 +251,7 @@ static func resolve_bleed(
 		GameEvents.attack_missed.emit(target_id, attacker_id)
 		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
-	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data)
+	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
 	var final_damage: int = calc["damage"]
 	var hit_type: String = calc["hit_type"]
 	var crit_result: Dictionary = combat.roll_crit()
@@ -347,16 +347,37 @@ static func _get_target_armor_type(target_id: String) -> String:
 	return "light"
 
 
+static func _get_element_prof_bonus(attacker_id: String, element) -> float:
+	## Returns the damage multiplier from the attacker's proficiency in the given element.
+	## Applies only to magical elements: fire, ice, lightning, earth, light, dark, arcane.
+	## Returns 1.0 if element is null/empty, attacker has no ProgressionComponent, or proficiency is 0.
+	const MAGIC_ELEMENTS: Array = ["fire", "ice", "lightning", "earth", "light", "dark", "arcane"]
+	if element == null or element == "":
+		return 1.0
+	if not element in MAGIC_ELEMENTS:
+		return 1.0
+	var attacker_node: Node = WorldState.get_entity(attacker_id)
+	if not attacker_node:
+		return 1.0
+	var progression: Node = attacker_node.get_node_or_null("ProgressionComponent")
+	if not progression:
+		return 1.0
+	var prof_level: int = progression.get_proficiency_level(element)
+	return 1.0 + prof_level * 0.05
+
+
 static func _calc_damage(
 		combat: Node,
 		skill_data: Dictionary,
 		skill_level: int,
 		target_id: String,
 		effectiveness_data: Dictionary,
-		def_ignore: float = 0.0
+		def_ignore: float = 0.0,
+		attacker_id: String = ""
 ) -> Dictionary:
-	## Full damage pipeline: ATK/MATK → multiplier → effectiveness → DEF → element → phys_type → min 1.
+	## Full damage pipeline: ATK/MATK → multiplier → effectiveness → DEF → element prof bonus → element → phys_type → min 1.
 	## def_ignore (0.0–1.0) reduces effective DEF before subtraction (armor_pierce use case).
+	## attacker_id is used to look up the attacker's element proficiency bonus.
 	## Crit is NOT applied here — callers apply it after this returns.
 	## Returns {damage: int, hit_type: String}.
 	var damage_category: String = skill_data.get("damage_category", "physical")
@@ -398,6 +419,10 @@ static func _calc_damage(
 	# Element modifier
 	var target_resistances: Dictionary = _get_target_resistances(target_id)
 	var element_mod: float = get_element_modifier(element, target_resistances)
+
+	# Element proficiency bonus (attacker's mastery of the skill's element)
+	var element_prof_bonus: float = _get_element_prof_bonus(attacker_id, element)
+	after_def *= element_prof_bonus
 
 	# Physical type modifier (physical attacks only)
 	var phys_type_mod: float = 1.0

@@ -6,6 +6,7 @@ extends BaseComponent
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
+const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 
 var _skills: Dictionary = {}  # skill_id -> level (int)
 var _skill_xp: Dictionary = {}  # skill_id -> current xp (int)
@@ -349,6 +350,11 @@ func _execute_skill_hit() -> void:
 		# INT XP: 3 per magical damage hit
 		if damage_category == "magical" and _progression:
 			_progression.grant_proficiency_xp("int", 3)
+
+		# Element magic XP: 5 per hit with an elemental skill
+		var element: String = skill_data.get("element", "")
+		if not element.is_empty() and not ProficiencyDatabase.get_skill(element).is_empty() and _progression:
+			_progression.grant_proficiency_xp(element, 5)
 
 	grant_skill_xp(_pending_skill_id, 5)
 
