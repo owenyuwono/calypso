@@ -204,8 +204,13 @@ func get_desires_prompt() -> String:
 
 # --- Secret API ---
 
-func get_secrets_for_tier(tier: String) -> Array:
-	if tier in ["close", "bonded"]:
+func get_secrets_for_tier(tier: String, charisma_level: int = 0) -> Array:
+	var effective_tier: String = tier
+	if charisma_level >= 7:
+		var idx: int = RelationshipComponent.TIER_LADDER.find(tier)
+		if idx >= 0 and idx < RelationshipComponent.TIER_LADDER.size() - 1:
+			effective_tier = RelationshipComponent.TIER_LADDER[idx + 1]
+	if effective_tier in ["close", "bonded"]:
 		return secrets.duplicate()
 	return []
 
@@ -221,7 +226,12 @@ func get_opinions() -> Array:
 	return opinions.duplicate()
 
 
-func get_opinions_for(topic: String, tier: String) -> Array:
+func get_opinions_for(topic: String, tier: String, charisma_level: int = 0) -> Array:
+	var effective_tier: String = tier
+	if charisma_level >= 7:
+		var idx: int = RelationshipComponent.TIER_LADDER.find(tier)
+		if idx >= 0 and idx < RelationshipComponent.TIER_LADDER.size() - 1:
+			effective_tier = RelationshipComponent.TIER_LADDER[idx + 1]
 	var result: Array = []
 	for op in opinions:
 		if not topic.is_empty() and op.get("topic", "") != topic:
@@ -231,7 +241,7 @@ func get_opinions_for(topic: String, tier: String) -> Array:
 			"anyone":
 				result.append(op)
 			"close only":
-				if tier in ["close", "bonded"]:
+				if effective_tier in ["close", "bonded"]:
 					result.append(op)
 			"keeps to self":
 				pass  # never share

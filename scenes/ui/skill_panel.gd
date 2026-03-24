@@ -37,6 +37,7 @@ const CATEGORY_LABELS: Dictionary = {
 	"attribute": "ATTRIBUTES",
 	"gathering": "GATHERING",
 	"production": "PRODUCTION",
+	"social": "SOCIAL",
 }
 
 var _panel: PanelContainer

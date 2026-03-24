@@ -22,12 +22,13 @@ const _STAT_ICONS: Dictionary = {
 }
 
 # Proficiency display order within each category
-const _CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production"]
+const _CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production", "social"]
 const _CATEGORY_LABELS: Dictionary = {
 	"weapon": "Weapon",
 	"attribute": "Attributes",
 	"gathering": "Gathering",
 	"production": "Production",
+	"social": "Social",
 }
 const _PROF_ICON_BASE: String = "res://assets/textures/ui/proficiencies/"
 const _COLOR_CATEGORY: Color = Color(0.6, 0.55, 0.45)
@@ -277,6 +278,7 @@ func _build_proficiency_section(vbox: VBoxContainer) -> void:
 	_build_category_row(left_col, "attribute")
 	_build_category_row(right_col, "gathering")
 	_build_category_row(right_col, "production")
+	_build_category_row(right_col, "social")
 
 func _build_category_row(vbox: VBoxContainer, category: String) -> void:
 	# Category label

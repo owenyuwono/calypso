@@ -200,6 +200,7 @@ func _build_choices_container() -> void:
 var _shop_panel: Node
 var _buy_button: Button = null
 var _hud_elements: Array = []  # nodes to hide when dialogue is open
+var _charisma_xp_granted: bool = false
 
 func set_player(player: Node) -> void:
 	_player = player
@@ -221,9 +222,25 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 	_in_gift_mode = false
 	_gift_return_node_id = ""
 	_gift_return_is_generic = false
+	_charisma_xp_granted = false
 
 	var npc_name: String = npc_node.npc_name if "npc_name" in npc_node else npc_id
 	_npc_name_label.text = npc_name
+
+	var prog: Node = _player.get_node_or_null("ProgressionComponent") if _player else null
+	var charisma_level: int = 0
+	if prog:
+		charisma_level = prog.get_proficiency_level("charisma")
+
+	# Record conversation event on NPC's RelationshipComponent
+	var rel: Node = npc_node.get_node_or_null("RelationshipComponent")
+	if rel:
+		rel.record_event("player", "conversation", TimeManager.get_day(), charisma_level)
+
+	# Grant charisma XP once per dialogue session
+	if prog and not _charisma_xp_granted:
+		prog.grant_proficiency_xp("charisma", 3)
+		_charisma_xp_granted = true
 
 	# Load portrait if it exists
 	var portrait_path: String = "res://assets/textures/ui/portraits/%s.png" % npc_id
@@ -314,6 +331,7 @@ func close_dialogue() -> void:
 	_npc_id = ""
 	_npc_node = null
 	_current_node_id = ""
+	_charisma_xp_granted = false
 
 
 func _show_node(node_id: String) -> void:
@@ -518,6 +536,13 @@ func _execute_action(action: String) -> void:
 		close_dialogue()
 		return
 
+	if action == "persuasion_attempt":
+		var prog: Node = _player.get_node_or_null("ProgressionComponent") if _player else null
+		if prog:
+			prog.grant_proficiency_xp("persuasion", 5)
+		close_dialogue()
+		return
+
 	match action:
 		"trade":
 			_dialogue_text.text = "Take your time browsing..."
@@ -629,6 +654,11 @@ func _show_trade_choices() -> void:
 func _on_buy_pressed() -> void:
 	if _shop_panel and _shop_panel.purchase_cart():
 		AudioManager.play_ui_sfx("ui_buy_sell")
+		# Grant persuasion XP for completing a trade
+		if _player:
+			var prog: Node = _player.get_node_or_null("ProgressionComponent")
+			if prog:
+				prog.grant_proficiency_xp("persuasion", 3)
 		_show_trade_choices()
 
 
