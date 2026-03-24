@@ -9,7 +9,7 @@ const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 const GRID_COLUMNS := 4
 const MIN_SLOTS := 20
 const CELL_SIZE := 64
-const EQUIP_CELL_SIZE := 58
+const EQUIP_CELL_SIZE := 72
 
 # All 8 equipment slots in a single 2-column grid, top to bottom
 const EQUIP_LAYOUT: Array = [
@@ -127,18 +127,11 @@ func _build_ui() -> void:
 	equip_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	body_hbox.add_child(equip_vbox)
 
-	var equip_header := Label.new()
-	equip_header.text = "EQUIPMENT"
-	equip_header.add_theme_font_size_override("font_size", 11)
-	equip_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
-	equip_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	equip_vbox.add_child(equip_header)
-
 	# Single 2×4 grid for all 8 slots
 	_equip_grid = GridContainer.new()
 	_equip_grid.columns = 2
-	_equip_grid.add_theme_constant_override("h_separation", 6)
-	_equip_grid.add_theme_constant_override("v_separation", 6)
+	_equip_grid.add_theme_constant_override("h_separation", 12)
+	_equip_grid.add_theme_constant_override("v_separation", 12)
 	equip_vbox.add_child(_equip_grid)
 
 	# Gold section under equipment

@@ -2,7 +2,7 @@ extends Control
 ## World map panel — shows full city + field layout with district labels.
 ## Toggle with W key. Defaults to zone view; toggle button switches to world view.
 
-const MAP_W := 500.0
+const MAP_W := 400.0
 const MAP_H := 400.0
 
 const COLOR_BG := Color(0.08, 0.08, 0.12, 0.92)
@@ -53,8 +53,6 @@ const ZONE_DESCRIPTIONS: Dictionary = {
 
 var _panel: PanelContainer
 var _draw_area: Control
-var _toggle_btn: Button
-var _zone_title_label: Label
 var _is_open: bool = false
 var _timer: float = 0.0
 # Cached zone extents for zone mode (updated each time map opens or zone changes)
@@ -85,7 +83,6 @@ func _ready() -> void:
 
 func _on_zone_changed(_old_zone_id: String, _new_zone_id: String) -> void:
 	_compute_zone_extents(_get_current_zone_id())
-	_update_zone_title()
 
 
 func _compute_world_extents() -> void:
@@ -132,45 +129,11 @@ func _get_current_zone_id() -> String:
 
 
 func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("World Map", Vector2(MAP_W + 20, MAP_H + 90), toggle)
+	var ui: Dictionary = UIHelper.create_titled_panel("World Map", Vector2(MAP_W + 20, MAP_H + 60), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
 
 	var vbox: VBoxContainer = ui["vbox"]
-
-	# Zone title label row
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 4)
-	vbox.add_child(title_row)
-
-	_zone_title_label = Label.new()
-	_zone_title_label.text = "Zone"
-	_zone_title_label.add_theme_font_size_override("font_size", 13)
-	_zone_title_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
-	_zone_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(_zone_title_label)
-
-	# View mode toggle button (top-right of title row)
-	_toggle_btn = Button.new()
-	_toggle_btn.text = "World"
-	_toggle_btn.custom_minimum_size = Vector2(60, 24)
-	var btn_style := StyleBoxFlat.new()
-	btn_style.bg_color = Color(0.12, 0.1, 0.08, 0.95)
-	btn_style.border_color = Color(0.7, 0.6, 0.2)
-	btn_style.set_border_width_all(1)
-	btn_style.set_corner_radius_all(3)
-	btn_style.content_margin_left = 6
-	btn_style.content_margin_right = 6
-	btn_style.content_margin_top = 2
-	btn_style.content_margin_bottom = 2
-	_toggle_btn.add_theme_stylebox_override("normal", btn_style)
-	var btn_hover := btn_style.duplicate() as StyleBoxFlat
-	btn_hover.bg_color = Color(0.2, 0.17, 0.1, 0.95)
-	_toggle_btn.add_theme_stylebox_override("hover", btn_hover)
-	_toggle_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	_toggle_btn.add_theme_font_size_override("font_size", 12)
-	_toggle_btn.pressed.connect(_on_view_toggle_pressed)
-	title_row.add_child(_toggle_btn)
 
 	# Drawing area — a Control node that we draw on
 	_draw_area = Control.new()
@@ -208,27 +171,6 @@ func _build_ui() -> void:
 
 	_panel.add_child(_hover_popup)
 
-
-func _on_view_toggle_pressed() -> void:
-	if _view_mode == "zone":
-		_view_mode = "world"
-		_toggle_btn.text = "Zone"
-	else:
-		_view_mode = "zone"
-		_toggle_btn.text = "World"
-		_hide_hover_popup()
-	_update_zone_title()
-	_draw_area.queue_redraw()
-
-
-func _update_zone_title() -> void:
-	var zone_id: String = _get_current_zone_id()
-	if _view_mode == "world":
-		_zone_title_label.text = "All Zones"
-	elif zone_id != "":
-		_zone_title_label.text = ZoneDatabase.get_zone_name(zone_id)
-	else:
-		_zone_title_label.text = "Unknown Zone"
 
 
 func _process(delta: float) -> void:
@@ -633,7 +575,6 @@ func toggle() -> void:
 		AudioManager.play_ui_sfx("ui_panel_open")
 		var zone_id: String = _get_current_zone_id()
 		_compute_zone_extents(zone_id)
-		_update_zone_title()
 		UIHelper.center_panel(_panel)
 		_draw_area.queue_redraw()
 	else:
