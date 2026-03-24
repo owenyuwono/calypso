@@ -6,6 +6,7 @@ const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const CityBuilderClass = preload("res://scripts/world/city_builder.gd")
 
 var zone_id: String = "city"
+var _ctx: WorldBuilderContext = null
 
 signal zone_ready
 
@@ -16,17 +17,17 @@ func _ready() -> void:
 		WorldState.register_location(marker.name, marker.global_position)
 
 	# Shared context for all builder utilities
-	var ctx: WorldBuilderContext = WorldBuilderContext.new()
-	ctx.nav_region = $NavigationRegion3D
-	ctx.world_root = self
+	_ctx = WorldBuilderContext.new()
+	_ctx.nav_region = $NavigationRegion3D
+	_ctx.world_root = self
 
 	# Build terrain, walls, scatter, decorations, districts
-	_build_city_terrain(ctx)
-	TownBuilder.build_walls(ctx)
-	BiomeScatter.setup_exclusion_zones(ctx)
-	TownBuilder.decorate_biomes(ctx)
-	TownBuilder.place_props(ctx)
-	CityBuilderClass.build_all_districts(ctx)
+	_build_city_terrain(_ctx)
+	TownBuilder.build_walls(_ctx)
+	BiomeScatter.setup_exclusion_zones(_ctx)
+	TownBuilder.decorate_biomes(_ctx)
+	TownBuilder.place_props(_ctx)
+	CityBuilderClass.build_all_districts(_ctx)
 
 	# Portals — requires ZoneDatabase autoload (may not be present yet)
 	TerrainHelpers.create_portals(self, zone_id)
@@ -41,6 +42,11 @@ func _on_navmesh_baked() -> void:
 	if nav_mesh.get_polygon_count() == 0:
 		push_warning("[ZoneCity] Navmesh is EMPTY after bake!")
 	zone_ready.emit()
+
+
+func _exit_tree() -> void:
+	if _ctx:
+		_ctx.cleanup()
 
 
 # --- Terrain -----------------------------------------------------------------

@@ -17,3 +17,12 @@ var city_bounds: Rect2 = Rect2(-70, -50, 140, 100)
 
 func is_in_city(pos: Vector3) -> bool:
 	return city_bounds.has_point(Vector2(pos.x, pos.z))
+
+
+## Free all cached materials to prevent "resource still in use" warnings at exit.
+func cleanup() -> void:
+	for mat in color_mat_cache.values():
+		if is_instance_valid(mat):
+			mat.free()
+	color_mat_cache.clear()
+	texture_cache.clear()

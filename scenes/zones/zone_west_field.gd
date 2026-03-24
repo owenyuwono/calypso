@@ -51,6 +51,11 @@ func _on_navmesh_baked() -> void:
 	zone_ready.emit()
 
 
+func _exit_tree() -> void:
+	if _ctx:
+		_ctx.cleanup()
+
+
 func _build_terrain(ctx: WorldBuilderContext) -> void:
 	# Shared noise matching game_world defaults
 	ctx.terrain_noise = TerrainHelpers.create_terrain_noise()
