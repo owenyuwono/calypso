@@ -228,9 +228,9 @@ func _build_character_preview() -> TextureRect:
 
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 2.5
-	camera.position = Vector3(0, 1.0, 3)
-	camera.look_at_from_position(Vector3(0, 1.0, 3), Vector3(0, 0.8, 0))
+	camera.size = 3.5
+	camera.position = Vector3(0, 1.2, 3)
+	camera.look_at_from_position(Vector3(0, 1.2, 3), Vector3(0, 1.0, 0))
 	_preview_viewport.add_child(camera)
 
 	var light := DirectionalLight3D.new()
@@ -249,7 +249,7 @@ func _build_character_preview() -> TextureRect:
 	tex_rect.texture = _preview_viewport.get_texture()
 	tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tex_rect.custom_minimum_size = Vector2(160, 240)
+	tex_rect.custom_minimum_size = Vector2(120, 180)
 	tex_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tex_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	# SubViewport must be in scene tree — add as child of TextureRect
