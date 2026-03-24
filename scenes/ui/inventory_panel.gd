@@ -9,7 +9,7 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const GRID_COLUMNS := 5
 const MIN_SLOTS := 25
 const CELL_SIZE := 64
-const EQUIP_CELL_SIZE := 58
+const EQUIP_CELL_SIZE := 64
 
 const SLOT_LABELS: Dictionary = {
 	"head": "Head", "torso": "Torso", "main_hand": "Main", "off_hand": "Off",
@@ -56,10 +56,9 @@ var _grid: GridContainer
 var _gold_label: Label
 var _gold_icon: TextureRect
 
-# Equipment containers (right column) — rebuilt on refresh()
-var _head_row: HBoxContainer
-var _armor_col: VBoxContainer
-var _weapon_row: HBoxContainer
+# Equipment containers — rebuilt on refresh()
+var _equip_left_col: VBoxContainer
+var _equip_right_col: VBoxContainer
 
 # Character preview
 var _preview_viewport: SubViewport
@@ -192,32 +191,31 @@ func _build_equipment_column(parent: Control) -> void:
 	var header: Label = _create_section_header("EQUIPMENT")
 	vbox.add_child(header)
 
-	# Head slot (centered)
-	_head_row = HBoxContainer.new()
-	_head_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(_head_row)
-
-	# Middle: character preview (left) + armor column (right)
+	# Layout: [left 4 slots] [character mesh] [right 4 slots]
 	var middle := HBoxContainer.new()
-	middle.add_theme_constant_override("separation", 10)
+	middle.add_theme_constant_override("separation", 8)
 	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	middle.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(middle)
 
+	# Left equipment column: head, gloves, main_hand, off_hand
+	_equip_left_col = VBoxContainer.new()
+	_equip_left_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	_equip_left_col.add_theme_constant_override("separation", 4)
+	_equip_left_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	middle.add_child(_equip_left_col)
+
+	# Character preview (center)
 	var preview: TextureRect = _build_character_preview()
 	middle.add_child(preview)
 
-	_armor_col = VBoxContainer.new()
-	_armor_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	_armor_col.add_theme_constant_override("separation", 4)
-	_armor_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	middle.add_child(_armor_col)
-
-	# Weapon row (centered)
-	_weapon_row = HBoxContainer.new()
-	_weapon_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_weapon_row.add_theme_constant_override("separation", 16)
-	vbox.add_child(_weapon_row)
+	# Right equipment column: torso, legs, feet, back
+	_equip_right_col = VBoxContainer.new()
+	_equip_right_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	_equip_right_col.add_theme_constant_override("separation", 4)
+	_equip_right_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	middle.add_child(_equip_right_col)
 
 # ── Character preview (SubViewport → TextureRect) ────────────────────────────
 
@@ -358,21 +356,19 @@ func refresh() -> void:
 	var gold: int = _inventory.get_gold_amount()
 	_gold_label.text = "%d" % gold
 
-	# Equipment rows — clear then rebuild
-	for child in _head_row.get_children():
+	# Equipment columns — clear then rebuild
+	for child in _equip_left_col.get_children():
 		child.queue_free()
-	for child in _armor_col.get_children():
-		child.queue_free()
-	for child in _weapon_row.get_children():
+	for child in _equip_right_col.get_children():
 		child.queue_free()
 
-	_head_row.add_child(_build_equip_cell("head"))
+	# Left: head, gloves, main_hand, off_hand
+	for slot_name in ["head", "gloves", "main_hand", "off_hand"]:
+		_equip_left_col.add_child(_build_equip_cell(slot_name))
 
-	for slot_name in ["torso", "gloves", "legs", "feet", "back"]:
-		_armor_col.add_child(_build_equip_cell(slot_name))
-
-	_weapon_row.add_child(_build_equip_cell("main_hand"))
-	_weapon_row.add_child(_build_equip_cell("off_hand"))
+	# Right: torso, legs, feet, back
+	for slot_name in ["torso", "legs", "feet", "back"]:
+		_equip_right_col.add_child(_build_equip_cell(slot_name))
 
 	# Re-render the character preview after equipment changes
 	if _preview_viewport:
