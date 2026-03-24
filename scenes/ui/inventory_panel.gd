@@ -249,6 +249,11 @@ func build_content(container: Control) -> void:
 	if _panel and _panel.get_parent():
 		_panel.get_parent().remove_child(_panel)
 	container.add_child(_panel)
+	if _player:
+		_refresh()
+
+func refresh() -> void:
+	_refresh()
 
 func get_overlay_nodes() -> Array:
 	var overlays: Array = []
