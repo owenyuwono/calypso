@@ -7,6 +7,7 @@ var inventory_panel: Control
 var skill_panel: Control
 var proficiency_panel: Control
 var settings_panel: Control
+var relationship_panel: Control
 
 var _buttons: Dictionary = {}  # key -> Button
 var _normal_styles: Dictionary = {}  # key -> StyleBoxFlat
@@ -17,6 +18,7 @@ const BUTTON_DEFS: Array = [
 	{"key": "status", "label": "Status", "hint": "C"},
 	{"key": "inventory", "label": "Inv", "hint": "I"},
 	{"key": "skills", "label": "Skills", "hint": "S"},
+	{"key": "rel", "label": "Rel", "hint": "R"},
 	{"key": "settings", "label": "Settings", "hint": "Esc"},
 ]
 
@@ -122,6 +124,7 @@ func _get_panel(key: String) -> Control:
 		"status": return status_panel
 		"inventory": return inventory_panel
 		"skills": return skill_panel
+		"rel": return relationship_panel
 		"settings": return settings_panel
 	return null
 

@@ -86,6 +86,7 @@ var npc_info_panel: Control
 var dialogue_panel: Node
 var crafting_panel: Control
 var quest_log_panel: Node
+var relationship_panel: Node
 var interior_manager: Node
 
 # Click marker (reused single instance)
@@ -785,6 +786,8 @@ func _is_ui_open() -> bool:
 	if dialogue_panel and dialogue_panel.visible:
 		return true
 	if quest_log_panel and quest_log_panel.visible:
+		return true
+	if relationship_panel and relationship_panel.is_open():
 		return true
 	for panel in [shop_panel, inventory_panel, status_panel, skill_panel, crafting_panel]:
 		if panel and panel.is_open():
