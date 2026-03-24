@@ -1,5 +1,5 @@
-extends Control
-## RuneScape-style proficiency skill list panel toggled with P key.
+extends Node
+## RuneScape-style proficiency skill list panel. Content builder for GameMenu.
 
 const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
 const CATEGORY_DISPLAY_NAMES: Dictionary = {
@@ -12,10 +12,8 @@ const CATEGORY_DISPLAY_NAMES: Dictionary = {
 
 const CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production", "social"]
 
-var _panel: PanelContainer
-var _is_open: bool = false
 var _player: Node
-
+var _content_parent: Control
 var _total_level_label: Label
 var _skill_list: VBoxContainer
 
@@ -25,30 +23,24 @@ func set_player(p: Node) -> void:
 
 
 func _ready() -> void:
-	visible = false
-	_build_ui()
 	GameEvents.proficiency_xp_gained.connect(_on_proficiency_changed)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
 
-func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Proficiencies", Vector2(280, 420), toggle)
-	_panel = ui["panel"]
-	add_child(_panel)
-
-	var vbox: VBoxContainer = ui["vbox"]
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
 	# Total level label
 	_total_level_label = UIHelper.create_label("Total Level: --", 15, UIHelper.COLOR_GOLD)
-	vbox.add_child(_total_level_label)
+	parent.add_child(_total_level_label)
 
-	vbox.add_child(HSeparator.new())
+	parent.add_child(HSeparator.new())
 
 	# Scrollable skill list
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 340)
-	vbox.add_child(scroll)
+	parent.add_child(scroll)
 
 	_skill_list = VBoxContainer.new()
 	_skill_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -56,22 +48,13 @@ func _build_ui() -> void:
 	scroll.add_child(_skill_list)
 
 
-func toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
-		_refresh()
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-
-
-func _refresh() -> void:
-	if not _is_open or not _player:
+func refresh() -> void:
+	if not _content_parent or not _content_parent.visible:
+		return
+	if not _player:
 		return
 
-	var prog := _player.get_node_or_null("ProgressionComponent")
+	var prog: Node = _player.get_node_or_null("ProgressionComponent")
 	if not prog:
 		return
 
@@ -147,20 +130,16 @@ func _refresh() -> void:
 
 
 func _on_proficiency_changed(entity_id: String, _skill_id: String, _amount: int, _new_xp: int) -> void:
-	if not _is_open or not _player:
+	if not _content_parent or not _content_parent.visible or not _player:
 		return
 	var player_entity_id: String = _player.get("entity_id") if "entity_id" in _player else ""
 	if entity_id == player_entity_id or player_entity_id.is_empty():
-		_refresh()
+		refresh()
 
 
 func _on_proficiency_level_up(entity_id: String, _skill_id: String, _new_level: int) -> void:
-	if not _is_open or not _player:
+	if not _content_parent or not _content_parent.visible or not _player:
 		return
 	var player_entity_id: String = _player.get("entity_id") if "entity_id" in _player else ""
 	if entity_id == player_entity_id or player_entity_id.is_empty():
-		_refresh()
-
-
-func is_open() -> bool:
-	return _is_open
+		refresh()

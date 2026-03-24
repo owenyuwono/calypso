@@ -78,14 +78,11 @@ var _player_input: Node
 
 # UI references (set by main scene setup)
 var shop_panel: Control
-var inventory_panel: Control
-var status_panel: Control
 var skill_hotbar: Control
-var skill_panel: Control
 var npc_info_panel: Control
 var dialogue_panel: Node
 var crafting_panel: Control
-var quest_log_panel: Node
+var game_menu: Node
 var interior_manager: Node
 
 # Click marker (reused single instance)
@@ -574,11 +571,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-
-	if event.is_action_pressed("toggle_quest_log"):
-		if quest_log_panel:
-			quest_log_panel._toggle()
-
 	if event.is_action_pressed("interact"):
 		_interact_with_nearest()
 
@@ -784,11 +776,12 @@ func enter_vending_state() -> void:
 func _is_ui_open() -> bool:
 	if dialogue_panel and dialogue_panel.visible:
 		return true
-	if quest_log_panel and quest_log_panel.visible:
+	if game_menu and game_menu.is_open():
 		return true
-	for panel in [shop_panel, inventory_panel, status_panel, skill_panel, crafting_panel]:
-		if panel and panel.is_open():
-			return true
+	if shop_panel and shop_panel.is_open():
+		return true
+	if crafting_panel and crafting_panel.is_open():
+		return true
 	return false
 
 # --- Death / Respawn ---

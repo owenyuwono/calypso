@@ -1,14 +1,13 @@
-extends Control
+extends Node
 ## Quest Journal panel — shows active and completed quests with objective progress.
-## Toggled with J key.
+## Content builder for GameMenu.
 
 const QuestDatabase = preload("res://scripts/data/quest_database.gd")
 
 var _player: Node
 var _quest_comp: Node
-var _panel: PanelContainer
 var _quest_list: VBoxContainer
-var _is_open: bool = false
+var _content_parent: Control
 
 
 func set_player(player: Node) -> void:
@@ -17,26 +16,20 @@ func set_player(player: Node) -> void:
 
 
 func _ready() -> void:
-	visible = false
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_build_ui()
 	GameEvents.quest_accepted.connect(func(_eid, _qid): refresh())
 	GameEvents.quest_objective_updated.connect(func(_eid, _qid, _idx, _prog): refresh())
 	GameEvents.quest_completed.connect(func(_eid, _qid, _rewards): refresh())
 
 
-func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Quest Journal", Vector2(400, 500), _toggle)
-	_panel = ui["panel"]
-	add_child(_panel)
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
-	var vbox: VBoxContainer = ui["vbox"]
-	vbox.add_child(HSeparator.new())
+	parent.add_child(HSeparator.new())
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(scroll)
+	parent.add_child(scroll)
 
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -52,23 +45,8 @@ func _build_ui() -> void:
 	margin.add_child(_quest_list)
 
 
-func _toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
-		refresh()
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-
-
-func is_open() -> bool:
-	return _is_open
-
-
 func refresh() -> void:
-	if not _is_open:
+	if not _content_parent or not _content_parent.visible:
 		return
 	if not _quest_comp:
 		if _player:

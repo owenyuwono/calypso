@@ -1,21 +1,16 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scenes/camera/isometric_camera.gd" id="4_camera"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_hud.tscn" id="5_hud"]
-[ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="7_shop"]
 [ext_resource type="Script" path="res://scenes/main.gd" id="8_main"]
-[ext_resource type="PackedScene" path="res://scenes/ui/status_panel.tscn" id="10_status"]
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_hotbar.tscn" id="11_skill_hotbar"]
-[ext_resource type="PackedScene" path="res://scenes/ui/skill_panel.tscn" id="12_skill_panel"]
 [ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="13_minimap"]
-[ext_resource type="Script" path="res://scenes/ui/panel_toggles.gd" id="15_panel_toggles"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_info_panel.tscn" id="16_npc_info"]
-[ext_resource type="Script" path="res://scenes/ui/proficiency_panel.gd" id="17_prof_panel"]
 [ext_resource type="Script" path="res://scenes/ui/world_map_panel.gd" id="18_world_map"]
 [ext_resource type="Script" path="res://scenes/ui/crafting_panel.gd" id="20_crafting_panel"]
-[ext_resource type="PackedScene" path="res://scenes/ui/settings_panel.tscn" id="21_settings_panel"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_menu.tscn" id="21_game_menu"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("8_main")
@@ -38,25 +33,13 @@ target_path = NodePath("../Player")
 
 [node name="PlayerHUD" parent="UILayer" instance=ExtResource("5_hud")]
 
-[node name="InventoryPanel" parent="UILayer" instance=ExtResource("6_inventory")]
-
-[node name="StatusPanel" parent="UILayer" instance=ExtResource("10_status")]
-
 [node name="ShopPanel" parent="UILayer" instance=ExtResource("7_shop")]
 
 [node name="Minimap" parent="UILayer" instance=ExtResource("13_minimap")]
 
 [node name="SkillHotbar" parent="UILayer" instance=ExtResource("11_skill_hotbar")]
 
-[node name="SkillPanel" parent="UILayer" instance=ExtResource("12_skill_panel")]
-
-[node name="PanelToggles" type="Control" parent="UILayer"]
-script = ExtResource("15_panel_toggles")
-
 [node name="NpcInfoPanel" parent="UILayer" instance=ExtResource("16_npc_info")]
-
-[node name="ProficiencyPanel" type="Control" parent="UILayer"]
-script = ExtResource("17_prof_panel")
 
 [node name="WorldMapPanel" type="Control" parent="UILayer"]
 script = ExtResource("18_world_map")
@@ -69,4 +52,4 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="SettingsPanel" parent="UILayer" instance=ExtResource("21_settings_panel")]
+[node name="GameMenu" parent="UILayer" instance=ExtResource("21_game_menu")]

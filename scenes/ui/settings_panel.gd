@@ -1,42 +1,37 @@
-extends Control
-## Settings panel — audio volume controls + quit game. Esc key toggle.
+extends Node
+## Settings panel — audio volume controls + quit game. Content builder for GameMenu.
 
-var _panel: PanelContainer
-var _is_open: bool = false
 var _player: Node
 var _master_slider: HSlider
 var _sfx_slider: HSlider
 var _ambient_slider: HSlider
+var _content_parent: Control
 
 
-func _ready() -> void:
-	visible = false
-	_build_ui()
+func set_player(p: Node) -> void:
+	_player = p
 
 
-func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Settings", Vector2(320, 280), close)
-	_panel = ui["panel"]
-	add_child(_panel)
-	var vbox: VBoxContainer = ui["vbox"]
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
 	# --- Audio Section ---
 	var audio_label: Label = UIHelper.create_label("Audio", 16, UIHelper.COLOR_HEADER)
-	vbox.add_child(audio_label)
+	parent.add_child(audio_label)
 
-	_master_slider = _add_volume_row(vbox, "Master", "Master")
-	_sfx_slider = _add_volume_row(vbox, "SFX", "SFX")
-	_ambient_slider = _add_volume_row(vbox, "Ambient", "Ambient")
+	_master_slider = _add_volume_row(parent, "Master", "Master")
+	_sfx_slider = _add_volume_row(parent, "SFX", "SFX")
+	_ambient_slider = _add_volume_row(parent, "Ambient", "Ambient")
 
 	# --- Separator ---
 	var sep: HSeparator = HSeparator.new()
-	vbox.add_child(sep)
+	parent.add_child(sep)
 
 	# --- Quit Button ---
 	var quit_btn: Button = Button.new()
 	quit_btn.text = "Quit Game"
 	quit_btn.pressed.connect(_on_quit_pressed)
-	vbox.add_child(quit_btn)
+	parent.add_child(quit_btn)
 
 
 func _add_volume_row(parent: Control, label_text: String, bus_name: String) -> HSlider:
@@ -65,6 +60,11 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
+func refresh() -> void:
+	if not _content_parent or not _content_parent.visible:
+		return
+
+
 static func _percent_to_db(percent: float) -> float:
 	if percent <= 0.0:
 		return -80.0
@@ -75,35 +75,3 @@ static func _db_to_percent(db: float) -> float:
 	if db <= -80.0:
 		return 0.0
 	return db_to_linear(db) * 100.0
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_settings"):
-		if get_viewport().gui_get_focus_owner() is LineEdit:
-			return
-		toggle()
-		get_viewport().set_input_as_handled()
-
-
-func toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-
-
-func close() -> void:
-	_is_open = false
-	visible = false
-	AudioManager.play_ui_sfx("ui_panel_close")
-
-
-func set_player(p: Node) -> void:
-	_player = p
-
-
-func is_open() -> bool:
-	return _is_open

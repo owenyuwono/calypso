@@ -15,25 +15,22 @@ func _ready() -> void:
 
 	var player := $Player
 	var shop_panel := $UILayer/ShopPanel
-	var inventory_panel := $UILayer/InventoryPanel
-	var status_panel := $UILayer/StatusPanel
 	var skill_hotbar := $UILayer/SkillHotbar
-	var skill_panel := $UILayer/SkillPanel
+	var game_menu := $UILayer/GameMenu
 
 	if player and shop_panel:
 		player.shop_panel = shop_panel
-	if player and inventory_panel:
-		player.inventory_panel = inventory_panel
-	if player and status_panel:
-		player.status_panel = status_panel
 	if player and skill_hotbar:
 		player.skill_hotbar = skill_hotbar
-	if player and skill_panel:
-		player.skill_panel = skill_panel
 
 	var npc_info_panel := $UILayer/NpcInfoPanel
 	if player and npc_info_panel:
 		player.npc_info_panel = npc_info_panel
+
+	# Wire GameMenu — it creates and owns all panel builders
+	if player and game_menu:
+		game_menu.set_player(player)
+		player.game_menu = game_menu
 
 	var dialogue_panel: PanelContainer = PanelContainer.new()
 	dialogue_panel.set_script(preload("res://scenes/ui/dialogue_panel.gd"))
@@ -46,7 +43,6 @@ func _ready() -> void:
 		dialogue_panel.set_hud_elements([
 			$UILayer/PlayerHUD,
 			$UILayer/Minimap,
-			$UILayer/PanelToggles,
 		])
 		player.dialogue_panel = dialogue_panel
 	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:
@@ -54,50 +50,19 @@ func _ready() -> void:
 			shop_panel.open_shop(npc_node)
 	)
 
-	var quest_log_panel: Control = Control.new()
-	quest_log_panel.set_script(preload("res://scenes/ui/quest_log_panel.gd"))
-	quest_log_panel.name = "QuestLogPanel"
-	quest_log_panel.visible = false
-	$UILayer.add_child(quest_log_panel)
-	if player:
-		quest_log_panel.set_player(player)
-		player.quest_log_panel = quest_log_panel
-
-	var proficiency_panel := $UILayer/ProficiencyPanel
-	if player and proficiency_panel:
-		proficiency_panel.set_player(player)
-
 	var crafting_panel := $UILayer/CraftingPanel
 	if player and crafting_panel:
 		crafting_panel.set_player(player)
 		player.crafting_panel = crafting_panel
 
-	var settings_panel := $UILayer/SettingsPanel
-	if player and settings_panel:
-		settings_panel.set_player(player)
-
-	# Wire player ref to UI panels
+	# Wire player ref to remaining UI panels
 	var player_hud := $UILayer/PlayerHUD
 	if player and player_hud:
 		player_hud.set_player(player)
-	if player and inventory_panel:
-		inventory_panel.set_player(player)
-	if player and status_panel:
-		status_panel.set_player(player)
 	if player and shop_panel:
 		shop_panel.set_player(player)
 	if player and skill_hotbar:
 		skill_hotbar.set_player(player)
-	if player and skill_panel:
-		skill_panel.set_player(player)
-
-	var panel_toggles := $UILayer/PanelToggles
-	if panel_toggles:
-		panel_toggles.status_panel = status_panel
-		panel_toggles.inventory_panel = inventory_panel
-		panel_toggles.skill_panel = skill_panel
-		panel_toggles.proficiency_panel = proficiency_panel
-		panel_toggles.settings_panel = settings_panel
 
 	# Wire world map reference to minimap so the compass button can open it
 	var minimap := $UILayer/Minimap
