@@ -1,9 +1,6 @@
 extends Control
 ## World map panel — shows full city + field layout with district labels.
-## Toggle with W key. Defaults to zone view; toggle button switches to world view.
-
-const MAP_W := 500.0
-const MAP_H := 400.0
+## Content builder pattern: call build_content(parent) to inject into a tab container.
 
 const COLOR_BG := Color(0.08, 0.08, 0.12, 0.92)
 const COLOR_WALL := Color(0.5, 0.45, 0.35, 0.8)
@@ -51,11 +48,10 @@ const ZONE_DESCRIPTIONS: Dictionary = {
 	"west_field": "Untamed wilderness west of the city walls. Dangerous creatures lurk here.",
 }
 
-var _panel: PanelContainer
+var _content_parent: Control = null
 var _draw_area: Control
 var _toggle_btn: Button
 var _zone_title_label: Label
-var _is_open: bool = false
 var _timer: float = 0.0
 # Cached zone extents for zone mode (updated each time map opens or zone changes)
 var _zone_min_x: float = 0.0
@@ -76,9 +72,7 @@ var _zone_rects: Dictionary = {}  # zone_id -> Rect2 (screen coords in _draw_are
 
 
 func _ready() -> void:
-	visible = false
 	_compute_world_extents()
-	_build_ui()
 	if ZoneManager.has_signal("zone_changed"):
 		ZoneManager.zone_changed.connect(_on_zone_changed)
 
@@ -131,17 +125,13 @@ func _get_current_zone_id() -> String:
 	return ""
 
 
-func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("World Map", Vector2(MAP_W + 20, MAP_H + 90), toggle)
-	_panel = ui["panel"]
-	add_child(_panel)
-
-	var vbox: VBoxContainer = ui["vbox"]
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
 	# Zone title label row
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 4)
-	vbox.add_child(title_row)
+	parent.add_child(title_row)
 
 	_zone_title_label = Label.new()
 	_zone_title_label.text = "Zone"
@@ -172,15 +162,16 @@ func _build_ui() -> void:
 	_toggle_btn.pressed.connect(_on_view_toggle_pressed)
 	title_row.add_child(_toggle_btn)
 
-	# Drawing area — a Control node that we draw on
+	# Drawing area — expands to fill available tab space
 	_draw_area = Control.new()
-	_draw_area.custom_minimum_size = Vector2(MAP_W, MAP_H)
+	_draw_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_draw_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_draw_area.mouse_filter = Control.MOUSE_FILTER_STOP
 	_draw_area.draw.connect(_on_draw_area_draw.bind(_draw_area))
 	_draw_area.gui_input.connect(_on_draw_area_input)
-	vbox.add_child(_draw_area)
+	parent.add_child(_draw_area)
 
-	# Hover popup — child of _panel so it renders on top of the draw area
+	# Hover popup — top_level so it renders above other tab content
 	_hover_popup = PanelContainer.new()
 	_hover_popup.visible = false
 	_hover_popup.top_level = true
@@ -206,7 +197,27 @@ func _build_ui() -> void:
 	_hover_desc_label.custom_minimum_size = Vector2(150, 0)
 	popup_vbox.add_child(_hover_desc_label)
 
-	_panel.add_child(_hover_popup)
+	# Initialize zone extents and title now that we have a parent
+	var zone_id: String = _get_current_zone_id()
+	_compute_zone_extents(zone_id)
+	_update_zone_title()
+
+
+func get_overlay_nodes() -> Array[Control]:
+	var result: Array[Control] = []
+	if _hover_popup:
+		result.append(_hover_popup)
+	return result
+
+
+func refresh() -> void:
+	if not _content_parent or not _content_parent.visible:
+		return
+	var zone_id: String = _get_current_zone_id()
+	_compute_zone_extents(zone_id)
+	_update_zone_title()
+	if _draw_area:
+		_draw_area.queue_redraw()
 
 
 func _on_view_toggle_pressed() -> void:
@@ -222,6 +233,8 @@ func _on_view_toggle_pressed() -> void:
 
 
 func _update_zone_title() -> void:
+	if not _zone_title_label:
+		return
 	var zone_id: String = _get_current_zone_id()
 	if _view_mode == "world":
 		_zone_title_label.text = "All Zones"
@@ -232,7 +245,7 @@ func _update_zone_title() -> void:
 
 
 func _process(delta: float) -> void:
-	if not _is_open:
+	if not _content_parent or not _content_parent.visible:
 		return
 	_timer -= delta
 	if _timer <= 0.0:
@@ -277,19 +290,24 @@ func _update_dots() -> void:
 
 
 func _world_to_map(world_pos: Vector2) -> Vector2:
+	var map_w: float = _draw_area.size.x if _draw_area else 500.0
+	var map_h: float = _draw_area.size.y if _draw_area else 400.0
 	if _view_mode == "zone":
-		var mx: float = (world_pos.x - _zone_min_x) / (_zone_max_x - _zone_min_x) * MAP_W
-		var my: float = (world_pos.y - _zone_min_z) / (_zone_max_z - _zone_min_z) * MAP_H
+		var mx: float = (world_pos.x - _zone_min_x) / (_zone_max_x - _zone_min_x) * map_w
+		var my: float = (world_pos.y - _zone_min_z) / (_zone_max_z - _zone_min_z) * map_h
 		return Vector2(mx, my)
 	else:
-		var mx: float = (world_pos.x - _world_min_x) / (_world_max_x - _world_min_x) * MAP_W
-		var my: float = (world_pos.y - _world_min_z) / (_world_max_z - _world_min_z) * MAP_H
+		var mx: float = (world_pos.x - _world_min_x) / (_world_max_x - _world_min_x) * map_w
+		var my: float = (world_pos.y - _world_min_z) / (_world_max_z - _world_min_z) * map_h
 		return Vector2(mx, my)
 
 
 func _on_draw_area_draw(draw_area: Control) -> void:
+	var map_w: float = draw_area.size.x
+	var map_h: float = draw_area.size.y
+
 	# Background
-	draw_area.draw_rect(Rect2(0, 0, MAP_W, MAP_H), COLOR_BG)
+	draw_area.draw_rect(Rect2(0, 0, map_w, map_h), COLOR_BG)
 
 	var current_zone_id: String = _get_current_zone_id()
 
@@ -300,6 +318,9 @@ func _on_draw_area_draw(draw_area: Control) -> void:
 
 
 func _draw_zone_mode(draw_area: Control, current_zone_id: String) -> void:
+	var map_w: float = draw_area.size.x
+	var map_h: float = draw_area.size.y
+
 	# Draw the current zone's rect with its color (highlighted)
 	if current_zone_id in ZoneDatabase.ZONES:
 		var zone_data: Dictionary = ZoneDatabase.ZONES[current_zone_id]
@@ -320,22 +341,22 @@ func _draw_zone_mode(draw_area: Control, current_zone_id: String) -> void:
 	var font := ThemeDB.fallback_font
 	if current_zone_id == "city":
 		for label_def in CITY_DISTRICT_LABELS:
-			var map_pos := _world_to_map(label_def["pos"])
-			if map_pos.x < 0 or map_pos.x > MAP_W or map_pos.y < 0 or map_pos.y > MAP_H:
+			var map_pos: Vector2 = _world_to_map(label_def["pos"])
+			if map_pos.x < 0 or map_pos.x > map_w or map_pos.y < 0 or map_pos.y > map_h:
 				continue
 			var label_text: String = label_def["name"]
 			var text_width: float = font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 			draw_area.draw_string(font, Vector2(map_pos.x - text_width * 0.5, map_pos.y - 6), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.82, 0.65, 0.85))
 	elif current_zone_id == "east_field":
 		var label_text := "East Field"
-		var map_pos := _world_to_map(Vector2(110, 0))
-		if map_pos.x >= 0 and map_pos.x <= MAP_W and map_pos.y >= 0 and map_pos.y <= MAP_H:
+		var map_pos: Vector2 = _world_to_map(Vector2(110, 0))
+		if map_pos.x >= 0 and map_pos.x <= map_w and map_pos.y >= 0 and map_pos.y <= map_h:
 			var text_width: float = font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 			draw_area.draw_string(font, Vector2(map_pos.x - text_width * 0.5, map_pos.y - 6), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.85, 0.82, 0.65, 0.85))
 	elif current_zone_id == "west_field":
 		var label_text := "West Field"
-		var map_pos := _world_to_map(Vector2(-110, 0))
-		if map_pos.x >= 0 and map_pos.x <= MAP_W and map_pos.y >= 0 and map_pos.y <= MAP_H:
+		var map_pos: Vector2 = _world_to_map(Vector2(-110, 0))
+		if map_pos.x >= 0 and map_pos.x <= map_w and map_pos.y >= 0 and map_pos.y <= map_h:
 			var text_width: float = font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 			draw_area.draw_string(font, Vector2(map_pos.x - text_width * 0.5, map_pos.y - 6), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.85, 0.82, 0.65, 0.85))
 
@@ -352,25 +373,24 @@ func _draw_zone_mode(draw_area: Control, current_zone_id: String) -> void:
 
 
 func _draw_world_mode(draw_area: Control, current_zone_id: String) -> void:
+	var map_w: float = draw_area.size.x
+	var map_h: float = draw_area.size.y
 	var font := ThemeDB.fallback_font
 	_zone_rects.clear()
 
 	# Compute layout: three side-by-side columns
 	# West Field | City | East Field
-	# We lay them out manually in screen space for a clean overview.
-	var margin: float = 95.0
-	var gap: float = 16.0
-	var available_w: float = MAP_W - margin * 2.0 - gap * 2.0
+	var margin: float = map_w * 0.19
+	var gap: float = map_w * 0.032
+	var available_w: float = map_w - margin * 2.0 - gap * 2.0
 	# City is 140 wide, fields are 80 wide each → total 300 world units
-	# Proportional widths
 	var total_world_w: float = 80.0 + 140.0 + 80.0
 	var west_w: float = available_w * (80.0 / total_world_w)
 	var city_w: float = available_w * (140.0 / total_world_w)
 	var east_w: float = available_w * (80.0 / total_world_w)
 
 	# Heights: city is 100 tall, fields are 80 tall
-	# Anchor all zones vertically centered
-	var max_h: float = MAP_H - margin * 2.0
+	var max_h: float = map_h - margin * 2.0
 	var city_h: float = max_h
 	var field_h: float = max_h * (80.0 / 100.0)
 
@@ -560,12 +580,12 @@ func _position_hover_popup(mouse_pos: Vector2) -> void:
 	# top_level=true means position is in global/screen coordinates
 	var draw_area_global: Vector2 = _draw_area.get_global_rect().position
 	var popup_pos: Vector2 = draw_area_global + mouse_pos + Vector2(12.0, 12.0)
-	# Clamp so popup stays within panel bounds
-	var panel_rect: Rect2 = _panel.get_global_rect()
+	# Clamp so popup stays within content parent bounds
+	var clamp_rect: Rect2 = _content_parent.get_global_rect() if _content_parent else Rect2(Vector2.ZERO, get_viewport().get_visible_rect().size)
 	_hover_popup.reset_size()
 	var popup_size: Vector2 = _hover_popup.size
-	popup_pos.x = clampf(popup_pos.x, panel_rect.position.x + 4.0, panel_rect.end.x - popup_size.x - 4.0)
-	popup_pos.y = clampf(popup_pos.y, panel_rect.position.y + 4.0, panel_rect.end.y - popup_size.y - 4.0)
+	popup_pos.x = clampf(popup_pos.x, clamp_rect.position.x + 4.0, clamp_rect.end.x - popup_size.x - 4.0)
+	popup_pos.y = clampf(popup_pos.y, clamp_rect.position.y + 4.0, clamp_rect.end.y - popup_size.y - 4.0)
 	_hover_popup.global_position = popup_pos
 
 
@@ -604,8 +624,10 @@ func _draw_portals_for_zone(draw_area: Control, zone_id: String) -> void:
 
 
 func _draw_portal_marker(draw_area: Control, world_pos: Vector2, dest_zone_id: String) -> void:
+	var map_w: float = draw_area.size.x
+	var map_h: float = draw_area.size.y
 	var map_pos: Vector2 = _world_to_map(world_pos)
-	if map_pos.x < 0 or map_pos.x > MAP_W or map_pos.y < 0 or map_pos.y > MAP_H:
+	if map_pos.x < 0 or map_pos.x > map_w or map_pos.y < 0 or map_pos.y > map_h:
 		return
 	var r: float = 5.0
 	var points: PackedVector2Array = PackedVector2Array([
@@ -624,32 +646,3 @@ func _draw_portal_marker(draw_area: Control, world_pos: Vector2, dest_zone_id: S
 		-1, 9,
 		Color(0.5, 0.8, 1.0, 0.8)
 	)
-
-
-func toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		var zone_id: String = _get_current_zone_id()
-		_compute_zone_extents(zone_id)
-		_update_zone_title()
-		UIHelper.center_panel(_panel)
-		_draw_area.queue_redraw()
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-		_hide_hover_popup()
-
-
-func is_open() -> bool:
-	return _is_open
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_W:
-			var focused := get_viewport().gui_get_focus_owner()
-			if focused is LineEdit:
-				return
-			toggle()
-			get_viewport().set_input_as_handled()

@@ -1,6 +1,6 @@
 extends Control
 ## Minimap overlay — draws entity dots on a player-centered 2D projection of the world.
-## Toggle with M key. Compass button (bottom-right) opens world map.
+## Toggle with M key.
 
 const MAP_SIZE := 180.0
 const MAP_RADIUS := 30.0  # world units visible around player
@@ -14,9 +14,6 @@ var _timer: float = 0.0
 var _dots: Array = []  # [{pos: Vector2, color: Color, radius: float, is_player: bool}]
 var _zone_label_text: String = "Town"
 var _player_pos := Vector3.ZERO
-
-# Reference to world map panel — set externally via set_world_map()
-var _world_map_panel: Control = null
 
 func _ready() -> void:
 	# Anchor top-right
@@ -40,7 +37,7 @@ func _ready() -> void:
 func _build_compass_button() -> void:
 	var compass_btn := Button.new()
 	compass_btn.custom_minimum_size = Vector2(26, 26)
-	compass_btn.tooltip_text = "World Map (W)"
+	compass_btn.tooltip_text = "World Map"
 	compass_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# Load the map icon if it exists
@@ -83,13 +80,8 @@ func _build_compass_button() -> void:
 	add_child(compass_btn)
 
 
-func set_world_map(panel: Control) -> void:
-	_world_map_panel = panel
-
-
 func _on_compass_pressed() -> void:
-	if _world_map_panel and _world_map_panel.has_method("toggle"):
-		_world_map_panel.toggle()
+	pass
 
 
 func _process(delta: float) -> void:

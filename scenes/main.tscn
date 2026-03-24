@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scenes/camera/isometric_camera.gd" id="4_camera"]
@@ -8,7 +8,6 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/skill_hotbar.tscn" id="11_skill_hotbar"]
 [ext_resource type="PackedScene" path="res://scenes/ui/minimap.tscn" id="13_minimap"]
 [ext_resource type="PackedScene" path="res://scenes/ui/npc_info_panel.tscn" id="16_npc_info"]
-[ext_resource type="Script" path="res://scenes/ui/world_map_panel.gd" id="18_world_map"]
 [ext_resource type="Script" path="res://scenes/ui/crafting_panel.gd" id="20_crafting_panel"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_menu.tscn" id="21_game_menu"]
 
@@ -40,9 +39,6 @@ target_path = NodePath("../Player")
 [node name="SkillHotbar" parent="UILayer" instance=ExtResource("11_skill_hotbar")]
 
 [node name="NpcInfoPanel" parent="UILayer" instance=ExtResource("16_npc_info")]
-
-[node name="WorldMapPanel" type="Control" parent="UILayer"]
-script = ExtResource("18_world_map")
 
 [node name="CraftingPanel" type="Control" parent="UILayer"]
 script = ExtResource("20_crafting_panel")
