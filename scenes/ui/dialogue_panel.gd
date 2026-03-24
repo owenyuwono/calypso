@@ -103,9 +103,9 @@ func _build_portrait() -> void:
 	_portrait.anchor_top = 1.0
 	_portrait.anchor_bottom = 1.0
 	_portrait.offset_left = 40       # match dialogue panel left margin
-	_portrait.offset_right = 180     # ~140px wide
-	_portrait.offset_bottom = -185   # just above dialogue box top (-180) with 5px gap
-	_portrait.offset_top = -420      # ~235px tall for portrait
+	_portrait.offset_right = 320     # ~280px wide (2x bigger)
+	_portrait.offset_bottom = -180   # bottom touches dialogue box top
+	_portrait.offset_top = -650      # ~470px tall for portrait (2x bigger)
 
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	get_parent().add_child(_portrait)
