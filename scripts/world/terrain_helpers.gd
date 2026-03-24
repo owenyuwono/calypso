@@ -40,6 +40,4 @@ static func begin_navmesh_bake(nav_region: NavigationRegion3D, on_baked: Callabl
 	## Call this after `await get_tree().create_timer(0.5).timeout` in the zone's _ready().
 	## The 0.5s delay must be awaited by the caller before this call so all geometry is in place.
 	nav_region.bake_finished.connect(on_baked)
-	if nav_region.navigation_mesh:
-		nav_region.navigation_mesh.parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	nav_region.bake_navigation_mesh()
