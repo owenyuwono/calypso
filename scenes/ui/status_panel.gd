@@ -72,6 +72,7 @@ func _build_ui() -> void:
 	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(520, 0), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
+	ui["drag_handle"].queue_free()
 
 	var vbox: VBoxContainer = ui["vbox"]
 

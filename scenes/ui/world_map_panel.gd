@@ -132,6 +132,7 @@ func _build_ui() -> void:
 	var ui: Dictionary = UIHelper.create_titled_panel("World Map", Vector2(MAP_W + 20, MAP_H + 60), toggle)
 	_panel = ui["panel"]
 	add_child(_panel)
+	ui["drag_handle"].queue_free()
 
 	var vbox: VBoxContainer = ui["vbox"]
 

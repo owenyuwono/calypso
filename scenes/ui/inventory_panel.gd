@@ -4,7 +4,6 @@ extends Control
 ## then side-by-side: EQUIPMENT section (left) | ITEMS section (right).
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 const GRID_COLUMNS := 4
 const MIN_SLOTS := 20
@@ -109,12 +108,6 @@ func _build_ui() -> void:
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
-
-	# Title bar (full width)
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Inventory")
-	drag_handle.close_pressed.connect(_toggle)
-	vbox.add_child(drag_handle)
 
 	# Main body: equipment (left) | separator | items (right)
 	var body_hbox := HBoxContainer.new()
