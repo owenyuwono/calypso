@@ -167,6 +167,14 @@ func close() -> void:
 	AudioManager.play_ui_sfx("ui_panel_close")
 
 
+func build_content(container: Control) -> void:
+	if not _panel:
+		_build_ui()
+	if _panel and _panel.get_parent():
+		_panel.get_parent().remove_child(_panel)
+	container.add_child(_panel)
+
+
 func set_player(p: Node) -> void:
 	_player = p
 

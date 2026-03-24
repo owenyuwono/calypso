@@ -568,6 +568,14 @@ func _draw_portal_marker(draw_area: Control, world_pos: Vector2, dest_zone_id: S
 	)
 
 
+func build_content(container: Control) -> void:
+	if not _panel:
+		_build_ui()
+	if _panel and _panel.get_parent():
+		_panel.get_parent().remove_child(_panel)
+	container.add_child(_panel)
+
+
 func toggle() -> void:
 	_is_open = not _is_open
 	visible = _is_open

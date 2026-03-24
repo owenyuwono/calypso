@@ -249,6 +249,15 @@ func _build_context_menu() -> void:
 	_context_vbox.add_theme_constant_override("separation", 2)
 	_context_menu.add_child(_context_vbox)
 
+func build_content(container: Control) -> void:
+	if not _panel:
+		_load_slot_icons()
+		_build_ui()
+	if _panel and _panel.get_parent():
+		_panel.get_parent().remove_child(_panel)
+	container.add_child(_panel)
+
+
 func set_player(p: Node) -> void:
 	_player = p
 	if _player:
