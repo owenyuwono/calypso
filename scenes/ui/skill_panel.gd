@@ -1,5 +1,6 @@
 extends Control
-## Skills & Proficiencies panel — sidebar layout.
+## Skills & Proficiencies panel — content builder.
+## Call build_content(parent) to embed into a parent container.
 ## Left sidebar: proficiency list grouped by category.
 ## Right content: proficiency info + skills for selected proficiency.
 
@@ -41,8 +42,6 @@ const CATEGORY_LABELS: Dictionary = {
 	"social": "SOCIAL",
 }
 
-var _panel: PanelContainer
-var _is_open: bool = false
 var _player: Node
 var _combat: Node
 var _progression: Node
@@ -52,6 +51,7 @@ var _selected_prof_id: String = "sword"
 var _sidebar: VBoxContainer
 var _right_content: VBoxContainer
 var _detail_panel: Control = null
+var _content_parent: Control = null
 
 
 func set_player(p: Node) -> void:
@@ -62,32 +62,25 @@ func set_player(p: Node) -> void:
 
 
 func _ready() -> void:
-	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_build_ui()
-	GameEvents.skill_learned.connect(func(_a, _b, _c): _refresh())
-	GameEvents.skill_used.connect(func(_a, _b): _refresh())
-	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
-	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): _refresh())
+	GameEvents.skill_learned.connect(func(_a, _b, _c): refresh())
+	GameEvents.skill_used.connect(func(_a, _b): refresh())
+	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): refresh())
+	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): refresh())
 
 
-func _build_ui() -> void:
-	var ui: Dictionary = UIHelper.create_titled_panel("Proficiencies & Skills", Vector2(600, 480), toggle)
-	_panel = ui["panel"]
-	add_child(_panel)
-
-	var vbox: VBoxContainer = ui["vbox"]
-
-	vbox.add_child(HSeparator.new())
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
 	# Main horizontal split
-	var hbox := HBoxContainer.new()
+	var hbox: HBoxContainer = HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hbox.add_theme_constant_override("separation", 0)
-	vbox.add_child(hbox)
+	parent.add_child(hbox)
 
 	# --- Left sidebar ---
-	var sidebar_scroll := ScrollContainer.new()
+	var sidebar_scroll: ScrollContainer = ScrollContainer.new()
 	sidebar_scroll.custom_minimum_size = Vector2(150, 0)
 	sidebar_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sidebar_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -111,13 +104,13 @@ func _build_ui() -> void:
 	hbox.add_child(VSeparator.new())
 
 	# --- Right content ---
-	var right_scroll := ScrollContainer.new()
+	var right_scroll: ScrollContainer = ScrollContainer.new()
 	right_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	hbox.add_child(right_scroll)
 
-	var right_margin := MarginContainer.new()
+	var right_margin: MarginContainer = MarginContainer.new()
 	right_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right_margin.add_theme_constant_override("margin_left", 12)
 	right_margin.add_theme_constant_override("margin_right", 12)
@@ -130,33 +123,24 @@ func _build_ui() -> void:
 	_right_content.add_theme_constant_override("separation", 6)
 	right_margin.add_child(_right_content)
 
-
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_skills") or event.is_action_pressed("toggle_proficiencies"):
-		if get_viewport().gui_get_focus_owner() is LineEdit:
-			return
-		toggle()
-
-
-func toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
-		_refresh()
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-		if _detail_panel:
-			_detail_panel.hide_skill()
+	# Create the detail panel overlay (not parented to parent — returned via get_overlay_nodes)
+	var DetailPanel: GDScript = preload("res://scenes/ui/skill_detail_panel.gd")
+	_detail_panel = DetailPanel.new()
+	if _player:
+		_detail_panel.setup(_player)
 
 
-func is_open() -> bool:
-	return _is_open
+func get_overlay_nodes() -> Array[Control]:
+	var result: Array[Control] = []
+	if _detail_panel:
+		result.append(_detail_panel)
+	return result
 
 
-func _refresh() -> void:
-	if not _is_open or not _player:
+func refresh() -> void:
+	if not _content_parent or not _content_parent.visible:
+		return
+	if not _player:
 		return
 	_build_sidebar()
 	_build_right_content(_selected_prof_id)
@@ -330,7 +314,7 @@ func _build_right_content(prof_id: String) -> void:
 	var display_name: String = prof_def.get("name", prof_id)
 
 	# --- Proficiency header row: icon + name + level ---
-	var header := HBoxContainer.new()
+	var header: HBoxContainer = HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	_right_content.add_child(header)
 
@@ -347,11 +331,11 @@ func _build_right_content(prof_id: String) -> void:
 	header.add_child(level_label)
 
 	# --- XP bar row ---
-	var bar_row := HBoxContainer.new()
+	var bar_row: HBoxContainer = HBoxContainer.new()
 	bar_row.add_theme_constant_override("separation", 6)
 	_right_content.add_child(bar_row)
 
-	var xp_bar := ProgressBar.new()
+	var xp_bar: ProgressBar = ProgressBar.new()
 	xp_bar.custom_minimum_size = Vector2(120, 14)
 	xp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	xp_bar.max_value = xp_to_next if not is_max else 1
@@ -463,15 +447,11 @@ func _on_skill_row_hover(drag_source: Control, skill_id: String) -> void:
 	if bg_style:
 		bg_style.bg_color = Color(0.18, 0.16, 0.13)
 		bg_style.border_color = Color(0.7, 0.6, 0.3, 0.5)
-	if not _detail_panel:
-		var DetailPanel: GDScript = preload("res://scenes/ui/skill_detail_panel.gd")
-		_detail_panel = DetailPanel.new()
-		_detail_panel.setup(_player)
-		get_tree().root.add_child(_detail_panel)
-	# Position tooltip to the right of the panel
-	var row_global: Vector2 = drag_source.global_position
-	var anchor_pos: Vector2 = Vector2(_panel.global_position.x + _panel.size.x + 8, row_global.y)
-	_detail_panel.show_skill(skill_id, anchor_pos)
+	if _detail_panel:
+		# Position tooltip to the right of the content parent
+		var row_global: Vector2 = drag_source.global_position
+		var anchor_pos: Vector2 = Vector2(_content_parent.global_position.x + _content_parent.size.x + 8, row_global.y)
+		_detail_panel.show_skill(skill_id, anchor_pos)
 
 
 func _on_skill_row_unhover(drag_source: Control, _skill_id: String) -> void:

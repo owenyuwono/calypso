@@ -1,10 +1,9 @@
 extends Control
-## Player inventory panel toggled with Tab.
-## Layout: drag handle (full width), attack type + gold row (full width),
-## then side-by-side: EQUIPMENT section (left) | ITEMS section (right).
+## Player inventory panel — content builder for embedding in GameMenu.
+## Call build_content(parent) to build UI into the parent container.
+## Call get_overlay_nodes() to get tooltip/context/desc panels for overlay rendering.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
 const GRID_COLUMNS := 4
 const MIN_SLOTS := 20
@@ -57,14 +56,13 @@ const STAT_ICON_MAP: Dictionary = {
 	"Value": "gold_coin.png",
 }
 
-var _panel: PanelContainer
+var _content_parent: Control
 var _equip_grid: GridContainer
 var _grid: GridContainer
 var _gold_label: Label
 var _gold_icon: TextureRect
 var _tooltip: PanelContainer
 var _tooltip_label: Label
-var _is_open: bool = false
 
 var _desc_panel: PanelContainer
 var _desc_vbox: VBoxContainer
@@ -80,10 +78,8 @@ var _combat: Node
 var _stats: Node
 
 func _ready() -> void:
-	visible = false
 	_load_slot_icons()
-	_build_ui()
-	GameEvents.item_looted.connect(func(_a, _b, _c): _refresh())
+	GameEvents.item_looted.connect(func(_a, _b, _c): refresh())
 
 func _load_slot_icons() -> void:
 	for slot_name in SLOT_LABELS:
@@ -92,29 +88,19 @@ func _load_slot_icons() -> void:
 		if tex:
 			_slot_icons[slot_name] = tex
 
-func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(470, 0)
-	var style := UIHelper.create_panel_style()
-	_panel.add_theme_stylebox_override("panel", style)
-	add_child(_panel)
+func build_content(parent: Control) -> void:
+	_content_parent = parent
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 6)
 	margin.add_theme_constant_override("margin_bottom", 10)
-	_panel.add_child(margin)
+	parent.add_child(margin)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
-
-	# Title bar (full width)
-	var drag_handle := DragHandle.new()
-	drag_handle.setup(_panel, "Inventory")
-	drag_handle.close_pressed.connect(_toggle)
-	vbox.add_child(drag_handle)
 
 	# Main body: equipment (left) | separator | items (right)
 	var body_hbox := HBoxContainer.new()
@@ -192,7 +178,15 @@ func _build_ui() -> void:
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items_vbox.add_child(_grid)
 
-	# Tooltip — child of root Control so it overlays everything
+	# Build overlay nodes (not added to parent — returned via get_overlay_nodes())
+	_build_tooltip()
+	_build_desc_panel()
+	_build_context_menu()
+
+func get_overlay_nodes() -> Array[Control]:
+	return [_tooltip, _context_menu, _desc_panel]
+
+func _build_tooltip() -> void:
 	_tooltip = PanelContainer.new()
 	var tooltip_style := StyleBoxFlat.new()
 	tooltip_style.bg_color = Color(0.06, 0.05, 0.04, 0.96)
@@ -210,10 +204,6 @@ func _build_ui() -> void:
 	_tooltip.add_child(_tooltip_label)
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_tooltip)
-
-	_build_desc_panel()
-	_build_context_menu()
 
 func _build_desc_panel() -> void:
 	_desc_panel = PanelContainer.new()
@@ -230,7 +220,6 @@ func _build_desc_panel() -> void:
 	_desc_panel.custom_minimum_size = Vector2(280, 0)
 	_desc_panel.visible = false
 	_desc_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(_desc_panel)
 
 	_desc_vbox = VBoxContainer.new()
 	_desc_vbox.add_theme_constant_override("separation", 4)
@@ -250,7 +239,6 @@ func _build_context_menu() -> void:
 	_context_menu.add_theme_stylebox_override("panel", style)
 	_context_menu.visible = false
 	_context_menu.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(_context_menu)
 
 	_context_vbox = VBoxContainer.new()
 	_context_vbox.add_theme_constant_override("separation", 2)
@@ -264,34 +252,14 @@ func set_player(p: Node) -> void:
 		_combat = _player.get_node_or_null("CombatComponent")
 		_stats = _player.get_node_or_null("StatsComponent")
 
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_inventory"):
-		_toggle()
+func refresh() -> void:
+	if not _content_parent or not _content_parent.visible:
+		return
 
-func toggle() -> void:
-	_toggle()
-
-func _toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
-		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
-		_refresh()
-	else:
-		AudioManager.play_ui_sfx("ui_panel_close")
-		_tooltip.visible = false
-		_hide_desc()
-		_hide_context_menu()
-
-func is_open() -> bool:
-	return _is_open
-
-func _refresh() -> void:
 	_hide_desc()
 	_hide_context_menu()
 
-	if not _is_open or not _player:
+	if not _player:
 		return
 
 	if not _inventory or not _equipment:
@@ -523,14 +491,14 @@ func _format_tooltip(item_id: String) -> String:
 
 func _on_equip_cell_hover(item_id: String, cell: Control) -> void:
 	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_pos: Vector2 = cell.global_position - _panel.global_position
-	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
+	var cell_global: Vector2 = cell.global_position
+	_tooltip.position = Vector2(cell_global.x, cell_global.y - 28)
 	_tooltip.visible = true
 
 func _on_cell_hover(item_id: String, cell: Control) -> void:
 	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_pos: Vector2 = cell.global_position - _panel.global_position
-	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
+	var cell_global: Vector2 = cell.global_position
+	_tooltip.position = Vector2(cell_global.x, cell_global.y - 28)
 	_tooltip.visible = true
 
 func _on_cell_unhover() -> void:
@@ -616,7 +584,7 @@ func _show_desc(item_id: String) -> void:
 	close_btn.pressed.connect(_hide_desc)
 	_desc_vbox.add_child(close_btn)
 
-	# Position near center of panel
+	# Position near center of overlay container
 	_desc_panel.position = Vector2(60, 180)
 	_desc_panel.visible = true
 
@@ -673,9 +641,8 @@ func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2)
 			_add_context_button("Equip", _ctx_equip)
 		_add_context_button("Discard", _ctx_discard)
 
-	# Position near mouse, relative to this Control
-	var local_pos: Vector2 = global_pos - global_position
-	_context_menu.position = local_pos
+	# Position near mouse, in overlay container space
+	_context_menu.position = global_pos
 	_context_menu.visible = true
 
 func _add_context_button(text: String, callback: Callable) -> void:
@@ -736,10 +703,10 @@ func _ctx_discard() -> void:
 			loot_parent = get_tree().current_scene
 		loot_parent.call_deferred("add_child", loot)
 	_hide_context_menu()
-	_refresh()
+	refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _is_open:
+	if not _content_parent or not _content_parent.visible:
 		return
 	if not (event is InputEventMouseButton) or not event.pressed:
 		return
@@ -759,17 +726,17 @@ func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if heal_amount > 0 and _combat:
 		_combat.heal(heal_amount)
 	_inventory.remove_item(item_id)
-	_refresh()
+	refresh()
 
 func _equip_to_slot(item_id: String, _slot_hint: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.equip(item_id):
 		AudioManager.play_ui_sfx("ui_item_equip")
-		_refresh()
+		refresh()
 
 func _unequip(slot_name: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.unequip(slot_name):
-		_refresh()
+		refresh()
