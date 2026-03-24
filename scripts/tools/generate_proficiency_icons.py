@@ -47,6 +47,7 @@ CATEGORY_BASE = {
     "weapon":     "red.png",
     "gathering":  "green.png",
     "production": "yellow.png",
+    "social":     "pink.png",
 }
 
 # ---------------------------------------------------------------------------
@@ -68,8 +69,11 @@ PROFICIENCIES = [
     ("int",   "attribute", "an open book with a star above it, compact badge shape", 40),
     ("dex",   "attribute", "a single elegant feather quill, compact badge", 40),
     ("wis",   "attribute", "an eye with rays above it, compact badge shape", 40),
-    ("bow",   "weapon",    "a bow with arrow, compact side view badge", 40),
-    ("spear", "weapon",    "a single spear with pointed tip, diagonal, compact badge", 40),
+    ("bow",          "weapon",    "a bow with arrow, compact side view badge", 40),
+    ("spear",        "weapon",    "a single spear with pointed tip, diagonal, compact badge", 40),
+    ("charisma",     "social",    "a single smiling theater comedy mask, compact front-facing badge shape", 40),
+    ("persuasion",   "social",    "a balanced scale with two pans, compact symmetrical badge shape", 40),
+    ("intimidation", "social",    "an iron gauntlet clenched into a fist, compact badge shape", 40),
 ]
 
 # ---------------------------------------------------------------------------
