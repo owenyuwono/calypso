@@ -22,10 +22,11 @@ const _STAT_ICONS: Dictionary = {
 }
 
 # Proficiency display order within each category
-const _CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production", "social"]
+const _CATEGORY_ORDER: Array = ["weapon", "attribute", "magic", "gathering", "production", "social"]
 const _CATEGORY_LABELS: Dictionary = {
 	"weapon": "Weapon",
 	"attribute": "Attributes",
+	"magic": "Magic",
 	"gathering": "Gathering",
 	"production": "Production",
 	"social": "Social",
@@ -276,6 +277,7 @@ func _build_proficiency_section(vbox: VBoxContainer) -> void:
 
 	_build_category_row(left_col, "weapon")
 	_build_category_row(left_col, "attribute")
+	_build_category_row(left_col, "magic")
 	_build_category_row(right_col, "gathering")
 	_build_category_row(right_col, "production")
 	_build_category_row(right_col, "social")

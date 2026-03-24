@@ -94,37 +94,37 @@ const SKILLS: Dictionary = {
 	},
 	# Magic skills — XP per magical hit with that element
 	"fire": {
-		"name": "Fire Magic",
+		"name": "Fire",
 		"category": "magic",
 		"description": "Mastery of fire spells. Increases fire damage.",
 	},
 	"ice": {
-		"name": "Ice Magic",
+		"name": "Ice",
 		"category": "magic",
 		"description": "Mastery of ice spells. Increases ice damage.",
 	},
 	"lightning": {
-		"name": "Lightning Magic",
+		"name": "Lightning",
 		"category": "magic",
 		"description": "Mastery of lightning spells. Increases lightning damage.",
 	},
 	"earth": {
-		"name": "Earth Magic",
+		"name": "Earth",
 		"category": "magic",
 		"description": "Mastery of earth spells. Increases earth damage.",
 	},
 	"light": {
-		"name": "Light Magic",
+		"name": "Light",
 		"category": "magic",
 		"description": "Mastery of holy spells. Increases light damage.",
 	},
 	"dark": {
-		"name": "Dark Magic",
+		"name": "Dark",
 		"category": "magic",
 		"description": "Mastery of dark spells. Increases dark damage.",
 	},
 	"arcane": {
-		"name": "Arcane Magic",
+		"name": "Arcane",
 		"category": "magic",
 		"description": "Mastery of arcane spells. Increases arcane damage.",
 	},
@@ -186,6 +186,6 @@ static func get_default_proficiencies() -> Dictionary:
 	var result: Dictionary = {}
 	for skill_id in SKILLS:
 		var skill: Dictionary = SKILLS[skill_id]
-		var starting_level: int = 0 if skill.get("category") == "magic" else 1
+		var starting_level: int = 1
 		result[skill_id] = {"level": starting_level, "xp": 0}
 	return result
