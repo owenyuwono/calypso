@@ -1,5 +1,5 @@
 extends Node
-## Translates LLM action decisions into game mechanics for adventurer NPCs.
+## Translates behavior decisions into game mechanics for adventurer NPCs.
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const RecipeDatabase = preload("res://scripts/data/recipe_database.gd")

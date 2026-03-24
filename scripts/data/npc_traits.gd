@@ -1,11 +1,18 @@
 extends RefCounted
-## Static NPC trait profiles — personality axes that drive behavior and LLM prompts.
+## Static NPC trait profiles — personality axes that drive behavior.
 
 # Trait axes (0.0–1.0):
 # boldness: 0=cautious, 1=reckless — affects retreat HP%, aggro willingness
 # sociability: 0=introverted, 1=extroverted — affects social chat cooldown
 # generosity: 0=selfish, 1=generous — future use (trade willingness)
 # curiosity: 0=focused, 1=exploratory — future use (goal switching)
+
+const BOLDNESS_LABELS: Array = [
+	[0.3, "cautious"], [0.6, "steady"], [1.0, "bold"],
+]
+const SOCIABILITY_LABELS: Array = [
+	[0.3, "quiet"], [0.6, "moderate"], [1.0, "talkative"],
+]
 
 const PROFILES: Dictionary = {
 	"bold_warrior": {
@@ -74,14 +81,6 @@ const PROFILES: Dictionary = {
 		"starting_proficiencies": {"sword": 2, "str": 2, "con": 2, "agi": 1, "int": 1, "dex": 2, "wis": 2},
 	},
 }
-
-# Label mappings for compact LLM trait summaries
-const BOLDNESS_LABELS: Array = [
-	[0.3, "cautious"], [0.6, "steady"], [1.0, "bold"],
-]
-const SOCIABILITY_LABELS: Array = [
-	[0.3, "quiet"], [0.6, "moderate"], [1.0, "talkative"],
-]
 
 static func get_profile(id: String) -> Dictionary:
 	return PROFILES.get(id, {})
