@@ -63,10 +63,14 @@ func _ready() -> void:
 		quest_log_panel.set_player(player)
 		player.quest_log_panel = quest_log_panel
 
-	var toast_notification: Control = Control.new()
-	toast_notification.set_script(preload("res://scenes/ui/toast_notification.gd"))
-	toast_notification.name = "ToastNotification"
-	$UILayer.add_child(toast_notification)
+	var relationship_panel: Control = Control.new()
+	relationship_panel.set_script(preload("res://scenes/ui/relationship_panel.gd"))
+	relationship_panel.name = "RelationshipPanel"
+	relationship_panel.visible = false
+	$UILayer.add_child(relationship_panel)
+	if player:
+		relationship_panel.set_player(player)
+		player.relationship_panel = relationship_panel
 
 	var proficiency_panel := $UILayer/ProficiencyPanel
 	if player and proficiency_panel:
@@ -103,6 +107,7 @@ func _ready() -> void:
 		panel_toggles.skill_panel = skill_panel
 		panel_toggles.proficiency_panel = proficiency_panel
 		panel_toggles.settings_panel = settings_panel
+		panel_toggles.relationship_panel = relationship_panel
 
 	# Wire world map reference to minimap so the compass button can open it
 	var minimap := $UILayer/Minimap

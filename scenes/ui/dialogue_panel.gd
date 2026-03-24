@@ -21,7 +21,6 @@ var _choices_container: VBoxContainer
 
 # Relationship indicator widgets (created in _build_ui, updated in open_dialogue)
 var _rel_tier_label: Label = null
-var _rel_progress_bar: ProgressBar = null
 
 # Whether we are currently in gift-selection mode
 var _in_gift_mode: bool = false
@@ -119,24 +118,6 @@ func _build_ui() -> void:
 	_rel_tier_label.add_theme_color_override("font_color", Color("888888"))
 	_rel_tier_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_row.add_child(_rel_tier_label)
-
-	# Progress bar — thin, 60px wide, 4px tall, centered vertically
-	_rel_progress_bar = ProgressBar.new()
-	_rel_progress_bar.custom_minimum_size = Vector2(60, 4)
-	_rel_progress_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_rel_progress_bar.show_percentage = false
-
-	var bar_bg := StyleBoxFlat.new()
-	bar_bg.bg_color = Color(0.2, 0.2, 0.2, 0.8)
-	bar_bg.set_corner_radius_all(2)
-	_rel_progress_bar.add_theme_stylebox_override("background", bar_bg)
-
-	var bar_fill := StyleBoxFlat.new()
-	bar_fill.bg_color = Color("888888")
-	bar_fill.set_corner_radius_all(2)
-	_rel_progress_bar.add_theme_stylebox_override("fill", bar_fill)
-
-	name_row.add_child(_rel_progress_bar)
 
 	# Dialogue text — body font, word-wrapped, fills available space
 	_dialogue_text = Label.new()
@@ -272,37 +253,19 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 
 
 func _update_relationship_indicator(npc_node: Node) -> void:
-	if _rel_tier_label == null or _rel_progress_bar == null:
+	if _rel_tier_label == null:
 		return
 
 	var rel_comp: Node = npc_node.get_node_or_null("RelationshipComponent")
 	if rel_comp == null:
-		_rel_tier_label.text = "stranger"
+		_rel_tier_label.text = "Stranger"
 		_rel_tier_label.add_theme_color_override("font_color", Color("888888"))
-		_rel_progress_bar.value = 0.0
-		_rel_progress_bar.visible = true
 		return
 
 	var tier: String = rel_comp.get_tier("player")
-	var progress: float = rel_comp.get_progress_toward_next("player")
-
 	var tier_color: Color = TIER_COLORS.get(tier, Color("888888"))
 	_rel_tier_label.text = tier.capitalize()
 	_rel_tier_label.add_theme_color_override("font_color", tier_color)
-
-	# Update progress bar fill color to match tier
-	var bar_fill := StyleBoxFlat.new()
-	bar_fill.bg_color = tier_color
-	bar_fill.set_corner_radius_all(2)
-	_rel_progress_bar.add_theme_stylebox_override("fill", bar_fill)
-
-	if tier == "bonded":
-		_rel_progress_bar.visible = false
-	else:
-		_rel_progress_bar.value = progress * 100.0
-		_rel_progress_bar.min_value = 0.0
-		_rel_progress_bar.max_value = 100.0
-		_rel_progress_bar.visible = true
 
 
 func _record_conversation_event(npc_node: Node) -> void:
