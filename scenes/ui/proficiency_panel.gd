@@ -7,9 +7,10 @@ const CATEGORY_DISPLAY_NAMES: Dictionary = {
 	"attribute": "Attributes",
 	"gathering": "Gathering",
 	"production": "Production",
+	"social": "Social",
 }
 
-const CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production"]
+const CATEGORY_ORDER: Array = ["weapon", "attribute", "gathering", "production", "social"]
 
 var _panel: PanelContainer
 var _is_open: bool = false

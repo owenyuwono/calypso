@@ -12,6 +12,15 @@ const FALLBACK_TOPICS: Array = [
 	"how the hunting is going", "life in town", "the monsters around here",
 ]
 
+const RICH_GREETINGS: Array = [
+	"It's always a pleasure to see you, %s!",
+	"Ah, %s! I was hoping I'd run into you today.",
+	"%s! Come, let me tell you about %s.",
+	"You brighten my day, %s. How have you been?",
+	"My friend %s! Have you been keeping well?",
+	"%s, you're just the person I wanted to talk to about %s.",
+]
+
 const SOCIAL_GOALS: Array = ["idle", "patrol", "rest", "vend"]
 
 var _npc: CharacterBody3D
@@ -78,17 +87,33 @@ func try_social_chat() -> bool:
 	# Sort by tier_index descending — prefer closer relationships
 	candidates.sort_custom(func(a, b): return a["tier_index"] > b["tier_index"])
 
+	# Check if a charisma 5+ player is within social range
+	var player_charisma: int = _get_nearby_player_charisma(perception)
+
 	for c in candidates:
 		var subject: String = FALLBACK_TOPICS[randi() % FALLBACK_TOPICS.size()]
 		var target_name: String = WorldState.get_entity_data(c["id"]).get("name", c["id"])
-		var canned_lines: Array = [
-			"Hey %s, how's it going?" % target_name,
-			"Good to see you, %s." % target_name,
-			"Stay safe out there, %s." % target_name,
-			"Have you heard anything about %s?" % subject,
-			"I was just thinking about %s." % subject,
-		]
-		var line: String = canned_lines[randi() % canned_lines.size()]
+		var line: String
+		if player_charisma >= 5:
+			# Use richer greeting pool when a high-charisma player is nearby
+			var rich_line: String = RICH_GREETINGS[randi() % RICH_GREETINGS.size()]
+			if "%s" in rich_line:
+				var placeholders: int = rich_line.count("%s")
+				if placeholders == 1:
+					line = rich_line % target_name
+				else:
+					line = rich_line % [target_name, subject]
+			else:
+				line = rich_line
+		else:
+			var canned_lines: Array = [
+				"Hey %s, how's it going?" % target_name,
+				"Good to see you, %s." % target_name,
+				"Stay safe out there, %s." % target_name,
+				"Have you heard anything about %s?" % subject,
+				"I was just thinking about %s." % subject,
+			]
+			line = canned_lines[randi() % canned_lines.size()]
 		GameEvents.npc_spoke.emit(_npc.npc_id, line, c["id"])
 		var sociability: float = NpcTraits.get_trait(_npc.trait_profile, "sociability", 0.5)
 		var min_cd: float = SOCIAL_COOLDOWN_MIN + (1.0 - sociability) * 40.0
@@ -96,4 +121,22 @@ func try_social_chat() -> bool:
 		_social_cooldown = randf_range(min_cd, max_cd)
 		return true
 	return false
+
+
+func _get_nearby_player_charisma(perception: Dictionary) -> int:
+	# The player entity is included in the "npcs" array with id "player"
+	var npcs: Array = perception.get("npcs", [])
+	for n in npcs:
+		var nid: String = n.get("id", "")
+		if nid != "player":
+			continue
+		var player_node: Node = WorldState.get_entity(nid)
+		if not player_node:
+			return 0
+		var prog: Node = player_node.get_node_or_null("ProgressionComponent")
+		if not prog:
+			return 0
+		var charisma_level: int = prog.get_proficiency_level("charisma")
+		return charisma_level
+	return 0
 

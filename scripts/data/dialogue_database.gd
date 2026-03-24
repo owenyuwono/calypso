@@ -11,6 +11,7 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about the fields.", "next": "fields_info"},
 				{"text": "Hunt together?", "next": "hunt_together", "condition": "relationship >= friendly"},
+				{"text": "Tell me about your adventures.", "next": "kael_adventures_prompt", "condition": "proficiency:charisma >= 3"},
 				{"text": "About those wolves...", "next": "kael_quest_offer", "condition": "quest:field_patrol:not_started"},
 				{"text": "Any progress on the wolves?", "next": "kael_quest_progress", "condition": "quest:field_patrol:active"},
 				{"text": "I've dealt with the wolves.", "next": "kael_quest_complete", "condition": "quest:field_patrol:completable"},
@@ -64,6 +65,27 @@ const DIALOGUES: Dictionary = {
 				{"text": "Maybe another time.", "next": null},
 			],
 		},
+		"kael_adventures_prompt": {
+			"text": "Ha! You actually want to hear it? Most people just nod and move on. Alright — pull up a wall, this one's worth telling.",
+			"choices": [
+				{"text": "I'm listening.", "next": "kael_adventures_story"},
+				{"text": "Actually, never mind.", "next": null},
+			],
+		},
+		"kael_adventures_story": {
+			"text": "Three months back I was cornered in the west field — four wolves, low on potions, one skill charge left. Most people would've run. I used Cleave on the two closest, got lucky crits on both, and the other two broke off. Walked away with full wolf pelt drops.",
+			"choices": [
+				{"text": "You stayed and fought all four?", "next": "kael_adventures_ending"},
+				{"text": "Bold move. Did it always work like that?", "next": "kael_adventures_ending"},
+			],
+		},
+		"kael_adventures_ending": {
+			"text": "That one time, yeah. Plenty of others I got flattened and had to limp back through the gate. That's the thing about the field — every run teaches you something, if you survive it. Keep that in mind when you head out.",
+			"choices": [
+				{"text": "I will. Thanks for telling me.", "next": null},
+				{"text": "I'll aim to do better than surviving.", "next": null},
+			],
+		},
 	},
 
 	"lyra": {
@@ -72,6 +94,7 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about magic.", "next": "magic_theory"},
 				{"text": "Any dangers I should know about?", "next": "field_dangers"},
+				{"text": "Could you teach me something?", "next": "lyra_teach_consider", "condition": "proficiency:persuasion >= 4"},
 				{"text": "About your research...", "next": "lyra_quest_offer", "condition": "quest:arcane_study:not_started"},
 				{"text": "How's the slime study going?", "next": "lyra_quest_progress", "condition": "quest:arcane_study:active"},
 				{"text": "I have data from the slimes.", "next": "lyra_quest_complete", "condition": "quest:arcane_study:completable"},
@@ -142,6 +165,27 @@ const DIALOGUES: Dictionary = {
 			"text": "The WIS stat also governs cooldown reduction — up to a cap. People sleep on WIS. If you're using skills heavily, a few points there will pay off. Probably. That's my working hypothesis, anyway.",
 			"choices": [
 				{"text": "I'll keep that in mind. Thanks.", "next": null},
+			],
+		},
+		"lyra_teach_consider": {
+			"text": "...Teach you something. That's an unusual request. Most people just want to know which element does more damage. You're asking about knowledge, not numbers. Hmm.",
+			"choices": [
+				{"text": "I want to understand the theory, not just the output.", "next": "lyra_teach_lesson"},
+				{"text": "I'll take whatever you're willing to share.", "next": "lyra_teach_lesson"},
+			],
+		},
+		"lyra_teach_lesson": {
+			"text": "Alright. Here's something worth knowing: the damage formula isn't linear. At low INT, each point of INT gains you very little. Past a threshold, returns improve. This is why mages who spread stats thin stay weak — the investment only pays off when you commit.",
+			"choices": [
+				{"text": "So single-stat focus is the right call.", "next": "lyra_teach_followup"},
+				{"text": "When does the threshold kick in?", "next": "lyra_teach_followup"},
+			],
+		},
+		"lyra_teach_followup": {
+			"text": "Around INT 4 or 5, in my estimation. Below that, a staff is mostly just a stick you swing. Above it, the magical damage starts to compound noticeably. I haven't had a student in a long time. Don't make me regret this.",
+			"choices": [
+				{"text": "You won't. Thank you, Lyra.", "next": null, "action": "persuasion_attempt"},
+				{"text": "I'll put it to use.", "next": null, "action": "persuasion_attempt"},
 			],
 		},
 	},
@@ -276,6 +320,7 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Tell me about healing and crafting.", "next": "healing_crafting"},
 				{"text": "Any advice for staying alive out there?", "next": "survival_advice"},
+				{"text": "You seem like you have a secret...", "next": "mira_secret_deflect", "condition": "proficiency:charisma >= 5"},
 				{"text": "About those sardines...", "next": "mira_quest_offer", "condition": "quest:healers_herbs:not_started"},
 				{"text": "I still need to get the sardines.", "next": "mira_quest_progress", "condition": "quest:healers_herbs:active"},
 				{"text": "I have the cooked sardine.", "next": "mira_quest_complete", "condition": "quest:healers_herbs:completable"},
@@ -338,6 +383,27 @@ const DIALOGUES: Dictionary = {
 			"text": "Between fights, just stand still for a moment. HP regenerates on its own outside of combat — it's slow, but it adds up. If you've trained CON, the regen rate is noticeably faster. For longer rest, there are spots in the park district.",
 			"choices": [
 				{"text": "Thank you. That's really helpful.", "next": null},
+			],
+		},
+		"mira_secret_deflect": {
+			"text": "A secret? That's... a strange thing to say. What makes you think that?",
+			"choices": [
+				{"text": "You pause before answering. You measure your words carefully.", "next": "mira_secret_pause"},
+				{"text": "Just a feeling. You don't have to say anything.", "next": "mira_secret_pause"},
+			],
+		},
+		"mira_secret_pause": {
+			"text": "...I used to be a field healer. Before I came here. There was an expedition — a large one, into the west caves before they were cleared. Someone I was responsible for didn't make it back. I couldn't help them in time.",
+			"choices": [
+				{"text": "That's why you're so focused on prevention.", "next": "mira_secret_resolve"},
+				{"text": "That must have been hard to carry.", "next": "mira_secret_resolve"},
+			],
+		},
+		"mira_secret_resolve": {
+			"text": "The potions, the stamina advice, the rest spots — yes. I'd rather ten people not need emergency healing than save one person dramatically. Nobody talks about the ones who didn't need saving. But I know they're out there. That's enough.",
+			"choices": [
+				{"text": "Thank you for telling me.", "next": null},
+				{"text": "I'll remember that. I'll be careful out there.", "next": null},
 			],
 		},
 	},
@@ -666,5 +732,19 @@ static func evaluate_condition(condition: String, player: Node, npc: Node) -> bo
 		var flag_name: String = condition.substr(5)
 		var quest_comp: Node = player.get_node_or_null("QuestComponent")
 		return quest_comp and quest_comp.has_flag(flag_name)
+
+	# proficiency:skill_id >= level — check player proficiency level
+	if condition.begins_with("proficiency:"):
+		var remainder: String = condition.substr(12)
+		var parts: Array = remainder.split(" >= ")
+		if parts.size() != 2:
+			return false
+		var skill_id: String = parts[0].strip_edges()
+		var required_level: int = int(parts[1].strip_edges())
+		var prog: Node = player.get_node_or_null("ProgressionComponent")
+		if not prog:
+			return false
+		var level: int = prog.get_proficiency_level(skill_id)
+		return level >= required_level
 
 	return true

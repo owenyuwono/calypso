@@ -24,8 +24,10 @@ func get_or_create(entity_id: String) -> Dictionary:
 
 # --- Event Recording ---
 
-func record_event(entity_id: String, event: String, game_day: int) -> void:
+func record_event(entity_id: String, event: String, game_day: int, charisma_level: int = 0) -> void:
 	var rel: Dictionary = get_or_create(entity_id)
+	if entity_id == "player" and charisma_level > 0:
+		rel["charisma_level"] = charisma_level
 	rel["history"].append({
 		"event": event,
 		"timestamp": Time.get_unix_time_from_system(),
@@ -79,8 +81,9 @@ func _evaluate_tier(entity_id: String) -> void:
 	# Promotion (one tier at a time, no cascading)
 	var current_tier: String = rel["tier"]
 	var next_tier: String = _get_next_tier(current_tier)
+	var charisma: int = rel.get("charisma_level", 0)
 	if not next_tier.is_empty():
-		if _can_promote(current_tier, next_tier, conversation_count, shared_combat_count, helped_count, saved_count, shared_secret_count, rel["tension"]):
+		if _can_promote(current_tier, next_tier, conversation_count, shared_combat_count, helped_count, saved_count, shared_secret_count, rel["tension"], charisma):
 			rel["tier"] = next_tier
 			GameEvents.relationship_tier_changed.emit(_get_entity_id(), entity_id, current_tier, next_tier)
 
@@ -99,16 +102,23 @@ func _get_prev_tier(current: String) -> String:
 	return TIER_LADDER[idx - 1]
 
 
-func _can_promote(from: String, to: String, conv: int, combat: int, helped: int, saved: int, secret: int, tension: float) -> bool:
+func _can_promote(from: String, to: String, conv: int, combat: int, helped: int, saved: int, secret: int, tension: float, charisma_level: int = 0) -> bool:
+	# Reduce conversation thresholds based on charisma (not combat/helped/saved/secret)
+	var conv_reduction: int = 0
+	if charisma_level >= 7:
+		conv_reduction = 2
+	elif charisma_level >= 4:
+		conv_reduction = 1
+
 	match to:
 		"recognized":
-			return conv >= 1 or combat >= 1
+			return conv >= max(1, 1 - conv_reduction) or combat >= 1
 		"acquaintance":
-			return conv >= 3 or combat >= 2
+			return conv >= max(1, 3 - conv_reduction) or combat >= 2
 		"friendly":
-			return (conv >= 5 and combat >= 1) or helped >= 1
+			return (conv >= max(1, 5 - conv_reduction) and combat >= 1) or helped >= 1
 		"close":
-			return conv >= 10 and combat >= 3 and tension < 0.7
+			return conv >= max(1, 10 - conv_reduction) and combat >= 3 and tension < 0.7
 		"bonded":
 			return saved >= 1 or secret >= 1
 	return false

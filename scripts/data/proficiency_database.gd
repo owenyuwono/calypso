@@ -3,7 +3,7 @@ extends RefCounted
 
 const MAX_LEVEL: int = 10
 
-const CATEGORIES: Array = ["weapon", "attribute", "gathering", "production"]
+const CATEGORIES: Array = ["weapon", "attribute", "gathering", "production", "social"]
 
 # Attribute display order within the attribute category
 const ATTRIBUTE_ORDER: Array = ["str", "con", "agi", "int", "dex", "wis"]
@@ -107,6 +107,17 @@ const SKILLS: Dictionary = {
 		"name": "Crafting",
 		"category": "production",
 		"description": "Creating items from gathered materials. Levels up by crafting.",
+	},
+	# Social skills — XP per successful social interaction
+	"charisma": {
+		"name": "Charisma",
+		"category": "social",
+		"description": "Your natural likeability and social warmth.",
+	},
+	"persuasion": {
+		"name": "Persuasion",
+		"category": "social",
+		"description": "Your ability to influence others.",
 	},
 }
 
