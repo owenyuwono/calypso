@@ -196,6 +196,7 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "Let me see what you have.", "next": null, "action": "trade"},
 				{"text": "Tell me about your weapons.", "next": "weapons_talk"},
+				{"text": "I suggest you tell me what you know.", "next": "bjorn_intimidate", "condition": "proficiency:intimidation >= 3"},
 				{"text": "About that ore...", "next": "bjorn_quest_offer", "condition": "quest:miners_request:not_started"},
 				{"text": "I have the ore.", "next": "bjorn_quest_complete", "condition": "quest:miners_request:completable"},
 				{"text": "About the ore...", "next": "bjorn_quest_progress", "condition": "quest:miners_request:active"},
@@ -242,6 +243,25 @@ const DIALOGUES: Dictionary = {
 				{"text": "Thanks for the advice.", "next": null},
 			],
 		},
+		"bjorn_intimidate": {
+			"text": "Ha! You've got nerve, I'll give you that. Alright, listen close — I suggest you tell me what you know. Monsters out west have been grouping tighter than usual. I've seen it myself. My advice? Hit fast, hit hard, don't let them surround you. The ones who hesitate don't come back.",
+			"choices": [
+				{"text": "That's what I needed. Thanks, Bjorn.", "next": "bjorn_intimidate_close"},
+				{"text": "Any specific tactics against the packs?", "next": "bjorn_intimidate_tactics"},
+			],
+		},
+		"bjorn_intimidate_tactics": {
+			"text": "AoE skills. Whirlwind, Cleave — anything that hits the group at once. Pick off the mages first, they hang back. And if you're using a mace, aim for the skeletons. Bones crack real nice.",
+			"choices": [
+				{"text": "I'll remember that. Good talk.", "next": "bjorn_intimidate_close"},
+			],
+		},
+		"bjorn_intimidate_close": {
+			"text": "Don't waste what I just told you. Now get out there and make it count.",
+			"choices": [
+				{"text": "Count on it.", "next": null, "action": "intimidation_attempt"},
+			],
+		},
 	},
 
 	"sera": {
@@ -250,6 +270,7 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "What are you selling?", "next": null, "action": "trade"},
 				{"text": "What can you tell me about rare drops?", "next": "rare_drops"},
+				{"text": "Don't make me ask twice.", "next": "sera_intimidate", "condition": "proficiency:intimidation >= 4"},
 				{"text": "Just looking around.", "next": null},
 			],
 		},
@@ -266,6 +287,25 @@ const DIALOGUES: Dictionary = {
 			"choices": [
 				{"text": "I owe you one. Let me see your stock.", "next": null, "action": "trade"},
 				{"text": "Much appreciated.", "next": null},
+			],
+		},
+		"sera_intimidate": {
+			"text": "...Fine. Fine! There's a stash — loose floorboard under the east market stall, the one that's always closed. I've been moving goods through there. Nothing you'd arrest me for, but information worth knowing. Now you know. We square?",
+			"choices": [
+				{"text": "For now. What else?", "next": "sera_intimidate_press"},
+				{"text": "We're square. For now.", "next": "sera_intimidate_close"},
+			],
+		},
+		"sera_intimidate_press": {
+			"text": "That's all you're getting out of me today. I've got a reputation to protect. Push much harder and I'll stop being cooperative entirely — and you won't like that.",
+			"choices": [
+				{"text": "Fair enough. We're done here.", "next": "sera_intimidate_close"},
+			],
+		},
+		"sera_intimidate_close": {
+			"text": "Smart. Now let's pretend this was a normal conversation.",
+			"choices": [
+				{"text": "Already forgotten.", "next": null, "action": "intimidation_attempt"},
 			],
 		},
 	},

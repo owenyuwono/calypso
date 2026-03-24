@@ -543,6 +543,13 @@ func _execute_action(action: String) -> void:
 		close_dialogue()
 		return
 
+	if action == "intimidation_attempt":
+		var prog: Node = _player.get_node_or_null("ProgressionComponent") if _player else null
+		if prog:
+			prog.grant_proficiency_xp("intimidation", 5)
+		close_dialogue()
+		return
+
 	match action:
 		"trade":
 			_dialogue_text.text = "Take your time browsing..."

@@ -119,6 +119,11 @@ const SKILLS: Dictionary = {
 		"category": "social",
 		"description": "Your ability to influence others.",
 	},
+	"intimidation": {
+		"name": "Intimidation",
+		"category": "social",
+		"description": "Your ability to coerce others through force of will.",
+	},
 }
 
 static func get_skill(skill_id: String) -> Dictionary:
