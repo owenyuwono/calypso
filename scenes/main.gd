@@ -63,6 +63,11 @@ func _ready() -> void:
 		quest_log_panel.set_player(player)
 		player.quest_log_panel = quest_log_panel
 
+	var toast_notification: Control = Control.new()
+	toast_notification.set_script(preload("res://scenes/ui/toast_notification.gd"))
+	toast_notification.name = "ToastNotification"
+	$UILayer.add_child(toast_notification)
+
 	var proficiency_panel := $UILayer/ProficiencyPanel
 	if player and proficiency_panel:
 		proficiency_panel.set_player(player)

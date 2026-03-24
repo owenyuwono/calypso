@@ -212,16 +212,16 @@ func get_key_memories_summary(max_count: int = 3) -> String:
 # =============================================================================
 
 func _on_npc_spoke_memory(speaker_id: String, _dialogue: String, target_id: String) -> void:
-	# Record conversation relationship when this NPC is speaker or target (exclude player)
+	# Record conversation relationship for any interaction involving this NPC, including player
+	var rel_comp: Node = get_parent().get_node_or_null("RelationshipComponent")
+	if rel_comp:
+		if speaker_id == _npc_id and target_id != _npc_id:
+			rel_comp.record_event(target_id, "conversation", TimeManager.get_day())
+		elif target_id == _npc_id and speaker_id != _npc_id:
+			rel_comp.record_event(speaker_id, "conversation", TimeManager.get_day())
+	# Skip NPC memory/LLM context building for player interactions
 	if speaker_id == "player" or target_id == "player":
 		return
-	var rel_comp = get_parent().get_node_or_null("RelationshipComponent")
-	if not rel_comp:
-		return
-	if speaker_id == _npc_id and target_id != _npc_id:
-		rel_comp.record_event(target_id, "conversation", TimeManager.get_day())
-	elif target_id == _npc_id and speaker_id != _npc_id:
-		rel_comp.record_event(speaker_id, "conversation", TimeManager.get_day())
 
 func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 	# Skip if this NPC died
@@ -233,9 +233,11 @@ func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 		return
 	if not ("monster_type" in entity_node):
 		return
-	# Check killer is an NPC
+	# Killer must be an NPC or the player
 	var killer_node := WorldState.get_entity(killer_id)
-	if not killer_node or not ("npc_id" in killer_node):
+	var killer_is_npc: bool = killer_node != null and is_instance_valid(killer_node) and ("npc_id" in killer_node)
+	var killer_is_player: bool = killer_id == "player"
+	if not killer_is_npc and not killer_is_player:
 		return
 	var my_node := get_parent()
 	if not is_instance_valid(my_node):
@@ -243,24 +245,26 @@ func _on_entity_died_memory(entity_id: String, killer_id: String) -> void:
 	var dist: float = my_node.global_position.distance_to(entity_node.global_position)
 	if dist >= 15.0:
 		return
-	var rel_comp = get_parent().get_node_or_null("RelationshipComponent")
+	var rel_comp: Node = get_parent().get_node_or_null("RelationshipComponent")
 	if not rel_comp:
 		return
 	if killer_id == _npc_id:
-		# This NPC is the killer — find nearby ally NPCs who were also fighting
+		# This NPC is the killer — find nearby ally NPCs and player who were also fighting
 		for eid in WorldState.entities:
 			if eid == _npc_id or eid == entity_id:
 				continue
 			var ally_node := WorldState.get_entity(eid)
 			if not ally_node or not is_instance_valid(ally_node):
 				continue
-			if not ("npc_id" in ally_node):
+			var ally_is_npc: bool = "npc_id" in ally_node
+			var ally_is_player: bool = eid == "player"
+			if not ally_is_npc and not ally_is_player:
 				continue
 			var ally_dist: float = ally_node.global_position.distance_to(entity_node.global_position)
 			if ally_dist < 15.0:
 				rel_comp.record_event(eid, "shared_combat", TimeManager.get_day())
 	else:
-		# This NPC is a bystander — record shared combat with the killer
+		# This NPC is a bystander — record shared combat with the killer (NPC or player)
 		rel_comp.record_event(killer_id, "shared_combat", TimeManager.get_day())
 
 func _on_proficiency_level_up_memory(entity_id: String, skill_id: String, new_level: int) -> void:

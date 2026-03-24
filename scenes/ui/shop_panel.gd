@@ -27,6 +27,7 @@ var _cart: Dictionary = {}  # {item_id: count}
 var _is_open: bool = false
 var _player: Node
 var _vendor: Node = null
+var _discount: float = 0.0
 
 
 func _ready() -> void:
@@ -117,6 +118,7 @@ func open_shop(vendor: Node) -> void:
 	visible = true
 	AudioManager.play_ui_sfx("ui_panel_open")
 	UIHelper.center_panel(_panel)
+	_cache_discount()
 	_refresh_wares()
 	_refresh_cart()
 
@@ -126,6 +128,7 @@ func close_shop() -> void:
 	visible = false
 	_vendor = null
 	_cart.clear()
+	_discount = 0.0
 	shop_closed.emit()
 
 
@@ -147,8 +150,9 @@ func get_cart_total() -> int:
 	var total: int = 0
 	for item_id: String in _cart:
 		var listing: Dictionary = listings.get(item_id, {})
-		var price: int = listing.get("price", 0)
-		total += price * _cart[item_id]
+		var base_price: int = listing.get("price", 0)
+		var discounted_price: int = maxi(1, ceili(base_price * (1.0 - _discount)))
+		total += discounted_price * _cart[item_id]
 	return total
 
 
@@ -213,6 +217,18 @@ func _remove_from_cart(item_id: String) -> void:
 	cart_changed.emit(get_cart_total())
 
 
+# --- Discount helpers ---
+
+func _cache_discount() -> void:
+	_discount = 0.0
+	if not _vendor or not _player:
+		return
+	var vending_comp: Node = _vendor.get_node_or_null("VendingComponent")
+	if not vending_comp:
+		return
+	_discount = vending_comp.get_discount_for("player")
+
+
 # --- Refresh helpers ---
 
 func _refresh_wares() -> void:
@@ -230,7 +246,8 @@ func _refresh_wares() -> void:
 		var listing: Dictionary = listings[item_id]
 		if listing.get("count", 0) <= 0:
 			continue
-		var cell: Control = _create_item_cell(item_id, listing.get("count", 0), listing.get("price", 0), false)
+		var base_price: int = listing.get("price", 0)
+		var cell: Control = _create_item_cell(item_id, listing.get("count", 0), base_price, false)
 		_wares_grid.add_child(cell)
 
 
@@ -264,6 +281,8 @@ func _create_item_cell(item_id: String, count: int, price: int, is_cart: bool) -
 	var item_type: String = item_data.get("type", "")
 
 	var bg_color: Color = TYPE_COLORS.get(item_type, TYPE_COLOR_DEFAULT)
+	var discounted_price: int = maxi(1, ceili(price * (1.0 - _discount)))
+	var has_discount: bool = _discount > 0.0 and discounted_price < price
 
 	# Outer container sized to CELL_SIZE
 	var container := Panel.new()
@@ -272,7 +291,10 @@ func _create_item_cell(item_id: String, count: int, price: int, is_cart: bool) -
 	var bg_style := UIHelper.create_style_box(bg_color, Color(0.8, 0.7, 0.5, 0.5), 3, 1)
 	container.add_theme_stylebox_override("panel", bg_style)
 
-	container.tooltip_text = "%s\n%dg each" % [item_name, price]
+	if has_discount:
+		container.tooltip_text = "%s\n%dg  →  %dg each" % [item_name, price, discounted_price]
+	else:
+		container.tooltip_text = "%s\n%dg each" % [item_name, discounted_price]
 	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	# Letter label centered
@@ -298,6 +320,24 @@ func _create_item_cell(item_id: String, count: int, price: int, is_cart: bool) -
 	count_label.offset_bottom = -2
 	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	container.add_child(count_label)
+
+	# Price label bottom-left — dimmed original if discounted, gold final price
+	var price_label := Label.new()
+	if has_discount:
+		price_label.text = "%dg" % discounted_price
+		price_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+	else:
+		price_label.text = "%dg" % discounted_price
+		price_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.8))
+	price_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	price_label.add_theme_font_size_override("font_size", 10)
+	price_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	price_label.offset_left = 2
+	price_label.offset_top = -14
+	price_label.offset_right = 30
+	price_label.offset_bottom = -2
+	price_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(price_label)
 
 	# Click handler
 	if is_cart:

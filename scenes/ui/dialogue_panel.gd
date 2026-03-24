@@ -4,6 +4,8 @@ extends PanelContainer
 ## Choices float as a sibling VBoxContainer on the right, above the dialogue box (Stardew Valley style).
 
 const DialogueDatabase = preload("res://scripts/data/dialogue_database.gd")
+const GiftDatabase = preload("res://scripts/data/gift_database.gd")
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 signal trade_requested(npc_node: Node)
 
@@ -16,6 +18,25 @@ var _npc_name_label: Label
 var _dialogue_text: Label
 var _portrait: TextureRect
 var _choices_container: VBoxContainer
+
+# Relationship indicator widgets (created in _build_ui, updated in open_dialogue)
+var _rel_tier_label: Label = null
+var _rel_progress_bar: ProgressBar = null
+
+# Whether we are currently in gift-selection mode
+var _in_gift_mode: bool = false
+# Node id / context to return to after gift reaction
+var _gift_return_node_id: String = ""
+var _gift_return_is_generic: bool = false
+
+const TIER_COLORS: Dictionary = {
+	"stranger":     Color("888888"),
+	"recognized":   Color("bbbbbb"),
+	"acquaintance": Color("ffdd66"),
+	"friendly":     Color("66cc66"),
+	"close":        Color("6688ff"),
+	"bonded":        Color("cc66ff"),
+}
 
 const PROFILE_TO_ARCHETYPE: Dictionary = {
 	"bold_warrior": "warrior",
@@ -70,12 +91,52 @@ func _build_ui() -> void:
 	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(main_vbox)
 
+	# Name row: NPC name + relationship indicator (tier + progress)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	main_vbox.add_child(name_row)
+
 	# NPC name — gold, display font
 	_npc_name_label = Label.new()
 	_npc_name_label.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
 	_npc_name_label.add_theme_font_size_override("font_size", 18)
 	_npc_name_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	main_vbox.add_child(_npc_name_label)
+	name_row.add_child(_npc_name_label)
+
+	# Separator "▸"
+	var sep_label := Label.new()
+	sep_label.text = "▸"
+	sep_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	sep_label.add_theme_font_size_override("font_size", 13)
+	sep_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	sep_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_row.add_child(sep_label)
+
+	# Tier name label — color set at open time
+	_rel_tier_label = Label.new()
+	_rel_tier_label.add_theme_font_override("font", UIHelper.GAME_FONT)
+	_rel_tier_label.add_theme_font_size_override("font_size", 13)
+	_rel_tier_label.add_theme_color_override("font_color", Color("888888"))
+	_rel_tier_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_row.add_child(_rel_tier_label)
+
+	# Progress bar — thin, 60px wide, 4px tall, centered vertically
+	_rel_progress_bar = ProgressBar.new()
+	_rel_progress_bar.custom_minimum_size = Vector2(60, 4)
+	_rel_progress_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_rel_progress_bar.show_percentage = false
+
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+	bar_bg.set_corner_radius_all(2)
+	_rel_progress_bar.add_theme_stylebox_override("background", bar_bg)
+
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color("888888")
+	bar_fill.set_corner_radius_all(2)
+	_rel_progress_bar.add_theme_stylebox_override("fill", bar_fill)
+
+	name_row.add_child(_rel_progress_bar)
 
 	# Dialogue text — body font, word-wrapped, fills available space
 	_dialogue_text = Label.new()
@@ -157,6 +218,9 @@ func set_shop_panel(shop: Node) -> void:
 func open_dialogue(npc_id: String, npc_node: Node) -> void:
 	_npc_id = npc_id
 	_npc_node = npc_node
+	_in_gift_mode = false
+	_gift_return_node_id = ""
+	_gift_return_is_generic = false
 
 	var npc_name: String = npc_node.npc_name if "npc_name" in npc_node else npc_id
 	_npc_name_label.text = npc_name
@@ -169,6 +233,12 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 	else:
 		_portrait.texture = null
 		_portrait.visible = false
+
+	# Update relationship indicator
+	_update_relationship_indicator(npc_node)
+
+	# Record conversation event
+	_record_conversation_event(npc_node)
 
 	var entry_node_id: String = DialogueDatabase.get_dialogue_entry(npc_id)
 	if not entry_node_id.is_empty():
@@ -184,10 +254,55 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 	AudioManager.play_ui_sfx("ui_panel_open")
 
 
+func _update_relationship_indicator(npc_node: Node) -> void:
+	if _rel_tier_label == null or _rel_progress_bar == null:
+		return
+
+	var rel_comp: Node = npc_node.get_node_or_null("RelationshipComponent")
+	if rel_comp == null:
+		_rel_tier_label.text = "stranger"
+		_rel_tier_label.add_theme_color_override("font_color", Color("888888"))
+		_rel_progress_bar.value = 0.0
+		_rel_progress_bar.visible = true
+		return
+
+	var tier: String = rel_comp.get_tier("player")
+	var progress: float = rel_comp.get_progress_toward_next("player")
+
+	var tier_color: Color = TIER_COLORS.get(tier, Color("888888"))
+	_rel_tier_label.text = tier.capitalize()
+	_rel_tier_label.add_theme_color_override("font_color", tier_color)
+
+	# Update progress bar fill color to match tier
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = tier_color
+	bar_fill.set_corner_radius_all(2)
+	_rel_progress_bar.add_theme_stylebox_override("fill", bar_fill)
+
+	if tier == "bonded":
+		_rel_progress_bar.visible = false
+	else:
+		_rel_progress_bar.value = progress * 100.0
+		_rel_progress_bar.min_value = 0.0
+		_rel_progress_bar.max_value = 100.0
+		_rel_progress_bar.visible = true
+
+
+func _record_conversation_event(npc_node: Node) -> void:
+	# Canonical path for player-initiated conversation events.
+	# NPC-NPC conversations are recorded separately in npc_memory.gd via the npc_spoke signal.
+	var rel_comp: Node = npc_node.get_node_or_null("RelationshipComponent")
+	if rel_comp == null:
+		return
+	var game_day: int = TimeManager.get_day() if TimeManager.has_method("get_day") else 0
+	rel_comp.record_event("player", "conversation", game_day)
+
+
 func close_dialogue() -> void:
 	if _shop_panel and _shop_panel.has_signal("cart_changed") and _shop_panel.cart_changed.is_connected(_on_cart_changed):
 		_shop_panel.cart_changed.disconnect(_on_cart_changed)
 	_buy_button = null
+	_in_gift_mode = false
 	visible = false
 	_choices_container.visible = false
 	_portrait.visible = false
@@ -225,6 +340,9 @@ func _show_node(node_id: String) -> void:
 		btn.pressed.connect(_on_choice_pressed.bind(next_node, action))
 		_choices_container.add_child(btn)
 
+	# Inject gift choice if eligible
+	_maybe_inject_gift_choice(node_id, false)
+
 	if _choices_container.get_child_count() == 0:
 		var btn := _create_choice_button("Goodbye.")
 		btn.pressed.connect(close_dialogue)
@@ -246,10 +364,128 @@ func _show_generic_greeting(npc_node: Node) -> void:
 		btn.pressed.connect(close_dialogue)
 		_choices_container.add_child(btn)
 
+	# Inject gift choice if eligible
+	_maybe_inject_gift_choice("", true)
+
 	if _choices_container.get_child_count() == 0:
 		var btn := _create_choice_button("Goodbye.")
 		btn.pressed.connect(close_dialogue)
 		_choices_container.add_child(btn)
+
+
+func _maybe_inject_gift_choice(node_id: String, is_generic: bool) -> void:
+	if _player == null:
+		return
+
+	# Only show gift if NPC has a RelationshipComponent and is not already bonded
+	var rel_comp: Node = _npc_node.get_node_or_null("RelationshipComponent") if _npc_node else null
+	if rel_comp == null:
+		return
+	var tier: String = rel_comp.get_tier("player")
+	if tier == "bonded":
+		return
+
+	# Only show gift if player has items
+	var inv: Node = _player.get_node_or_null("InventoryComponent")
+	if inv == null:
+		return
+	var items: Dictionary = inv.get_items()
+	if items.is_empty():
+		return
+
+	var gift_btn := _create_choice_button("Give a Gift")
+	gift_btn.pressed.connect(_on_gift_choice_pressed.bind(node_id, is_generic))
+	_choices_container.add_child(gift_btn)
+
+
+func _on_gift_choice_pressed(node_id: String, is_generic: bool) -> void:
+	_in_gift_mode = true
+	_gift_return_node_id = node_id
+	_gift_return_is_generic = is_generic
+	_show_gift_items()
+
+
+func _show_gift_items() -> void:
+	_dialogue_text.text = "What would you like to give?"
+	_clear_choices()
+
+	var inv: Node = _player.get_node_or_null("InventoryComponent")
+	if inv == null:
+		_in_gift_mode = false
+		_restore_after_gift()
+		return
+
+	var items: Dictionary = inv.get_items()
+	for item_id: String in items:
+		var count: int = items[item_id]
+		if count <= 0:
+			continue
+		var item_data: Dictionary = ItemDatabase.get_item(item_id)
+		var item_name: String = item_data.get("name", item_id)
+		var btn_text: String = item_name if count <= 1 else "%s (%d)" % [item_name, count]
+		var gift_item_btn := _create_choice_button(btn_text)
+		gift_item_btn.pressed.connect(_on_gift_item_selected.bind(item_id))
+		_choices_container.add_child(gift_item_btn)
+
+	var cancel_btn := _create_choice_button("Cancel")
+	cancel_btn.pressed.connect(_on_gift_cancelled)
+	_choices_container.add_child(cancel_btn)
+
+
+func _on_gift_item_selected(item_id: String) -> void:
+	_in_gift_mode = false
+
+	# Remove 1 of the item from inventory
+	var inv: Node = _player.get_node_or_null("InventoryComponent")
+	if inv:
+		inv.remove_item(item_id, 1)
+
+	# Determine preference
+	var archetype: String = _get_archetype(_npc_node) if _npc_node else ""
+	var preference: String = GiftDatabase.get_preference(_npc_id, archetype, item_id)
+
+	# Record events on the NPC's RelationshipComponent
+	var rel_comp: Node = _npc_node.get_node_or_null("RelationshipComponent") if _npc_node else null
+	if rel_comp != null:
+		var game_day: int = TimeManager.get_day() if TimeManager.has_method("get_day") else 0
+		match preference:
+			"loved":
+				rel_comp.record_event("player", "helped", game_day)
+				rel_comp.record_event("player", "helped", game_day)
+			"liked":
+				rel_comp.record_event("player", "helped", game_day)
+			"neutral":
+				rel_comp.record_event("player", "conversation", game_day)
+			"disliked":
+				pass  # No relationship event for disliked gifts
+
+	# Refresh relationship indicator
+	if _npc_node:
+		_update_relationship_indicator(_npc_node)
+
+	# Show reaction
+	var reaction: String = GiftDatabase.get_reaction(preference)
+	_dialogue_text.text = reaction
+
+	# Return to normal choices after reaction
+	_clear_choices()
+	var ok_btn := _create_choice_button("You're welcome.")
+	ok_btn.pressed.connect(_restore_after_gift)
+	_choices_container.add_child(ok_btn)
+
+
+func _on_gift_cancelled() -> void:
+	_in_gift_mode = false
+	_restore_after_gift()
+
+
+func _restore_after_gift() -> void:
+	if _gift_return_is_generic:
+		_show_generic_greeting(_npc_node)
+	elif not _gift_return_node_id.is_empty():
+		_show_node(_gift_return_node_id)
+	else:
+		_show_generic_greeting(_npc_node)
 
 
 func _on_choice_pressed(next_node, action: String) -> void:
@@ -288,6 +524,10 @@ func _execute_action(action: String) -> void:
 			_show_trade_choices()
 			if _npc_node and is_instance_valid(_npc_node):
 				trade_requested.emit(_npc_node)
+		"follow":
+			if _npc_node and is_instance_valid(_npc_node) and _npc_node.has_method("set_goal"):
+				_npc_node.set_goal("follow_player")
+			close_dialogue()
 		"info":
 			close_dialogue()
 		_:

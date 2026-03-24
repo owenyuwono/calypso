@@ -16,6 +16,13 @@ func get_listings() -> Dictionary:
 func get_shop_title() -> String:
 	return _shop_title
 
+func get_discount_for(buyer_id: String) -> float:
+	var rel_comp: Node = get_parent().get_node_or_null("RelationshipComponent")
+	if not rel_comp:
+		return 0.0
+	return rel_comp.get_discount_for(buyer_id)
+
+
 func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 	if not _listings.has(item_id):
 		return false
@@ -27,7 +34,10 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 	if available_count < count:
 		return false
 
-	var total_cost: int = price_each * count
+	var buyer_id: String = WorldState.get_entity_id_for_node(buyer)
+	var discount: float = get_discount_for(buyer_id)
+	var discounted_price: int = maxi(1, ceili(price_each * (1.0 - discount)))
+	var total_cost: int = discounted_price * count
 
 	var buyer_inv: Node = buyer.get_node_or_null("InventoryComponent")
 	if not buyer_inv:
@@ -54,7 +64,6 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 
 	_sync()
 
-	var buyer_id: String = WorldState.get_entity_id_for_node(buyer)
 	GameEvents.item_purchased.emit(buyer_id, item_id, total_cost)
 
 	return true

@@ -156,6 +156,59 @@ func get_tier(entity_id: String) -> String:
 	return rel.get("tier", "stranger")
 
 
+func get_progress_toward_next(entity_id: String) -> float:
+	var rel: Dictionary = relationships.get(entity_id, {})
+	if rel.is_empty():
+		return 0.0
+	var tier: String = rel.get("tier", "stranger")
+	var next_tier: String = _get_next_tier(tier)
+	if next_tier.is_empty():
+		return 1.0
+
+	var conv: int = get_event_count(entity_id, "conversation")
+	var combat: int = get_event_count(entity_id, "shared_combat")
+	var helped: int = get_event_count(entity_id, "helped")
+	var saved: int = get_event_count(entity_id, "saved_from_death")
+	var secret: int = get_event_count(entity_id, "shared_secret")
+	var tension: float = rel.get("tension", 0.0)
+
+	var score: float = 0.0
+	match next_tier:
+		"recognized":
+			# OR: conv >= 1, combat >= 1
+			score = maxf(minf(float(conv) / 1.0, 1.0), minf(float(combat) / 1.0, 1.0))
+		"acquaintance":
+			# OR: conv >= 3, combat >= 2
+			score = maxf(minf(float(conv) / 3.0, 1.0), minf(float(combat) / 2.0, 1.0))
+		"friendly":
+			# OR: (conv >= 5 AND combat >= 1) OR helped >= 1
+			var and_path: float = (minf(float(conv) / 5.0, 1.0) + minf(float(combat) / 1.0, 1.0)) / 2.0
+			var helped_path: float = minf(float(helped) / 1.0, 1.0)
+			score = maxf(and_path, helped_path)
+		"close":
+			# AND: conv >= 10 AND combat >= 3 AND tension < 0.7
+			var tension_progress: float = 1.0 if tension < 0.7 else 0.0
+			score = (minf(float(conv) / 10.0, 1.0) + minf(float(combat) / 3.0, 1.0) + tension_progress) / 3.0
+		"bonded":
+			# OR: saved >= 1, secret >= 1
+			score = maxf(minf(float(saved) / 1.0, 1.0), minf(float(secret) / 1.0, 1.0))
+	return score
+
+
+func get_discount_for(buyer_id: String) -> float:
+	var tier: String = get_tier(buyer_id)
+	match tier:
+		"acquaintance":
+			return 0.05
+		"friendly":
+			return 0.10
+		"close":
+			return 0.15
+		"bonded":
+			return 0.20
+	return 0.0
+
+
 # --- Tension API ---
 
 func get_tension(entity_id: String) -> float:

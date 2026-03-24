@@ -37,6 +37,10 @@ var _was_in_combat: bool = false  # Detects combat → non-combat transition
 var _frame_skip: int = randi() % 2
 var _last_equip_check_hash: int = -1
 
+var _combat_assist_cooldown: float = 0.0
+const COMBAT_ASSIST_INTERVAL: float = 2.5  # Check at most every 2.5s
+const TIER_LADDER: Array = ["stranger", "recognized", "acquaintance", "friendly", "close", "bonded"]
+
 func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
@@ -81,6 +85,9 @@ func _process(delta: float) -> void:
 
 	_idle_timer += effective_delta
 
+	if _combat_assist_cooldown > 0.0:
+		_combat_assist_cooldown -= effective_delta
+
 	_behavior_timer += effective_delta
 	if _behavior_timer >= TICK_INTERVAL:
 		_behavior_timer = 0.0
@@ -105,6 +112,9 @@ func evaluate() -> void:
 			npc.last_thought = "It's getting dark, better head back"
 			_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 			return
+	# Priority 2.4: Combat assist — friendly+ NPCs help player when nearby
+	if _check_combat_assist():
+		return
 	# Priority 2.5: Schedule override for routine NPCs
 	var identity = npc.get_node_or_null("NpcIdentity")
 	if identity and identity.schedule_type == "routine":
@@ -323,19 +333,19 @@ func _execute_chop_wood() -> void:
 	_do_action("chop_tree", target_tree["id"])
 
 var _follow_timer: float = 0.0
-const FOLLOW_TIMEOUT: float = 120.0  # Stop following after 2 minutes
 const FOLLOW_MAX_DISTANCE: float = 30.0  # Stop if player gets too far
 
 func _execute_follow_player() -> void:
-	var player_node := WorldState.get_entity("player")
+	var player_node: Node = WorldState.get_entity("player")
 	if not player_node:
 		npc.set_goal(default_goal)
 		_follow_timer = 0.0
 		return
 
-	# Timeout — stop following after FOLLOW_TIMEOUT seconds
+	# Timeout — dynamic based on relationship tier
+	var follow_timeout: float = _get_follow_timeout()
 	_follow_timer += TICK_INTERVAL
-	if _follow_timer >= FOLLOW_TIMEOUT:
+	if _follow_timer >= follow_timeout:
 		npc.set_goal(default_goal)
 		npc.last_thought = "I should get back to my own business"
 		_follow_timer = 0.0
@@ -593,6 +603,68 @@ func _get_total_material_count() -> int:
 
 func _is_near_position(pos: Vector3, range: float) -> bool:
 	return npc.global_position.distance_to(pos) <= range
+
+func _get_relationship_tier_index(entity_id: String) -> int:
+	var rel_comp: Node = npc.get_node_or_null("RelationshipComponent")
+	if not rel_comp:
+		return 0
+	var tier: String = rel_comp.get_tier(entity_id)
+	var idx: int = TIER_LADDER.find(tier)
+	return maxi(idx, 0)
+
+func _get_follow_timeout() -> float:
+	var tier_idx: int = _get_relationship_tier_index("player")
+	var tier: String = TIER_LADDER[tier_idx]
+	match tier:
+		"close":
+			return 300.0
+		"bonded":
+			return 999999.0
+		_:
+			return 120.0
+
+func _check_combat_assist() -> bool:
+	# Only fires at most every COMBAT_ASSIST_INTERVAL seconds
+	if _combat_assist_cooldown > 0.0:
+		return false
+	# Skip if NPC is already in combat
+	if npc.current_state == "combat":
+		return false
+	# Skip if NPC is vending or crafting — don't interrupt
+	if npc.current_goal == "vend" or npc.current_goal == "craft_items":
+		return false
+	# Require friendly or higher relationship with the player
+	var tier_idx: int = _get_relationship_tier_index("player")
+	if tier_idx < 3:  # 0=stranger, 1=recognized, 2=acquaintance, 3=friendly
+		return false
+	# Find the player node
+	var player_node: Node = WorldState.get_entity("player")
+	if not player_node or not is_instance_valid(player_node):
+		return false
+	# Player must be within perception range
+	var dist: float = npc.global_position.distance_to(player_node.global_position)
+	if dist > 15.0:
+		return false
+	# Player must be in combat — check _attack_target (non-empty = in combat)
+	var player_target = player_node.get("_attack_target")
+	if player_target == null or (player_target is String and player_target.is_empty()):
+		return false
+	# Player must not be dead
+	var player_dead = player_node.get("_is_dead")
+	if player_dead == null or player_dead:
+		return false
+	# NPC's own safety: don't assist if HP is critically low
+	var hp_pct: float = float(npc._stats.hp) / float(npc._stats.max_hp)
+	if hp_pct < 0.25:
+		return false
+	# Target must still be alive
+	if not WorldState.is_alive(player_target):
+		return false
+	# All checks passed — join the fight
+	_combat_assist_cooldown = COMBAT_ASSIST_INTERVAL
+	npc.last_thought = "Helping the player fight!"
+	npc.enter_combat(player_target)
+	return true
 
 func _execute_craft() -> void:
 	var progression: Node = npc.get_node_or_null("ProgressionComponent")
