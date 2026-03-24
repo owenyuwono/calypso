@@ -3,15 +3,14 @@ extends Control
 ## Builds its entire scene tree in code. Tab content containers
 ## are exposed for external builders via get_content_container().
 
-enum Tab { STATUS, EQUIP, SKILLS, PROFICIENCY, QUESTS, SYSTEM }
+enum Tab { STATUS, INVENTORY, SKILLS, QUESTS, SYSTEM }
 
-const TAB_NAMES: Array = ["Status", "Equip", "Skills", "Proficiency", "Quests", "System"]
+const TAB_NAMES: Array = ["Status", "Inventory", "Skills", "Quests", "System"]
 
 # Panel builder scripts — one per Tab enum value
 const StatusPanel = preload("res://scenes/ui/status_panel.gd")
 const InventoryPanel = preload("res://scenes/ui/inventory_panel.gd")
 const SkillPanel = preload("res://scenes/ui/skill_panel.gd")
-const ProficiencyPanel = preload("res://scenes/ui/proficiency_panel.gd")
 const QuestLogPanel = preload("res://scenes/ui/quest_log_panel.gd")
 const SettingsPanel = preload("res://scenes/ui/settings_panel.gd")
 
@@ -95,12 +94,10 @@ func _build_ui() -> void:
 	# --- Main panel ---
 	var main_panel := PanelContainer.new()
 	main_panel.name = "MainPanel"
-	main_panel.anchor_left = 0.03
-	main_panel.anchor_top = 0.05
-	main_panel.anchor_right = 0.97
-	main_panel.anchor_bottom = 0.95
-	main_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	main_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main_panel.anchor_left = 0.0
+	main_panel.anchor_top = 0.0
+	main_panel.anchor_right = 1.0
+	main_panel.anchor_bottom = 1.0
 	main_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
 	add_child(main_panel)
 
@@ -110,16 +107,34 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", 0)
 	main_panel.add_child(vbox)
 
+	# --- Tab bar wrapper (adds vertical padding) ---
+	var tab_bar_margin := MarginContainer.new()
+	tab_bar_margin.name = "TabBarMargin"
+	tab_bar_margin.add_theme_constant_override("margin_top", 8)
+	tab_bar_margin.add_theme_constant_override("margin_bottom", 8)
+	tab_bar_margin.add_theme_constant_override("margin_left", 0)
+	tab_bar_margin.add_theme_constant_override("margin_right", 0)
+	vbox.add_child(tab_bar_margin)
+
 	# --- Tab bar ---
 	_tab_bar = HBoxContainer.new()
 	_tab_bar.name = "TabBar"
-	_tab_bar.add_theme_constant_override("separation", 4)
-	vbox.add_child(_tab_bar)
+	_tab_bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	_tab_bar.add_theme_constant_override("separation", 24)
+	tab_bar_margin.add_child(_tab_bar)
 
 	for i in TAB_NAMES.size():
 		var btn := _create_tab_button(TAB_NAMES[i], i)
 		_tab_bar.add_child(btn)
 		_tab_buttons.append(btn)
+
+	# --- Divider between tab bar and content ---
+	var divider: ColorRect = ColorRect.new()
+	divider.name = "TabDivider"
+	divider.color = Color(0.6, 0.5, 0.2, 0.6)
+	divider.custom_minimum_size = Vector2(0, 2)
+	divider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(divider)
 
 	# --- Content area ---
 	_content_area = Control.new()
@@ -186,7 +201,6 @@ func _setup_builders() -> void:
 		StatusPanel,
 		InventoryPanel,
 		SkillPanel,
-		ProficiencyPanel,
 		QuestLogPanel,
 		SettingsPanel,
 	]
@@ -295,9 +309,12 @@ func _input(event: InputEvent) -> void:
 	if InputMap.has_action("toggle_settings") and event.is_action_pressed("toggle_settings"):
 		if visible:
 			close()
+			get_viewport().set_input_as_handled()
 		else:
-			open(Tab.SYSTEM)
-		get_viewport().set_input_as_handled()
+			# Only open if no other UI is active — lets Esc propagate to panels
+			if _player and _player.has_method("_is_ui_open") and not _player._is_ui_open():
+				open(Tab.SYSTEM)
+				get_viewport().set_input_as_handled()
 		return
 
 	# Actions only processed when menu is open
