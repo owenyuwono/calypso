@@ -64,12 +64,6 @@ func _ready() -> void:
 	if player and skill_hotbar:
 		skill_hotbar.set_player(player)
 
-	# Wire world map reference to minimap so the compass button can open it
-	var minimap := $UILayer/Minimap
-	var world_map_panel := $UILayer/WorldMapPanel
-	if minimap and world_map_panel:
-		minimap.set_world_map(world_map_panel)
-
 	# Boot ZoneManager first — it creates the LoadingScreen we share with InteriorManager.
 	ZoneManager.setup($ZoneAnchor, player, self)
 
