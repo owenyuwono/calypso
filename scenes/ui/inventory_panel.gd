@@ -232,7 +232,7 @@ func _build_character_preview() -> TextureRect:
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 2.5
 	camera.position = Vector3(0, 1.0, 3)
-	camera.look_at(Vector3(0, 0.8, 0))
+	camera.look_at_from_position(Vector3(0, 1.0, 3), Vector3(0, 0.8, 0))
 	_preview_viewport.add_child(camera)
 
 	var light := DirectionalLight3D.new()
