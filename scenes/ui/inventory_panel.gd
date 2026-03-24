@@ -250,6 +250,16 @@ func build_content(container: Control) -> void:
 		_panel.get_parent().remove_child(_panel)
 	container.add_child(_panel)
 
+func get_overlay_nodes() -> Array:
+	var overlays: Array = []
+	if _tooltip:
+		overlays.append(_tooltip)
+	if _desc_panel:
+		overlays.append(_desc_panel)
+	if _context_menu:
+		overlays.append(_context_menu)
+	return overlays
+
 
 func set_player(p: Node) -> void:
 	_player = p
