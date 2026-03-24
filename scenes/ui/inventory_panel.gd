@@ -1,15 +1,23 @@
 extends Control
-## Player inventory panel — content builder for embedding in GameMenu.
-## Call build_content(parent) to build UI into the parent container.
-## Call get_overlay_nodes() to get tooltip/context/desc panels for overlay rendering.
+## Player inventory panel toggled with Tab.
+## Layout: drag handle (full width), attack type + gold row (full width),
+## then side-by-side: EQUIPMENT section (left) | ITEMS section (right).
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
-const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+const DragHandle = preload("res://scripts/utils/drag_handle.gd")
 
-const GRID_COLUMNS := 5
-const MIN_SLOTS := 25
+const GRID_COLUMNS := 4
+const MIN_SLOTS := 20
 const CELL_SIZE := 64
-const EQUIP_CELL_SIZE := 64
+const EQUIP_CELL_SIZE := 72
+
+# All 8 equipment slots in a single 2-column grid, top to bottom
+const EQUIP_LAYOUT: Array = [
+	["head",     "torso"],
+	["gloves",   "legs"],
+	["feet",     "back"],
+	["main_hand","off_hand"],
+]
 
 const SLOT_LABELS: Dictionary = {
 	"head": "Head", "torso": "Torso", "main_hand": "Main", "off_hand": "Off",
@@ -49,24 +57,15 @@ const STAT_ICON_MAP: Dictionary = {
 	"Value": "gold_coin.png",
 }
 
-var _content_parent: Control
-
-# Item grid (left column)
+var _panel: PanelContainer
+var _equip_grid: GridContainer
 var _grid: GridContainer
 var _gold_label: Label
 var _gold_icon: TextureRect
-
-# Equipment containers — rebuilt on refresh()
-var _equip_left_col: VBoxContainer
-var _equip_right_col: VBoxContainer
-
-# Character preview
-var _preview_viewport: SubViewport
-var _preview_model: Node3D
-
-# Overlay panels
 var _tooltip: PanelContainer
 var _tooltip_label: Label
+var _is_open: bool = false
+
 var _desc_panel: PanelContainer
 var _desc_vbox: VBoxContainer
 var _context_menu: PanelContainer
@@ -81,8 +80,10 @@ var _combat: Node
 var _stats: Node
 
 func _ready() -> void:
+	visible = false
 	_load_slot_icons()
-	GameEvents.item_looted.connect(func(_a, _b, _c): refresh())
+	_build_ui()
+	GameEvents.item_looted.connect(func(_a, _b, _c): _refresh())
 
 func _load_slot_icons() -> void:
 	for slot_name in SLOT_LABELS:
@@ -91,67 +92,56 @@ func _load_slot_icons() -> void:
 		if tex:
 			_slot_icons[slot_name] = tex
 
-func build_content(parent: Control) -> void:
-	_content_parent = parent
+func _build_ui() -> void:
+	_panel = PanelContainer.new()
+	_panel.custom_minimum_size = Vector2(470, 0)
+	var style := UIHelper.create_panel_style()
+	_panel.add_theme_stylebox_override("panel", style)
+	add_child(_panel)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 12)
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(margin)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	_panel.add_child(margin)
 
-	# Root: items (left) | separator | equipment+preview (right)
-	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 0)
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(body)
-
-	_build_items_column(body)
-	_build_separator(body)
-	_build_equipment_column(body)
-
-	# Overlay nodes (not added to parent — returned via get_overlay_nodes())
-	_build_tooltip()
-	_build_desc_panel()
-	_build_context_menu()
-
-# ── Left column: items grid + gold ──────────────────────────────────────────
-
-func _build_items_column(parent: Control) -> void:
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	var header: Label = _create_section_header("ITEMS")
-	vbox.add_child(header)
+	# Title bar (full width)
+	var drag_handle := DragHandle.new()
+	drag_handle.setup(_panel, "Inventory")
+	drag_handle.close_pressed.connect(_toggle)
+	vbox.add_child(drag_handle)
 
-	# AspectRatioContainer enforces square shape on the grid area
-	var aspect := AspectRatioContainer.new()
-	aspect.ratio = 1.0
-	aspect.stretch_mode = AspectRatioContainer.STRETCH_FIT
-	aspect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	aspect.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(aspect)
+	# Main body: equipment (left) | separator | items (right)
+	var body_hbox := HBoxContainer.new()
+	body_hbox.add_theme_constant_override("separation", 10)
+	vbox.add_child(body_hbox)
 
-	_grid = GridContainer.new()
-	_grid.columns = GRID_COLUMNS
-	_grid.add_theme_constant_override("h_separation", 4)
-	_grid.add_theme_constant_override("v_separation", 4)
-	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	aspect.add_child(_grid)
+	# --- Left: equipment VBox ---
+	var equip_vbox := VBoxContainer.new()
+	equip_vbox.add_theme_constant_override("separation", 6)
+	equip_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	body_hbox.add_child(equip_vbox)
 
-	# Gold display
+	# Single 2×4 grid for all 8 slots
+	_equip_grid = GridContainer.new()
+	_equip_grid.columns = 2
+	_equip_grid.add_theme_constant_override("h_separation", 12)
+	_equip_grid.add_theme_constant_override("v_separation", 12)
+	equip_vbox.add_child(_equip_grid)
+
+	# Gold section under equipment
+	var gold_sep := HSeparator.new()
+	equip_vbox.add_child(gold_sep)
+
 	var gold_hbox := HBoxContainer.new()
 	gold_hbox.add_theme_constant_override("separation", 4)
-	gold_hbox.alignment = BoxContainer.ALIGNMENT_BEGIN
-	vbox.add_child(gold_hbox)
+	gold_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	equip_vbox.add_child(gold_hbox)
 
 	_gold_icon = TextureRect.new()
 	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
@@ -170,109 +160,32 @@ func _build_items_column(parent: Control) -> void:
 	_gold_label.text = "0"
 	gold_hbox.add_child(_gold_label)
 
-# ── Separator ────────────────────────────────────────────────────────────────
+	# --- Vertical separator ---
+	var vsep := VSeparator.new()
+	body_hbox.add_child(vsep)
 
-func _build_separator(parent: Control) -> void:
-	var sep := ColorRect.new()
-	sep.color = Color(0.6, 0.5, 0.2, 0.4)
-	sep.custom_minimum_size = Vector2(2, 0)
-	sep.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(sep)
+	# --- Right: items VBox ---
+	var items_vbox := VBoxContainer.new()
+	items_vbox.add_theme_constant_override("separation", 6)
+	items_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_hbox.add_child(items_vbox)
 
-# ── Right column: equipment slots + character preview ────────────────────────
+	var items_header := Label.new()
+	items_header.text = "ITEMS"
+	items_header.add_theme_font_size_override("font_size", 11)
+	items_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
+	items_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	items_vbox.add_child(items_header)
 
-func _build_equipment_column(parent: Control) -> void:
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(vbox)
+	# Item grid (no scroll — panel fits to content)
+	_grid = GridContainer.new()
+	_grid.columns = GRID_COLUMNS
+	_grid.add_theme_constant_override("h_separation", 4)
+	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	items_vbox.add_child(_grid)
 
-	var header: Label = _create_section_header("EQUIPMENT")
-	vbox.add_child(header)
-
-	# Layout: [left 4 slots] [character mesh] [right 4 slots]
-	var middle := HBoxContainer.new()
-	middle.add_theme_constant_override("separation", 8)
-	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	middle.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(middle)
-
-	# Left equipment column: head, gloves, main_hand, off_hand
-	_equip_left_col = VBoxContainer.new()
-	_equip_left_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	_equip_left_col.add_theme_constant_override("separation", 4)
-	_equip_left_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	middle.add_child(_equip_left_col)
-
-	# Character preview (center)
-	var preview: TextureRect = _build_character_preview()
-	middle.add_child(preview)
-
-	# Right equipment column: torso, legs, feet, back
-	_equip_right_col = VBoxContainer.new()
-	_equip_right_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	_equip_right_col.add_theme_constant_override("separation", 4)
-	_equip_right_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	middle.add_child(_equip_right_col)
-
-# ── Character preview (SubViewport → TextureRect) ────────────────────────────
-
-func _build_character_preview() -> TextureRect:
-	_preview_viewport = SubViewport.new()
-	_preview_viewport.size = Vector2i(256, 384)
-	_preview_viewport.transparent_bg = true
-	_preview_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	_preview_viewport.own_world_3d = true
-
-	var camera := Camera3D.new()
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 3.5
-	camera.position = Vector3(0, 1.2, 3)
-	camera.look_at_from_position(Vector3(0, 1.2, 3), Vector3(0, 1.0, 0))
-	_preview_viewport.add_child(camera)
-
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-30, 30, 0)
-	_preview_viewport.add_child(light)
-
-	var model_data: Dictionary = ModelHelper.instantiate_model(
-		"res://assets/models/characters/swordsman_m.glb", 1.5
-	)
-	if model_data.has("model") and model_data["model"]:
-		_preview_model = model_data["model"] as Node3D
-		ModelHelper.apply_toon_to_model(_preview_model)
-		_preview_viewport.add_child(_preview_model)
-
-	var tex_rect := TextureRect.new()
-	tex_rect.texture = _preview_viewport.get_texture()
-	tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tex_rect.custom_minimum_size = Vector2(120, 180)
-	tex_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	tex_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# SubViewport must be in scene tree — add as child of TextureRect
-	tex_rect.add_child(_preview_viewport)
-
-	return tex_rect
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-func _create_section_header(text: String) -> Label:
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 13)
-	lbl.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	return lbl
-
-func get_overlay_nodes() -> Array[Control]:
-	return [_tooltip, _context_menu, _desc_panel]
-
-# ── Overlay panels ────────────────────────────────────────────────────────────
-
-func _build_tooltip() -> void:
+	# Tooltip — child of root Control so it overlays everything
 	_tooltip = PanelContainer.new()
 	var tooltip_style := StyleBoxFlat.new()
 	tooltip_style.bg_color = Color(0.06, 0.05, 0.04, 0.96)
@@ -290,6 +203,10 @@ func _build_tooltip() -> void:
 	_tooltip.add_child(_tooltip_label)
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_tooltip)
+
+	_build_desc_panel()
+	_build_context_menu()
 
 func _build_desc_panel() -> void:
 	_desc_panel = PanelContainer.new()
@@ -306,6 +223,7 @@ func _build_desc_panel() -> void:
 	_desc_panel.custom_minimum_size = Vector2(280, 0)
 	_desc_panel.visible = false
 	_desc_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_desc_panel)
 
 	_desc_vbox = VBoxContainer.new()
 	_desc_vbox.add_theme_constant_override("separation", 4)
@@ -325,12 +243,11 @@ func _build_context_menu() -> void:
 	_context_menu.add_theme_stylebox_override("panel", style)
 	_context_menu.visible = false
 	_context_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_context_menu)
 
 	_context_vbox = VBoxContainer.new()
 	_context_vbox.add_theme_constant_override("separation", 2)
 	_context_menu.add_child(_context_vbox)
-
-# ── Player wiring ─────────────────────────────────────────────────────────────
 
 func set_player(p: Node) -> void:
 	_player = p
@@ -340,62 +257,71 @@ func set_player(p: Node) -> void:
 		_combat = _player.get_node_or_null("CombatComponent")
 		_stats = _player.get_node_or_null("StatsComponent")
 
-# ── Refresh ───────────────────────────────────────────────────────────────────
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_inventory"):
+		_toggle()
 
-func refresh() -> void:
-	if not _content_parent or not _content_parent.visible:
-		return
+func toggle() -> void:
+	_toggle()
 
+func _toggle() -> void:
+	_is_open = not _is_open
+	visible = _is_open
+	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
+		UIHelper.center_panel(_panel)
+		_refresh()
+	else:
+		AudioManager.play_ui_sfx("ui_panel_close")
+		_tooltip.visible = false
+		_hide_desc()
+		_hide_context_menu()
+
+func is_open() -> bool:
+	return _is_open
+
+func _refresh() -> void:
 	_hide_desc()
 	_hide_context_menu()
 
-	if not _player or not _inventory or not _equipment:
+	if not _is_open or not _player:
+		return
+
+	if not _inventory or not _equipment:
 		return
 
 	# Gold
 	var gold: int = _inventory.get_gold_amount()
 	_gold_label.text = "%d" % gold
 
-	# Equipment columns — clear then rebuild
-	for child in _equip_left_col.get_children():
-		child.queue_free()
-	for child in _equip_right_col.get_children():
+	# Rebuild unified equipment grid (2×4: all 8 slots)
+	for child in _equip_grid.get_children():
 		child.queue_free()
 
-	# Left: head, gloves, main_hand, off_hand
-	for slot_name in ["head", "gloves", "main_hand", "off_hand"]:
-		_equip_left_col.add_child(_build_equip_cell(slot_name))
+	for row in EQUIP_LAYOUT:
+		for slot_name in row:
+			var item_id: String = _equipment.get_slot(slot_name)
+			if item_id.is_empty():
+				_equip_grid.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
+			else:
+				_equip_grid.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
 
-	# Right: torso, legs, feet, back
-	for slot_name in ["torso", "legs", "feet", "back"]:
-		_equip_right_col.add_child(_build_equip_cell(slot_name))
-
-	# Re-render the character preview after equipment changes
-	if _preview_viewport:
-		_preview_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-
-	# Inventory grid — clear then rebuild
+	# Rebuild inventory grid
 	for child in _grid.get_children():
 		child.queue_free()
 
 	var inv: Dictionary = _inventory.get_items()
 	var sorted_items: Array = _sort_items(inv)
-	var slot_count: int = max(MIN_SLOTS, sorted_items.size())
 
+	var slot_count: int = max(MIN_SLOTS, sorted_items.size())
 	for i in range(slot_count):
 		if i < sorted_items.size():
 			var entry: Array = sorted_items[i]
-			_grid.add_child(_build_cell(entry[0], entry[1]))
+			var item_id: String = entry[0]
+			var count: int = entry[1]
+			_grid.add_child(_build_cell(item_id, count))
 		else:
 			_grid.add_child(_build_empty_cell())
-
-# ── Equipment cell builder (empty or filled) ──────────────────────────────────
-
-func _build_equip_cell(slot_name: String) -> Control:
-	var item_id: String = _equipment.get_slot(slot_name)
-	if item_id.is_empty():
-		return _build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE)
-	return _build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE)
 
 func _sort_items(inv: Dictionary) -> Array:
 	var entries: Array = []
@@ -416,8 +342,6 @@ func _sort_items(inv: Dictionary) -> Array:
 		result.append([entry[0], entry[1]])
 	return result
 
-# ── Cell builders ─────────────────────────────────────────────────────────────
-
 func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(cell_size, cell_size)
@@ -434,6 +358,7 @@ func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cell.add_child(center)
 
+	# Slot icon (dimmed, centered)
 	var icon_tex: Texture2D = _slot_icons.get(slot_name)
 	if icon_tex:
 		var icon := TextureRect.new()
@@ -478,7 +403,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(icon)
 
-	# 2-char abbreviation centered
+	# 2-char abbreviation of item name, centered
 	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
 	var letter := Label.new()
 	letter.text = abbrev
@@ -574,8 +499,6 @@ func _build_empty_cell() -> Control:
 	cell.add_theme_stylebox_override("panel", style)
 	return cell
 
-# ── Tooltip ───────────────────────────────────────────────────────────────────
-
 func _format_tooltip(item_id: String) -> String:
 	var item: Dictionary = ItemDatabase.get_item(item_id)
 	var name: String = item.get("name", item_id)
@@ -593,20 +516,18 @@ func _format_tooltip(item_id: String) -> String:
 
 func _on_equip_cell_hover(item_id: String, cell: Control) -> void:
 	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_global: Vector2 = cell.global_position
-	_tooltip.position = Vector2(cell_global.x, cell_global.y - 28)
+	var cell_pos: Vector2 = cell.global_position - _panel.global_position
+	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
 	_tooltip.visible = true
 
 func _on_cell_hover(item_id: String, cell: Control) -> void:
 	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_global: Vector2 = cell.global_position
-	_tooltip.position = Vector2(cell_global.x, cell_global.y - 28)
+	var cell_pos: Vector2 = cell.global_position - _panel.global_position
+	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
 	_tooltip.visible = true
 
 func _on_cell_unhover() -> void:
 	_tooltip.visible = false
-
-# ── Input handlers ────────────────────────────────────────────────────────────
 
 func _on_equip_cell_input(event: InputEvent, slot_name: String) -> void:
 	if not (event is InputEventMouseButton) or not event.pressed:
@@ -629,22 +550,6 @@ func _on_cell_input(event: InputEvent, item_id: String) -> void:
 	elif mb.button_index == MOUSE_BUTTON_RIGHT:
 		_show_context_menu(item_id, "", mb.global_position)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not _content_parent or not _content_parent.visible:
-		return
-	if not (event is InputEventMouseButton) or not event.pressed:
-		return
-	var mb := event as InputEventMouseButton
-	if _context_menu.visible:
-		_hide_context_menu()
-	if _desc_panel.visible:
-		var local: Vector2 = mb.global_position - _desc_panel.global_position
-		var rect: Vector2 = _desc_panel.size
-		if local.x < 0 or local.y < 0 or local.x > rect.x or local.y > rect.y:
-			_hide_desc()
-
-# ── Description panel ─────────────────────────────────────────────────────────
-
 func _show_desc(item_id: String) -> void:
 	_hide_context_menu()
 	for child in _desc_vbox.get_children():
@@ -658,12 +563,14 @@ func _show_desc(item_id: String) -> void:
 	var type_str: String = item.get("type", "")
 	var type_color: Color = TYPE_COLORS.get(type_str, Color(0.5, 0.5, 0.5))
 
+	# Item name (large, colored)
 	var name_label := Label.new()
 	name_label.text = item.get("name", item_id)
 	name_label.add_theme_font_size_override("font_size", 16)
 	name_label.add_theme_color_override("font_color", type_color.lightened(0.4))
 	_desc_vbox.add_child(name_label)
 
+	# Type label
 	var type_label := Label.new()
 	type_label.text = type_str.capitalize()
 	type_label.add_theme_font_size_override("font_size", 11)
@@ -672,6 +579,7 @@ func _show_desc(item_id: String) -> void:
 
 	_desc_vbox.add_child(HSeparator.new())
 
+	# Stats
 	if item.has("atk_bonus"):
 		_add_desc_stat("ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
 	if item.has("def_bonus"):
@@ -681,22 +589,27 @@ func _show_desc(item_id: String) -> void:
 	if item.has("value"):
 		_add_desc_stat("Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
 
+	# Weapon type
 	if item.has("weapon_type"):
 		_add_desc_stat("Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
 
+	# Proficiency requirement
 	if item.has("required_skill") and item.has("required_level"):
 		var req_text: String = "%s Lv. %d" % [item["required_skill"].capitalize(), item["required_level"]]
 		_add_desc_stat("Requires", req_text, Color(0.7, 0.6, 0.4))
 
+	# Attack speed (daggers)
 	if item.has("attack_speed"):
 		_add_desc_stat("Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
 
+	# Close button
 	var close_btn := Button.new()
 	close_btn.text = "Close"
 	close_btn.add_theme_font_size_override("font_size", 11)
 	close_btn.pressed.connect(_hide_desc)
 	_desc_vbox.add_child(close_btn)
 
+	# Position near center of panel
 	_desc_panel.position = Vector2(60, 180)
 	_desc_panel.visible = true
 
@@ -723,7 +636,6 @@ func _add_desc_stat(label_text: String, value_text: String, color: Color) -> voi
 	lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
 	lbl.custom_minimum_size.x = 60
 	row.add_child(lbl)
-
 	var val := Label.new()
 	val.text = value_text
 	val.add_theme_font_size_override("font_size", 12)
@@ -732,8 +644,6 @@ func _add_desc_stat(label_text: String, value_text: String, color: Color) -> voi
 
 func _hide_desc() -> void:
 	_desc_panel.visible = false
-
-# ── Context menu ──────────────────────────────────────────────────────────────
 
 func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2) -> void:
 	_hide_desc()
@@ -744,8 +654,10 @@ func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2)
 		child.queue_free()
 
 	if not slot_name.is_empty():
+		# Equipment slot right-click — just Unequip
 		_add_context_button("Unequip", _ctx_unequip)
 	else:
+		# Inventory item right-click
 		var item: Dictionary = ItemDatabase.get_item(item_id)
 		var type_str: String = item.get("type", "")
 		if type_str == "consumable" and item.has("heal"):
@@ -754,7 +666,9 @@ func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2)
 			_add_context_button("Equip", _ctx_equip)
 		_add_context_button("Discard", _ctx_discard)
 
-	_context_menu.position = global_pos
+	# Position near mouse, relative to this Control
+	var local_pos: Vector2 = global_pos - global_position
+	_context_menu.position = local_pos
 	_context_menu.visible = true
 
 func _add_context_button(text: String, callback: Callable) -> void:
@@ -769,8 +683,6 @@ func _hide_context_menu() -> void:
 	_context_menu.visible = false
 	_context_item_id = ""
 	_context_slot_name = ""
-
-# ── Context actions ───────────────────────────────────────────────────────────
 
 func _ctx_use() -> void:
 	if not _context_item_id.is_empty():
@@ -802,6 +714,7 @@ func _ctx_discard() -> void:
 		return
 	var discard_id: String = _context_item_id
 	_inventory.remove_item(discard_id)
+	# Spawn loot drop at player position
 	if _player:
 		var loot_script := preload("res://scenes/objects/loot_drop.gd")
 		var loot := Area3D.new()
@@ -816,9 +729,21 @@ func _ctx_discard() -> void:
 			loot_parent = get_tree().current_scene
 		loot_parent.call_deferred("add_child", loot)
 	_hide_context_menu()
-	refresh()
+	_refresh()
 
-# ── Equip / unequip ───────────────────────────────────────────────────────────
+func _unhandled_input(event: InputEvent) -> void:
+	if not _is_open:
+		return
+	if not (event is InputEventMouseButton) or not event.pressed:
+		return
+	var mb := event as InputEventMouseButton
+	if _context_menu.visible:
+		_hide_context_menu()
+	if _desc_panel.visible:
+		var local: Vector2 = mb.global_position - _desc_panel.global_position
+		var rect: Vector2 = _desc_panel.size
+		if local.x < 0 or local.y < 0 or local.x > rect.x or local.y > rect.y:
+			_hide_desc()
 
 func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if not _inventory or not _inventory.has_item(item_id):
@@ -827,17 +752,17 @@ func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if heal_amount > 0 and _combat:
 		_combat.heal(heal_amount)
 	_inventory.remove_item(item_id)
-	refresh()
+	_refresh()
 
 func _equip_to_slot(item_id: String, _slot_hint: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.equip(item_id):
 		AudioManager.play_ui_sfx("ui_item_equip")
-		refresh()
+		_refresh()
 
 func _unequip(slot_name: String) -> void:
 	if not _equipment:
 		return
 	if _equipment.unequip(slot_name):
-		refresh()
+		_refresh()

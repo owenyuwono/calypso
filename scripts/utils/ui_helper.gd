@@ -65,10 +65,10 @@ static func create_panel_style(_bg_color: Color = Color.BLACK, _border_color: Co
 	style.texture_margin_bottom = margin
 	style.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	style.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 16
-	style.content_margin_bottom = 16
+	style.content_margin_left = 20
+	style.content_margin_right = 20
+	style.content_margin_top = 20
+	style.content_margin_bottom = 20
 	return style
 
 ## Creates a TextureRect icon from a texture path.

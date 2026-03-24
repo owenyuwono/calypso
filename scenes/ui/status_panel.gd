@@ -1,7 +1,5 @@
 extends Control
-## Player status content builder — embeds stat UI into a parent container provided by GameMenu.
-
-const ProficiencyDatabase = preload("res://scripts/data/proficiency_database.gd")
+## Player status/character screen toggled with C key.
 
 const _STAT_ICONS: Dictionary = {
 	"HP": "res://assets/textures/ui/stats/stat_hp.png",
@@ -21,22 +19,11 @@ const _STAT_ICONS: Dictionary = {
 	"CDR": "res://assets/textures/ui/stats/stat_cdr.png",
 }
 
-# Proficiency display order within each category
-const _CATEGORY_ORDER: Array = ["weapon", "attribute", "magic", "gathering", "production", "social"]
-const _CATEGORY_LABELS: Dictionary = {
-	"weapon": "Weapon",
-	"attribute": "Attributes",
-	"magic": "Magic",
-	"gathering": "Gathering",
-	"production": "Production",
-	"social": "Social",
-}
-const _PROF_ICON_BASE: String = "res://assets/textures/ui/proficiencies/"
-const _COLOR_CATEGORY: Color = Color(0.6, 0.55, 0.45)
 const _COLOR_BONUS: Color = Color(0.4, 0.9, 0.4)
 const _COLOR_SECTION: Color = Color(0.8, 0.75, 0.5)
 
-var _content_parent: Control
+var _panel: PanelContainer
+var _is_open: bool = false
 var _player: Node
 
 # Dynamic label refs — name/level
@@ -70,23 +57,23 @@ var _stamina_value: Label
 var _hp_regen_value: Label
 var _cdr_value: Label
 
-# Proficiency level labels: {skill_id: Label}
-var _prof_level_labels: Dictionary = {}
 
 func _ready() -> void:
-	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): refresh())
-	GameEvents.entity_healed.connect(func(_a, _b, _c): refresh())
-	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): refresh())
-	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): refresh())
+	visible = false
+	_build_ui()
+
+	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): _refresh())
+	GameEvents.entity_healed.connect(func(_a, _b, _c): _refresh())
+	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): _refresh())
+	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
-func build_content(parent: Control) -> void:
-	_content_parent = parent
+func _build_ui() -> void:
+	var ui: Dictionary = UIHelper.create_titled_panel("Status", Vector2(520, 0), toggle)
+	_panel = ui["panel"]
+	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(vbox)
+	var vbox: VBoxContainer = ui["vbox"]
 
 	# Name + Level row
 	var name_row := HBoxContainer.new()
@@ -94,13 +81,13 @@ func build_content(parent: Control) -> void:
 
 	_name_label = Label.new()
 	_name_label.text = "Player"
-	_name_label.add_theme_font_size_override("font_size", 16)
+	_name_label.add_theme_font_size_override("font_size", 18)
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_row.add_child(_name_label)
 
 	_level_label = Label.new()
 	_level_label.text = "Lv. 1"
-	_level_label.add_theme_font_size_override("font_size", 16)
+	_level_label.add_theme_font_size_override("font_size", 18)
 	_level_label.add_theme_color_override("font_color", Color(1, 1, 0.8))
 	name_row.add_child(_level_label)
 
@@ -119,46 +106,46 @@ func build_content(parent: Control) -> void:
 
 	_add_column_header(left_col, "Offensive")
 
-	var atk_row: Dictionary = _create_stat_row("ATK", true)
+	var atk_row := _create_stat_row("ATK", true)
 	_atk_value = atk_row.value
 	_atk_bonus = atk_row.bonus
 	left_col.add_child(atk_row.container)
 
-	var matk_row: Dictionary = _create_stat_row("MATK", true)
+	var matk_row := _create_stat_row("MATK", true)
 	_matk_value = matk_row.value
 	_matk_bonus = matk_row.bonus
 	left_col.add_child(matk_row.container)
 
-	var acc_row: Dictionary = _create_stat_row("Accuracy", false)
+	var acc_row := _create_stat_row("Accuracy", false)
 	_accuracy_value = acc_row.value
 	left_col.add_child(acc_row.container)
 
-	var crit_row: Dictionary = _create_stat_row("Crit Rate", false)
+	var crit_row := _create_stat_row("Crit Rate", false)
 	_crit_rate_value = crit_row.value
 	left_col.add_child(crit_row.container)
 
-	var critdmg_row: Dictionary = _create_stat_row("Crit Dmg", false)
+	var critdmg_row := _create_stat_row("Crit Dmg", false)
 	_crit_dmg_value = critdmg_row.value
 	left_col.add_child(critdmg_row.container)
 
 	left_col.add_child(HSeparator.new())
 	_add_column_header(left_col, "Defensive")
 
-	var hp_row: Dictionary = _create_stat_row("HP", false)
+	var hp_row := _create_stat_row("HP", false)
 	_hp_value = hp_row.value
 	left_col.add_child(hp_row.container)
 
-	var def_row: Dictionary = _create_stat_row("DEF", true)
+	var def_row := _create_stat_row("DEF", true)
 	_def_value = def_row.value
 	_def_bonus = def_row.bonus
 	left_col.add_child(def_row.container)
 
-	var mdef_row: Dictionary = _create_stat_row("MDEF", true)
+	var mdef_row := _create_stat_row("MDEF", true)
 	_mdef_value = mdef_row.value
 	_mdef_bonus = mdef_row.bonus
 	left_col.add_child(mdef_row.container)
 
-	var eva_row: Dictionary = _create_stat_row("Evasion", false)
+	var eva_row := _create_stat_row("Evasion", false)
 	_evasion_value = eva_row.value
 	left_col.add_child(eva_row.container)
 
@@ -173,42 +160,43 @@ func build_content(parent: Control) -> void:
 
 	_add_column_header(right_col, "Speed")
 
-	var aspd_row: Dictionary = _create_stat_row("Atk Speed", false)
+	var aspd_row := _create_stat_row("Atk Speed", false)
 	_atk_speed_value = aspd_row.value
 	right_col.add_child(aspd_row.container)
 
-	var mspd_row: Dictionary = _create_stat_row("Move Spd", false)
+	var mspd_row := _create_stat_row("Move Spd", false)
 	_move_speed_value = mspd_row.value
 	right_col.add_child(mspd_row.container)
 
-	var cspd_row: Dictionary = _create_stat_row("Cast Spd", false)
+	var cspd_row := _create_stat_row("Cast Spd", false)
 	_cast_speed_value = cspd_row.value
 	right_col.add_child(cspd_row.container)
 
 	right_col.add_child(HSeparator.new())
 	_add_column_header(right_col, "Resource")
 
-	var stamina_row: Dictionary = _create_stat_row("Stamina", false)
+	var stamina_row := _create_stat_row("Stamina", false)
 	_stamina_value = stamina_row.value
 	right_col.add_child(stamina_row.container)
 
-	var hpregen_row: Dictionary = _create_stat_row("HP Regen", false)
+	var hpregen_row := _create_stat_row("HP Regen", false)
 	_hp_regen_value = hpregen_row.value
 	right_col.add_child(hpregen_row.container)
 
-	var cdr_row: Dictionary = _create_stat_row("CDR", false)
+	var cdr_row := _create_stat_row("CDR", false)
 	_cdr_value = cdr_row.value
 	right_col.add_child(cdr_row.container)
 
-	# Proficiency section — full width below columns
+
+func _add_section_header(vbox: VBoxContainer, title: String) -> void:
 	vbox.add_child(HSeparator.new())
-	_build_proficiency_section(vbox)
+	_add_column_header(vbox, title)
 
 # Header without a leading separator — used for the first section at the top of a column.
 func _add_column_header(vbox: VBoxContainer, title: String) -> void:
 	var header := Label.new()
 	header.text = title
-	header.add_theme_font_size_override("font_size", 13)
+	header.add_theme_font_size_override("font_size", 16)
 	header.add_theme_color_override("font_color", _COLOR_SECTION)
 	vbox.add_child(header)
 
@@ -228,121 +216,53 @@ func _create_stat_row(stat_name: String, has_bonus: bool) -> Dictionary:
 
 	var name_lbl := Label.new()
 	name_lbl.text = stat_name
-	name_lbl.add_theme_font_size_override("font_size", 13)
+	name_lbl.add_theme_font_size_override("font_size", 15)
 	name_lbl.custom_minimum_size.x = 68
 	hbox.add_child(name_lbl)
 
 	var value_lbl := Label.new()
-	value_lbl.add_theme_font_size_override("font_size", 13)
+	value_lbl.add_theme_font_size_override("font_size", 15)
 	value_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(value_lbl)
 
 	var bonus_lbl := Label.new()
-	bonus_lbl.add_theme_font_size_override("font_size", 13)
+	bonus_lbl.add_theme_font_size_override("font_size", 15)
 	bonus_lbl.add_theme_color_override("font_color", _COLOR_BONUS)
 	bonus_lbl.visible = has_bonus
 	hbox.add_child(bonus_lbl)
 
 	return {"container": hbox, "value": value_lbl, "bonus": bonus_lbl}
 
-func _build_proficiency_section(vbox: VBoxContainer) -> void:
-	var header := Label.new()
-	header.text = "PROFICIENCIES"
-	header.add_theme_font_size_override("font_size", 12)
-	header.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(header)
 
-	# 2-column layout: weapon+attribute left, gathering+production right
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 12)
-	vbox.add_child(columns)
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_status"):
+		if get_viewport().gui_get_focus_owner() is LineEdit:
+			return
+		toggle()
 
-	var left_col := VBoxContainer.new()
-	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_col.add_theme_constant_override("separation", 2)
-	columns.add_child(left_col)
-
-	var right_col := VBoxContainer.new()
-	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_col.add_theme_constant_override("separation", 2)
-	columns.add_child(right_col)
-
-	_build_category_row(left_col, "weapon")
-	_build_category_row(left_col, "magic")
-	_build_category_row(left_col, "attribute")
-	_build_category_row(right_col, "gathering")
-	_build_category_row(right_col, "production")
-	_build_category_row(right_col, "social")
-
-func _build_category_row(vbox: VBoxContainer, category: String) -> void:
-	# Category label
-	var cat_label := Label.new()
-	cat_label.text = _CATEGORY_LABELS.get(category, category)
-	cat_label.add_theme_font_size_override("font_size", 11)
-	cat_label.add_theme_color_override("font_color", _COLOR_CATEGORY)
-	vbox.add_child(cat_label)
-
-	# Icon row — HBoxContainer of icon+level pairs
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	vbox.add_child(row)
-
-	# Iterate skills in insertion order, keeping only those in this category
-	for skill_id in ProficiencyDatabase.SKILLS:
-		var skill_def: Dictionary = ProficiencyDatabase.SKILLS[skill_id]
-		if skill_def.get("category", "") != category:
-			continue
-		var entry: Control = _build_prof_entry(skill_id, skill_def.get("name", skill_id))
-		row.add_child(entry)
-
-func _build_prof_entry(skill_id: String, skill_name: String) -> Control:
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 1)
-
-	var icon_path: String = _PROF_ICON_BASE + skill_id + ".png"
-	if ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.texture = load(icon_path)
-		icon.custom_minimum_size = Vector2(20, 20)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture_filter = TEXTURE_FILTER_NEAREST
-		icon.tooltip_text = skill_name
-		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		vbox.add_child(icon)
+func toggle() -> void:
+	_is_open = not _is_open
+	visible = _is_open
+	if _is_open:
+		AudioManager.play_ui_sfx("ui_panel_open")
+		UIHelper.center_panel(_panel)
+		_refresh()
 	else:
-		# Fallback: colored square placeholder
-		var placeholder := ColorRect.new()
-		placeholder.custom_minimum_size = Vector2(18, 18)
-		placeholder.color = Color(0.4, 0.35, 0.25)
-		placeholder.tooltip_text = skill_name
-		placeholder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		vbox.add_child(placeholder)
-
-	var level_lbl := Label.new()
-	level_lbl.text = "1"
-	level_lbl.add_theme_font_size_override("font_size", 10)
-	level_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	level_lbl.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
-	vbox.add_child(level_lbl)
-
-	_prof_level_labels[skill_id] = level_lbl
-	return vbox
+		AudioManager.play_ui_sfx("ui_panel_close")
 
 func set_player(p: Node) -> void:
 	_player = p
 
 func _on_stamina_changed(entity_id: String, stamina: float, max_stamina: float) -> void:
-	if entity_id != "player" or not _content_parent or not _content_parent.visible:
+	if entity_id != "player" or not _is_open:
 		return
 	_update_stamina_label(stamina, max_stamina)
 
 func _update_stamina_label(stamina: float, max_stamina: float) -> void:
 	_stamina_value.text = "%d / %d" % [int(stamina), int(max_stamina)]
 
-func refresh() -> void:
-	if not _content_parent or not _content_parent.visible or not _player:
+func _refresh() -> void:
+	if not _is_open or not _player:
 		return
 
 	var stats: Node = _player.get_node_or_null("StatsComponent")
@@ -398,9 +318,6 @@ func refresh() -> void:
 	var cdr: float = stats.cooldown_reduction
 	_cdr_value.text = "%d%%" % int(cdr)
 
-	# Proficiencies
-	var progression: Node = _player.get_node_or_null("ProgressionComponent")
-	if progression:
-		for skill_id in _prof_level_labels:
-			var lvl: int = progression.get_proficiency_level(skill_id)
-			_prof_level_labels[skill_id].text = str(lvl)
+
+func is_open() -> bool:
+	return _is_open
