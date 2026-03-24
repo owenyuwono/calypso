@@ -10,10 +10,13 @@ var _overlay_material: StandardMaterial3D
 var _anim_player: AnimationPlayer
 var _current_anim: String = ""
 var _hp_bar: Node3D
+var _mesh_path: String = ""
+var _anim_paths: Dictionary = {}
 
 # --- Setup ---
 
 func setup_model(path: String, scale_val: float, fallback_color: Color, use_box: bool = false) -> void:
+	_mesh_path = path
 	var parent: Node3D = get_parent()
 	var result: Dictionary = {"model": null, "anim_player": null}
 	if not path.is_empty():
@@ -32,6 +35,8 @@ func setup_model(path: String, scale_val: float, fallback_color: Color, use_box:
 	_finish_model_setup()
 
 func setup_model_with_anims(mesh_path: String, anim_paths: Dictionary, scale_val: float, fallback_color: Color) -> void:
+	_mesh_path = mesh_path
+	_anim_paths = anim_paths
 	var parent: Node3D = get_parent()
 	var result: Dictionary = {"model": null, "anim_player": null}
 	if not mesh_path.is_empty():

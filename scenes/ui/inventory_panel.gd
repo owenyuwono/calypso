@@ -4,19 +4,15 @@ extends Control
 ## then side-by-side: EQUIPMENT section (left) | ITEMS section (right).
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
-const GRID_COLUMNS := 4
-const MIN_SLOTS := 20
+const GRID_COLUMNS := 5
+const MIN_SLOTS := 35
 const CELL_SIZE := 64
-const EQUIP_CELL_SIZE := 72
+const EQUIP_CELL_SIZE := 68
 
-# All 8 equipment slots in a single 2-column grid, top to bottom
-const EQUIP_LAYOUT: Array = [
-	["head",     "torso"],
-	["gloves",   "legs"],
-	["feet",     "back"],
-	["main_hand","off_hand"],
-]
+const LEFT_EQUIP: Array = ["head", "torso", "gloves", "feet"]
+const RIGHT_EQUIP: Array = ["back", "legs", "main_hand", "off_hand"]
 
 const SLOT_LABELS: Dictionary = {
 	"head": "Head", "torso": "Torso", "main_hand": "Main", "off_hand": "Off",
@@ -57,13 +53,16 @@ const STAT_ICON_MAP: Dictionary = {
 }
 
 var _panel: PanelContainer
-var _equip_grid: GridContainer
+var _left_equip_vbox: VBoxContainer
+var _right_equip_vbox: VBoxContainer
 var _grid: GridContainer
 var _gold_label: Label
 var _gold_icon: TextureRect
 var _tooltip: PanelContainer
 var _tooltip_label: Label
 var _is_open: bool = false
+var _preview_model_root: Node3D
+var _preview_viewport: SubViewport
 
 var _desc_panel: PanelContainer
 var _desc_vbox: VBoxContainer
@@ -93,48 +92,106 @@ func _load_slot_icons() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(470, 0)
+	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var style := UIHelper.create_panel_style()
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
 
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_bottom", 10)
-	_panel.add_child(margin)
-
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
-	margin.add_child(vbox)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_panel.add_child(vbox)
 
-	# Main body: equipment (left) | separator | items (right)
+	# Main body: items (left 2/3) | separator | equipment+mesh (right 1/3)
 	var body_hbox := HBoxContainer.new()
 	body_hbox.add_theme_constant_override("separation", 10)
+	body_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(body_hbox)
 
-	# --- Left: equipment VBox ---
-	var equip_vbox := VBoxContainer.new()
-	equip_vbox.add_theme_constant_override("separation", 6)
-	equip_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	body_hbox.add_child(equip_vbox)
+	# --- Left column: item grid (2/3 width) ---
+	var items_vbox := VBoxContainer.new()
+	items_vbox.add_theme_constant_override("separation", 4)
+	items_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	items_vbox.size_flags_stretch_ratio = 2.0
+	body_hbox.add_child(items_vbox)
 
-	# Single 2×4 grid for all 8 slots
-	_equip_grid = GridContainer.new()
-	_equip_grid.columns = 2
-	_equip_grid.add_theme_constant_override("h_separation", 12)
-	_equip_grid.add_theme_constant_override("v_separation", 12)
-	equip_vbox.add_child(_equip_grid)
+	_grid = GridContainer.new()
+	_grid.columns = GRID_COLUMNS
+	_grid.add_theme_constant_override("h_separation", 4)
+	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	items_vbox.add_child(_grid)
 
-	# Gold section under equipment
-	var gold_sep := HSeparator.new()
-	equip_vbox.add_child(gold_sep)
+	# --- Vertical separator ---
+	var vsep := VSeparator.new()
+	body_hbox.add_child(vsep)
 
+	# --- Right column: equipment + mesh (1/3 width) ---
+	var right_vbox := VBoxContainer.new()
+	right_vbox.add_theme_constant_override("separation", 8)
+	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_vbox.size_flags_stretch_ratio = 1.0
+	body_hbox.add_child(right_vbox)
+
+	# Equipment row: left slots | mesh preview | right slots
+	var equip_hbox := HBoxContainer.new()
+	equip_hbox.add_theme_constant_override("separation", 6)
+	equip_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equip_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_vbox.add_child(equip_hbox)
+
+	# Left equip VBox: head, torso, gloves, feet
+	_left_equip_vbox = VBoxContainer.new()
+	_left_equip_vbox.add_theme_constant_override("separation", 8)
+	_left_equip_vbox.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	equip_hbox.add_child(_left_equip_vbox)
+
+	# Center: player 3D mesh preview
+	var viewport_container := SubViewportContainer.new()
+	viewport_container.stretch = true
+	viewport_container.custom_minimum_size = Vector2(120, 200)
+	viewport_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	viewport_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	equip_hbox.add_child(viewport_container)
+
+	_preview_viewport = SubViewport.new()
+	_preview_viewport.transparent_bg = true
+	_preview_viewport.size = Vector2i(240, 400)
+	_preview_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	viewport_container.add_child(_preview_viewport)
+
+	var viewport_root := Node3D.new()
+	_preview_viewport.add_child(viewport_root)
+
+	var camera := Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 1.8
+	camera.position = Vector3(0, 0.9, 3)
+	camera.look_at(Vector3(0, 0.9, 0), Vector3.UP)
+	viewport_root.add_child(camera)
+
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-45, -30, 0)
+	light.light_energy = 1.0
+	viewport_root.add_child(light)
+
+	_preview_model_root = Node3D.new()
+	viewport_root.add_child(_preview_model_root)
+
+	# Right equip VBox: back, legs, main_hand, off_hand
+	_right_equip_vbox = VBoxContainer.new()
+	_right_equip_vbox.add_theme_constant_override("separation", 8)
+	_right_equip_vbox.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	equip_hbox.add_child(_right_equip_vbox)
+
+	# Gold row below equipment
 	var gold_hbox := HBoxContainer.new()
 	gold_hbox.add_theme_constant_override("separation", 4)
 	gold_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	equip_vbox.add_child(gold_hbox)
+	right_vbox.add_child(gold_hbox)
 
 	_gold_icon = TextureRect.new()
 	var gold_coin_tex: Texture2D = load("res://assets/textures/ui/stats/gold_coin.png") as Texture2D
@@ -152,31 +209,6 @@ func _build_ui() -> void:
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	_gold_label.text = "0"
 	gold_hbox.add_child(_gold_label)
-
-	# --- Vertical separator ---
-	var vsep := VSeparator.new()
-	body_hbox.add_child(vsep)
-
-	# --- Right: items VBox ---
-	var items_vbox := VBoxContainer.new()
-	items_vbox.add_theme_constant_override("separation", 6)
-	items_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body_hbox.add_child(items_vbox)
-
-	var items_header := Label.new()
-	items_header.text = "ITEMS"
-	items_header.add_theme_font_size_override("font_size", 11)
-	items_header.add_theme_color_override("font_color", Color(0.7, 0.6, 0.35))
-	items_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	items_vbox.add_child(items_header)
-
-	# Item grid (no scroll — panel fits to content)
-	_grid = GridContainer.new()
-	_grid.columns = GRID_COLUMNS
-	_grid.add_theme_constant_override("h_separation", 4)
-	_grid.add_theme_constant_override("v_separation", 4)
-	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	items_vbox.add_child(_grid)
 
 	# Tooltip — child of root Control so it overlays everything
 	_tooltip = PanelContainer.new()
@@ -200,6 +232,28 @@ func _build_ui() -> void:
 
 	_build_desc_panel()
 	_build_context_menu()
+
+func _update_mesh_preview() -> void:
+	if not _player or not _preview_model_root:
+		return
+	for child in _preview_model_root.get_children():
+		child.queue_free()
+	var visuals: Node = _player.get_node_or_null("EntityVisuals")
+	if not visuals:
+		return
+	var mesh_path: String = visuals.get("_mesh_path")
+	var anim_paths: Dictionary = visuals.get("_anim_paths")
+	if mesh_path.is_empty():
+		return
+	var result: Dictionary = ModelHelper.instantiate_model_with_anims(mesh_path, anim_paths, 1.0)
+	var model: Node3D = result.get("model")
+	if not model:
+		return
+	ModelHelper.apply_toon_to_model(model)
+	_preview_model_root.add_child(model)
+	var anim_player: AnimationPlayer = result.get("anim_player")
+	if anim_player and anim_player.has_animation("Idle"):
+		anim_player.play("Idle")
 
 func _build_desc_panel() -> void:
 	_desc_panel = PanelContainer.new()
@@ -273,6 +327,7 @@ func set_player(p: Node) -> void:
 		_equipment = _player.get_node_or_null("EquipmentComponent")
 		_combat = _player.get_node_or_null("CombatComponent")
 		_stats = _player.get_node_or_null("StatsComponent")
+		_update_mesh_preview()
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_inventory"):
@@ -286,7 +341,6 @@ func _toggle() -> void:
 	visible = _is_open
 	if _is_open:
 		AudioManager.play_ui_sfx("ui_panel_open")
-		UIHelper.center_panel(_panel)
 		_refresh()
 	else:
 		AudioManager.play_ui_sfx("ui_panel_close")
@@ -311,17 +365,25 @@ func _refresh() -> void:
 	var gold: int = _inventory.get_gold_amount()
 	_gold_label.text = "%d" % gold
 
-	# Rebuild unified equipment grid (2×4: all 8 slots)
-	for child in _equip_grid.get_children():
+	# Rebuild left equipment column (head, torso, gloves, feet)
+	for child in _left_equip_vbox.get_children():
 		child.queue_free()
+	for slot_name in LEFT_EQUIP:
+		var item_id: String = _equipment.get_slot(slot_name)
+		if item_id.is_empty():
+			_left_equip_vbox.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
+		else:
+			_left_equip_vbox.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
 
-	for row in EQUIP_LAYOUT:
-		for slot_name in row:
-			var item_id: String = _equipment.get_slot(slot_name)
-			if item_id.is_empty():
-				_equip_grid.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
-			else:
-				_equip_grid.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
+	# Rebuild right equipment column (back, legs, main_hand, off_hand)
+	for child in _right_equip_vbox.get_children():
+		child.queue_free()
+	for slot_name in RIGHT_EQUIP:
+		var item_id: String = _equipment.get_slot(slot_name)
+		if item_id.is_empty():
+			_right_equip_vbox.add_child(_build_equip_cell_empty(slot_name, EQUIP_CELL_SIZE))
+		else:
+			_right_equip_vbox.add_child(_build_equip_cell_filled(slot_name, item_id, EQUIP_CELL_SIZE))
 
 	# Rebuild inventory grid
 	for child in _grid.get_children():
