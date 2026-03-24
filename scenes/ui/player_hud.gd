@@ -77,17 +77,24 @@ func _build_ui() -> void:
 	_build_time_panel()
 
 func _build_time_panel() -> void:
-	# Single-line time display to the left of the minimap
+	# Time display centered under the minimap, slightly overlapping
 	var viewport_w := get_viewport().get_visible_rect().size.x
-	var minimap_left := viewport_w - 184.0 - 10.0
+	var minimap_size := 184.0  # MAP_SIZE + BORDER * 2
+	var minimap_right := viewport_w - 10.0
+	var minimap_center_x := minimap_right - minimap_size * 0.5
+	var minimap_bottom := 10.0 + minimap_size
 
 	var time_panel := PanelContainer.new()
 	time_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
-	time_panel.position = Vector2(minimap_left - 160.0, 10)
 	add_child(time_panel)
 
 	_time_label = UIHelper.create_label("08:00 - Day 1 (day)", 12, Color(0.9, 0.85, 0.7), HORIZONTAL_ALIGNMENT_CENTER)
 	time_panel.add_child(_time_label)
+
+	# Position centered under minimap, overlapping by ~8px
+	await get_tree().process_frame
+	var panel_w := time_panel.size.x
+	time_panel.position = Vector2(minimap_center_x - panel_w * 0.5, minimap_bottom - 8)
 
 func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color, bar_height: int) -> ProgressBar:
 	var bar := ProgressBar.new()

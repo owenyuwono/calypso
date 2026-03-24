@@ -23,7 +23,7 @@ func _ready() -> void:
 	anchor_top = 0.0
 	anchor_bottom = 0.0
 	var total_w := MAP_SIZE + BORDER * 2
-	var total_h := MAP_SIZE + BORDER * 2 + 22  # extra for zone label
+	var total_h := MAP_SIZE + BORDER * 2
 	offset_left = -total_w - 10
 	offset_right = -10
 	offset_top = 10
@@ -187,10 +187,6 @@ func _draw() -> void:
 
 	# Circular border (drawn on top)
 	draw_arc(center, radius, 0, TAU, 64, COLOR_BORDER, BORDER)
-
-	# Zone label below circle
-	var label_pos := Vector2(BORDER + 4, MAP_SIZE + BORDER * 2 + 14)
-	draw_string(ThemeDB.fallback_font, label_pos, _zone_label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.8, 0.8, 0.7))
 
 
 func _is_inside_circle(point: Vector2, center: Vector2, radius: float) -> bool:
