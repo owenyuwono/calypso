@@ -276,8 +276,8 @@ func _build_proficiency_section(vbox: VBoxContainer) -> void:
 	columns.add_child(right_col)
 
 	_build_category_row(left_col, "weapon")
-	_build_category_row(left_col, "attribute")
 	_build_category_row(left_col, "magic")
+	_build_category_row(left_col, "attribute")
 	_build_category_row(right_col, "gathering")
 	_build_category_row(right_col, "production")
 	_build_category_row(right_col, "social")
