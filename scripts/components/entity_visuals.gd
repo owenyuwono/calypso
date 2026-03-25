@@ -96,6 +96,18 @@ func play_anim(anim_name: String, force: bool = false) -> void:
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
+func crossfade_anim(anim_name: String, blend_time: float = 0.3, force: bool = false) -> void:
+	if not _anim_player:
+		return
+	if not force and _current_anim == anim_name and _anim_player.is_playing():
+		return
+	if _anim_player.has_animation(anim_name):
+		_anim_player.play(anim_name, blend_time)
+		_current_anim = anim_name
+
+func is_anim_playing() -> bool:
+	return _anim_player and _anim_player.is_playing()
+
 func get_hit_delay(anim_name: String) -> float:
 	return ModelHelper.get_hit_delay(_anim_player, anim_name)
 
@@ -105,7 +117,10 @@ func reset_anim() -> void:
 # --- Facing ---
 
 func face_direction(dir: Vector3) -> void:
-	ModelHelper.face_direction(_model, dir)
+	if not _model or dir.length_squared() < 0.01:
+		return
+	var target_y: float = atan2(dir.x, dir.z)
+	_model.rotation.y = lerp_angle(_model.rotation.y, target_y, 0.15)
 
 # --- Visual Effects ---
 

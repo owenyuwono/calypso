@@ -47,7 +47,7 @@ var _hp_regen_accumulator: float = 0.0
 
 # Idle variation
 var _idle_timer: float = 0.0
-const IDLE_VARIATION_INTERVAL: float = 8.0
+var _idle_next_variation: float = 0.0
 const IDLE_ANIMS: PackedStringArray = ["Idle", "Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3"]
 const IDLE_RARE_ANIMS: PackedStringArray = ["Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look"]
 const IDLE_TIRED_ANIMS: PackedStringArray = ["Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck"]
@@ -91,6 +91,7 @@ var dialogue_panel: Node
 var crafting_panel: Control
 var game_menu: Node
 var interior_manager: Node
+var relationship_panel: Control
 
 # Click marker (reused single instance)
 var _click_marker: MeshInstance3D
@@ -277,10 +278,40 @@ func _physics_process(delta: float) -> void:
 
 	var is_moving := false
 
+	# WASD input (camera-relative direct movement)
+	var input_dir := Vector2(
+		Input.get_axis("move_left", "move_right"),
+		Input.get_axis("move_forward", "move_back")
+	)
+	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open()
+
 	if _is_ui_open():
 		_stop_navigation()
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
+	elif wasd_active:
+		# WASD cancels any click-based navigation/combat/harvest
+		if _is_navigating:
+			_stop_navigation()
+		if not _attack_target.is_empty():
+			_cancel_attack()
+		if not _harvest_target.is_empty():
+			_cancel_harvest()
+		# Camera-relative direction
+		var cam := get_viewport().get_camera_3d()
+		var cam_basis := cam.global_transform.basis
+		var cam_fwd := Vector3(-cam_basis.z.x, 0.0, -cam_basis.z.z).normalized()
+		var cam_right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
+		var move_dir := (cam_right * input_dir.x + cam_fwd * -input_dir.y).normalized()
+		var effective_speed: float = SPEED * _stats.move_speed
+		if _stamina:
+			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
+		if Input.is_action_pressed("sprint"):
+			effective_speed *= 1.5
+		velocity.x = move_dir.x * effective_speed
+		velocity.z = move_dir.z * effective_speed
+		_visuals.face_direction(move_dir)
+		is_moving = true
 	elif not _attack_target.is_empty():
 		is_moving = _process_combat(delta)
 	elif not _harvest_target.is_empty():
@@ -357,11 +388,13 @@ func _physics_process(delta: float) -> void:
 			_visuals.play_anim("Running")
 		else:
 			_idle_timer += delta
-			if _idle_timer >= IDLE_VARIATION_INTERVAL:
+			if _idle_timer >= _idle_next_variation:
 				_idle_timer = 0.0
-				_visuals.play_anim(_pick_idle_anim(), true)
-			elif not _was_moving:
-				_visuals.play_anim("Idle")
+				_idle_next_variation = randf_range(5.0, 12.0)
+				_visuals.crossfade_anim(_pick_idle_anim(), 0.5, true)
+			elif _was_moving:
+				_idle_next_variation = randf_range(5.0, 12.0)
+				_visuals.crossfade_anim("Idle", 0.15)
 
 	# Footstep audio: trigger on movement state transitions
 	if is_moving and not _was_moving:
@@ -736,16 +769,7 @@ func _handle_left_click() -> void:
 				_navigate_to(_get_approach_pos(target_node.global_position, 1.5))
 			return
 
-	# Click on ground: move there, cancel target lock, close NPC info
-	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
-		npc_info_panel.close()
-	var ground_pos := _raycast_ground()
-	if ground_pos != Vector3.INF:
-		_cancel_attack()
-		_cancel_harvest()
-		_interact_target = ""
-		_spawn_click_marker(ground_pos)
-		_navigate_to(ground_pos)
+	# Ground click movement removed — WASD only
 
 func _raycast_ground() -> Vector3:
 	var camera := get_viewport().get_camera_3d()
@@ -805,6 +829,8 @@ func _is_ui_open() -> bool:
 	if shop_panel and shop_panel.is_open():
 		return true
 	if crafting_panel and crafting_panel.is_open():
+		return true
+	if relationship_panel and relationship_panel.is_open():
 		return true
 	return false
 

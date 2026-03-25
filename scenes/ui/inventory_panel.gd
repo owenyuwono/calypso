@@ -170,8 +170,8 @@ func _build_ui() -> void:
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 1.8
 	camera.position = Vector3(0, 0.9, 3)
-	camera.look_at(Vector3(0, 0.9, 0), Vector3.UP)
 	viewport_root.add_child(camera)
+	camera.look_at(Vector3(0, 0.9, 0), Vector3.UP)
 
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45, -30, 0)

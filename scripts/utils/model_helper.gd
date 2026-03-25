@@ -9,6 +9,13 @@ const ANIM_WHITELIST: PackedStringArray = [
 	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",
 ]
 
+const LOOP_ANIMS: PackedStringArray = [
+	"Idle", "Running",
+	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",
+	"Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look",
+	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",
+]
+
 static var _scene_cache: Dictionary = {}
 static var _toon_shader: Shader = null
 
@@ -37,6 +44,9 @@ static func instantiate_model(path: String, scale_val: float) -> Dictionary:
 	instance.scale = Vector3.ONE * scale_val
 	var anim_player := find_animation_player(instance)
 	if anim_player:
+		# Rescue the first animation as "Idle" before stripping — FBX files
+		# import with internal names (e.g. "mixamo.com") that aren't in the whitelist.
+		_rescue_first_anim_as_idle(anim_player)
 		strip_unused_animations(anim_player)
 	return { "model": instance, "anim_player": anim_player }
 
@@ -104,8 +114,7 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 
 		anim_instance.queue_free()
 
-	# Ensure an Idle animation exists — Meshy base meshes only contain a T-pose clip
-	# that gets stripped before this point. A zero-track animation holds the rest pose.
+	# Fallback: create zero-track Idle if rescue + external anims didn't provide one
 	if not anim_player.has_animation("Idle"):
 		var idle_anim := Animation.new()
 		idle_anim.length = 0.1
@@ -113,7 +122,30 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 		var lib: AnimationLibrary = anim_player.get_animation_library("")
 		lib.add_animation("Idle", idle_anim)
 
+	# Set loop mode on animations that should loop (idle variants, running)
+	for lib_name in anim_player.get_animation_library_list():
+		var anim_lib: AnimationLibrary = anim_player.get_animation_library(lib_name)
+		for anim_name in anim_lib.get_animation_list():
+			if String(anim_name) in LOOP_ANIMS:
+				anim_lib.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+
 	return result
+
+## Rename the first animation in an AnimationPlayer to "Idle" if no "Idle" exists.
+## FBX imports use internal names like "mixamo.com" that get stripped by the whitelist.
+static func _rescue_first_anim_as_idle(anim_player: AnimationPlayer) -> void:
+	if anim_player.has_animation("Idle"):
+		return
+	for lib_name in anim_player.get_animation_library_list():
+		var anim_lib: AnimationLibrary = anim_player.get_animation_library(lib_name)
+		var names := anim_lib.get_animation_list()
+		for anim_name in names:
+			if String(anim_name) == "RESET":
+				continue
+			var anim: Animation = anim_lib.get_animation(anim_name)
+			anim_lib.remove_animation(anim_name)
+			anim_lib.add_animation("Idle", anim)
+			return
 
 ## Find the Skeleton3D node in a scene tree.
 static func _find_skeleton_3d(root: Node) -> Skeleton3D:
