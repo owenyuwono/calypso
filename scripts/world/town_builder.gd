@@ -38,12 +38,6 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(arch)  # Add to scene root, not nav region
 
-	# East gate torches
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(69, 0, -4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(69, 0, 4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(71, 0, -4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(71, 0, 4))
-
 	# West gate towers — placed outside the gap so they don't block passage
 	_build_tower(ctx, Vector3(-70, 0, -7), 6.0, 3.0, wall_mat)
 	_build_tower(ctx, Vector3(-70, 0, 7), 6.0, 3.0, wall_mat)
@@ -57,12 +51,6 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	west_arch.set_surface_override_material(0, wall_mat)
 	west_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(west_arch)  # Add to scene root, not nav region
-
-	# West gate torches
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-69, 0, -4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-69, 0, 4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-71, 0, -4))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-71, 0, 4))
 
 	var gate_tower_height := 6.0
 	var gate_tower_width := 3.0
@@ -81,12 +69,6 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	north_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(north_arch)  # Add to scene root, not nav region
 
-	# North gate torches
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-4, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(4, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-4, 0, -51))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(4, 0, -51))
-
 	# South gate towers — placed outside the gap so they don't block passage
 	_build_tower(ctx, Vector3(-7, 0, 50), gate_tower_height, gate_tower_width, wall_mat)
 	_build_tower(ctx, Vector3(7, 0, 50), gate_tower_height, gate_tower_width, wall_mat)
@@ -100,12 +82,6 @@ static func build_walls(ctx: WorldBuilderContext) -> void:
 	south_arch.set_surface_override_material(0, wall_mat)
 	south_arch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ctx.world_root.add_child(south_arch)  # Add to scene root, not nav region
-
-	# South gate torches
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-4, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(4, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-4, 0, 51))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(4, 0, 51))
 
 static func _place_wall_segment(ctx: WorldBuilderContext, start: Vector3, end: Vector3, height: float, thickness: float, mat: Material) -> void:
 	var dir := end - start
@@ -222,119 +198,10 @@ static func decorate_biomes(ctx: WorldBuilderContext) -> void:
 	print("[City] Biome scatter placed %d objects" % total)
 
 static func place_props(ctx: WorldBuilderContext) -> void:
-	# Market district props
-	# Torches at shops
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-43, 0, 18))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-47, 0, 18))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-53, 0, 28))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-57, 0, 28))
-
-	# Temple/Noble quarter
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(-2, 0, -33))
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(2, 0, -33))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(15, 0, -23))
-
-	# Garrison
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(38, 0, 28))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(52, 0, 28))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(45, 0, 33))
-
 	# Central plaza — flowers near well/fountain
 	var flower_pink := Color(0.85, 0.4, 0.55)
 	var flower_yellow := Color(0.9, 0.85, 0.3)
 	AssetSpawner.spawn_foliage(ctx, "SM_Flower_Daisies1.FBX", Vector3(3, 0, 2), Color(0.9, 0.9, 0.85))
 	AssetSpawner.spawn_foliage(ctx, "SM_FlowerBush01.FBX", Vector3(-3, 0, -2), flower_pink)
 	AssetSpawner.spawn_foliage(ctx, "SM_Flower_TulipsYellow.FBX", Vector3(2, 0, -3), flower_yellow)
-
-	# House 6 — torch near door
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-60, 0, -18))
-
-	# Library — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(2, 0, -18))
-
-	# Chapel Annex — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(20, 0, -38))
-
-	# Guard Tower — 2 torches flanking entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(28, 0, 42))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(32, 0, 42))
-
-	# Armory — torch
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(55, 0, 23))
-
-	# Gazebo — torch near path
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(37, 0, -18))
-
-	# Wash House — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-48, 0, -33))
-
-	# Midwife Hut — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-28, 0, -43))
-
-	# A1 Merchant Office — torch at door
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-36, 0, 7))
-
-	# B1 Boarding House — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(-47, 0, -16))
-
-	# C1 Scriptorium — torch
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(6, 0, -24))
-
-	# C2 Records Hall — torch at entrance
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(18, 0, -33))
-
-	# E1 Quartermaster — torch
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(36, 0, 28))
-
-	# F1 Waystation — torch
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_lit.gltf.glb", Vector3(49, 0, -2))
-
-	# Decorative pillars at central plaza corners (plaza ~8x8 centered at origin)
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(-8, 0, -8), 0.0, 1.2)
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(8, 0, -8), 0.0, 1.2)
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(-8, 0, 8), 0.0, 1.2)
-	AssetSpawner.spawn_dungeon_model(ctx, "pillar_decorated.gltf.glb", Vector3(8, 0, 8), 0.0, 1.2)
-
-	# Banner flags along main east-west road (gate road at z≈0, x:70..10)
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(65, 0, -3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(50, 0, -3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(35, 0, -3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(20, 0, -3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(65, 0, 3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(50, 0, 3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(35, 0, 3))
-	AssetSpawner.spawn_dungeon_model(ctx, "banner_red.gltf.glb", Vector3(20, 0, 3))
-
-	# Wall-mounted torches along city wall interior at ~15-unit intervals
-	# North wall interior (z≈-49), west of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-55, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-40, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-25, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-12, 0, -49))
-	# North wall interior (z≈-49), east of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(12, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(25, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(40, 0, -49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(55, 0, -49))
-	# South wall interior (z≈49), west of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-55, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-40, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-25, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-12, 0, 49))
-	# South wall interior (z≈49), east of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(12, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(25, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(40, 0, 49))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(55, 0, 49))
-	# West wall interior (x≈-69), north and south of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, -35))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, -20))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 10))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 25))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(-69, 0, 40))
-	# East wall interior (x≈69), north and south of gate gap
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, -35))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, -20))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, 20))
-	AssetSpawner.spawn_dungeon_model(ctx, "torch_mounted.gltf.glb", Vector3(69, 0, 35))
 

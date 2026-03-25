@@ -5,7 +5,6 @@ class_name AssetSpawner
 const FOLIAGE_DIR := "res://assets/models/environment/nature/foliage/"
 const TREE_DIR := "res://assets/models/environment/nature/trees/stylized/"
 const TREE_TEX_DIR := "res://assets/models/environment/nature/trees/stylized/textures/"
-const DUNGEON_DIR := "res://assets/models/environment/dungeon/"
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 
@@ -181,12 +180,6 @@ static func spawn_fishing_spot(ctx: WorldBuilderContext, pos: Vector3, tier: Str
 	spot.setup(tier)
 	return spot
 
-
-static func spawn_dungeon_model(ctx: WorldBuilderContext, filename: String, pos: Vector3, rot_y: float = 0.0, scale_val: float = 1.0) -> Node3D:
-	var instance: Node3D = spawn_model(ctx, DUNGEON_DIR + filename, pos, rot_y, scale_val)
-	if instance:
-		disable_shadows_recursive(instance)
-	return instance
 
 static func disable_shadows_recursive(node: Node) -> void:
 	if node is MeshInstance3D:
