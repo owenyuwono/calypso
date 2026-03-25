@@ -238,7 +238,7 @@ func _process_hover() -> void:
 			var hp: int = data.get("hp", 0)
 			var max_hp: int = data.get("max_hp", 0)
 			display_name += " (HP: %d/%d)" % [hp, max_hp]
-			_cursor_manager.set_cursor("attack")
+			_cursor_manager.set_cursor("default")
 		elif entity_type == "loot_drop":
 			display_name += " [Loot]"
 			_cursor_manager.set_cursor("click")
