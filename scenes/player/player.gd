@@ -103,7 +103,7 @@ func _ready() -> void:
 		"res://assets/models/characters/swordsman_m.glb",
 		{
 			"Walking_A": "res://assets/models/characters/swordsman_m_walk.glb",
-			"Running_A": "res://assets/models/characters/swordsman_m_run.glb",
+			"Running_A": "res://assets/animation/Running.fbx",
 		},
 		MODEL_SCALE,
 		Color(0.2, 0.4, 0.7)
