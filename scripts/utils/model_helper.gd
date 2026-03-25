@@ -90,6 +90,11 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 			anim_instance.queue_free()
 			continue
 
+		# Auto-detect and remap Mixamo bone names (duplicate to avoid mutating cached resource)
+		if _has_mixamo_bones(animation):
+			animation = animation.duplicate()
+			_remap_mixamo_animation(animation, model)
+
 		if library.has_animation(target_name):
 			library.remove_animation(target_name)
 		library.add_animation(target_name, animation)
@@ -106,6 +111,84 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 		lib.add_animation("Idle", idle_anim)
 
 	return result
+
+## Find the Skeleton3D node in a scene tree.
+static func _find_skeleton_3d(root: Node) -> Skeleton3D:
+	if root is Skeleton3D:
+		return root as Skeleton3D
+	for child in root.get_children():
+		var result: Skeleton3D = _find_skeleton_3d(child)
+		if result:
+			return result
+	return null
+
+## Build a node path string from an ancestor to a descendant by walking up the tree.
+static func _node_path_to(ancestor: Node, descendant: Node) -> String:
+	var parts: PackedStringArray = []
+	var current: Node = descendant
+	while current != ancestor and current != null:
+		parts.insert(0, current.name)
+		current = current.get_parent()
+	return "/".join(parts)
+
+## Check if an animation has Mixamo bone names (mixamorig: prefix).
+static func _has_mixamo_bones(animation: Animation) -> bool:
+	for i in animation.get_track_count():
+		var sub: String = animation.track_get_path(i).get_concatenated_subnames()
+		if "mixamorig" in sub:
+			return true
+	return false
+
+## Remap Mixamo animation tracks to match target model skeleton.
+## Strips mixamorig: prefix, applies bone renames, drops unmapped bones,
+## and fixes skeleton node path.
+static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) -> void:
+	var tgt_skeleton: Skeleton3D = _find_skeleton_3d(target_model)
+	if not tgt_skeleton:
+		push_warning("ModelHelper: No Skeleton3D in target model for bone remap")
+		return
+
+	# Build target bone name set
+	var target_bones: Dictionary = {}
+	for i in tgt_skeleton.get_bone_count():
+		target_bones[tgt_skeleton.get_bone_name(i)] = true
+
+	# Target skeleton path relative to model root
+	var tgt_skel_path: String = _node_path_to(target_model, tgt_skeleton)
+
+	# Specific renames after prefix strip
+	var renames: Dictionary = {
+		"Spine1": "Spine01",
+		"Spine2": "Spine02",
+		"Neck": "neck",
+		"HeadTop_End": "head_end",
+	}
+
+	for i in range(animation.get_track_count() - 1, -1, -1):
+		var path: NodePath = animation.track_get_path(i)
+		var sub: String = path.get_concatenated_subnames()
+
+		if sub.is_empty():
+			# Non-bone track (root motion etc.) — drop
+			animation.remove_track(i)
+			continue
+
+		# Strip mixamorig: prefix
+		var bone: String = sub
+		if bone.begins_with("mixamorig:"):
+			bone = bone.substr(10)
+
+		# Apply specific renames
+		if renames.has(bone):
+			bone = renames[bone]
+
+		# Drop if target skeleton doesn't have this bone
+		if not target_bones.has(bone):
+			animation.remove_track(i)
+			continue
+
+		# Set remapped path: target skeleton path + remapped bone name
+		animation.track_set_path(i, NodePath(tgt_skel_path + ":" + bone))
 
 static func strip_unused_animations(anim_player: AnimationPlayer, keep_list: PackedStringArray = ANIM_WHITELIST) -> void:
 	for lib_name in anim_player.get_animation_library_list():
