@@ -216,11 +216,11 @@ func _build_sidebar_entry(prof_id: String) -> Control:
 	fill.anchor_right = xp_percent
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if is_max:
-		fill.color = Color(0.6, 0.5, 0.15, 0.3)
+		fill.color = Color(0.7, 0.6, 0.2, 0.6)
 	elif is_selected:
-		fill.color = Color(0.35, 0.28, 0.1, 0.4)
+		fill.color = Color(0.4, 0.35, 0.15, 0.6)
 	else:
-		fill.color = Color(0.2, 0.18, 0.1, 0.3)
+		fill.color = Color(0.3, 0.25, 0.1, 0.5)
 	wrapper.add_child(fill)
 
 	# Content row (icon + name + level) on top of fill
