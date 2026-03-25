@@ -93,7 +93,7 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 		# Auto-detect and remap Mixamo bone names (duplicate to avoid mutating cached resource)
 		if _has_mixamo_bones(animation):
 			animation = animation.duplicate()
-			_remap_mixamo_animation(animation, model)
+			_remap_mixamo_animation(animation, model, anim_instance)
 
 		if library.has_animation(target_name):
 			library.remove_animation(target_name)
@@ -141,17 +141,18 @@ static func _has_mixamo_bones(animation: Animation) -> bool:
 
 ## Remap Mixamo animation tracks to match target model skeleton.
 ## Strips mixamorig: prefix, applies bone renames, drops unmapped bones,
-## and fixes skeleton node path.
-static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) -> void:
+## fixes skeleton node path, and retargets rotations via rest pose deltas.
+static func _remap_mixamo_animation(animation: Animation, target_model: Node3D, source_model: Node3D) -> void:
 	var tgt_skeleton: Skeleton3D = _find_skeleton_3d(target_model)
+	var src_skeleton: Skeleton3D = _find_skeleton_3d(source_model)
 	if not tgt_skeleton:
 		push_warning("ModelHelper: No Skeleton3D in target model for bone remap")
 		return
 
-	# Build target bone name set
+	# Build target bone name set and index lookup
 	var target_bones: Dictionary = {}
 	for i in tgt_skeleton.get_bone_count():
-		target_bones[tgt_skeleton.get_bone_name(i)] = true
+		target_bones[tgt_skeleton.get_bone_name(i)] = i
 
 	# Target skeleton path relative to model root
 	var tgt_skel_path: String = _node_path_to(target_model, tgt_skeleton)
@@ -169,16 +170,17 @@ static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) 
 		var sub: String = path.get_concatenated_subnames()
 
 		if sub.is_empty():
-			# Non-bone track (root motion etc.) — drop
 			animation.remove_track(i)
 			continue
 
-		# Drop position tracks — Mixamo skeleton proportions differ from target,
-		# causing the mesh to sink/float. Rotation tracks are sufficient for locomotion.
+		# Drop position tracks — Mixamo skeleton proportions differ from target
 		var track_type: int = animation.track_get_type(i)
 		if track_type == Animation.TYPE_POSITION_3D:
 			animation.remove_track(i)
 			continue
+
+		# Get original bone name before stripping (for source skeleton lookup)
+		var src_bone_name: String = sub
 
 		# Strip mixamorig prefix (colon in raw FBX, underscore after Godot import)
 		var bone: String = sub
@@ -193,6 +195,19 @@ static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) 
 		if not target_bones.has(bone):
 			animation.remove_track(i)
 			continue
+
+		# Retarget rotation keyframes using rest pose delta
+		if track_type == Animation.TYPE_ROTATION_3D and src_skeleton:
+			var src_bone_idx: int = src_skeleton.find_bone(src_bone_name)
+			var tgt_bone_idx: int = target_bones[bone]
+			if src_bone_idx >= 0 and tgt_bone_idx >= 0:
+				var src_rest_quat: Quaternion = src_skeleton.get_bone_rest(src_bone_idx).basis.get_rotation_quaternion()
+				var tgt_rest_quat: Quaternion = tgt_skeleton.get_bone_rest(tgt_bone_idx).basis.get_rotation_quaternion()
+				var delta: Quaternion = tgt_rest_quat * src_rest_quat.inverse()
+				var key_count: int = animation.track_get_key_count(i)
+				for k in key_count:
+					var rot: Quaternion = animation.track_get_key_value(i, k)
+					animation.track_set_key_value(i, k, delta * rot)
 
 		# Set remapped path: target skeleton path + remapped bone name
 		animation.track_set_path(i, NodePath(tgt_skel_path + ":" + bone))
