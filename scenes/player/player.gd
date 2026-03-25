@@ -23,6 +23,7 @@ const PerceptionComponent = preload("res://scripts/components/perception_compone
 const LevelData = preload("res://scripts/data/level_data.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
+const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
 
 var entity_id: String = "player"
 
@@ -115,6 +116,7 @@ func _ready() -> void:
 	collision_layer |= (1 << 8)
 
 	_visuals = EntityVisuals.new()
+	_visuals.name = "EntityVisuals"
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
 		"res://assets/models/characters/player.fbx",
@@ -520,10 +522,71 @@ func _resolve_melee_hit() -> void:
 		# Project onto facing axis (depth) and perpendicular axis (width)
 		var along: float = to_target.dot(facing)
 		var perp: float = abs(to_target.dot(facing.cross(Vector3.UP)))
-		if abs(along) <= depth * 0.5 and perp <= half_width:
-			_combat.deal_damage_to(eid, target_node)
-			_visuals.flash_target(eid)
-		break
+		if not (abs(along) <= depth * 0.5 and perp <= half_width):
+			continue
+		var target_pos: Vector3 = target_node.global_position
+
+		# Hit/miss check
+		if not _combat.roll_hit(eid):
+			GameEvents.attack_missed.emit(eid, entity_id)
+			var miss_color: Color = Color(1, 0.3, 0.3)
+			_visuals.spawn_styled_damage_number(eid, 0, "miss", false, target_pos, miss_color)
+			continue
+
+		# Base damage: effective ATK - target effective DEF
+		var target_combat: Node = target_node.get_node_or_null("CombatComponent")
+		var atk: int = _combat.get_effective_atk()
+		var def: int = target_combat.get_effective_def() if target_combat else 0
+		var raw_damage: float = maxf(1.0, atk - def)
+
+		# Physical type modifier (weapon phys_type vs target armor type)
+		var phys_type: String = _combat.get_equipped_phys_type()
+		var armor_type: String = target_combat.get_armor_type() if target_combat else "light"
+		var phys_mod: float = SkillEffectResolver.get_phys_type_modifier(phys_type, armor_type)
+
+		# Element resistance (auto-attacks use target's per-phys_type resistance)
+		var target_resistances: Dictionary = edata.get("resistances", {})
+		var resist_mod: float = 1.0
+		if target_resistances.has(phys_type):
+			resist_mod = SkillEffectResolver.RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
+
+		# Combine modifiers and determine hit_type label
+		var combined_mod: float = phys_mod * resist_mod
+		var hit_type: String = "normal"
+		if combined_mod >= 1.5:
+			hit_type = "weak"
+		elif combined_mod <= 0.5 and combined_mod > 0.0:
+			hit_type = "resist"
+
+		var damage: int = maxi(1, int(raw_damage * combined_mod)) if combined_mod > 0.0 else 0
+
+		# Crit check (skip on 0 damage)
+		var crit_result: Dictionary = _combat.roll_crit()
+		if crit_result["is_crit"] and damage > 0:
+			damage = maxi(1, int(damage * crit_result["multiplier"]))
+
+		# Apply damage
+		if damage > 0:
+			_combat.apply_flat_damage_to(eid, damage)
+
+		# Damage numbers and flash
+		_visuals.spawn_styled_damage_number(eid, damage, hit_type, crit_result["is_crit"] and damage > 0, target_pos)
+		_visuals.flash_target(eid)
+
+		# XP grants (weapon, STR, DEX)
+		if _progression:
+			var weapon_type: String = _combat.get_equipped_weapon_type()
+			_progression.grant_proficiency_xp(weapon_type, 3)
+			_progression.grant_proficiency_xp("str", 3)
+			_progression.grant_proficiency_xp("dex", 2)
+
+		# SFX
+		if _audio:
+			var weapon_type_sfx: String = _combat.get_equipped_weapon_type()
+			var hit_key: String = "combat_hit_" + weapon_type_sfx
+			if SfxDatabase.get_sfx(hit_key).is_empty():
+				hit_key = "combat_hit_generic"
+			_audio.play_oneshot(hit_key)
 
 func _show_target_hp_bar(target_id: String) -> void:
 	var target: Node3D = WorldState.get_entity(target_id)

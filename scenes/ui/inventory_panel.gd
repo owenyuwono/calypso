@@ -158,6 +158,7 @@ func _build_ui() -> void:
 	equip_hbox.add_child(viewport_container)
 
 	_preview_viewport = SubViewport.new()
+	_preview_viewport.own_world_3d = true
 	_preview_viewport.transparent_bg = true
 	_preview_viewport.size = Vector2i(240, 400)
 	_preview_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
@@ -168,10 +169,10 @@ func _build_ui() -> void:
 
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 1.8
-	camera.position = Vector3(0, 0.9, 3)
+	camera.size = 2.5
+	camera.position = Vector3(0, 0.8, 3)
 	viewport_root.add_child(camera)
-	camera.look_at(Vector3(0, 0.9, 0), Vector3.UP)
+	camera.look_at(Vector3(0, 0.8, 0), Vector3.UP)
 
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45, -30, 0)
@@ -247,26 +248,13 @@ func _update_mesh_preview() -> void:
 	if not visuals:
 		return
 	var mesh_path: String = visuals.get("_mesh_path")
-	var anim_paths: Dictionary = visuals.get("_anim_paths")
 	if mesh_path.is_empty():
 		return
-	var result: Dictionary = ModelHelper.instantiate_model_with_anims(mesh_path, anim_paths, 1.0)
+	# Load mesh only (no animations) for the preview — faster and avoids loading all anim FBX files
+	var result: Dictionary = ModelHelper.instantiate_model(mesh_path, 1.0)
 	var model: Node3D = result.get("model")
 	if not model:
 		return
-	# Apply center-origin Y offset (same as EntityVisuals.setup_model_with_anims)
-	var aabb := AABB()
-	var first := true
-	for mi in ModelHelper.find_mesh_instances(model):
-		if mi.mesh:
-			var mesh_aabb: AABB = mi.get_aabb()
-			if first:
-				aabb = mesh_aabb
-				first = false
-			else:
-				aabb = aabb.merge(mesh_aabb)
-	if not first and aabb.position.y < -0.01:
-		model.position.y += abs(aabb.position.y)
 	ModelHelper.apply_toon_to_model(model)
 	_preview_model_root.add_child(model)
 	var anim_player: AnimationPlayer = result.get("anim_player")

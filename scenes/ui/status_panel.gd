@@ -62,10 +62,10 @@ func _ready() -> void:
 	visible = false
 	_build_ui()
 
-	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): _refresh())
-	GameEvents.entity_healed.connect(func(_a, _b, _c): _refresh())
-	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): _refresh())
-	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): _refresh())
+	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): refresh())
+	GameEvents.entity_healed.connect(func(_a, _b, _c): refresh())
+	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): refresh())
+	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): refresh())
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
 func _build_ui() -> void:
@@ -242,7 +242,7 @@ func toggle() -> void:
 	if _is_open:
 		AudioManager.play_ui_sfx("ui_panel_open")
 		UIHelper.center_panel(_panel)
-		_refresh()
+		refresh()
 	else:
 		AudioManager.play_ui_sfx("ui_panel_close")
 
@@ -265,8 +265,8 @@ func _on_stamina_changed(entity_id: String, stamina: float, max_stamina: float) 
 func _update_stamina_label(stamina: float, max_stamina: float) -> void:
 	_stamina_value.text = "%d / %d" % [int(stamina), int(max_stamina)]
 
-func _refresh() -> void:
-	if not _is_open or not _player:
+func refresh() -> void:
+	if not _player:
 		return
 
 	var stats: Node = _player.get_node_or_null("StatsComponent")
