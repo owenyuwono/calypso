@@ -86,15 +86,6 @@ func setup_styled(damage: int, hit_type: String, is_crit: bool, direction: Vecto
 			_fall_depth = 0.6
 			if is_crit:
 				_do_pop_scale()
-		"miss":
-			# Text only
-			_label.text = "MISS"
-			_label.modulate = color_override if color_override.r >= 0 else COLOR_GRAY
-			_label.outline_size = 4
-			_duration = 1.0
-			_rise_time = 0.2
-			_jump_height = 1.5
-			_fall_depth = 0.5
 		_:
 			# Normal or crit — number only
 			_label.text = str(damage)

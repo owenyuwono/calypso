@@ -3,7 +3,7 @@ extends BaseComponent
 ## Bridge: _sync() writes back to WorldState.entity_data on every mutation.
 
 const DEFAULT_ATTACK_SPEED: float = 1.0
-const DEFAULT_ATTACK_RANGE: float = 2.0
+const DEFAULT_ATTACK_RANGE: float = 4.0
 
 var hp: int = 0
 var max_hp: int = 0
@@ -15,8 +15,6 @@ var attack_range: float = DEFAULT_ATTACK_RANGE
 
 var matk: int = 0
 var mdef: int = 0
-var accuracy: int = 80       # percentage
-var evasion: int = 0          # percentage
 var crit_rate: int = 5        # percentage
 var crit_damage: int = 150    # percentage (150 = 1.5×)
 var move_speed: float = 1.0   # multiplier
@@ -39,8 +37,6 @@ func setup(stats: Dictionary) -> void:
 	attack_range = stats.get("attack_range", DEFAULT_ATTACK_RANGE)
 	matk = stats.get("matk", 0)
 	mdef = stats.get("mdef", 0)
-	accuracy = stats.get("accuracy", 80)
-	evasion = stats.get("evasion", 0)
 	crit_rate = stats.get("crit_rate", 5)
 	crit_damage = stats.get("crit_damage", 150)
 	move_speed = stats.get("move_speed", 1.0)
@@ -75,7 +71,6 @@ func get_stats_dict() -> Dictionary:
 		"level": level,
 		"attack_speed": attack_speed, "attack_range": attack_range,
 		"matk": matk, "mdef": mdef,
-		"accuracy": accuracy, "evasion": evasion,
 		"crit_rate": crit_rate, "crit_damage": crit_damage,
 		"move_speed": move_speed, "cast_speed": cast_speed,
 		"max_stamina": max_stamina, "stamina_regen": stamina_regen,
@@ -100,8 +95,6 @@ func _sync() -> void:
 	WorldState.set_entity_data(eid, "attack_range", attack_range)
 	WorldState.set_entity_data(eid, "matk", matk)
 	WorldState.set_entity_data(eid, "mdef", mdef)
-	WorldState.set_entity_data(eid, "accuracy", accuracy)
-	WorldState.set_entity_data(eid, "evasion", evasion)
 	WorldState.set_entity_data(eid, "crit_rate", crit_rate)
 	WorldState.set_entity_data(eid, "crit_damage", crit_damage)
 	WorldState.set_entity_data(eid, "move_speed", move_speed)

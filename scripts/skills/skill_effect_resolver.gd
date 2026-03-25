@@ -42,26 +42,31 @@ static func resolve_skill_hit(
 		perception: Node,
 		skill_data: Dictionary,
 		skill_level: int,
-		target_id: String,
+		hit_targets: Array,
 		attacker_pos: Vector3,
 		active_bleeds: Dictionary,
 		attacker_id: String,
 		effectiveness_data: Dictionary = {}
 ) -> Array:
 	## Main dispatch: routes to the correct resolver based on skill_data.type.
-	## Returns Array of {target_id: String, damage: int, is_crit: bool, is_miss: bool}.
+	## hit_targets: Array of {id: String, node: Node, distance: float} — already filtered by hitbox.
+	## Returns Array of {target_id: String, damage: int, is_crit: bool, hit_type: String}.
 	## Self-harm entries additionally carry {self_harm: true}.
+	if hit_targets.is_empty():
+		return []
+
 	var skill_type: String = skill_data.get("type", "")
+	var primary_id: String = hit_targets[0].id
 	var results: Array = []
 	match skill_type:
 		"melee_attack":
-			results = resolve_melee_attack(combat, skill_data, skill_level, target_id, attacker_id, effectiveness_data)
+			results = resolve_melee_attack(combat, skill_data, skill_level, primary_id, attacker_id, effectiveness_data)
 		"aoe_melee":
-			results = resolve_aoe(combat, perception, skill_data, skill_level, target_id, attacker_pos, attacker_id, effectiveness_data)
+			results = resolve_aoe_hitbox(combat, skill_data, skill_level, hit_targets, attacker_id, effectiveness_data)
 		"armor_pierce":
-			results = resolve_armor_pierce(combat, skill_data, skill_level, target_id, attacker_id, effectiveness_data)
+			results = resolve_armor_pierce(combat, skill_data, skill_level, primary_id, attacker_id, effectiveness_data)
 		"bleed":
-			results = resolve_bleed(combat, skill_data, skill_level, target_id, active_bleeds, attacker_id, effectiveness_data)
+			results = resolve_bleed(combat, skill_data, skill_level, primary_id, active_bleeds, attacker_id, effectiveness_data)
 		_:
 			push_warning("SkillEffectResolver: unknown skill type '%s'" % skill_type)
 			return []
@@ -81,7 +86,7 @@ static func resolve_skill_hit(
 		var would_be_damage: int = floori(raw_atk * multiplier)
 		var self_damage: int = maxi(1, floori(would_be_damage * self_harm_pct))
 		# SkillsComponent handles the actual HP deduction for self-harm entries.
-		results.append({"target_id": attacker_id, "damage": self_damage, "is_crit": false, "is_miss": false, "hit_type": "normal", "self_harm": true})
+		results.append({"target_id": attacker_id, "damage": self_damage, "is_crit": false, "hit_type": "normal", "self_harm": true})
 
 	return results
 
@@ -98,11 +103,6 @@ static func resolve_melee_attack(
 	if not WorldState.is_alive(target_id):
 		return []
 
-	# Hit/miss check
-	if not combat.roll_hit(target_id):
-		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
-
 	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
 	var final_damage: int = calc["damage"]
 	var hit_type: String = calc["hit_type"]
@@ -112,89 +112,33 @@ static func resolve_melee_attack(
 		final_damage = maxi(1, int(final_damage * crit_result["multiplier"]))
 
 	combat.apply_flat_damage_to(target_id, final_damage)
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "hit_type": hit_type}]
 
 
-static func resolve_aoe(
+static func resolve_aoe_hitbox(
 		combat: Node,
-		perception: Node,
 		skill_data: Dictionary,
 		skill_level: int,
-		target_id: String,
-		attacker_pos: Vector3,
+		hit_targets: Array,
 		attacker_id: String,
 		effectiveness_data: Dictionary = {}
 ) -> Array:
-	## AoE melee: hits primary target then all nearby hostiles within aoe_radius.
-	## No friendly fire — only entities whose id starts with "monster_".
-	## Hit/miss and crit are checked per target individually.
+	## AoE: damages ALL targets found in the hitbox.
+	## Hitbox filtering already done by SkillsComponent._query_hitbox().
 	var results: Array = []
-
-	# Primary target
-	if WorldState.is_alive(target_id):
-		if not combat.roll_hit(target_id):
-			GameEvents.attack_missed.emit(target_id, attacker_id)
-			results.append({"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
-		else:
-			var primary_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
-			var primary_damage: int = primary_calc["damage"]
-			var primary_hit_type: String = primary_calc["hit_type"]
-			var crit_result: Dictionary = combat.roll_crit()
-			var is_crit: bool = crit_result["is_crit"]
-			if is_crit:
-				primary_damage = maxi(1, int(primary_damage * crit_result["multiplier"]))
-			combat.apply_flat_damage_to(target_id, primary_damage)
-			results.append({"target_id": target_id, "damage": primary_damage, "is_crit": is_crit, "is_miss": false, "hit_type": primary_hit_type})
-
-	# Determine AoE center
-	var aoe_center: Vector3 = attacker_pos
-	var center_mode: String = skill_data.get("aoe_center", "self")
-	if center_mode == "target":
-		var target_entity: Node3D = WorldState.get_entity(target_id)
-		if target_entity and is_instance_valid(target_entity):
-			aoe_center = target_entity.global_position
-
-	var bonuses: Dictionary = effectiveness_data.get("synergy_bonuses", {})
-	var radius_bonus: float = bonuses.get("aoe_radius_bonus", 0.0)
-	var effective_radius: float = skill_data.get("aoe_radius", 3.0) + radius_bonus
-
-	# Gather secondary targets from perception — fetch slightly wider than effective_radius,
-	# then filter precisely by distance to aoe_center below.
-	var nearby: Array = perception.get_nearby(effective_radius + 5.0)
-
-	for entry in nearby:
-		var eid: String = entry.get("id", "")
-		# Skip primary target, self, non-monsters, and dead entities
-		if eid == target_id:
-			continue
-		if eid == attacker_id:
-			continue
-		if not eid.begins_with("monster_"):
-			continue
+	for target_entry: Dictionary in hit_targets:
+		var eid: String = target_entry.get("id", "")
 		if not WorldState.is_alive(eid):
 			continue
-		# Check distance to aoe_center (not to attacker)
-		var node: Node3D = entry.get("node")
-		if not node or not is_instance_valid(node):
-			continue
-		var dist_to_center: float = aoe_center.distance_to(node.global_position)
-		if dist_to_center > effective_radius:
-			continue
-
-		if not combat.roll_hit(eid):
-			GameEvents.attack_missed.emit(eid, attacker_id)
-			results.append({"target_id": eid, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"})
-		else:
-			var splash_calc: Dictionary = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data, 0.0, attacker_id)
-			var splash_damage: int = splash_calc["damage"]
-			var splash_hit_type: String = splash_calc["hit_type"]
-			var crit_result: Dictionary = combat.roll_crit()
-			var is_crit: bool = crit_result["is_crit"]
-			if is_crit:
-				splash_damage = maxi(1, int(splash_damage * crit_result["multiplier"]))
-			combat.apply_flat_damage_to(eid, splash_damage)
-			results.append({"target_id": eid, "damage": splash_damage, "is_crit": is_crit, "is_miss": false, "hit_type": splash_hit_type})
-
+		var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, eid, effectiveness_data, 0.0, attacker_id)
+		var damage: int = calc.damage
+		var hit_type: String = calc.hit_type
+		var crit_result: Dictionary = combat.roll_crit()
+		if crit_result.is_crit and damage > 0:
+			damage = maxi(1, int(damage * crit_result.multiplier))
+		if damage > 0:
+			combat.apply_flat_damage_to(eid, damage)
+		results.append({"target_id": eid, "damage": damage, "is_crit": crit_result.is_crit, "hit_type": hit_type})
 	return results
 
 
@@ -210,11 +154,6 @@ static func resolve_armor_pierce(
 	if not WorldState.is_alive(target_id):
 		return []
 
-	# Hit/miss check
-	if not combat.roll_hit(target_id):
-		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
-
 	var bonuses: Dictionary = effectiveness_data.get("synergy_bonuses", {})
 	var pierce_bonus: float = bonuses.get("pierce_bonus", 0.0)
 	var effective_pierce: float = clampf(skill_data.get("def_ignore_percent", 0.0) + pierce_bonus, 0.0, 1.0)
@@ -228,7 +167,7 @@ static func resolve_armor_pierce(
 		final_damage = maxi(1, int(final_damage * crit_result["multiplier"]))
 
 	combat.apply_flat_damage_to(target_id, final_damage)
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "hit_type": hit_type}]
 
 
 static func resolve_bleed(
@@ -245,11 +184,6 @@ static func resolve_bleed(
 	## Caller must call process_bleeds() each frame to apply tick damage.
 	if not WorldState.is_alive(target_id):
 		return []
-
-	# Hit/miss check
-	if not combat.roll_hit(target_id):
-		GameEvents.attack_missed.emit(target_id, attacker_id)
-		return [{"target_id": target_id, "damage": 0, "is_crit": false, "is_miss": true, "hit_type": "miss"}]
 
 	var calc: Dictionary = _calc_damage(combat, skill_data, skill_level, target_id, effectiveness_data, 0.0, attacker_id)
 	var final_damage: int = calc["damage"]
@@ -279,13 +213,13 @@ static func resolve_bleed(
 		"tick_interval": tick_interval,
 	}
 
-	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "is_miss": false, "hit_type": hit_type}]
+	return [{"target_id": target_id, "damage": final_damage, "is_crit": is_crit, "hit_type": hit_type}]
 
 
 static func process_bleeds(active_bleeds: Dictionary, delta: float) -> Array:
 	## Called every _process() frame. Advances bleed timers and deals tick damage.
 	## Removes expired or dead-target bleeds from active_bleeds in-place.
-	## Returns Array of {target_id: String, damage: int, is_crit: bool, is_miss: bool} for ticks that fired this frame.
+	## Returns Array of {target_id: String, damage: int, is_crit: bool} for ticks that fired this frame.
 	var results: Array = []
 	var to_remove: Array = []
 
@@ -302,7 +236,7 @@ static func process_bleeds(active_bleeds: Dictionary, delta: float) -> Array:
 			var damage_per_tick: int = bleed.get("damage_per_tick", 1)
 			if combat and is_instance_valid(combat):
 				var tick_damage: int = combat.apply_flat_damage_to(target_id, damage_per_tick)
-				results.append({"target_id": target_id, "damage": tick_damage, "is_crit": false, "is_miss": false, "hit_type": "normal"})
+				results.append({"target_id": target_id, "damage": tick_damage, "is_crit": false, "hit_type": "normal"})
 				# If the tick killed the target, remove bleed immediately this frame
 				if not WorldState.is_alive(target_id):
 					to_remove.append(target_id)
@@ -442,13 +376,3 @@ static func _calc_damage(
 	var final_damage: int = maxi(1, int(after_def * combined_mod)) if combined_mod > 0.0 else 0
 
 	return {"damage": final_damage, "hit_type": hit_type}
-
-
-static func _apply_effectiveness(raw_damage: int, effectiveness_data: Dictionary) -> int:
-	## Kept for backward compatibility. Applies effectiveness scaling and synergy damage_bonus only.
-	## Crit is no longer handled here — use combat.roll_crit() in each resolver.
-	var effectiveness: float = effectiveness_data.get("effectiveness", 1.0)
-	var bonuses: Dictionary = effectiveness_data.get("synergy_bonuses", {})
-	var result: int = floori(raw_damage * effectiveness)
-	result = floori(result * (1.0 + bonuses.get("damage_bonus", 0.0)))
-	return result

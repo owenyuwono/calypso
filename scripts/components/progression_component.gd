@@ -122,8 +122,6 @@ func _recalculate_stats() -> void:
 		if hp_diff > 0:
 			_stats.hp = mini(_stats.hp + hp_diff, _stats.max_hp)
 
-	_stats.accuracy = 80 + dex_level * 5
-	_stats.evasion = agi_level * 3
 	_stats.crit_rate = 5 + dex_level * 2
 	_stats.crit_damage = 150 + str_level * 5
 	_stats.attack_speed_mult = 1.0 + agi_level * 0.05

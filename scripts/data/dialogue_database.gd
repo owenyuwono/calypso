@@ -135,7 +135,7 @@ const DIALOGUES: Dictionary = {
 			],
 		},
 		"field_dangers": {
-			"text": "The wolves have higher evasion than they look. Probably. I've noticed misses happen more often against them than against slimes. I'd recommend accuracy-focused gear before heading into the west field — the dark mages there are genuinely dangerous.",
+			"text": "The west field is another matter entirely. The dark mages there resist most physical damage — you'll want strong elemental coverage. I'd focus on magical power and element matching before heading out there.",
 			"choices": [
 				{"text": "What do the dark mages drop?", "next": "mage_drops"},
 				{"text": "Thanks for the warning.", "next": null},

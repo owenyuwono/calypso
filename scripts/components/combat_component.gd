@@ -54,17 +54,6 @@ func get_effective_mdef() -> int:
 func get_armor_type() -> String:
 	return _equipment.get_armor_type() if _equipment else "light"
 
-func roll_hit(target_id: String) -> bool:
-	var target_node: Node = WorldState.get_entity(target_id)
-	if not target_node:
-		return true  # Can't find target, assume hit
-	var target_stats: Node = target_node.get_node_or_null("StatsComponent")
-	if not target_stats:
-		return true
-	var target_evasion: int = target_stats.evasion
-	var hit_chance: int = clampi(_stats.accuracy - target_evasion, 5, 100)
-	return randf() * 100.0 < hit_chance
-
 func roll_crit() -> Dictionary:
 	var is_crit: bool = randf() < (_stats.crit_rate / 100.0)
 	var multiplier: float = _stats.crit_damage / 100.0

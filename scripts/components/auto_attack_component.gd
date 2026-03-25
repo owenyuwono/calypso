@@ -149,14 +149,6 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	var target_pos: Vector3 = target_node.global_position if is_instance_valid(target_node) else Vector3.ZERO
 	var attacker_id: String = _get_entity_id()
 
-	# Hit check
-	if not _combat.roll_hit(target_id):
-		GameEvents.attack_missed.emit(target_id, attacker_id)
-		# Red if we (player) miss, white if enemy misses
-		var miss_color: Color = Color(1, 0.3, 0.3) if attacker_id == "player" else Color.WHITE
-		_visuals.spawn_styled_damage_number(target_id, 0, "miss", false, target_pos, miss_color)
-		return
-
 	# Calculate damage with phys_type resistance
 	var target_combat: Node = target_node.get_node_or_null("CombatComponent") if is_instance_valid(target_node) else null
 	var atk: int = _combat.get_effective_atk()

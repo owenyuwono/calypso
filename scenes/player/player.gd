@@ -299,7 +299,8 @@ func _physics_process(delta: float) -> void:
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_forward", "move_back")
 	)
-	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open()
+	var skill_pending: bool = _skills_comp != null and _skills_comp.is_skill_pending()
+	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open() and not skill_pending
 
 	if _is_ui_open():
 		_stop_navigation()
@@ -411,8 +412,12 @@ func _physics_process(delta: float) -> void:
 			_is_attacking = false
 			_visuals.crossfade_anim("Idle", 0.15)
 
+	# Skill animation lock — tick pending hit each frame
+	if _skills_comp and _skills_comp.is_skill_pending():
+		_skills_comp.tick_pending_hit(delta)
+
 	# Update animation
-	if not _is_attacking and _attack_target.is_empty() and _harvest_target.is_empty():
+	if not _is_attacking and not (_skills_comp and _skills_comp.is_skill_pending()) and _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
 			_idle_timer = 0.0
 			_visuals.play_anim("Running")
@@ -444,10 +449,6 @@ func _process_combat(delta: float) -> bool:
 	var effective_move_speed: float = SPEED * _stats.move_speed
 	if _stamina:
 		effective_move_speed *= _stamina.get_fatigue_multiplier("move_speed")
-
-	# While a skill hit is pending, handle it here — auto-attack is suppressed
-	if _player_input.pending_skill_hit:
-		return _player_input.process_skill_hit(delta, attack_range)
 
 	# Normal auto-attack: delegate to component
 	var result: Dictionary = _auto_attack.process_attack(
@@ -509,9 +510,9 @@ func _resolve_melee_hit() -> void:
 		return
 	var attack_range: float = _stats.attack_range if _stats else 3.0
 	var facing: Vector3 = _get_facing_dir()
-	var half_width: float = attack_range * 0.8
+	var half_width: float = attack_range * 0.5
 	var depth: float = attack_range
-	var forward_offset: float = attack_range * 0.7
+	var forward_offset: float = attack_range * 0.4
 	_show_debug_hitbox(half_width, depth, forward_offset)
 	# Only hit enemies in front of the player within the hitbox
 	var hitbox_center: Vector3 = global_position + facing * forward_offset
@@ -783,6 +784,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _is_ui_open():
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
+				if _is_attacking or (_skills_comp and _skills_comp.is_skill_pending()):
+					get_viewport().set_input_as_handled()
+					return
 				_player_input.try_use_hotbar_slot(i)
 				get_viewport().set_input_as_handled()
 				return

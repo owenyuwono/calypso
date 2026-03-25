@@ -1,7 +1,8 @@
 extends Node
 ## Thin AI adapter for NPC skill use. Handles skill selection and global
 ## cooldown gating only. All execution (hit resolution, bleeds, XP, cooldowns)
-## delegates to SkillsComponent.
+## delegates to SkillsComponent. target_id is passed as face_target_id so the
+## NPC faces its target during the skill animation.
 
 const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 

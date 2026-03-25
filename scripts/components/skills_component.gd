@@ -27,7 +27,6 @@ var _global_cooldown: float = 0.0
 # Pending hit state
 var _pending_skill_hit: bool = false
 var _pending_skill_id: String = ""
-var _pending_target_id: String = ""
 var _pending_skill_anim: String = ""
 var _skill_hit_time: float = 0.0
 
@@ -125,20 +124,21 @@ func setup_execution(combat: Node, stats: Node, progression: Node, visuals: Node
 
 # --- Public execution API ---
 
-func begin_skill_use(skill_id: String, target_id: String) -> bool:
+func begin_skill_use(skill_id: String, face_target_id: String = "") -> bool:
 	## Validate, animate, cancel auto-attack, drain stamina, start cooldown, set pending state.
 	## Returns true on success, false if validation fails.
+	## face_target_id: if non-empty, entity will face this target before animating.
 	var skill_data: Dictionary = SkillDatabase.get_skill(skill_id)
 	if skill_data.is_empty():
 		return false
 
-	var skill_level: int = get_skill_level(skill_id)
-
-	if not WorldState.is_alive(target_id):
-		return false
-	var target_node: Node3D = WorldState.get_entity(target_id)
-	if not target_node or not is_instance_valid(target_node):
-		return false
+	if not face_target_id.is_empty():
+		var target_node: Node3D = WorldState.get_entity(face_target_id)
+		if target_node and is_instance_valid(target_node):
+			var dir: Vector3 = target_node.global_position - get_parent().global_position
+			dir.y = 0.0
+			if dir.length_squared() > 0.01:
+				_visuals.face_direction(dir.normalized())
 
 	var anim_name: String = skill_data.get("animation", "1H_Melee_Attack_Chop")
 	_visuals.play_anim(anim_name, true)
@@ -152,6 +152,7 @@ func begin_skill_use(skill_id: String, target_id: String) -> bool:
 		var cost: int = skill_data.get("stamina_cost", 15)
 		stamina_comp.drain_flat(float(cost))
 
+	var skill_level: int = get_skill_level(skill_id)
 	var cd_bonuses: Dictionary = {}
 	if _progression:
 		cd_bonuses = SkillDatabase.get_synergy_bonuses(skill_id, _progression)
@@ -165,7 +166,6 @@ func begin_skill_use(skill_id: String, target_id: String) -> bool:
 
 	_pending_skill_hit = true
 	_pending_skill_id = skill_id
-	_pending_target_id = target_id
 	_pending_skill_anim = anim_name
 
 	return true
@@ -173,14 +173,10 @@ func begin_skill_use(skill_id: String, target_id: String) -> bool:
 
 func tick_pending_hit(delta: float) -> int:
 	## Advance pending hit timing. Returns:
-	##   0 — nothing pending or target died (cancelled)
+	##   0 — nothing pending
 	##   1 — hit resolved this frame
 	##   2 — still waiting
 	if not _pending_skill_hit:
-		return 0
-
-	if not WorldState.is_alive(_pending_target_id):
-		cancel_pending()
 		return 0
 
 	var anim_player: AnimationPlayer = _visuals.get_anim_player()
@@ -200,7 +196,6 @@ func tick_pending_hit(delta: float) -> int:
 func cancel_pending() -> void:
 	_pending_skill_hit = false
 	_pending_skill_id = ""
-	_pending_target_id = ""
 	_pending_skill_anim = ""
 
 
@@ -272,26 +267,115 @@ func _process(delta: float) -> void:
 
 # --- Private ---
 
+func _get_facing_dir() -> Vector3:
+	if _visuals and _visuals.get_model():
+		var yaw: float = _visuals.get_model().rotation.y
+		return Vector3(sin(yaw), 0.0, cos(yaw))
+	return Vector3.FORWARD
+
+
+func _is_hostile_target(target_id: String, attacker_id: String) -> bool:
+	var attacker_is_monster: bool = attacker_id.begins_with("monster_")
+	var target_is_monster: bool = target_id.begins_with("monster_")
+	return attacker_is_monster != target_is_monster
+
+
+func _query_hitbox(skill_data: Dictionary, attack_range: float) -> Array:
+	var facing: Vector3 = _get_facing_dir()
+	var skill_type: String = skill_data.get("type", "melee_attack")
+
+	var half_width: float = skill_data.get("hitbox_half_width", attack_range * 0.5)
+	var depth: float = skill_data.get("hitbox_depth", attack_range)
+	var forward_offset: float = skill_data.get("hitbox_offset", attack_range * 0.4)
+
+	if skill_type == "aoe_melee":
+		var aoe_radius: float = skill_data.get("aoe_radius", 3.0)
+		half_width = aoe_radius
+		depth = aoe_radius * 1.5
+		var center_mode: String = skill_data.get("aoe_center", "self")
+		if center_mode == "self":
+			forward_offset = 0.0
+		else:
+			forward_offset = aoe_radius * 0.5
+
+	var entity_pos: Vector3 = get_parent().global_position
+	var hitbox_center: Vector3 = entity_pos + facing * forward_offset
+	var search_radius: float = maxf(half_width, depth) + forward_offset + 2.0
+	var nearby: Array = _perception.get_nearby(search_radius)
+
+	var entity_id: String = _get_entity_id()
+	var results: Array = []
+
+	for entry: Dictionary in nearby:
+		var eid: String = entry.get("id", "")
+		if eid == entity_id:
+			continue
+		if not _is_hostile_target(eid, entity_id):
+			continue
+		if not WorldState.is_alive(eid):
+			continue
+		var target_node: Node = entry.get("node")
+		if not target_node or not is_instance_valid(target_node):
+			continue
+
+		var to_target: Vector3 = target_node.global_position - hitbox_center
+		to_target.y = 0.0
+		var along: float = to_target.dot(facing)
+		var perp: float = abs(to_target.dot(facing.cross(Vector3.UP)))
+		if along >= -forward_offset and along <= depth * 0.5 and perp <= half_width:
+			results.append({"id": eid, "node": target_node, "distance": entry.get("distance", 999.0)})
+
+	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.distance < b.distance)
+
+	if OS.is_debug_build():
+		_show_debug_hitbox(facing, half_width, depth, forward_offset)
+
+	return results
+
+
+func _show_debug_hitbox(facing: Vector3, half_width: float, depth: float, forward_offset: float) -> void:
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(half_width * 2.0, 1.5, depth)
+	mesh_inst.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.2, 0.5, 1.0, 0.25)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh_inst.material_override = mat
+	get_tree().current_scene.add_child(mesh_inst)
+	mesh_inst.global_position = get_parent().global_position + facing * forward_offset + Vector3(0, 0.75, 0)
+	if _visuals and _visuals.get_model():
+		mesh_inst.rotation.y = _visuals.get_model().rotation.y
+	var tween := get_tree().create_tween()
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.2)
+	tween.tween_callback(mesh_inst.queue_free)
+
+
 func _execute_skill_hit() -> void:
 	_pending_skill_hit = false
+	var skill_id: String = _pending_skill_id
+	_pending_skill_id = ""
 
-	if _pending_target_id.is_empty():
-		return
-	if not WorldState.is_alive(_pending_target_id):
-		return
-
-	var skill_data: Dictionary = SkillDatabase.get_skill(_pending_skill_id)
+	var skill_data: Dictionary = SkillDatabase.get_skill(skill_id)
 	if skill_data.is_empty():
 		return
 
-	var skill_level: int = get_skill_level(_pending_skill_id)
+	var attack_range: float = _stats.attack_range if _stats and "attack_range" in _stats else 3.0
+	var hit_targets: Array = _query_hitbox(skill_data, attack_range)
+
+	if hit_targets.is_empty():
+		return
+
+	var skill_level: int = get_skill_level(skill_id)
 
 	var effectiveness_data: Dictionary = {}
 	if _progression:
-		var primary: Dictionary = SkillDatabase.get_primary_proficiency(_pending_skill_id)
+		var primary: Dictionary = SkillDatabase.get_primary_proficiency(skill_id)
 		var prof_level: int = _progression.get_proficiency_level(primary.skill)
-		var eff_data: Dictionary = SkillDatabase.get_primary_effectiveness(_pending_skill_id, prof_level)
-		var bonuses: Dictionary = SkillDatabase.get_synergy_bonuses(_pending_skill_id, _progression)
+		var eff_data: Dictionary = SkillDatabase.get_primary_effectiveness(skill_id, prof_level)
+		var bonuses: Dictionary = SkillDatabase.get_synergy_bonuses(skill_id, _progression)
 		effectiveness_data = {
 			"effectiveness": eff_data.effectiveness,
 			"synergy_bonuses": bonuses,
@@ -302,7 +386,7 @@ func _execute_skill_hit() -> void:
 	var entity_id: String = _get_entity_id()
 	var results: Array = SkillEffectResolver.resolve_skill_hit(
 		_combat, _perception, skill_data, skill_level,
-		_pending_target_id, get_parent().global_position, _active_bleeds, entity_id,
+		hit_targets, get_parent().global_position, _active_bleeds, entity_id,
 		effectiveness_data
 	)
 
@@ -311,6 +395,7 @@ func _execute_skill_hit() -> void:
 		_progression.grant_proficiency_xp("wis", 2)
 
 	var damage_category: String = skill_data.get("damage_category", "physical")
+	var primary_target_id: String = hit_targets[0].id
 
 	for result in results:
 		if result.get("self_harm", false):
@@ -319,7 +404,7 @@ func _execute_skill_hit() -> void:
 				_stats.take_damage(self_damage)
 			_visuals.flash_hit()
 			_visuals.spawn_styled_damage_number(entity_id, self_damage, "weak", false, get_parent().global_position)
-			GameEvents.skill_backfired.emit(entity_id, _pending_skill_id, self_damage)
+			GameEvents.skill_backfired.emit(entity_id, skill_id, self_damage)
 			continue
 
 		var hit_target_id: String = result.get("target_id", "")
@@ -329,12 +414,6 @@ func _execute_skill_hit() -> void:
 
 		var result_hit_type: String = result.get("hit_type", "normal")
 		var result_is_crit: bool = result.get("is_crit", false)
-
-		if result.get("is_miss", false):
-			# Red if player's skill misses, white if NPC/monster skill misses us
-			var miss_color: Color = Color(1, 0.3, 0.3) if entity_id == "player" else Color.WHITE
-			_visuals.spawn_styled_damage_number(hit_target_id, 0, "miss", false, hit_pos, miss_color)
-			continue
 
 		_visuals.spawn_styled_damage_number(hit_target_id, hit_damage, result_hit_type, result_is_crit, hit_pos)
 		_visuals.flash_target(hit_target_id)
@@ -356,16 +435,13 @@ func _execute_skill_hit() -> void:
 		if not element.is_empty() and not ProficiencyDatabase.get_skill(element).is_empty() and _progression:
 			_progression.grant_proficiency_xp(element, 5)
 
-	grant_skill_xp(_pending_skill_id, 5)
+	grant_skill_xp(skill_id, 5)
 
 	if _progression:
-		var target_data: Dictionary = WorldState.get_entity_data(_pending_target_id)
+		var target_data: Dictionary = WorldState.get_entity_data(primary_target_id)
 		var monster_type: String = target_data.get("monster_type", "")
 		if not monster_type.is_empty():
 			var weapon_type: String = _combat.get_equipped_weapon_type()
 			_progression.grant_combat_xp(monster_type, weapon_type)
 
-	GameEvents.skill_used.emit(entity_id, _pending_skill_id)
-
-	_pending_skill_id = ""
-	_pending_target_id = ""
+	GameEvents.skill_used.emit(entity_id, skill_id)
