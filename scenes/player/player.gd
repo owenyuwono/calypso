@@ -802,21 +802,6 @@ func _handle_left_click() -> void:
 		var data := WorldState.get_entity_data(hovered_entity_id)
 		var etype: String = data.get("type", "")
 
-		if etype == "monster" and WorldState.is_alive(hovered_entity_id):
-			# Click monster: walk to + auto-attack, lock ring on target
-			_cancel_harvest()
-			_interact_target = ""
-			_cancel_attack()  # Hide HP bar on old target before switching
-			_attack_target = hovered_entity_id
-			_auto_attack.cancel()
-			_is_navigating = false
-			_hover.lock_ring(hovered_entity_id, Color(1.0, 0.3, 0.2, 0.6))
-			# Show HP bar on locked target
-			_show_target_hp_bar(hovered_entity_id)
-			if _audio:
-				_audio.start_combat_loop()
-			return
-
 		if etype == "loot_drop":
 			# Click loot: walk to + pick up on arrival
 			_cancel_attack()
