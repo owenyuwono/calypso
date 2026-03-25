@@ -45,6 +45,13 @@ var _stagger_timer: float = 0.0
 var _last_damage_time: int = 0
 var _hp_regen_accumulator: float = 0.0
 
+# Idle variation
+var _idle_timer: float = 0.0
+const IDLE_VARIATION_INTERVAL: float = 8.0
+const IDLE_ANIMS: PackedStringArray = ["Idle", "Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3"]
+const IDLE_RARE_ANIMS: PackedStringArray = ["Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look"]
+const IDLE_TIRED_ANIMS: PackedStringArray = ["Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck"]
+
 # AGI travel XP
 var _combat_distance_traveled: float = 0.0
 var _last_position: Vector3
@@ -105,10 +112,21 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
-		"res://assets/models/characters/swordsman_m.glb",
+		"res://assets/models/characters/player.fbx",
 		{
-			"Walking_A": "res://assets/models/characters/swordsman_m_walk.glb",
-			"Running_A": "res://assets/animation/Running.fbx",
+			"Running": "res://assets/animation/player/running.fbx",
+			"Attack": "res://assets/animation/player/attack_slash.fbx",
+			"Hit": "res://assets/animation/player/hit_impact.fbx",
+			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
+			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
+			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
+			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
+			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
+			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
+			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
+			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
+			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
+			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
 		},
 		MODEL_SCALE,
 		Color(0.2, 0.4, 0.7)
@@ -335,9 +353,15 @@ func _physics_process(delta: float) -> void:
 	# Update animation
 	if _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
-			_visuals.play_anim("Running_A")
+			_idle_timer = 0.0
+			_visuals.play_anim("Running")
 		else:
-			_visuals.play_anim("Idle")
+			_idle_timer += delta
+			if _idle_timer >= IDLE_VARIATION_INTERVAL:
+				_idle_timer = 0.0
+				_visuals.play_anim(_pick_idle_anim(), true)
+			elif not _was_moving:
+				_visuals.play_anim("Idle")
 
 	# Footstep audio: trigger on movement state transitions
 	if is_moving and not _was_moving:
@@ -468,9 +492,9 @@ func _process_harvesting(delta: float) -> bool:
 	_chop_timer += delta
 	if _chop_timer >= _chop_interval:
 		_chop_timer = 0.0
-		_visuals.play_anim("1H_Melee_Attack_Chop")
+		_visuals.play_anim("Attack")
 		_chop_hit_pending = true
-		_chop_hit_timer = _visuals.get_hit_delay("1H_Melee_Attack_Chop")
+		_chop_hit_timer = _visuals.get_hit_delay("Attack")
 
 	# Resolve hit frame
 	if _chop_hit_pending:
@@ -844,6 +868,7 @@ func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _
 	if target_id == "player":
 		flash_hit()
 		_stagger_timer = 0.3
+		_visuals.play_anim("Hit", true)
 		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 		_last_damage_time = Time.get_ticks_msec()
 		_hp_regen_accumulator = 0.0
@@ -882,6 +907,15 @@ func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
 
 func flash_hit() -> void:
 	_visuals.flash_hit()
+
+func _pick_idle_anim() -> String:
+	# If stamina is low, use tired idles
+	if _stamina and _stamina.get_stamina_percent() < 0.3:
+		return IDLE_TIRED_ANIMS[randi() % IDLE_TIRED_ANIMS.size()]
+	# 20% chance for rare idle
+	if randf() < 0.2:
+		return IDLE_RARE_ANIMS[randi() % IDLE_RARE_ANIMS.size()]
+	return IDLE_ANIMS[randi() % IDLE_ANIMS.size()]
 
 func _spawn_click_marker(pos: Vector3) -> void:
 	# Reuse a single marker instance — kill any in-progress tween first

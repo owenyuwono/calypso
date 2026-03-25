@@ -3,7 +3,10 @@ extends RefCounted
 ## Includes toon shader material creation and application.
 
 const ANIM_WHITELIST: PackedStringArray = [
-	"Idle", "Walking_A", "Running_A", "1H_Melee_Attack_Chop", "Death_A", "RESET"
+	"Idle", "Running", "Attack", "Hit", "Death_A", "RESET",
+	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",
+	"Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look",
+	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",
 ]
 
 static var _scene_cache: Dictionary = {}
@@ -155,6 +158,17 @@ static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) 
 
 	# Target skeleton path relative to model root
 	var tgt_skel_path: String = _node_path_to(target_model, tgt_skeleton)
+
+	# If target skeleton is also Mixamo, just fix skeleton node paths (no name remapping)
+	var first_bone: String = tgt_skeleton.get_bone_name(0) if tgt_skeleton.get_bone_count() > 0 else ""
+	if "mixamorig" in first_bone:
+		for i in animation.get_track_count():
+			var path: NodePath = animation.track_get_path(i)
+			var sub: String = path.get_concatenated_subnames()
+			if sub.is_empty():
+				continue
+			animation.track_set_path(i, NodePath(tgt_skel_path + ":" + sub))
+		return
 
 	# Bone renames after prefix strip.
 	# Meshy spine (bottom→top): Hips → Spine02 → Spine01 → Spine → neck
