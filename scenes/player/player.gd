@@ -24,6 +24,7 @@ const LevelData = preload("res://scripts/data/level_data.gd")
 const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
+const HitVFX = preload("res://scripts/vfx/hit_vfx.gd")
 
 var entity_id: String = "player"
 
@@ -43,6 +44,8 @@ var _attack_target: String = ""
 var _is_dead: bool = false
 var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
+var _hitstop_timer: float = 0.0
+var _knockback_velocity: Vector3 = Vector3.ZERO
 var _last_damage_time: int = 0
 var _hp_regen_accumulator: float = 0.0
 var _is_attacking: bool = false
@@ -167,9 +170,6 @@ func _ready() -> void:
 	add_child(_progression)
 	_progression.setup(_stats, {}, _equipment)
 
-	# DEBUG: Override stats for testing combat mechanics — remove when done
-	_progression.set_debug_overrides({"evasion": 50, "crit_rate": 50})
-
 	_combat = CombatComponent.new()
 	_combat.name = "CombatComponent"
 	add_child(_combat)
@@ -239,7 +239,6 @@ func _ready() -> void:
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-	GameEvents.attack_missed.connect(_on_attack_missed)
 
 	_last_position = global_position
 
@@ -270,6 +269,16 @@ func _setup_dialogue_bubble() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _hitstop_timer > 0.0:
+		_hitstop_timer -= delta
+		# Freeze animation for hit stop effect
+		var anim_p: AnimationPlayer = _visuals.get_anim_player() if _visuals else null
+		if anim_p:
+			anim_p.speed_scale = 0.0
+		if _hitstop_timer <= 0.0 and anim_p:
+			anim_p.speed_scale = 1.0
+		return
+
 	if _is_dead:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
@@ -278,7 +287,8 @@ func _physics_process(delta: float) -> void:
 
 	if _stagger_timer > 0.0:
 		_stagger_timer -= delta
-		velocity = Vector3.ZERO
+		velocity = _knockback_velocity
+		_knockback_velocity = _knockback_velocity.lerp(Vector3.ZERO, 0.15)
 		move_and_slide()
 		return
 
@@ -501,11 +511,12 @@ func _resolve_melee_hit() -> void:
 	var facing: Vector3 = _get_facing_dir()
 	var half_width: float = attack_range * 0.8
 	var depth: float = attack_range
-	var forward_offset: float = attack_range * 1.0
+	var forward_offset: float = attack_range * 0.7
 	_show_debug_hitbox(half_width, depth, forward_offset)
 	# Only hit enemies in front of the player within the hitbox
 	var hitbox_center: Vector3 = global_position + facing * forward_offset
 	var nearby: Array = _perception.get_nearby(attack_range * 2.0)
+	var hit_landed: bool = false
 	for entity_data: Dictionary in nearby:
 		var eid: String = entity_data.get("id", "")
 		var edata: Dictionary = WorldState.get_entity_data(eid)
@@ -525,13 +536,6 @@ func _resolve_melee_hit() -> void:
 		if not (abs(along) <= depth * 0.5 and perp <= half_width):
 			continue
 		var target_pos: Vector3 = target_node.global_position
-
-		# Hit/miss check
-		if not _combat.roll_hit(eid):
-			GameEvents.attack_missed.emit(eid, entity_id)
-			var miss_color: Color = Color(1, 0.3, 0.3)
-			_visuals.spawn_styled_damage_number(eid, 0, "miss", false, target_pos, miss_color)
-			continue
 
 		# Base damage: effective ATK - target effective DEF
 		var target_combat: Node = target_node.get_node_or_null("CombatComponent")
@@ -568,8 +572,13 @@ func _resolve_melee_hit() -> void:
 		# Apply damage
 		if damage > 0:
 			_combat.apply_flat_damage_to(eid, damage)
+			if not hit_landed:
+				_hitstop_timer = 0.1
+				hit_landed = true
 
-		# Damage numbers and flash
+		# VFX, damage numbers and flash
+		var hit_vfx_pos: Vector3 = target_node.global_position + Vector3(0, 1.0, 0)
+		HitVFX.spawn_hit_effect(self, hit_vfx_pos, facing)
 		_visuals.spawn_styled_damage_number(eid, damage, hit_type, crit_result["is_crit"] and damage > 0, target_pos)
 		_visuals.flash_target(eid)
 
@@ -1041,10 +1050,17 @@ func _respawn() -> void:
 		# In a field or unknown zone — load city
 		ZoneManager.load_zone("city", city_spawn)
 
-func _on_entity_damaged(target_id: String, _attacker_id: String, _damage: int, _remaining_hp: int) -> void:
+func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
 		flash_hit()
 		_stagger_timer = 0.3
+		_hitstop_timer = 0.1
+		var attacker_node: Node3D = WorldState.get_entity(attacker_id) as Node3D
+		if attacker_node and is_instance_valid(attacker_node):
+			var dir: Vector3 = (global_position - attacker_node.global_position)
+			dir.y = 0.0
+			if dir.length_squared() > 0.01:
+				_knockback_velocity = dir.normalized() * 5.0
 		_visuals.play_anim("Hit", true)
 		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 		_last_damage_time = Time.get_ticks_msec()
@@ -1075,10 +1091,6 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
 	_cancel_harvest()
-
-func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
-	if target_id == entity_id and _progression:
-		_progression.grant_proficiency_xp("agi", 5)
 
 # --- Duck typing delegations ---
 

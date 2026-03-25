@@ -25,8 +25,6 @@ const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 @export var personality: String = ""
 @export var starting_goal: String = ""
 @export var npc_color: Color = Color(0.6, 0.3, 0.3, 1.0)
-@export var model_path: String = "res://assets/models/characters/Knight.glb"
-@export var model_scale: float = 0.7
 @export var trait_profile: String = ""
 
 var entity_id: String = ""
@@ -58,6 +56,8 @@ var _nav_wait_frames: int = 0
 var combat_target: String = ""
 var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
+var _hitstop_timer: float = 0.0
+var _knockback_velocity: Vector3 = Vector3.ZERO
 var _combat_tracker: Dictionary = {"damage_dealt": 0, "damage_taken": 0, "hits_dealt": 0, "hits_taken": 0}
 var _combat_distance_traveled: float = 0.0
 var _hp_regen_accumulator: float = 0.0
@@ -137,7 +137,26 @@ func _ready() -> void:
 
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
-	_visuals.setup_model(model_path, model_scale, npc_color)
+	_visuals.setup_model_with_anims(
+		"res://assets/models/characters/player.fbx",
+		{
+			"Running": "res://assets/animation/player/running.fbx",
+			"Attack": "res://assets/animation/player/attack_slash.fbx",
+			"Hit": "res://assets/animation/player/hit_impact.fbx",
+			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
+			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
+			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
+			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
+			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
+			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
+			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
+			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
+			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
+			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
+		},
+		1.5,
+		npc_color
+	)
 
 	_audio = preload("res://scripts/audio/audio_component.gd").new()
 	_audio.name = "AudioComponent"
@@ -267,7 +286,6 @@ func _ready() -> void:
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.entity_healed.connect(_on_entity_healed)
 	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-	GameEvents.attack_missed.connect(_on_attack_missed)
 
 	_visuals.setup_hp_bar(1.8, npc_name)
 	_visuals.hide_hp_bar_keep_name()
@@ -419,16 +437,24 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 func _physics_process(delta: float) -> void:
 	if not _zone_active:
 		return
+	if _hitstop_timer > 0.0:
+		_hitstop_timer -= delta
+		if _visuals:
+			var ap: AnimationPlayer = _visuals.get_anim_player()
+			if ap:
+				ap.speed_scale = 0.0 if _hitstop_timer > 0.0 else 1.0
+		return
 	if current_state == STATE_DEAD:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
 			_respawn()
 		return
 
-	# Hit stagger — freeze briefly on taking damage
+	# Hit stagger — freeze briefly on taking damage, then apply knockback
 	if _stagger_timer > 0.0:
 		_stagger_timer -= delta
-		velocity = Vector3.ZERO
+		velocity = _knockback_velocity
+		_knockback_velocity = _knockback_velocity.lerp(Vector3.ZERO, 0.15)
 		move_and_slide()
 		return
 
@@ -768,6 +794,13 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		_combat_tracker["hits_taken"] += 1
 		if current_state != STATE_DEAD:
 			_stagger_timer = 0.3
+			_hitstop_timer = 0.05
+			var attacker_node: Node3D = WorldState.get_entity(attacker_id) as Node3D
+			if attacker_node and is_instance_valid(attacker_node):
+				var dir: Vector3 = (global_position - attacker_node.global_position)
+				dir.y = 0.0
+				if dir.length_squared() > 0.01:
+					_knockback_velocity = dir.normalized() * 5.0
 		# Fight back if not already in combat
 		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
 			enter_combat(attacker_id)
@@ -778,12 +811,6 @@ func _on_entity_healed(_entity_id: String, _amount: int, _current_hp: int) -> vo
 func _on_proficiency_level_up(leveled_entity_id: String, _prof_id: String, _new_level: int) -> void:
 	if leveled_entity_id != entity_id:
 		return
-
-func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
-	if target_id != npc_id:
-		return
-	if _progression:
-		_progression.grant_proficiency_xp("agi", 5)
 
 func _process_hp_regen(delta: float) -> void:
 	if not _stats:

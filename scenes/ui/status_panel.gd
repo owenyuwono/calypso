@@ -7,8 +7,6 @@ const _STAT_ICONS: Dictionary = {
 	"MATK": "res://assets/textures/ui/stats/stat_matk.png",
 	"DEF": "res://assets/textures/ui/stats/stat_def.png",
 	"MDEF": "res://assets/textures/ui/stats/stat_mdef.png",
-	"Accuracy": "res://assets/textures/ui/stats/stat_accuracy.png",
-	"Evasion": "res://assets/textures/ui/stats/stat_evasion.png",
 	"Crit Rate": "res://assets/textures/ui/stats/stat_crit_rate.png",
 	"Crit Dmg": "res://assets/textures/ui/stats/stat_crit_dmg.png",
 	"Atk Speed": "res://assets/textures/ui/stats/stat_atk_speed.png",
@@ -35,7 +33,6 @@ var _atk_value: Label
 var _atk_bonus: Label
 var _matk_value: Label
 var _matk_bonus: Label
-var _accuracy_value: Label
 var _crit_rate_value: Label
 var _crit_dmg_value: Label
 
@@ -45,7 +42,6 @@ var _def_value: Label
 var _def_bonus: Label
 var _mdef_value: Label
 var _mdef_bonus: Label
-var _evasion_value: Label
 
 # Speed stats
 var _atk_speed_value: Label
@@ -117,10 +113,6 @@ func _build_ui() -> void:
 	_matk_bonus = matk_row.bonus
 	left_col.add_child(matk_row.container)
 
-	var acc_row := _create_stat_row("Accuracy", false)
-	_accuracy_value = acc_row.value
-	left_col.add_child(acc_row.container)
-
 	var crit_row := _create_stat_row("Crit Rate", false)
 	_crit_rate_value = crit_row.value
 	left_col.add_child(crit_row.container)
@@ -145,10 +137,6 @@ func _build_ui() -> void:
 	_mdef_value = mdef_row.value
 	_mdef_bonus = mdef_row.bonus
 	left_col.add_child(mdef_row.container)
-
-	var eva_row := _create_stat_row("Evasion", false)
-	_evasion_value = eva_row.value
-	left_col.add_child(eva_row.container)
 
 	# Column divider
 	stats_columns.add_child(VSeparator.new())
@@ -286,7 +274,6 @@ func refresh() -> void:
 	_matk_value.text = str(stats.matk)
 	_matk_bonus.text = "+%d" % matk_bonus if matk_bonus > 0 else ""
 
-	_accuracy_value.text = "%d%%" % stats.accuracy
 	_crit_rate_value.text = "%d%%" % stats.crit_rate
 	_crit_dmg_value.text = "%d%%" % stats.crit_damage
 
@@ -301,8 +288,6 @@ func refresh() -> void:
 	var mdef_bonus: int = equip.get_mdef_bonus()
 	_mdef_value.text = str(stats.mdef)
 	_mdef_bonus.text = "+%d" % mdef_bonus if mdef_bonus > 0 else ""
-
-	_evasion_value.text = "%d%%" % stats.evasion
 
 	# --- Speed ---
 	_atk_speed_value.text = "%.2f×" % stats.attack_speed_mult

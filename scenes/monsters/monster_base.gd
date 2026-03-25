@@ -39,6 +39,8 @@ var _nav_wait_frames: int = 0
 var _aggro_check_timer: float = 0.0
 var _last_nav_target_pos: Vector3 = Vector3.INF
 var _stagger_timer: float = 0.0
+var _hitstop_timer: float = 0.0
+var _knockback_velocity: Vector3 = Vector3.ZERO
 
 # Cached stats
 var _base_aggro_range: float = 6.0
@@ -232,6 +234,14 @@ func _update_lod() -> void:
 				_audio.start_presence("presence_monster_idle")
 
 func _physics_process(delta: float) -> void:
+	if _hitstop_timer > 0.0:
+		_hitstop_timer -= delta
+		if _visuals:
+			var ap: AnimationPlayer = _visuals.get_anim_player()
+			if ap:
+				ap.speed_scale = 0.0 if _hitstop_timer > 0.0 else 1.0
+		return
+
 	if state == "dead":
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
@@ -240,7 +250,8 @@ func _physics_process(delta: float) -> void:
 
 	if _stagger_timer > 0.0:
 		_stagger_timer -= delta
-		velocity = Vector3.ZERO
+		velocity = _knockback_velocity
+		_knockback_velocity = _knockback_velocity.lerp(Vector3.ZERO, 0.15)
 		move_and_slide()
 		return
 
@@ -442,6 +453,13 @@ func _drop_aggro() -> void:
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == monster_id and state != "dead":
 		_stagger_timer = 0.3
+		_hitstop_timer = 0.05
+		var attacker_node: Node3D = WorldState.get_entity(attacker_id) as Node3D
+		if attacker_node and is_instance_valid(attacker_node):
+			var dir: Vector3 = (global_position - attacker_node.global_position)
+			dir.y = 0.0
+			if dir.length_squared() > 0.01:
+				_knockback_velocity = dir.normalized() * 5.0
 		# Update HP bar on damage
 		if _visuals and _stats:
 			_visuals.update_hp_bar_combat(_stats.hp, _stats.max_hp, true)
