@@ -173,6 +173,13 @@ static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) 
 			animation.remove_track(i)
 			continue
 
+		# Drop position tracks — Mixamo skeleton proportions differ from target,
+		# causing the mesh to sink/float. Rotation tracks are sufficient for locomotion.
+		var track_type: int = animation.track_get_type(i)
+		if track_type == Animation.TYPE_POSITION_3D:
+			animation.remove_track(i)
+			continue
+
 		# Strip mixamorig prefix (colon in raw FBX, underscore after Godot import)
 		var bone: String = sub
 		if bone.begins_with("mixamorig:") or bone.begins_with("mixamorig_"):
