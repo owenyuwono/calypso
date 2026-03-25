@@ -44,6 +44,10 @@ var _respawn_timer: float = 0.0
 var _stagger_timer: float = 0.0
 var _last_damage_time: int = 0
 var _hp_regen_accumulator: float = 0.0
+var _is_attacking: bool = false
+var _attack_anim_timer: float = 0.0
+var _attack_hit_pending: bool = false
+var _attack_hit_timer: float = 0.0
 
 # Idle variation
 var _idle_timer: float = 0.0
@@ -297,6 +301,7 @@ func _physics_process(delta: float) -> void:
 			_cancel_attack()
 		if not _harvest_target.is_empty():
 			_cancel_harvest()
+		_is_attacking = false
 		# Camera-relative direction
 		var cam := get_viewport().get_camera_3d()
 		var cam_basis := cam.global_transform.basis
@@ -381,8 +386,21 @@ func _physics_process(delta: float) -> void:
 				_stats.heal(heal_amount)
 				_hp_regen_accumulator -= heal_amount
 
+	# Melee attack animation lock
+	if _is_attacking:
+		_attack_anim_timer -= delta
+		# Hit detection at the swing's impact point
+		if _attack_hit_pending:
+			_attack_hit_timer -= delta
+			if _attack_hit_timer <= 0.0:
+				_attack_hit_pending = false
+				_resolve_melee_hit()
+		if _attack_anim_timer <= 0.0:
+			_is_attacking = false
+			_visuals.crossfade_anim("Idle", 0.15)
+
 	# Update animation
-	if _attack_target.is_empty() and _harvest_target.is_empty():
+	if not _is_attacking and _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
 			_idle_timer = 0.0
 			_visuals.play_anim("Running")
@@ -437,6 +455,75 @@ func _cancel_attack() -> void:
 	_combat_distance_traveled = 0.0
 	if _audio:
 		_audio.stop_combat_loop()
+
+func _trigger_melee_attack() -> void:
+	if _is_attacking or _is_dead:
+		return
+	_is_attacking = true
+	_visuals.play_anim_speed("Attack", 2.0)
+	var hit_delay: float = _visuals.get_hit_delay("Attack") / 2.0
+	_attack_anim_timer = hit_delay * 2.0
+	_attack_hit_pending = true
+	_attack_hit_timer = hit_delay
+
+func _get_facing_dir() -> Vector3:
+	if _visuals and _visuals.get_model():
+		var yaw: float = _visuals.get_model().rotation.y
+		return Vector3(sin(yaw), 0.0, cos(yaw))
+	return Vector3.FORWARD
+
+func _show_debug_hitbox(half_width: float, depth: float, forward_offset: float, duration: float = 0.2) -> void:
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(half_width * 2.0, 1.5, depth)
+	mesh_inst.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.2, 0.2, 0.25)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh_inst.material_override = mat
+	# Position box in front of player along facing direction
+	var facing: Vector3 = _get_facing_dir()
+	get_tree().current_scene.add_child(mesh_inst)
+	mesh_inst.global_position = global_position + facing * forward_offset + Vector3(0, 0.75, 0)
+	mesh_inst.rotation.y = _visuals.get_model().rotation.y if _visuals and _visuals.get_model() else 0.0
+	var tween := create_tween()
+	tween.tween_property(mat, "albedo_color:a", 0.0, duration)
+	tween.tween_callback(mesh_inst.queue_free)
+
+func _resolve_melee_hit() -> void:
+	if not _perception or not _combat:
+		return
+	var attack_range: float = _stats.attack_range if _stats else 3.0
+	var facing: Vector3 = _get_facing_dir()
+	var half_width: float = attack_range * 0.8
+	var depth: float = attack_range
+	var forward_offset: float = attack_range * 1.0
+	_show_debug_hitbox(half_width, depth, forward_offset)
+	# Only hit enemies in front of the player within the hitbox
+	var hitbox_center: Vector3 = global_position + facing * forward_offset
+	var nearby: Array = _perception.get_nearby(attack_range * 2.0)
+	for entity_data: Dictionary in nearby:
+		var eid: String = entity_data.get("id", "")
+		var edata: Dictionary = WorldState.get_entity_data(eid)
+		if edata.get("type", "") != "monster":
+			continue
+		if not WorldState.is_alive(eid):
+			continue
+		var target_node: Node = WorldState.get_entity(eid)
+		if not target_node or not is_instance_valid(target_node):
+			continue
+		# Check if target is inside the forward hitbox
+		var to_target: Vector3 = target_node.global_position - hitbox_center
+		to_target.y = 0.0
+		# Project onto facing axis (depth) and perpendicular axis (width)
+		var along: float = to_target.dot(facing)
+		var perp: float = abs(to_target.dot(facing.cross(Vector3.UP)))
+		if abs(along) <= depth * 0.5 and perp <= half_width:
+			_combat.deal_damage_to(eid, target_node)
+			_visuals.flash_target(eid)
+		break
 
 func _show_target_hp_bar(target_id: String) -> void:
 	var target: Node3D = WorldState.get_entity(target_id)
@@ -769,7 +856,8 @@ func _handle_left_click() -> void:
 				_navigate_to(_get_approach_pos(target_node.global_position, 1.5))
 			return
 
-	# Ground click movement removed — WASD only
+	# No entity hovered — melee attack swing
+	_trigger_melee_attack()
 
 func _raycast_ground() -> Vector3:
 	var camera := get_viewport().get_camera_3d()
