@@ -235,11 +235,6 @@ func _create_stat_row(stat_name: String, has_bonus: bool) -> Dictionary:
 	return {"container": hbox, "value": value_lbl, "bonus": bonus_lbl}
 
 
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_status"):
-		if get_viewport().gui_get_focus_owner() is LineEdit:
-			return
-		toggle()
 
 func toggle() -> void:
 	_is_open = not _is_open

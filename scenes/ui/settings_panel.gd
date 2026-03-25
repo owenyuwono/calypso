@@ -144,12 +144,6 @@ static func _db_to_percent(db: float) -> float:
 	return db_to_linear(db) * 100.0
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_settings"):
-		if get_viewport().gui_get_focus_owner() is LineEdit:
-			return
-		toggle()
-		get_viewport().set_input_as_handled()
 
 
 func toggle() -> void:

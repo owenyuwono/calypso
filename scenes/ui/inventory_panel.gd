@@ -178,6 +178,11 @@ func _build_ui() -> void:
 	light.light_energy = 1.0
 	viewport_root.add_child(light)
 
+	var fill_light := DirectionalLight3D.new()
+	fill_light.rotation_degrees = Vector3(-30, 150, 0)
+	fill_light.light_energy = 0.4
+	viewport_root.add_child(fill_light)
+
 	_preview_model_root = Node3D.new()
 	viewport_root.add_child(_preview_model_root)
 
@@ -249,6 +254,19 @@ func _update_mesh_preview() -> void:
 	var model: Node3D = result.get("model")
 	if not model:
 		return
+	# Apply center-origin Y offset (same as EntityVisuals.setup_model_with_anims)
+	var aabb := AABB()
+	var first := true
+	for mi in ModelHelper.find_mesh_instances(model):
+		if mi.mesh:
+			var mesh_aabb: AABB = mi.get_aabb()
+			if first:
+				aabb = mesh_aabb
+				first = false
+			else:
+				aabb = aabb.merge(mesh_aabb)
+	if not first and aabb.position.y < -0.01:
+		model.position.y += abs(aabb.position.y)
 	ModelHelper.apply_toon_to_model(model)
 	_preview_model_root.add_child(model)
 	var anim_player: AnimationPlayer = result.get("anim_player")
@@ -329,9 +347,6 @@ func set_player(p: Node) -> void:
 		_stats = _player.get_node_or_null("StatsComponent")
 		_update_mesh_preview()
 
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_inventory"):
-		_toggle()
 
 func toggle() -> void:
 	_toggle()

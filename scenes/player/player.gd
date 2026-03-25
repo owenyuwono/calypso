@@ -5,7 +5,6 @@ extends CharacterBody3D
 const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const INTERACT_RANGE: float = 4.0
-const HOVER_RAY_LENGTH: float = 100.0
 const MODEL_SCALE: float = 1.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
@@ -85,11 +84,6 @@ var crafting_panel: Control
 var game_menu: Node
 var relationship_panel: Node
 var interior_manager: Node
-
-# Click marker (reused single instance)
-var _click_marker: MeshInstance3D
-var _click_marker_material: StandardMaterial3D
-var _click_marker_tween: Tween
 
 # Dialogue bubble above head
 var _dialogue_bubble: Node3D
@@ -208,7 +202,6 @@ func _ready() -> void:
 
 
 	_setup_dialogue_bubble()
-	_setup_click_marker()
 
 	# Player HP is shown in HUD, no 3D bar needed
 
@@ -218,24 +211,6 @@ func _ready() -> void:
 	GameEvents.attack_missed.connect(_on_attack_missed)
 
 	_last_position = global_position
-
-func _setup_click_marker() -> void:
-	_click_marker = MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.3
-	torus.outer_radius = 0.5
-	_click_marker.mesh = torus
-	_click_marker.top_level = true
-
-	_click_marker_material = StandardMaterial3D.new()
-	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.0)
-	_click_marker_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_click_marker_material.no_depth_test = true
-	_click_marker_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_click_marker.material_override = _click_marker_material
-
-	_click_marker.visible = false
-	add_child(_click_marker)
 
 
 func _setup_dialogue_bubble() -> void:
@@ -260,10 +235,40 @@ func _physics_process(delta: float) -> void:
 
 	var is_moving := false
 
+	# WASD input (camera-relative direct movement)
+	var input_dir := Vector2(
+		Input.get_axis("move_left", "move_right"),
+		Input.get_axis("move_forward", "move_back")
+	)
+	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open()
+
 	if _is_ui_open():
 		_stop_navigation()
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
+	elif wasd_active:
+		# WASD cancels any click-based navigation/combat/harvest
+		if _is_navigating:
+			_stop_navigation()
+		if not _attack_target.is_empty():
+			_cancel_attack()
+		if not _harvest_target.is_empty():
+			_cancel_harvest()
+		# Camera-relative direction
+		var cam := get_viewport().get_camera_3d()
+		var cam_basis := cam.global_transform.basis
+		var cam_fwd := Vector3(-cam_basis.z.x, 0.0, -cam_basis.z.z).normalized()
+		var cam_right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
+		var move_dir := (cam_right * input_dir.x + cam_fwd * -input_dir.y).normalized()
+		var effective_speed: float = SPEED * _stats.move_speed
+		if _stamina:
+			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
+		if Input.is_action_pressed("sprint"):
+			effective_speed *= 1.5
+		velocity.x = move_dir.x * effective_speed
+		velocity.z = move_dir.z * effective_speed
+		_visuals.face_direction(move_dir)
+		is_moving = true
 	elif not _attack_target.is_empty():
 		is_moving = _process_combat(delta)
 	elif not _harvest_target.is_empty():
@@ -713,34 +718,7 @@ func _handle_left_click() -> void:
 				_navigate_to(_get_approach_pos(target_node.global_position, 1.5))
 			return
 
-	# Click on ground: move there, cancel target lock, close NPC info
-	if npc_info_panel and npc_info_panel.has_method("close") and npc_info_panel.is_open():
-		npc_info_panel.close()
-	var ground_pos := _raycast_ground()
-	if ground_pos != Vector3.INF:
-		_cancel_attack()
-		_cancel_harvest()
-		_interact_target = ""
-		_spawn_click_marker(ground_pos)
-		_navigate_to(ground_pos)
-
-func _raycast_ground() -> Vector3:
-	var camera := get_viewport().get_camera_3d()
-	if not camera:
-		return Vector3.INF
-
-	var mouse_pos := get_viewport().get_mouse_position()
-	var from := camera.project_ray_origin(mouse_pos)
-	var to := from + camera.project_ray_normal(mouse_pos) * HOVER_RAY_LENGTH
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [self.get_rid()]
-	var result := space.intersect_ray(query)
-
-	if result:
-		return result.position
-
-	return Vector3.INF
+	# Click on empty space: no ground navigation (use WASD to move)
 
 func _interact_with_nearest() -> void:
 	var nearby: Array = _perception.get_nearby(INTERACT_RANGE)
@@ -886,18 +864,3 @@ func _on_attack_missed(target_id: String, _attacker_id: String) -> void:
 func flash_hit() -> void:
 	_visuals.flash_hit()
 
-func _spawn_click_marker(pos: Vector3) -> void:
-	# Reuse a single marker instance — kill any in-progress tween first
-	if _click_marker_tween and _click_marker_tween.is_valid():
-		_click_marker_tween.kill()
-
-	_click_marker.global_position = Vector3(pos.x, pos.y + 0.05, pos.z)
-	_click_marker.scale = Vector3.ONE
-	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.7)
-	_click_marker.visible = true
-
-	_click_marker_tween = get_tree().create_tween()
-	_click_marker_tween.set_parallel(true)
-	_click_marker_tween.tween_property(_click_marker_material, "albedo_color:a", 0.0, 0.6)
-	_click_marker_tween.tween_property(_click_marker, "scale", Vector3(0.3, 0.3, 0.3), 0.6)
-	_click_marker_tween.chain().tween_callback(func() -> void: _click_marker.visible = false)

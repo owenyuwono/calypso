@@ -278,11 +278,6 @@ func _capitalize(text: String) -> String:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_relationships"):
-		toggle()
-		get_viewport().set_input_as_handled()
-		return
-
 	if event.is_action_pressed("ui_cancel") and _is_open:
 		toggle()
 		get_viewport().set_input_as_handled()

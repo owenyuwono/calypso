@@ -595,11 +595,3 @@ func is_open() -> bool:
 	return _is_open
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_W:
-			var focused := get_viewport().gui_get_focus_owner()
-			if focused is LineEdit:
-				return
-			toggle()
-			get_viewport().set_input_as_handled()

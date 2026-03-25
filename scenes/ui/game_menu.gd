@@ -307,18 +307,6 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# toggle_settings — close when open, open to SYSTEM tab when closed
-	if InputMap.has_action("toggle_settings") and event.is_action_pressed("toggle_settings"):
-		if visible:
-			close()
-			get_viewport().set_input_as_handled()
-		else:
-			# Only open if no other UI is active — lets Esc propagate to panels
-			if _player and _player.has_method("_is_ui_open") and not _player._is_ui_open():
-				open(Tab.SYSTEM)
-				get_viewport().set_input_as_handled()
-		return
-
 	# Actions only processed when menu is open
 	if not visible:
 		return
@@ -328,20 +316,12 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# Tab navigation — prefer named actions, fall back to arrow keys
-	var next_tab: bool = event.is_action_pressed("ui_right")
-	var prev_tab: bool = event.is_action_pressed("ui_left")
-
-	if InputMap.has_action("menu_next_tab"):
-		next_tab = next_tab or event.is_action_pressed("menu_next_tab")
-	if InputMap.has_action("menu_prev_tab"):
-		prev_tab = prev_tab or event.is_action_pressed("menu_prev_tab")
-
-	if next_tab:
+	# Tab navigation via arrow keys
+	if event.is_action_pressed("ui_right"):
 		var next: int = (_last_active_tab + 1) % TAB_NAMES.size()
 		switch_tab(next)
 		get_viewport().set_input_as_handled()
-	elif prev_tab:
+	elif event.is_action_pressed("ui_left"):
 		var prev: int = (_last_active_tab - 1 + TAB_NAMES.size()) % TAB_NAMES.size()
 		switch_tab(prev)
 		get_viewport().set_input_as_handled()

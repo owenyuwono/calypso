@@ -208,12 +208,3 @@ func _draw_zone_rect(zone: Rect2, color: Color) -> void:
 	if x2 > x1 and z2 > z1:
 		draw_rect(Rect2(x1, z1, x2 - x1, z2 - z1), color)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_M:
-			# Don't toggle if a LineEdit has focus
-			var focused := get_viewport().gui_get_focus_owner()
-			if focused is LineEdit:
-				return
-			visible = not visible
-			get_viewport().set_input_as_handled()
