@@ -734,10 +734,7 @@ func _on_arrived() -> void:
 	var etype: String = data.get("type", "")
 	var target_node := WorldState.get_entity(_interact_target)
 
-	if etype == "loot_drop":
-		if target_node and is_instance_valid(target_node) and target_node.has_method("pickup"):
-			target_node.pickup("player")
-	elif etype == "npc":
+	if etype == "npc":
 		if dialogue_panel and target_node and is_instance_valid(target_node):
 			dialogue_panel.open_dialogue(_interact_target, target_node)
 		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
@@ -805,20 +802,6 @@ func _handle_left_click() -> void:
 	if not hovered_entity_id.is_empty():
 		var data := WorldState.get_entity_data(hovered_entity_id)
 		var etype: String = data.get("type", "")
-
-		if etype == "loot_drop":
-			# Click loot: walk to + pick up on arrival
-			_cancel_attack()
-			_cancel_harvest()
-			_interact_target = hovered_entity_id
-			var target_node := WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				var dist := global_position.distance_to(target_node.global_position)
-				if dist <= INTERACT_RANGE:
-					_on_arrived()
-					return
-				_navigate_to(target_node.global_position)
-			return
 
 		if etype == "npc":
 			# Click NPC: walk to + interact on arrival

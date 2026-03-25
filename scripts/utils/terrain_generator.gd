@@ -5,6 +5,7 @@ extends RefCounted
 static func generate_terrain(center: Vector3, size: Vector2, subdivisions: Vector2i, noise: FastNoiseLite, height_scale: float, paint_rules: Array) -> Dictionary:
 	var mesh_instance := MeshInstance3D.new()
 	var static_body := StaticBody3D.new()
+	static_body.collision_layer |= (1 << 1)  # Layer 2: ground-only (for loot RigidBody3D)
 
 	var cols := subdivisions.x + 1
 	var rows := subdivisions.y + 1

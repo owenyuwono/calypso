@@ -799,7 +799,7 @@ func _ctx_discard() -> void:
 	# Spawn loot drop at player position
 	if _player:
 		var loot_script := preload("res://scenes/objects/loot_drop.gd")
-		var loot := Area3D.new()
+		var loot := RigidBody3D.new()
 		loot.set_script(loot_script)
 		loot.item_id = discard_id
 		loot.item_count = 1

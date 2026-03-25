@@ -614,7 +614,7 @@ func _remove_night_buffs() -> void:
 
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
 	var loot_scene := preload("res://scenes/objects/loot_drop.gd")
-	var loot := Area3D.new()
+	var loot := RigidBody3D.new()
 	loot.set_script(loot_scene)
 	loot.item_id = item_id
 	loot.item_count = item_count

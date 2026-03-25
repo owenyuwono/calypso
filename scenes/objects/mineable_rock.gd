@@ -194,7 +194,7 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 	for i in drop_count:
 		if item_id.is_empty():
 			break
-		var loot := Area3D.new()
+		var loot := RigidBody3D.new()
 		loot.set_script(loot_scene)
 		loot.item_id = item_id
 		loot.item_count = 1
@@ -206,7 +206,7 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 			loot_parent = get_tree().current_scene
 		loot_parent.call_deferred("add_child", loot)
 	if not bonus_item.is_empty():
-		var bonus := Area3D.new()
+		var bonus := RigidBody3D.new()
 		bonus.set_script(loot_scene)
 		bonus.item_id = bonus_item
 		bonus.item_count = 1
