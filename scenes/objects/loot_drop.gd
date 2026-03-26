@@ -18,7 +18,7 @@ var _label: Label3D
 
 # Physics pop
 var _is_airborne: bool = true
-var _grace_timer: float = 0.5
+var _grace_timer: float = 0.25
 var _player_node: Node3D
 const MAGNET_RANGE: float = 2.0
 const PICKUP_RANGE: float = 0.8
