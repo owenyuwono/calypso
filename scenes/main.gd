@@ -117,8 +117,6 @@ func _spawn_merchant() -> void:
 	npc.npc_id = "celine"
 	npc.npc_name = "Celine"
 	npc.npc_color = Color(0.5, 0.6, 0.45)
-	npc.model_path = "res://assets/models/characters/Barbarian.glb"
-	npc.model_scale = 0.7
 	npc.trait_profile = "merchant"
 	$NPCs.add_child(npc)
 	npc.global_position = Vector3(5, 1, 5)

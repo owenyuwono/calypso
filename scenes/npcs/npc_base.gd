@@ -26,6 +26,8 @@ const SkillDatabase = preload("res://scripts/data/skill_database.gd")
 @export var starting_goal: String = ""
 @export var npc_color: Color = Color(0.6, 0.3, 0.3, 1.0)
 @export var trait_profile: String = ""
+@export var model_path: String = "res://assets/models/characters/player.fbx"
+@export var model_scale: float = 1.5
 
 var entity_id: String = ""
 
@@ -138,7 +140,7 @@ func _ready() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
-		"res://assets/models/characters/player.fbx",
+		model_path,
 		{
 			"Running": "res://assets/animation/player/running.fbx",
 			"Attack": "res://assets/animation/player/attack_slash.fbx",
@@ -154,7 +156,7 @@ func _ready() -> void:
 			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
 			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
 		},
-		1.5,
+		model_scale,
 		npc_color
 	)
 
