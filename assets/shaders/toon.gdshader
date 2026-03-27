@@ -5,6 +5,7 @@ uniform vec4 albedo_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap;
 uniform bool use_texture = false;
 uniform float alpha_multiplier : hint_range(0.0, 1.0) = 1.0;
+uniform float light_attenuation : hint_range(0.0, 1.0) = 0.7;
 
 // Cel shading parameters
 uniform float shadow_threshold : hint_range(0.0, 1.0) = 0.3;
@@ -39,7 +40,7 @@ void light() {
 	float NdotL = dot(NORMAL, LIGHT);
 	float self_lit = smoothstep(shadow_threshold - shadow_softness, shadow_threshold + shadow_softness, NdotL);
 
-	vec3 lit = ALBEDO * LIGHT_COLOR;
+	vec3 lit = ALBEDO * LIGHT_COLOR * light_attenuation;
 	vec3 shaded = ALBEDO * shadow_tint * shadow_strength;
 
 	// Toon banding for surface normals
