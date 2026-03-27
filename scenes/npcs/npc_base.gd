@@ -183,6 +183,7 @@ func _ready() -> void:
 		"head": "", "torso": "", "legs": "", "gloves": "",
 		"feet": "", "back": "", "main_hand": "", "off_hand": "",
 	}, _inventory)
+	_equipment.equipment_changed.connect(_on_equipment_changed)
 
 	# Equip starting weapon from trait profile
 	if not trait_profile.is_empty():
@@ -647,6 +648,10 @@ func _on_auto_attack_target_lost() -> void:
 	if _audio:
 		_audio.stop_combat_loop()
 	change_state(STATE_IDLE)
+
+func _on_equipment_changed(slot: String, item_id: String) -> void:
+	if slot == "main_hand":
+		_visuals.update_weapon_visual(not item_id.is_empty())
 
 func _on_navigation_finished() -> void:
 	if current_state == STATE_MOVING and _nav_started:

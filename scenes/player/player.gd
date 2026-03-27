@@ -4,8 +4,6 @@ extends CharacterBody3D
 
 const SPEED: float = 7.2
 const GRAVITY: float = 9.8
-const INTERACT_RANGE: float = 4.0
-const HOVER_RAY_LENGTH: float = 100.0
 const MODEL_SCALE: float = 1.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
@@ -21,7 +19,6 @@ const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const LevelData = preload("res://scripts/data/level_data.gd")
-const CursorManager = preload("res://scripts/utils/cursor_manager.gd")
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
 const HitVFX = preload("res://scripts/vfx/hit_vfx.gd")
@@ -30,11 +27,8 @@ var entity_id: String = "player"
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
-var _cursor_manager: RefCounted
-
 # Navigation
 var _is_navigating: bool = false
-var _interact_target: String = ""
 var _stuck_timer: float = 0.0
 var _last_nav_pos: Vector3 = Vector3.ZERO
 var _was_moving: bool = false
@@ -110,10 +104,6 @@ var _click_marker_tween: Tween
 var _dialogue_bubble: Node3D
 
 
-func _exit_tree() -> void:
-	if _cursor_manager:
-		_cursor_manager.cleanup()
-
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer |= (1 << 8)
@@ -164,6 +154,7 @@ func _ready() -> void:
 		"head": "", "torso": "", "legs": "", "gloves": "",
 		"feet": "", "back": "", "main_hand": "", "off_hand": "",
 	}, _inventory)
+	_equipment.equipment_changed.connect(_on_equipment_changed)
 
 	_progression = ProgressionComponent.new()
 	_progression.name = "ProgressionComponent"
@@ -214,13 +205,11 @@ func _ready() -> void:
 	perception_comp.setup()
 	_perception = perception_comp
 
-	_cursor_manager = CursorManager.new()
-
 	# Hover subsystem
 	_hover = preload("res://scenes/player/player_hover.gd").new()
 	_hover.name = "PlayerHover"
 	add_child(_hover)
-	_hover.setup(self, _cursor_manager)
+	_hover.setup(self)
 
 	_skills_comp.setup_execution(_combat, _stats, _progression, _visuals, _perception, _auto_attack)
 
@@ -364,7 +353,6 @@ func _physics_process(delta: float) -> void:
 	else:
 		if _is_navigating:
 			_is_navigating = false
-			_on_arrived()
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
 
@@ -464,20 +452,10 @@ func _cancel_attack() -> void:
 	_attack_target = ""
 	_auto_attack.cancel()
 	_player_input.cancel_pending()
-	_hover.clear_ring()
+
 	_combat_distance_traveled = 0.0
 	if _audio:
 		_audio.stop_combat_loop()
-
-func _trigger_melee_attack() -> void:
-	if _is_attacking or _is_dead:
-		return
-	_is_attacking = true
-	_visuals.play_anim_speed("Attack", 2.0)
-	var hit_delay: float = _visuals.get_hit_delay("Attack") / 2.0
-	_attack_anim_timer = hit_delay * 2.0
-	_attack_hit_pending = true
-	_attack_hit_timer = hit_delay
 
 func _get_facing_dir() -> Vector3:
 	if _visuals and _visuals.get_model():
@@ -629,7 +607,7 @@ func _cancel_harvest() -> void:
 	_chop_timer = _chop_interval
 	_chop_hit_pending = false
 	_chop_hit_timer = 0.0
-	_hover.clear_ring()
+
 
 func _process_harvesting(delta: float) -> bool:
 	# Validate target still exists and is harvestable
@@ -718,7 +696,6 @@ func _process_harvesting(delta: float) -> bool:
 
 func _stop_navigation() -> void:
 	_is_navigating = false
-	_interact_target = ""
 
 func _navigate_to(pos: Vector3) -> void:
 	nav_agent.target_position = pos
@@ -726,41 +703,6 @@ func _navigate_to(pos: Vector3) -> void:
 	_last_nav_pos = global_position
 	_stuck_timer = 0.0
 
-func _on_arrived() -> void:
-	if _interact_target.is_empty():
-		return
-
-	var data := WorldState.get_entity_data(_interact_target)
-	var etype: String = data.get("type", "")
-	var target_node := WorldState.get_entity(_interact_target)
-
-	if etype == "npc":
-		if dialogue_panel and target_node and is_instance_valid(target_node):
-			dialogue_panel.open_dialogue(_interact_target, target_node)
-		elif npc_info_panel and npc_info_panel.has_method("show_npc"):
-			npc_info_panel.show_npc(_interact_target)
-		_hover.clear_ring()
-	elif etype == "interior_npc":
-		if dialogue_panel and target_node and is_instance_valid(target_node):
-			dialogue_panel.open_dialogue(_interact_target, target_node)
-		else:
-			var vending_comp: Node = target_node.get_node_or_null("VendingComponent") if target_node else null
-			if vending_comp and vending_comp.get_listings().size() > 0:
-				_open_shop(_interact_target)
-		_hover.clear_ring()
-	elif etype == "crafting_station":
-		if crafting_panel and target_node and is_instance_valid(target_node):
-			var stype: String = data.get("station_type", "")
-			var sname: String = data.get("name", "Crafting")
-			crafting_panel.open(stype, sname)
-		_hover.clear_ring()
-	elif etype == "door":
-		if interior_manager and target_node and is_instance_valid(target_node):
-			var btype: String = data.get("building_type", "")
-			interior_manager.enter_interior(btype, target_node.global_position)
-		_hover.clear_ring()
-
-	_interact_target = ""
 
 func _input(event: InputEvent) -> void:
 	if _is_dead:
@@ -788,153 +730,40 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-	if event.is_action_pressed("interact"):
+	if event.is_action_pressed("interact") and not _is_ui_open():
 		_interact_with_nearest()
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			if _is_ui_open():
-				return
-			_handle_left_click()
-
-func _handle_left_click() -> void:
-	var hovered_entity_id: String = _hover.get_hovered_entity_id()
-	if not hovered_entity_id.is_empty():
-		var data := WorldState.get_entity_data(hovered_entity_id)
-		var etype: String = data.get("type", "")
-
-		if etype == "npc":
-			# Click NPC: walk to + interact on arrival
-			_cancel_attack()
-			_cancel_harvest()
-			_interact_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.3, 0.6, 1.0, 0.6))
-			var target_node := WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				# Check if already in range
-				var dist := global_position.distance_to(target_node.global_position)
-				if dist <= INTERACT_RANGE:
-					_on_arrived()
-					return
-				_navigate_to(target_node.global_position)
-			return
-
-		if etype == "interior_npc":
-			# Click interior NPC: walk to + open shop on arrival
-			_cancel_attack()
-			_cancel_harvest()
-			_interact_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.3, 0.6, 1.0, 0.6))
-			var target_node := WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				var dist := global_position.distance_to(target_node.global_position)
-				if dist <= INTERACT_RANGE:
-					_on_arrived()
-					return
-				_navigate_to(target_node.global_position)
-			return
-
-		if etype == "tree":
-			# Click tree: walk to + chop when in range
-			_cancel_attack()
-			_cancel_harvest()
-			_harvest_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.4, 0.8, 0.3, 0.6))
-			var target_node := WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
-			return
-
-		if etype == "rock":
-			# Click rock: walk to + mine when in range
-			_cancel_attack()
-			_cancel_harvest()
-			_harvest_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.8, 0.5, 0.2, 0.6))
-			var target_node: Node = WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
-			return
-
-		if etype == "fishing_spot":
-			# Click fishing spot: walk to + fish when in range
-			_cancel_attack()
-			_cancel_harvest()
-			_harvest_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.2, 0.5, 1.0, 0.6))
-			var target_node: Node = WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				_navigate_to(_get_approach_pos(target_node.global_position, 2.5))
-			return
-
-		if etype == "crafting_station":
-			# Click crafting station: walk to + open panel on arrival
-			_cancel_attack()
-			_cancel_harvest()
-			_interact_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.5, 0.8, 0.6, 0.6))
-			var target_node: Node = WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				var dist: float = global_position.distance_to(target_node.global_position)
-				if dist <= INTERACT_RANGE:
-					_on_arrived()
-					return
-				_navigate_to(_get_approach_pos(target_node.global_position, 2.0))
-			return
-
-		if etype == "door":
-			# Guard: don't process door clicks while already inside
-			if not interior_manager or interior_manager.is_inside():
-				return
-			# Click door: walk to + enter interior on arrival
-			_cancel_attack()
-			_cancel_harvest()
-			_interact_target = hovered_entity_id
-			_hover.lock_ring(hovered_entity_id, Color(0.9, 0.7, 0.3, 0.6))
-			var target_node: Node = WorldState.get_entity(hovered_entity_id)
-			if target_node and is_instance_valid(target_node):
-				var dist: float = global_position.distance_to(target_node.global_position)
-				if dist <= INTERACT_RANGE:
-					_on_arrived()
-					return
-				_navigate_to(_get_approach_pos(target_node.global_position, 1.5))
-			return
-
-	# No entity hovered — melee attack swing
-	_trigger_melee_attack()
-
-func _raycast_ground() -> Vector3:
-	var camera := get_viewport().get_camera_3d()
-	if not camera:
-		return Vector3.INF
-
-	var mouse_pos := get_viewport().get_mouse_position()
-	var from := camera.project_ray_origin(mouse_pos)
-	var to := from + camera.project_ray_normal(mouse_pos) * HOVER_RAY_LENGTH
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [self.get_rid()]
-	var result := space.intersect_ray(query)
-
-	if result:
-		return result.position
-
-	return Vector3.INF
-
 func _interact_with_nearest() -> void:
-	var nearby: Array = _perception.get_nearby(INTERACT_RANGE)
-	for entry in nearby:
-		if entry.id == "player":
-			continue
-		var data := WorldState.get_entity_data(entry.id)
-		var etype: String = data.get("type", "")
-		if etype == "npc":
-			var vending_comp: Node = entry.node.get_node_or_null("VendingComponent") if entry.node else null
-			if vending_comp and vending_comp.get_listings().size() > 0:
-				_open_shop(entry.id)
-				return
-			_command_npc_follow(entry.node)
-			return
+	var target_id: String = _hover.get_proximity_target_id()
+	if target_id.is_empty():
+		return
+	var data := WorldState.get_entity_data(target_id)
+	var etype: String = data.get("type", "")
+	var target_node := WorldState.get_entity(target_id)
+	if not target_node or not is_instance_valid(target_node):
+		return
+
+	match etype:
+		"npc", "interior_npc":
+			if dialogue_panel:
+				_cancel_attack()
+				_cancel_harvest()
+				dialogue_panel.open_dialogue(target_id, target_node)
+		"tree", "rock", "fishing_spot":
+			_cancel_attack()
+			_cancel_harvest()
+			_harvest_target = target_id
+		"crafting_station":
+			if crafting_panel:
+				_cancel_attack()
+				_cancel_harvest()
+				var stype: String = data.get("station_type", "")
+				var sname: String = data.get("name", "Crafting")
+				crafting_panel.open(stype, sname)
+		"door":
+			if interior_manager:
+				var btype: String = data.get("building_type", "")
+				interior_manager.enter_interior(btype, target_node.global_position)
 
 func _command_npc_follow(npc_node: Node3D) -> void:
 	if npc_node.has_method("set_goal"):
@@ -970,7 +799,7 @@ func _is_ui_open() -> bool:
 
 func _on_entity_died(eid: String, _killer_id: String) -> void:
 	if eid == _attack_target:
-		_hover.clear_ring()
+	
 	if eid != "player":
 		return
 	_die()
@@ -981,7 +810,6 @@ func _die() -> void:
 	_cancel_harvest()
 	_stop_navigation()
 	velocity = Vector3.ZERO
-	_cursor_manager.reset()
 	if _audio:
 		_audio.play_oneshot("combat_death")
 		_audio.stop_all_loops()
@@ -1063,6 +891,10 @@ func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3)
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
 	_cancel_harvest()
+
+func _on_equipment_changed(slot: String, item_id: String) -> void:
+	if slot == "main_hand":
+		_visuals.update_weapon_visual(not item_id.is_empty())
 
 # --- Duck typing delegations ---
 

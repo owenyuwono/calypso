@@ -4,6 +4,8 @@ extends BaseComponent
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
+signal equipment_changed(slot: String, item_id: String)
+
 var _slots: Dictionary = {
 	"head": "", "torso": "", "legs": "", "gloves": "",
 	"feet": "", "back": "", "main_hand": "", "off_hand": "",
@@ -35,6 +37,7 @@ func equip(item_id: String) -> bool:
 	_inventory.remove_item(item_id)
 	_slots[slot] = item_id
 	_sync()
+	equipment_changed.emit(slot, item_id)
 	return true
 
 func unequip(slot: String) -> bool:
@@ -44,6 +47,7 @@ func unequip(slot: String) -> bool:
 	_slots[slot] = ""
 	_inventory.add_item(item_id)
 	_sync()
+	equipment_changed.emit(slot, "")
 	return true
 
 func get_weapon() -> String:

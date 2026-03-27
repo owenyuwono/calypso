@@ -148,11 +148,11 @@ static func _rescue_first_anim_as_idle(anim_player: AnimationPlayer) -> void:
 			return
 
 ## Find the Skeleton3D node in a scene tree.
-static func _find_skeleton_3d(root: Node) -> Skeleton3D:
+static func find_skeleton_3d(root: Node) -> Skeleton3D:
 	if root is Skeleton3D:
 		return root as Skeleton3D
 	for child in root.get_children():
-		var result: Skeleton3D = _find_skeleton_3d(child)
+		var result: Skeleton3D = find_skeleton_3d(child)
 		if result:
 			return result
 	return null
@@ -178,7 +178,7 @@ static func _has_mixamo_bones(animation: Animation) -> bool:
 ## Strips mixamorig_ prefix, applies bone renames, drops position tracks
 ## and unmapped bones, and fixes skeleton node path.
 static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) -> void:
-	var tgt_skeleton: Skeleton3D = _find_skeleton_3d(target_model)
+	var tgt_skeleton: Skeleton3D = find_skeleton_3d(target_model)
 	if not tgt_skeleton:
 		push_warning("ModelHelper: No Skeleton3D in target model for bone remap")
 		return
@@ -471,6 +471,41 @@ static func create_fallback_mesh(parent: Node3D, color: Color, use_box: bool = f
 	apply_overlay(meshes, overlay)
 	apply_toon_to_model(model)
 	return {"model": model, "mesh_instances": meshes, "overlay": overlay}
+
+## Create a simple procedural sword mesh (blade + crossguard + handle).
+## Returns a Node3D with toon-shaded children, oriented for RightHand bone attachment.
+static func create_procedural_sword() -> Node3D:
+	var root := Node3D.new()
+	root.name = "SwordMesh"
+
+	# Blade
+	var blade_mi := MeshInstance3D.new()
+	var blade := BoxMesh.new()
+	blade.size = Vector3(0.04, 0.55, 0.02)
+	blade_mi.mesh = blade
+	blade_mi.position = Vector3(0, 0.35, 0)
+	blade_mi.set_surface_override_material(0, create_toon_material_color(Color(0.75, 0.78, 0.82)))
+	root.add_child(blade_mi)
+
+	# Crossguard
+	var guard_mi := MeshInstance3D.new()
+	var guard := BoxMesh.new()
+	guard.size = Vector3(0.12, 0.02, 0.04)
+	guard_mi.mesh = guard
+	guard_mi.position = Vector3(0, 0.075, 0)
+	guard_mi.set_surface_override_material(0, create_toon_material_color(Color(0.55, 0.45, 0.2)))
+	root.add_child(guard_mi)
+
+	# Handle
+	var handle_mi := MeshInstance3D.new()
+	var handle := BoxMesh.new()
+	handle.size = Vector3(0.025, 0.1, 0.025)
+	handle_mi.mesh = handle
+	handle_mi.position = Vector3(0, 0.0, 0)
+	handle_mi.set_surface_override_material(0, create_toon_material_color(Color(0.35, 0.2, 0.1)))
+	root.add_child(handle_mi)
+
+	return root
 
 ## Create and attach an HP bar above an entity.
 static func create_hp_bar(parent: Node3D, y_offset: float = 1.8) -> Node:

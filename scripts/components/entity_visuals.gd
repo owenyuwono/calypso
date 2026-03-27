@@ -12,6 +12,8 @@ var _current_anim: String = ""
 var _hp_bar: Node3D
 var _mesh_path: String = ""
 var _anim_paths: Dictionary = {}
+var _weapon_attachment: BoneAttachment3D
+var _weapon_mesh: Node3D
 
 # --- Setup ---
 
@@ -161,6 +163,37 @@ func restore_materials() -> void:
 func clear_overlay() -> void:
 	if _overlay_material:
 		ModelHelper.clear_overlay(_overlay_material)
+
+# --- Weapon Visual ---
+
+func update_weapon_visual(has_weapon: bool) -> void:
+	if has_weapon:
+		_show_weapon()
+	else:
+		_hide_weapon()
+
+func _show_weapon() -> void:
+	if _weapon_mesh and is_instance_valid(_weapon_mesh):
+		_weapon_mesh.visible = true
+		return
+	if not _model:
+		return
+	var skeleton: Skeleton3D = ModelHelper.find_skeleton_3d(_model)
+	if not skeleton:
+		return
+	var bone_idx: int = skeleton.find_bone("RightHand")
+	if bone_idx == -1:
+		return
+	_weapon_attachment = BoneAttachment3D.new()
+	_weapon_attachment.name = "WeaponAttachment"
+	_weapon_attachment.bone_name = "RightHand"
+	skeleton.add_child(_weapon_attachment)
+	_weapon_mesh = ModelHelper.create_procedural_sword()
+	_weapon_attachment.add_child(_weapon_mesh)
+
+func _hide_weapon() -> void:
+	if _weapon_mesh and is_instance_valid(_weapon_mesh):
+		_weapon_mesh.visible = false
 
 # --- HP Bar ---
 
