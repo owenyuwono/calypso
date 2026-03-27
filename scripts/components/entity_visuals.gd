@@ -98,13 +98,6 @@ func play_anim(anim_name: String, force: bool = false) -> void:
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
-func play_anim_speed(anim_name: String, speed: float = 1.0) -> void:
-	if not _anim_player:
-		return
-	if _anim_player.has_animation(anim_name):
-		_anim_player.play(anim_name, -1, speed)
-		_current_anim = anim_name
-
 func crossfade_anim(anim_name: String, blend_time: float = 0.3, force: bool = false) -> void:
 	if not _anim_player:
 		return
@@ -113,9 +106,6 @@ func crossfade_anim(anim_name: String, blend_time: float = 0.3, force: bool = fa
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name, blend_time)
 		_current_anim = anim_name
-
-func is_anim_playing() -> bool:
-	return _anim_player and _anim_player.is_playing()
 
 func get_hit_delay(anim_name: String) -> float:
 	return ModelHelper.get_hit_delay(_anim_player, anim_name)

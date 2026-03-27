@@ -1048,13 +1048,6 @@ static func get_skills_for_proficiency(prof_id: String) -> Array:
 			result.append(skill_id)
 	return result
 
-static func get_skill_ids_by_type(type: String) -> Array:
-	var result: Array = []
-	for skill_id in SKILLS:
-		if SKILLS[skill_id].type == type:
-			result.append(skill_id)
-	return result
-
 static func get_primary_proficiency(skill_id: String) -> Dictionary:
 	var skill: Dictionary = get_skill(skill_id)
 	if skill.has("synergy"):

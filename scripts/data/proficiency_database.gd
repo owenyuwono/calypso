@@ -175,13 +175,6 @@ static func get_xp_fill_percent(level: int, xp: int, xp_to_next: int) -> float:
 		return 0.0
 	return clampf(float(xp) / float(xp_to_next), 0.0, 1.0)
 
-static func get_skills_by_category(category: String) -> Dictionary:
-	var result: Dictionary = {}
-	for skill_id in SKILLS:
-		if SKILLS[skill_id].get("category", "") == category:
-			result[skill_id] = SKILLS[skill_id]
-	return result
-
 static func get_default_proficiencies() -> Dictionary:
 	var result: Dictionary = {}
 	for skill_id in SKILLS:

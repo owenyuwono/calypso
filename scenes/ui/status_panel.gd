@@ -177,10 +177,6 @@ func _build_ui() -> void:
 	right_col.add_child(cdr_row.container)
 
 
-func _add_section_header(vbox: VBoxContainer, title: String) -> void:
-	vbox.add_child(HSeparator.new())
-	_add_column_header(vbox, title)
-
 # Header without a leading separator — used for the first section at the top of a column.
 func _add_column_header(vbox: VBoxContainer, title: String) -> void:
 	var header := Label.new()
