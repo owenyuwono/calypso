@@ -81,7 +81,6 @@ func add_memory(fact: String, source: String = SOURCE_WITNESSED, importance: Str
 		memories.sort_custom(func(a, b): return score_memory(a) < score_memory(b))
 		memories.remove_at(0)
 
-	GameEvents.memory_added.emit(_get_entity_id(), fact, importance)
 	return new_memory
 
 func score_memory(memory: Dictionary) -> float:
@@ -245,28 +244,6 @@ func can_continue_conversation(partner_id: String) -> bool:
 		return entry["count"] < MAX_CONVERSATION_TURNS
 	return true
 
-func increment_turn(partner_id: String) -> void:
-	if _conversation_turns.has(partner_id):
-		var entry: Dictionary = _conversation_turns[partner_id]
-		if Time.get_ticks_msec() / 1000.0 - entry["time"] > CONVERSATION_WINDOW:
-			_conversation_turns[partner_id] = {"count": 1, "time": Time.get_ticks_msec() / 1000.0}
-		else:
-			entry["count"] += 1
-			entry["time"] = Time.get_ticks_msec() / 1000.0
-	else:
-		_conversation_turns[partner_id] = {"count": 1, "time": Time.get_ticks_msec() / 1000.0}
-
-func reset_conversation_turns(partner_id: String) -> void:
-	_conversation_turns.erase(partner_id)
-
-func add_recent_topic(topic: String) -> void:
-	_recent_chat_topics.append(topic)
-	if _recent_chat_topics.size() > MAX_RECENT_TOPICS:
-		_recent_chat_topics.pop_front()
-
-func is_recent_topic(topic: String) -> bool:
-	return topic in _recent_chat_topics
-
 func get_recent_observations(count: int = 10) -> Array:
 	# DEPRECATED: Returns most recent memories as plain text strings for backward compat.
 	var sorted: Array = memories.duplicate()
@@ -276,13 +253,6 @@ func get_recent_observations(count: int = 10) -> Array:
 	for mem in top:
 		result.append("[%s] %s" % [_timestamp(), mem["fact"]])
 	return result
-
-func get_summary() -> String:
-	var parts: Array = []
-	var km_summary: String = get_key_memories_summary(3)
-	if not km_summary.is_empty():
-		parts.append(km_summary)
-	return "\n".join(parts)
 
 # =============================================================================
 # Sync to WorldState

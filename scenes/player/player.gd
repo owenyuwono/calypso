@@ -9,6 +9,7 @@ const DEATH_GOLD_PENALTY_RATIO: float = 0.1
 const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 3.0
 
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
 const InventoryComponent = preload("res://scripts/components/inventory_component.gd")
@@ -88,20 +89,11 @@ var _player_input: Node
 # UI references (set by main scene setup)
 var shop_panel: Control
 var skill_hotbar: Control
-var npc_info_panel: Control
 var dialogue_panel: Node
 var crafting_panel: Control
 var game_menu: Node
 var interior_manager: Node
 var relationship_panel: Control
-
-# Click marker (reused single instance)
-var _click_marker: MeshInstance3D
-var _click_marker_material: StandardMaterial3D
-var _click_marker_tween: Tween
-
-# Dialogue bubble above head
-var _dialogue_bubble: Node3D
 
 
 func _ready() -> void:
@@ -113,21 +105,7 @@ func _ready() -> void:
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
 		"res://assets/models/characters/player.fbx",
-		{
-			"Running": "res://assets/animation/player/running.fbx",
-			"Attack": "res://assets/animation/player/attack_slash.fbx",
-			"Hit": "res://assets/animation/player/hit_impact.fbx",
-			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
-			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
-			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
-			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
-			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
-			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
-			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
-			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
-			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
-			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
-		},
+		ModelHelper.DEFAULT_ANIM_PATHS,
 		MODEL_SCALE,
 		Color(0.2, 0.4, 0.7)
 	)
@@ -220,42 +198,12 @@ func _ready() -> void:
 	_player_input.setup(self, _skills_comp)
 
 
-	_setup_dialogue_bubble()
-	_setup_click_marker()
-
 	# Player HP is shown in HUD, no 3D bar needed
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
-	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
 	_last_position = global_position
-
-func _setup_click_marker() -> void:
-	_click_marker = MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.3
-	torus.outer_radius = 0.5
-	_click_marker.mesh = torus
-	_click_marker.top_level = true
-
-	_click_marker_material = StandardMaterial3D.new()
-	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.0)
-	_click_marker_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_click_marker_material.no_depth_test = true
-	_click_marker_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_click_marker.material_override = _click_marker_material
-
-	_click_marker.visible = false
-	add_child(_click_marker)
-
-
-func _setup_dialogue_bubble() -> void:
-	var bubble_scene := preload("res://scenes/ui/dialogue_bubble.tscn")
-	_dialogue_bubble = bubble_scene.instantiate()
-	add_child(_dialogue_bubble)
-	_dialogue_bubble.position = Vector3(0, 2.2, 0)
-
 
 func _physics_process(delta: float) -> void:
 	if _hitstop_timer > 0.0:
@@ -697,12 +645,6 @@ func _process_harvesting(delta: float) -> bool:
 func _stop_navigation() -> void:
 	_is_navigating = false
 
-func _navigate_to(pos: Vector3) -> void:
-	nav_agent.target_position = pos
-	_is_navigating = true
-	_last_nav_pos = global_position
-	_stuck_timer = 0.0
-
 
 func _input(event: InputEvent) -> void:
 	if _is_dead:
@@ -764,17 +706,6 @@ func _interact_with_nearest() -> void:
 			if interior_manager:
 				var btype: String = data.get("building_type", "")
 				interior_manager.enter_interior(btype, target_node.global_position)
-
-func _command_npc_follow(npc_node: Node3D) -> void:
-	if npc_node.has_method("set_goal"):
-		npc_node.set_goal("follow_player")
-
-func _open_shop(shop_id: String) -> void:
-	if shop_panel:
-		var vendor_node := WorldState.get_entity(shop_id)
-		if vendor_node and is_instance_valid(vendor_node):
-			enter_vending_state()
-			shop_panel.open_shop(vendor_node)
 
 func enter_vending_state() -> void:
 	_cancel_attack()
@@ -866,10 +797,6 @@ func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _r
 		_last_damage_time = Time.get_ticks_msec()
 		_hp_regen_accumulator = 0.0
 
-func _on_proficiency_level_up(eid: String, _skill_id: String, _new_level: int) -> void:
-	if eid != "player":
-		return
-
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.flash_target(target_id)
 	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
@@ -910,18 +837,3 @@ func _pick_idle_anim() -> String:
 		return IDLE_RARE_ANIMS[randi() % IDLE_RARE_ANIMS.size()]
 	return IDLE_ANIMS[randi() % IDLE_ANIMS.size()]
 
-func _spawn_click_marker(pos: Vector3) -> void:
-	# Reuse a single marker instance — kill any in-progress tween first
-	if _click_marker_tween and _click_marker_tween.is_valid():
-		_click_marker_tween.kill()
-
-	_click_marker.global_position = Vector3(pos.x, pos.y + 0.05, pos.z)
-	_click_marker.scale = Vector3.ONE
-	_click_marker_material.albedo_color = Color(0.3, 1.0, 0.4, 0.7)
-	_click_marker.visible = true
-
-	_click_marker_tween = get_tree().create_tween()
-	_click_marker_tween.set_parallel(true)
-	_click_marker_tween.tween_property(_click_marker_material, "albedo_color:a", 0.0, 0.6)
-	_click_marker_tween.tween_property(_click_marker, "scale", Vector3(0.3, 0.3, 0.3), 0.6)
-	_click_marker_tween.chain().tween_callback(func() -> void: _click_marker.visible = false)

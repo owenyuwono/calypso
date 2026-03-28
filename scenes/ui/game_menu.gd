@@ -1,7 +1,6 @@
 extends Control
 ## BotW-style full-screen menu with a horizontal tab bar.
-## Builds its entire scene tree in code. Tab content containers
-## are exposed for external builders via get_content_container().
+## Builds its entire scene tree in code.
 
 enum Tab { STATUS, INVENTORY, SKILLS, MAP, QUESTS, SYSTEM }
 
@@ -255,14 +254,6 @@ func switch_tab(index: int) -> void:
 
 func is_open() -> bool:
 	return visible
-
-
-func get_content_container(tab: int) -> Control:
-	return _content_containers[tab]
-
-
-func get_overlay_container() -> Control:
-	return _overlay_container
 
 
 func _refresh_active_builder(index: int) -> void:

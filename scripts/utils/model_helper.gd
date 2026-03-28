@@ -2,6 +2,22 @@ extends RefCounted
 ## Shared utilities for 3D model effects: mesh discovery, overlay materials, hit flash, death fade, respawn.
 ## Includes toon shader material creation and application.
 
+const DEFAULT_ANIM_PATHS: Dictionary = {
+	"Running": "res://assets/animation/player/running.fbx",
+	"Attack": "res://assets/animation/player/attack_slash.fbx",
+	"Hit": "res://assets/animation/player/hit_impact.fbx",
+	"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
+	"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
+	"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
+	"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
+	"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
+	"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
+	"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
+	"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
+	"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
+	"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
+}
+
 const ANIM_WHITELIST: PackedStringArray = [
 	"Idle", "Running", "Attack", "Hit", "Death_A", "RESET",
 	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",

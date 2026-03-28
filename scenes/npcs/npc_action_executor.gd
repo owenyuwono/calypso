@@ -4,8 +4,6 @@ extends Node
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const RecipeDatabase = preload("res://scripts/data/recipe_database.gd")
 
-const SELL_PRICE_RATIO: float = 0.5
-
 var npc: CharacterBody3D  # NPCBase, duck-typed
 
 func _ready() -> void:
@@ -22,10 +20,6 @@ func execute(action: String, target: String, dialogue: String = "", action_data:
 			_do_attack(target)
 		"use_item":
 			_do_use_item(target)
-		"buy_item":
-			_do_buy_item(target, action_data)
-		"sell_item":
-			_do_sell_item(target, action_data)
 		"talk_to":
 			_do_talk_to(target, dialogue)
 		"wait":
@@ -137,87 +131,6 @@ func _do_use_item(item_id: String) -> void:
 			_add_npc_memory("Equipped %s" % item.get("name", item_id))
 
 	GameEvents.npc_action_completed.emit(npc.npc_id, "use_item", true)
-	npc.change_state("idle")
-
-func _do_buy_item(vendor_id: String, action_data: Dictionary = {}) -> void:
-	var vendor_node := WorldState.get_entity(vendor_id)
-	if not vendor_node:
-		_fail("buy_item", "Vendor '%s' not found" % vendor_id)
-		return
-
-	var close_enough: bool = await _approach_entity(vendor_node)
-	if not close_enough:
-		_fail("buy_item", "Vendor '%s' unreachable" % vendor_id)
-		return
-
-	var item_id: String = action_data.get("item_id", "")
-	var count: int = action_data.get("count", 1)
-	if item_id.is_empty():
-		_fail("buy_item", "No item_id specified")
-		return
-
-	var cost: int = 0
-	var vending_comp: Node = vendor_node.get_node_or_null("VendingComponent")
-	if vending_comp and vending_comp.get_listings().size() > 0:
-		# Buy via VendingComponent — handles gold transfer and inventory on both sides
-		var success: bool = vending_comp.buy_from(npc, item_id, count)
-		if not success:
-			_fail("buy_item", "VendingComponent refused purchase of %s from %s" % [item_id, vendor_id])
-			return
-	else:
-		# Vendor has no active vending — fall back to direct purchase at base value
-		var fallback_item: Dictionary = ItemDatabase.get_item(item_id)
-		cost = fallback_item.get("value", 0) * count
-		if not npc._inventory.remove_gold_amount(cost):
-			_fail("buy_item", "Not enough gold for %s (need %d)" % [item_id, cost])
-			return
-		npc._inventory.add_item(item_id, count)
-		GameEvents.item_purchased.emit(npc.npc_id, item_id, cost)
-
-	var item: Dictionary = ItemDatabase.get_item(item_id)
-	_add_npc_memory("Bought %dx %s for %d gold" % [count, item.get("name", item_id), cost])
-	if item.get("type", "") in ["weapon", "armor"]:
-		_add_npc_memory("Bought %s for %d gold" % [item.get("name", item_id), cost], "medium", false, "big_purchase")
-
-	GameEvents.npc_action_completed.emit(npc.npc_id, "buy_item", true)
-	npc.change_state("idle")
-
-func _do_sell_item(vendor_id: String, action_data: Dictionary = {}) -> void:
-	var vendor_node := WorldState.get_entity(vendor_id)
-	if not vendor_node:
-		_fail("sell_item", "Vendor '%s' not found" % vendor_id)
-		return
-
-	var close_enough: bool = await _approach_entity(vendor_node)
-	if not close_enough:
-		_fail("sell_item", "Vendor '%s' unreachable" % vendor_id)
-		return
-
-	var item_id: String = action_data.get("item_id", "")
-	var count: int = action_data.get("count", 1)
-	if item_id.is_empty():
-		_fail("sell_item", "No item_id specified")
-		return
-
-	if not npc._inventory.remove_item(item_id, count):
-		_fail("sell_item", "Don't have %dx %s" % [count, item_id])
-		return
-
-	var item := ItemDatabase.get_item(item_id)
-	# Pay the selling NPC 50% of base value (vendor absorbs the item)
-	var revenue: int = int(item.get("value", 0) * SELL_PRICE_RATIO) * count
-	npc._inventory.add_gold_amount(revenue)
-	GameEvents.item_sold.emit(npc.npc_id, item_id, revenue)
-
-	# Vendor gains the item in their inventory (they can re-list it)
-	var vendor_inv: Node = vendor_node.get_node_or_null("InventoryComponent")
-	if vendor_inv:
-		vendor_inv.remove_gold_amount(revenue)
-		vendor_inv.add_item(item_id, count)
-
-	_add_npc_memory("Sold %dx %s for %d gold" % [count, item.get("name", item_id), revenue])
-
-	GameEvents.npc_action_completed.emit(npc.npc_id, "sell_item", true)
 	npc.change_state("idle")
 
 func _do_talk_to(target_id: String, dialogue: String) -> void:

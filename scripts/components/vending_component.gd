@@ -64,8 +64,6 @@ func buy_from(buyer: Node, item_id: String, count: int) -> bool:
 
 	_sync()
 
-	GameEvents.item_purchased.emit(buyer_id, item_id, total_cost)
-
 	return true
 
 func refresh_listings(inventory: Node, equipment: Node) -> void:

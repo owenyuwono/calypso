@@ -65,7 +65,6 @@ func shift_mood(emotion: String, energy: String = "") -> void:
 	mood_emotion = emotion
 	if not energy.is_empty():
 		mood_energy = energy
-	GameEvents.mood_changed.emit(_get_entity_id(), mood_emotion, mood_energy)
 	_sync_mood()
 
 
@@ -89,7 +88,6 @@ func _on_game_hour_changed(_hour: int) -> void:
 		changed = true
 
 	if changed:
-		GameEvents.mood_changed.emit(_get_entity_id(), mood_emotion, mood_energy)
 		_sync_mood()
 
 

@@ -23,10 +23,6 @@ func _ready() -> void:
 	if player and skill_hotbar:
 		player.skill_hotbar = skill_hotbar
 
-	var npc_info_panel := $UILayer/NpcInfoPanel
-	if player and npc_info_panel:
-		player.npc_info_panel = npc_info_panel
-
 	# Wire GameMenu — it creates and owns all panel builders
 	if player and game_menu:
 		game_menu.set_player(player)

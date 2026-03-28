@@ -64,21 +64,6 @@ func restore_full_hp() -> void:
 	hp = max_hp
 	_sync()
 
-func get_stats_dict() -> Dictionary:
-	return {
-		"hp": hp, "max_hp": max_hp,
-		"atk": atk, "def": def,
-		"level": level,
-		"attack_speed": attack_speed, "attack_range": attack_range,
-		"matk": matk, "mdef": mdef,
-		"crit_rate": crit_rate, "crit_damage": crit_damage,
-		"move_speed": move_speed, "cast_speed": cast_speed,
-		"max_stamina": max_stamina, "stamina_regen": stamina_regen,
-		"hp_regen": hp_regen,
-		"cooldown_reduction": cooldown_reduction,
-		"attack_speed_mult": attack_speed_mult,
-	}
-
 func _sync() -> void:
 	var parent := get_parent()
 	if not parent or not ("entity_id" in parent):

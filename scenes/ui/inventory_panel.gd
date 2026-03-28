@@ -5,6 +5,7 @@ extends Control
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
+const LootHelper = preload("res://scripts/utils/loot_helper.gd")
 
 const GRID_COLUMNS := 5
 const MIN_SLOTS := 35
@@ -798,18 +799,8 @@ func _ctx_discard() -> void:
 	_inventory.remove_item(discard_id)
 	# Spawn loot drop at player position
 	if _player:
-		var loot_script := preload("res://scenes/objects/loot_drop.gd")
-		var loot := RigidBody3D.new()
-		loot.set_script(loot_script)
-		loot.item_id = discard_id
-		loot.item_count = 1
-		loot.gold_amount = 0
 		var offset := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-		loot.position = _player.global_position + offset
-		var loot_parent: Node = ZoneManager.get_loaded_zone()
-		if not loot_parent:
-			loot_parent = get_tree().current_scene
-		loot_parent.call_deferred("add_child", loot)
+		LootHelper.spawn_drop(_player.global_position + offset, discard_id, 1, 0)
 	_hide_context_menu()
 	_refresh()
 

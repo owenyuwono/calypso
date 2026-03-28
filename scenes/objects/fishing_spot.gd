@@ -6,6 +6,7 @@ extends StaticBody3D
 const FishDatabase = preload("res://scripts/data/fish_database.gd")
 const HarvestableComponent = preload("res://scripts/components/harvestable_component.gd")
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
+const LootHelper = preload("res://scripts/utils/loot_helper.gd")
 
 const WATER_COLOR: Color = Color(0.2, 0.4, 0.8, 0.5)
 const WATER_COLOR_DEPLETED: Color = Color(0.2, 0.4, 0.8, 0.05)
@@ -137,32 +138,14 @@ func spawn_loot(item_id: String, bonus_item: String = "") -> void:
 	var fish_data: Dictionary = FishDatabase.get_fish(fish_tier)
 	var max_casts: int = fish_data.get("chops", [2, 4])[1]
 	var drop_count: int = maxi(max_casts / 2, 1)
-	var loot_scene := preload("res://scenes/objects/loot_drop.gd")
 	for i in drop_count:
 		if item_id.is_empty():
 			break
-		var loot := RigidBody3D.new()
-		loot.set_script(loot_scene)
-		loot.item_id = item_id
-		loot.item_count = 1
-		loot.gold_amount = 0
 		var offset := Vector3(randf_range(-1.2, 1.2), 0.0, randf_range(-1.2, 1.2))
-		loot.position = global_position + offset
-		var loot_parent: Node = ZoneManager.get_loaded_zone()
-		if not loot_parent:
-			loot_parent = get_tree().current_scene
-		loot_parent.call_deferred("add_child", loot)
+		LootHelper.spawn_drop(global_position + offset, item_id, 1, 0)
 	if not bonus_item.is_empty():
-		var bonus := RigidBody3D.new()
-		bonus.set_script(loot_scene)
-		bonus.item_id = bonus_item
-		bonus.item_count = 1
-		bonus.gold_amount = 0
-		bonus.position = global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-		var bonus_parent: Node = ZoneManager.get_loaded_zone()
-		if not bonus_parent:
-			bonus_parent = get_tree().current_scene
-		bonus_parent.call_deferred("add_child", bonus)
+		var offset := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+		LootHelper.spawn_drop(global_position + offset, bonus_item, 1, 0)
 
 
 func highlight() -> void:

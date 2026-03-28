@@ -118,8 +118,6 @@ func enter_interior(building_type: String, door_world_pos: Vector3) -> void:
 
 	await _loading_screen.hide_loading()
 
-	GameEvents.entered_interior.emit(building_type)
-
 
 func exit_interior() -> void:
 	if _transitioning or not _is_inside:
@@ -165,8 +163,6 @@ func exit_interior() -> void:
 	_player.set_process_unhandled_input(true)
 
 	await _loading_screen.hide_loading()
-
-	GameEvents.exited_interior.emit()
 
 
 # --- Internal -----------------------------------------------------------------

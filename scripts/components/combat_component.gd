@@ -108,42 +108,6 @@ func _get_item_penalty(item_id: String) -> Dictionary:
 	var speed_mult: float = minf(1.75, 1.0 + level_gap * 0.15)
 	return {"stat_mult": stat_mult, "speed_mult": speed_mult}
 
-func deal_damage_to(target_id: String) -> int:
-	## Standard auto-attack: effective_atk - target_effective_def, min 1.
-	var target_entity = WorldState.get_entity(target_id)
-	if not target_entity or not is_instance_valid(target_entity):
-		return 0
-	var target_combat = target_entity.get_node_or_null("CombatComponent")
-	var atk: int = get_effective_atk()
-	var def: int = target_combat.get_effective_def() if target_combat else 0
-	var damage: int = maxi(atk - def, 1)
-	_apply_damage_to(target_id, damage)
-	return damage
-
-func deal_damage_amount_to(target_id: String, amount: int) -> int:
-	## Skill damage: raw amount - target_effective_def, min 1.
-	var target_entity = WorldState.get_entity(target_id)
-	if not target_entity or not is_instance_valid(target_entity):
-		return 0
-	var target_combat = target_entity.get_node_or_null("CombatComponent")
-	var def: int = target_combat.get_effective_def() if target_combat else 0
-	var damage: int = maxi(amount - def, 1)
-	_apply_damage_to(target_id, damage)
-	return damage
-
-func deal_damage_amount_to_with_pierce(target_id: String, amount: int, def_ignore: float) -> int:
-	## Armor-piercing skill damage: raw amount - (target_effective_def * (1 - def_ignore)), min 1.
-	## def_ignore is 0.0 to 1.0 (e.g., 0.75 means ignore 75% of DEF).
-	var target_entity = WorldState.get_entity(target_id)
-	if not target_entity or not is_instance_valid(target_entity):
-		return 0
-	var target_combat = target_entity.get_node_or_null("CombatComponent")
-	var def: int = target_combat.get_effective_def() if target_combat else 0
-	var reduced_def: int = floori(def * (1.0 - def_ignore))
-	var damage: int = maxi(amount - reduced_def, 1)
-	_apply_damage_to(target_id, damage)
-	return damage
-
 func apply_flat_damage_to(target_id: String, amount: int) -> int:
 	## Applies a pre-computed damage amount directly, bypassing DEF calculation.
 	## Used by SkillEffectResolver after it has resolved the full damage pipeline.

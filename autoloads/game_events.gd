@@ -19,17 +19,10 @@ signal proficiency_level_up(entity_id: String, skill_id: String, new_level: int)
 
 # Economy
 signal item_looted(entity_id: String, item_id: String, count: int)
-signal item_purchased(buyer_id: String, item_id: String, cost: int)
-signal item_sold(seller_id: String, item_id: String, revenue: int)
-
-# Interiors
-signal entered_interior(building_type: String)
-signal exited_interior()
 
 # Skills
 signal skill_used(entity_id: String, skill_id: String)
 signal skill_learned(entity_id: String, skill_id: String, new_level: int)
-signal skill_backfired(entity_id: String, skill_id: String, self_damage: int)
 
 # Time
 signal time_phase_changed(old_phase: String, new_phase: String)
@@ -37,12 +30,6 @@ signal game_hour_changed(hour: int)
 
 # Stamina
 signal stamina_changed(entity_id: String, stamina: float, max_stamina: float)
-
-# Identity / Mood
-signal mood_changed(entity_id: String, emotion: String, energy: String)
-
-# Memory
-signal memory_added(entity_id: String, fact: String, importance: String)
 
 # Relationships
 signal relationship_tier_changed(entity_id: String, partner_id: String, old_tier: String, new_tier: String)

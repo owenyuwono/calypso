@@ -9,6 +9,7 @@ const AutoAttackComponent = preload("res://scripts/components/auto_attack_compon
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
 const MonsterDatabase = preload("res://scripts/data/monster_database.gd")
 
+const LootHelper = preload("res://scripts/utils/loot_helper.gd")
 @export var monster_type: String = "slime"
 @export var monster_id: String = ""
 
@@ -128,20 +129,7 @@ func _ready() -> void:
 	nav_agent.path_desired_distance = 1.0
 
 	# Register with WorldState
-	WorldState.register_entity(monster_id, self, {
-		"type": "monster",
-		"name": display_name,
-		"monster_type": monster_type,
-		"hp": stats.get("hp", 0),
-		"max_hp": stats.get("hp", 0),
-		"atk": stats.get("atk", 0),
-		"def": stats.get("def", 0),
-		"level": 1,
-		"attack_speed": _attack_speed,
-		"attack_range": _attack_range,
-		"element": stats.get("element", ""),
-		"resistances": stats.get("resistances", {}),
-	})
+	WorldState.register_entity(monster_id, self, _build_registration_data(stats))
 
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
 	_aggro_check_timer = randf() * 0.3  # Stagger initial timer
@@ -548,20 +536,7 @@ func _respawn() -> void:
 	_wander_timer = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
 
 	# Re-register
-	WorldState.register_entity(monster_id, self, {
-		"type": "monster",
-		"name": stats.get("name", monster_type),
-		"monster_type": monster_type,
-		"hp": stats.get("hp", 0),
-		"max_hp": stats.get("hp", 0),
-		"atk": stats.get("atk", 0),
-		"def": stats.get("def", 0),
-		"level": 1,
-		"attack_speed": _attack_speed,
-		"attack_range": _attack_range,
-		"element": stats.get("element", ""),
-		"resistances": stats.get("resistances", {}),
-	})
+	WorldState.register_entity(monster_id, self, _build_registration_data(stats))
 
 	_stats.setup({
 		"hp": stats.get("hp", 0), "max_hp": stats.get("hp", 0),
@@ -612,23 +587,25 @@ func _remove_night_buffs() -> void:
 	var stats := MonsterDatabase.get_monster(monster_type)
 	WorldState.set_entity_data(monster_id, "atk", stats.get("atk", 0))
 
+func _build_registration_data(stats: Dictionary) -> Dictionary:
+	return {
+		"type": "monster",
+		"name": stats.get("name", monster_type),
+		"monster_type": monster_type,
+		"hp": stats.get("hp", 0),
+		"max_hp": stats.get("hp", 0),
+		"atk": stats.get("atk", 0),
+		"def": stats.get("def", 0),
+		"level": 1,
+		"attack_speed": _attack_speed,
+		"attack_range": _attack_range,
+		"element": stats.get("element", ""),
+		"resistances": stats.get("resistances", {}),
+	}
+
 func _spawn_loot_drop(origin: Vector3, item_id: String, item_count: int, gold: int, index: int) -> void:
-	var loot_scene := preload("res://scenes/objects/loot_drop.gd")
-	var loot := RigidBody3D.new()
-	loot.set_script(loot_scene)
-	loot.item_id = item_id
-	loot.item_count = item_count
-	loot.gold_amount = gold
 	# Scatter so multiple drops don't stack
-	var offset := Vector3(
-		randf_range(-0.8, 0.8),
-		0,
-		randf_range(-0.8, 0.8)
-	)
+	var offset := Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8))
 	if index > 0:
 		offset += Vector3(float(index) * 0.5, 0, 0)
-	loot.position = origin + offset
-	var loot_parent: Node = ZoneManager.get_loaded_zone()
-	if not loot_parent:
-		loot_parent = get_tree().current_scene
-	loot_parent.call_deferred("add_child", loot)
+	LootHelper.spawn_drop(origin + offset, item_id, item_count, gold)

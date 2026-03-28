@@ -41,10 +41,13 @@ var _combat_assist_cooldown: float = 0.0
 const COMBAT_ASSIST_INTERVAL: float = 2.5  # Check at most every 2.5s
 const TIER_LADDER: Array = ["stranger", "recognized", "acquaintance", "friendly", "close", "bonded"]
 
+var _stamina: Node
+
 func _ready() -> void:
 	npc = get_parent()
 	memory = npc.get_node("NPCMemory")
 	executor = npc.get_node("NPCActionExecutor")
+	_stamina = npc.get_node_or_null("StaminaComponent")
 	# Stagger behavior ticks so 50+ NPCs don't all evaluate on the same frame
 	_behavior_timer = randf_range(0.0, TICK_INTERVAL)
 	_social = preload("res://scenes/npcs/npc_social.gd").new()
@@ -172,9 +175,8 @@ func _check_survival() -> bool:
 		return true
 
 	# Stamina check — return to town if exhausted
-	var stamina_comp = npc.get_node_or_null("StaminaComponent")
-	if stamina_comp:
-		var stamina_pct: float = stamina_comp.get_stamina_percent()
+	if _stamina:
+		var stamina_pct: float = _stamina.get_stamina_percent()
 		var rest_threshold: float = 0.25 - (boldness * 0.15)  # bold: 0.10, cautious: 0.25
 		# Hard floor: force retreat at 5% regardless
 		if (stamina_pct < rest_threshold or stamina_pct < 0.05) and not _is_in_town():
@@ -192,15 +194,13 @@ func _check_survival() -> bool:
 func _check_goal_completion() -> bool:
 	match npc.current_goal:
 		"rest":
-			var rest_stamina_comp = npc.get_node_or_null("StaminaComponent")
-			if rest_stamina_comp and rest_stamina_comp.get_stamina_percent() >= 0.8:
+			if _stamina and _stamina.get_stamina_percent() >= 0.8:
 				npc.set_goal(default_goal)
 				return true
 		"return_to_town":
 			if _is_in_town():
 				# Check if stamina is low — transition to rest goal
-				var rtt_stamina_comp = npc.get_node_or_null("StaminaComponent")
-				if rtt_stamina_comp and rtt_stamina_comp.get_stamina_percent() < 0.5:
+				if _stamina and _stamina.get_stamina_percent() < 0.5:
 					npc.set_goal("rest")
 					return true
 				var hp: int = npc._stats.hp
@@ -393,8 +393,7 @@ func _execute_return_to_town() -> void:
 		_do_action("move_to", TOWN_DESTINATIONS.pick_random())
 
 func _execute_rest() -> void:
-	var stamina_comp = npc.get_node_or_null("StaminaComponent")
-	if stamina_comp and stamina_comp.get_stamina_percent() >= 0.8:
+	if _stamina and _stamina.get_stamina_percent() >= 0.8:
 		npc.set_goal(default_goal)
 		return
 	# Find nearest rest spot and move to it
@@ -433,11 +432,7 @@ func _execute_idle() -> void:
 # Action Dispatchers
 # =============================================================================
 
-func _do_action(action: String, target: String) -> void:
-	_action_in_progress = true
-	executor.execute(action, target)
-
-func _do_action_with_data(action: String, target: String, data: Dictionary) -> void:
+func _do_action(action: String, target: String, data: Dictionary = {}) -> void:
 	_action_in_progress = true
 	executor.execute(action, target, "", data)
 
@@ -586,24 +581,6 @@ func _is_near_location(location_id: String, range: float) -> bool:
 	var loc_pos := WorldState.get_location(location_id)
 	return npc.global_position.distance_to(loc_pos) < range
 
-func _is_near_entity(entity_id: String, range: float) -> bool:
-	var entity_node := WorldState.get_entity(entity_id)
-	if not entity_node or not is_instance_valid(entity_node):
-		return false
-	return npc.global_position.distance_to(entity_node.global_position) < range
-
-func _get_total_material_count() -> int:
-	var inv: Dictionary = npc._inventory.get_items()
-	var total := 0
-	for item_id in inv:
-		var item := ItemDatabase.get_item(item_id)
-		if item.get("type", "") == "material":
-			total += inv[item_id]
-	return total
-
-func _is_near_position(pos: Vector3, range: float) -> bool:
-	return npc.global_position.distance_to(pos) <= range
-
 func _get_relationship_tier_index(entity_id: String) -> int:
 	var rel_comp: Node = npc.get_node_or_null("RelationshipComponent")
 	if not rel_comp:
@@ -707,7 +684,7 @@ func _execute_craft() -> void:
 	# Dispatch craft action — executor handles navigation internally
 	var recipe: Dictionary = RecipeDatabase.get_recipe(best_recipe_id)
 	npc.last_thought = "Going to craft %s" % recipe.get("name", best_recipe_id)
-	_do_action_with_data("craft_at_station", station._entity_id, {"recipe_id": best_recipe_id})
+	_do_action("craft_at_station", station._entity_id, {"recipe_id": best_recipe_id})
 
 func _find_nearest_crafting_station(skill_id: String) -> Node:
 	var best: Node = null

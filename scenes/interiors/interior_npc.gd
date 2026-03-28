@@ -3,6 +3,7 @@ extends StaticBody3D
 ## No AI, no pathfinding, no LLM. Stands still, shows model, optionally vends.
 ## Greets the player on proximity entry via an Area3D trigger.
 
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const VendingComponent = preload("res://scripts/components/vending_component.gd")
 const DialogueBubbleScene = preload("res://scenes/ui/dialogue_bubble.tscn")
@@ -81,21 +82,7 @@ func _setup_visuals() -> void:
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
 		"res://assets/models/characters/player.fbx",
-		{
-			"Running": "res://assets/animation/player/running.fbx",
-			"Attack": "res://assets/animation/player/attack_slash.fbx",
-			"Hit": "res://assets/animation/player/hit_impact.fbx",
-			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
-			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
-			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
-			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
-			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
-			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
-			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
-			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
-			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
-			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
-		},
+		ModelHelper.DEFAULT_ANIM_PATHS,
 		1.5,
 		npc_color
 	)

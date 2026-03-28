@@ -215,14 +215,6 @@ func open_dialogue(npc_id: String, npc_node: Node) -> void:
 	_npc_name_label.text = npc_name
 
 	var prog: Node = _player.get_node_or_null("ProgressionComponent") if _player else null
-	var charisma_level: int = 0
-	if prog:
-		charisma_level = prog.get_proficiency_level("charisma")
-
-	# Record conversation event on NPC's RelationshipComponent
-	var rel: Node = npc_node.get_node_or_null("RelationshipComponent")
-	if rel:
-		rel.record_event("player", "conversation", TimeManager.get_day(), charisma_level)
 
 	# Grant charisma XP once per dialogue session
 	if prog and not _charisma_xp_granted:

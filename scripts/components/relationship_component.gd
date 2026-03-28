@@ -143,14 +143,6 @@ func _check_tension_demotion(entity_id: String, rel: Dictionary) -> void:
 			GameEvents.relationship_tier_changed.emit(_get_entity_id(), entity_id, old_tier, prev_tier)
 
 
-# --- Impression API ---
-
-func set_impression(entity_id: String, text: String) -> void:
-	var rel: Dictionary = get_or_create(entity_id)
-	rel["impression"] = text
-	_sync()
-
-
 func get_impression(entity_id: String) -> String:
 	var rel: Dictionary = relationships.get(entity_id, {})
 	var impression: String = rel.get("impression", "")
@@ -217,19 +209,6 @@ func get_discount_for(buyer_id: String) -> float:
 		"bonded":
 			return 0.20
 	return 0.0
-
-
-# --- Tension API ---
-
-func get_tension(entity_id: String) -> float:
-	var rel: Dictionary = relationships.get(entity_id, {})
-	return rel.get("tension", 0.0)
-
-
-func set_tension(entity_id: String, value: float) -> void:
-	var rel: Dictionary = get_or_create(entity_id)
-	rel["tension"] = clampf(value, 0.0, 1.0)
-	_sync()
 
 
 # --- Event Count ---

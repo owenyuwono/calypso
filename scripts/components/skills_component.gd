@@ -404,7 +404,6 @@ func _execute_skill_hit() -> void:
 				_stats.take_damage(self_damage)
 			_visuals.flash_hit()
 			_visuals.spawn_styled_damage_number(entity_id, self_damage, "weak", false, get_parent().global_position)
-			GameEvents.skill_backfired.emit(entity_id, skill_id, self_damage)
 			continue
 
 		var hit_target_id: String = result.get("target_id", "")

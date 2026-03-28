@@ -2,6 +2,7 @@ extends CharacterBody3D
 ## NPC base — state machine, navigation, perception, and combat.
 ## Uses KayKit 3D character models with overlay-based visual effects.
 
+const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const EntityVisuals = preload("res://scripts/components/entity_visuals.gd")
 const StatsComponent = preload("res://scripts/components/stats_component.gd")
 const InventoryComponent = preload("res://scripts/components/inventory_component.gd")
@@ -38,8 +39,6 @@ var _zone_active: bool = true
 const STATE_IDLE: String = "idle"
 const STATE_THINKING: String = "thinking"
 const STATE_MOVING: String = "moving"
-const STATE_TALKING: String = "talking"
-const STATE_INTERACTING: String = "interacting"
 const STATE_FAILED: String = "failed"
 const STATE_COMBAT: String = "combat"
 const STATE_DEAD: String = "dead"
@@ -49,7 +48,6 @@ var current_goal: String = ""
 var current_action: String = ""
 var current_target: String = ""
 var last_thought: String = ""
-var current_mood: String = ""
 var _suppress_nav_complete: bool = false
 var _nav_started: bool = false
 var _nav_wait_frames: int = 0
@@ -107,8 +105,6 @@ var _current_anim: String = ""
 # Navigation mode flag — true when chasing a moving entity (skips arrive deceleration)
 var _navigating_to_entity: bool = false
 
-# Debug
-var _perception_circle: MeshInstance3D
 const PERCEPTION_RADIUS: float = 15.0
 const LOD_FULL_DIST: float = 30.0
 const LOD_REDUCED_DIST: float = 60.0
@@ -141,21 +137,7 @@ func _ready() -> void:
 	add_child(_visuals)
 	_visuals.setup_model_with_anims(
 		model_path,
-		{
-			"Running": "res://assets/animation/player/running.fbx",
-			"Attack": "res://assets/animation/player/attack_slash.fbx",
-			"Hit": "res://assets/animation/player/hit_impact.fbx",
-			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
-			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
-			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
-			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
-			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
-			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
-			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
-			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
-			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
-			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
-		},
+		ModelHelper.DEFAULT_ANIM_PATHS,
 		model_scale,
 		npc_color
 	)
@@ -287,8 +269,6 @@ func _ready() -> void:
 	GameEvents.npc_spoke.connect(_on_any_npc_spoke)
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
-	GameEvents.entity_healed.connect(_on_entity_healed)
-	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
 
 	_visuals.setup_hp_bar(1.8, npc_name)
 	_visuals.hide_hp_bar_keep_name()
@@ -297,30 +277,6 @@ func _ready() -> void:
 	_vending_comp = get_node_or_null("VendingComponent")
 	_behavior_node = get_node_or_null("NPCBehavior")
 	_memory = get_node_or_null("NPCMemory")
-
-	_setup_perception_circle()
-
-func _setup_perception_circle() -> void:
-	var im := ImmediateMesh.new()
-	var segments: int = 64
-	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
-	for i in segments + 1:
-		var angle: float = TAU * float(i) / float(segments)
-		im.surface_add_vertex(Vector3(cos(angle) * PERCEPTION_RADIUS, 0, sin(angle) * PERCEPTION_RADIUS))
-	im.surface_end()
-
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.no_depth_test = true
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.6, 0.85, 1.0, 0.35)
-
-	_perception_circle = MeshInstance3D.new()
-	_perception_circle.mesh = im
-	_perception_circle.material_override = mat
-	_perception_circle.position = Vector3(0, 0.05, 0)
-	_perception_circle.visible = false
-	add_child(_perception_circle)
 
 
 func _get_separation_velocity() -> Vector3:
@@ -811,13 +767,6 @@ func _on_entity_damaged(target_id: String, attacker_id: String, damage: int, _re
 		# Fight back if not already in combat
 		if current_state != STATE_COMBAT and current_state != STATE_DEAD and attacker_id != "":
 			enter_combat(attacker_id)
-
-func _on_entity_healed(_entity_id: String, _amount: int, _current_hp: int) -> void:
-	pass  # NPC HP bar is never shown
-
-func _on_proficiency_level_up(leveled_entity_id: String, _prof_id: String, _new_level: int) -> void:
-	if leveled_entity_id != entity_id:
-		return
 
 func _process_hp_regen(delta: float) -> void:
 	if not _stats:
