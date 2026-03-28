@@ -183,6 +183,17 @@ func _build_choices_container() -> void:
 
 	get_parent().add_child(_choices_container)
 
+	# Choice cursor — golden "▶" that floats left of the active button
+	_choice_cursor = Label.new()
+	_choice_cursor.text = "▶"
+	_choice_cursor.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
+	_choice_cursor.add_theme_font_size_override("font_size", 16)
+	_choice_cursor.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	_choice_cursor.visible = false
+	_choice_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_choice_cursor.z_index = 10
+	get_parent().add_child(_choice_cursor)
+
 
 var _shop_panel: Node
 var _hud_elements: Array = []  # nodes to hide when dialogue is open
@@ -190,6 +201,7 @@ var _charisma_xp_granted: bool = false
 
 var _choice_idx: int = 0
 var _choice_buttons: Array = []
+var _choice_cursor: Label  # "▶" indicator next to active choice
 
 func set_player(player: Node) -> void:
 	_player = player
@@ -281,6 +293,8 @@ func close_dialogue() -> void:
 	visible = false
 	_choices_container.visible = false
 	_portrait.visible = false
+	if _choice_cursor:
+		_choice_cursor.visible = false
 	_clear_choices()
 	_choice_buttons.clear()
 	_choice_idx = 0
@@ -527,6 +541,8 @@ func _execute_action(action: String) -> void:
 		"trade":
 			self.visible = false
 			_choices_container.visible = false
+			if _choice_cursor:
+				_choice_cursor.visible = false
 			if _npc_node and is_instance_valid(_npc_node):
 				trade_requested.emit(_npc_node)
 		"follow":
@@ -678,6 +694,13 @@ func _update_choice_highlight() -> void:
 			btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 		else:
 			btn.add_theme_color_override("font_color", Color(0.92, 0.89, 0.82))
+	# Position cursor next to active button
+	if _choice_cursor and _choice_idx >= 0 and _choice_idx < _choice_buttons.size():
+		_choice_cursor.visible = true
+		var btn: Button = _choice_buttons[_choice_idx]
+		_choice_cursor.global_position = Vector2(btn.global_position.x - 20, btn.global_position.y + 6)
+	elif _choice_cursor:
+		_choice_cursor.visible = false
 
 
 func _exit_tree() -> void:
@@ -685,6 +708,8 @@ func _exit_tree() -> void:
 		_choices_container.queue_free()
 	if is_instance_valid(_portrait):
 		_portrait.queue_free()
+	if is_instance_valid(_choice_cursor):
+		_choice_cursor.queue_free()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -695,11 +720,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	match event.keycode:
 		KEY_W, KEY_UP:
-			_choice_idx = maxi(0, _choice_idx - 1)
+			_choice_idx = (_choice_idx - 1 + _choice_buttons.size()) % _choice_buttons.size()
 			_update_choice_highlight()
 			get_viewport().set_input_as_handled()
 		KEY_S, KEY_DOWN:
-			_choice_idx = mini(_choice_buttons.size() - 1, _choice_idx + 1)
+			_choice_idx = (_choice_idx + 1) % _choice_buttons.size()
 			_update_choice_highlight()
 			get_viewport().set_input_as_handled()
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:

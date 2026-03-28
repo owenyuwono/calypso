@@ -39,6 +39,7 @@ func _ready() -> void:
 		dialogue_panel.set_hud_elements([
 			$UILayer/PlayerHUD,
 			$UILayer/Minimap,
+			skill_hotbar,
 		])
 		player.dialogue_panel = dialogue_panel
 	dialogue_panel.trade_requested.connect(func(npc_node: Node) -> void:

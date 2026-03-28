@@ -5,12 +5,12 @@ uniform vec4 albedo_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap;
 uniform bool use_texture = false;
 uniform float alpha_multiplier : hint_range(0.0, 1.0) = 1.0;
-uniform float light_attenuation : hint_range(0.0, 1.0) = 0.45;
+uniform float light_attenuation : hint_range(0.0, 1.0) = 0.3;
 
 // Cel shading parameters
 uniform float shadow_threshold : hint_range(0.0, 1.0) = 0.3;
 uniform float shadow_softness : hint_range(0.0, 0.5) = 0.02;
-uniform float shadow_strength : hint_range(0.0, 1.0) = 0.55;
+uniform float shadow_strength : hint_range(0.0, 1.0) = 0.4;
 uniform vec3 shadow_tint : source_color = vec3(0.6, 0.5, 0.4);
 
 // Specular (toonified Blinn-Phong)
