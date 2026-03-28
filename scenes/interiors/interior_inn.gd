@@ -48,8 +48,6 @@ func _build_innkeeper() -> void:
 	innkeeper.npc_name = "Innkeeper"
 	innkeeper.npc_role = "innkeeper"
 	innkeeper.npc_color = Color(0.7, 0.5, 0.3, 1.0)
-	innkeeper.model_path = "res://assets/models/characters/Barbarian.glb"
-	innkeeper.model_scale = 0.7
 	innkeeper.position = Vector3(0.0, 0.0, -4.7)
 	add_child(innkeeper)
 

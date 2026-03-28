@@ -77,6 +77,16 @@ var _equipment: Node
 var _combat: Node
 var _stats: Node
 
+var _cursor_idx: int = 0
+var _cursor_cells: Array = []      # all navigable cells (equip + inventory)
+var _cursor_item_ids: Array = []   # item_id per cell ("" for empty)
+var _cursor_slot_names: Array = [] # slot_name for equip cells ("" for inventory)
+var _equip_cell_count: int = 0     # number of equip cells at start of arrays
+var _action_menu_open: bool = false
+var _action_idx: int = 0
+var _action_buttons: Array = []
+var _cursor_rect: Panel
+
 func _ready() -> void:
 	visible = false
 	_load_slot_icons()
@@ -124,6 +134,25 @@ func _build_ui() -> void:
 	_grid.add_theme_constant_override("v_separation", 4)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items_vbox.add_child(_grid)
+
+	# Cursor highlight overlay — repositioned over the active cell each frame
+	_cursor_rect = Panel.new()
+	_cursor_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_rect.z_index = 10
+	_cursor_rect.visible = false
+	var cursor_style := StyleBoxFlat.new()
+	cursor_style.bg_color = Color(0, 0, 0, 0)
+	cursor_style.border_width_left = 2
+	cursor_style.border_width_right = 2
+	cursor_style.border_width_top = 2
+	cursor_style.border_width_bottom = 2
+	cursor_style.border_color = Color(1.0, 0.85, 0.2, 1.0)
+	cursor_style.corner_radius_top_left = 5
+	cursor_style.corner_radius_top_right = 5
+	cursor_style.corner_radius_bottom_left = 5
+	cursor_style.corner_radius_bottom_right = 5
+	_cursor_rect.add_theme_stylebox_override("panel", cursor_style)
+	add_child(_cursor_rect)
 
 	# --- Vertical separator ---
 	var vsep := VSeparator.new()
@@ -350,6 +379,8 @@ func _toggle() -> void:
 		_tooltip.visible = false
 		_hide_desc()
 		_hide_context_menu()
+		if _cursor_rect:
+			_cursor_rect.visible = false
 
 func is_open() -> bool:
 	return _is_open
@@ -404,6 +435,47 @@ func _refresh() -> void:
 			_grid.add_child(_build_cell(item_id, count))
 		else:
 			_grid.add_child(_build_empty_cell())
+
+	# Rebuild cursor arrays: equipment cells first, then inventory grid
+	_cursor_cells.clear()
+	_cursor_item_ids.clear()
+	_cursor_slot_names.clear()
+
+	# Equipment cells (left column then right column)
+	for slot_name in LEFT_EQUIP:
+		var cell: Control = null
+		var idx: int = LEFT_EQUIP.find(slot_name)
+		if idx >= 0 and idx < _left_equip_vbox.get_child_count():
+			cell = _left_equip_vbox.get_child(idx)
+		if cell:
+			_cursor_cells.append(cell)
+			var eid: String = _equipment.get_slot(slot_name) if _equipment else ""
+			_cursor_item_ids.append(eid)
+			_cursor_slot_names.append(slot_name)
+	for slot_name in RIGHT_EQUIP:
+		var cell: Control = null
+		var idx: int = RIGHT_EQUIP.find(slot_name)
+		if idx >= 0 and idx < _right_equip_vbox.get_child_count():
+			cell = _right_equip_vbox.get_child(idx)
+		if cell:
+			_cursor_cells.append(cell)
+			var eid: String = _equipment.get_slot(slot_name) if _equipment else ""
+			_cursor_item_ids.append(eid)
+			_cursor_slot_names.append(slot_name)
+	_equip_cell_count = _cursor_cells.size()
+
+	# Inventory grid cells
+	for cell in _grid.get_children():
+		_cursor_cells.append(cell)
+		_cursor_slot_names.append("")
+	for i in range(sorted_items.size()):
+		_cursor_item_ids.append(sorted_items[i][0])
+	# Pad item_ids for empty inventory cells
+	while _cursor_item_ids.size() < _cursor_cells.size():
+		_cursor_item_ids.append("")
+	_cursor_idx = clampi(_cursor_idx, 0, max(0, _cursor_cells.size() - 1))
+	# Defer highlight so grid has processed layout and global_position is valid
+	call_deferred("_update_cursor_highlight")
 
 func _sort_items(inv: Dictionary) -> Array:
 	var entries: Array = []
@@ -497,10 +569,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 	letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.add_child(letter)
 
-	cell.mouse_filter = Control.MOUSE_FILTER_STOP
-	cell.mouse_entered.connect(_on_equip_cell_hover.bind(item_id, cell))
-	cell.mouse_exited.connect(_on_cell_unhover)
-	cell.gui_input.connect(_on_equip_cell_input.bind(slot_name))
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	return cell
 
@@ -562,10 +631,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 		badge.add_child(count_label)
 		cell.add_child(badge)
 
-	cell.mouse_filter = Control.MOUSE_FILTER_STOP
-	cell.mouse_entered.connect(_on_cell_hover.bind(item_id, cell))
-	cell.mouse_exited.connect(_on_cell_unhover)
-	cell.gui_input.connect(_on_cell_input.bind(item_id))
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	return cell
 
@@ -596,41 +662,6 @@ func _format_tooltip(item_id: String) -> String:
 		extra = " (Material)"
 	return name + extra
 
-func _on_equip_cell_hover(item_id: String, cell: Control) -> void:
-	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_pos: Vector2 = cell.global_position - _panel.global_position
-	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
-	_tooltip.visible = true
-
-func _on_cell_hover(item_id: String, cell: Control) -> void:
-	_tooltip_label.text = _format_tooltip(item_id)
-	var cell_pos: Vector2 = cell.global_position - _panel.global_position
-	_tooltip.position = Vector2(cell_pos.x, cell_pos.y - 28)
-	_tooltip.visible = true
-
-func _on_cell_unhover() -> void:
-	_tooltip.visible = false
-
-func _on_equip_cell_input(event: InputEvent, slot_name: String) -> void:
-	if not (event is InputEventMouseButton) or not event.pressed:
-		return
-	var mb := event as InputEventMouseButton
-	var item_id: String = _equipment.get_slot(slot_name)
-	if item_id.is_empty():
-		return
-	if mb.button_index == MOUSE_BUTTON_LEFT:
-		_show_desc(item_id)
-	elif mb.button_index == MOUSE_BUTTON_RIGHT:
-		_show_context_menu("", slot_name, mb.global_position)
-
-func _on_cell_input(event: InputEvent, item_id: String) -> void:
-	if not (event is InputEventMouseButton) or not event.pressed:
-		return
-	var mb := event as InputEventMouseButton
-	if mb.button_index == MOUSE_BUTTON_LEFT:
-		_show_desc(item_id)
-	elif mb.button_index == MOUSE_BUTTON_RIGHT:
-		_show_context_menu(item_id, "", mb.global_position)
 
 func _show_desc(item_id: String) -> void:
 	_hide_context_menu()
@@ -727,44 +758,13 @@ func _add_desc_stat(label_text: String, value_text: String, color: Color) -> voi
 func _hide_desc() -> void:
 	_desc_panel.visible = false
 
-func _show_context_menu(item_id: String, slot_name: String, global_pos: Vector2) -> void:
-	_hide_desc()
-	_context_item_id = item_id
-	_context_slot_name = slot_name
-
-	for child in _context_vbox.get_children():
-		child.queue_free()
-
-	if not slot_name.is_empty():
-		# Equipment slot right-click — just Unequip
-		_add_context_button("Unequip", _ctx_unequip)
-	else:
-		# Inventory item right-click
-		var item: Dictionary = ItemDatabase.get_item(item_id)
-		var type_str: String = item.get("type", "")
-		if type_str == "consumable" and item.has("heal"):
-			_add_context_button("Use", _ctx_use)
-		elif type_str in ["weapon", "armor"]:
-			_add_context_button("Equip", _ctx_equip)
-		_add_context_button("Discard", _ctx_discard)
-
-	# Position near mouse, relative to this Control
-	var local_pos: Vector2 = global_pos - global_position
-	_context_menu.position = local_pos
-	_context_menu.visible = true
-
-func _add_context_button(text: String, callback: Callable) -> void:
-	var btn := Button.new()
-	btn.text = text
-	btn.add_theme_font_size_override("font_size", 12)
-	btn.custom_minimum_size = Vector2(80, 26)
-	btn.pressed.connect(callback)
-	_context_vbox.add_child(btn)
 
 func _hide_context_menu() -> void:
 	_context_menu.visible = false
 	_context_item_id = ""
 	_context_slot_name = ""
+	_action_menu_open = false
+	_action_buttons.clear()
 
 func _ctx_use() -> void:
 	if not _context_item_id.is_empty():
@@ -816,16 +816,177 @@ func _ctx_discard() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_open:
 		return
-	if not (event is InputEventMouseButton) or not event.pressed:
+
+	# --- Keyboard/Gamepad Navigation ---
+	if event is InputEventKey and event.pressed and not event.echo:
+		if _action_menu_open:
+			_handle_action_menu_input(event as InputEventKey)
+		else:
+			_handle_grid_input(event as InputEventKey)
+		get_viewport().set_input_as_handled()
 		return
-	var mb := event as InputEventMouseButton
-	if _context_menu.visible:
-		_hide_context_menu()
-	if _desc_panel.visible:
-		var local: Vector2 = mb.global_position - _desc_panel.global_position
-		var rect: Vector2 = _desc_panel.size
-		if local.x < 0 or local.y < 0 or local.x > rect.x or local.y > rect.y:
-			_hide_desc()
+
+
+func _handle_grid_input(event: InputEventKey) -> void:
+	var key: int = event.keycode
+	var old_idx: int = _cursor_idx
+
+	match key:
+		KEY_A:
+			if _cursor_idx > 0:
+				_cursor_idx -= 1
+		KEY_D:
+			if _cursor_idx + 1 < _cursor_cells.size():
+				_cursor_idx += 1
+		KEY_W:
+			if _cursor_idx >= _equip_cell_count:
+				# In inventory grid — go up by GRID_COLUMNS, or jump to last equip cell
+				var grid_idx: int = _cursor_idx - _equip_cell_count
+				if grid_idx >= GRID_COLUMNS:
+					_cursor_idx -= GRID_COLUMNS
+				elif _equip_cell_count > 0:
+					_cursor_idx = _equip_cell_count - 1
+			elif _cursor_idx > 0:
+				_cursor_idx -= 1
+		KEY_S:
+			if _cursor_idx >= _equip_cell_count:
+				# In inventory grid — go down by GRID_COLUMNS
+				if _cursor_idx + GRID_COLUMNS < _cursor_cells.size():
+					_cursor_idx += GRID_COLUMNS
+			elif _cursor_idx < _equip_cell_count - 1:
+				_cursor_idx += 1
+			else:
+				# Last equip cell — jump to first inventory cell
+				if _equip_cell_count < _cursor_cells.size():
+					_cursor_idx = _equip_cell_count
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			var slot_name: String = _cursor_slot_names[_cursor_idx] if _cursor_idx < _cursor_slot_names.size() else ""
+			var item_id: String = _cursor_item_ids[_cursor_idx] if _cursor_idx < _cursor_item_ids.size() else ""
+			if not slot_name.is_empty() and not item_id.is_empty():
+				_open_equip_action_menu(slot_name, item_id)
+			elif not item_id.is_empty():
+				_open_action_menu(item_id)
+			return
+		KEY_ESCAPE:
+			_toggle()
+			return
+		_:
+			return
+
+	if _cursor_idx != old_idx:
+		_update_cursor_highlight()
+
+func _handle_action_menu_input(event: InputEventKey) -> void:
+	var key: int = event.keycode
+
+	match key:
+		KEY_W:
+			_action_idx = maxi(0, _action_idx - 1)
+			_update_action_highlight()
+		KEY_S:
+			_action_idx = mini(_action_buttons.size() - 1, _action_idx + 1)
+			_update_action_highlight()
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			if _action_idx >= 0 and _action_idx < _action_buttons.size():
+				_action_buttons[_action_idx].emit_signal("pressed")
+		KEY_ESCAPE:
+			_close_action_menu()
+
+func _update_cursor_highlight() -> void:
+	if not _cursor_rect:
+		return
+	if _cursor_idx < 0 or _cursor_idx >= _cursor_cells.size():
+		_cursor_rect.visible = false
+		_tooltip.visible = false
+		return
+	var cell: Control = _cursor_cells[_cursor_idx]
+	_cursor_rect.visible = true
+	_cursor_rect.global_position = cell.global_position
+	_cursor_rect.size = cell.size
+	var item_id: String = _cursor_item_ids[_cursor_idx] if _cursor_idx < _cursor_item_ids.size() else ""
+	if not item_id.is_empty():
+		_tooltip_label.text = _format_tooltip(item_id)
+		_tooltip.position = cell.global_position - global_position + Vector2(0, -28)
+		_tooltip.visible = true
+	else:
+		_tooltip.visible = false
+
+func _open_action_menu(item_id: String) -> void:
+	_hide_desc()
+	_context_item_id = item_id
+	_context_slot_name = ""
+
+	for child in _context_vbox.get_children():
+		child.queue_free()
+	_action_buttons.clear()
+
+	var item: Dictionary = ItemDatabase.get_item(item_id)
+	var type_str: String = item.get("type", "")
+	if type_str == "consumable" and item.has("heal"):
+		_add_action_button("Use", _ctx_use)
+	if type_str in ["weapon", "armor"]:
+		_add_action_button("Equip", _ctx_equip)
+	_add_action_button("Discard", _ctx_discard)
+	_add_action_button("Cancel", _close_action_menu)
+
+	# Position next to the selected cell
+	if _cursor_idx >= 0 and _cursor_idx < _cursor_cells.size():
+		var cell: Control = _cursor_cells[_cursor_idx]
+		var cell_pos: Vector2 = cell.global_position - global_position
+		_context_menu.position = Vector2(cell_pos.x + CELL_SIZE + 4, cell_pos.y)
+
+	_context_menu.visible = true
+	_action_menu_open = true
+	_action_idx = 0
+	_update_action_highlight()
+
+func _open_equip_action_menu(slot_name: String, item_id: String) -> void:
+	_hide_desc()
+	_context_item_id = item_id
+	_context_slot_name = slot_name
+
+	for child in _context_vbox.get_children():
+		child.queue_free()
+	_action_buttons.clear()
+
+	_add_action_button("Unequip", _ctx_unequip)
+	_add_action_button("Cancel", _close_action_menu)
+
+	if _cursor_idx >= 0 and _cursor_idx < _cursor_cells.size():
+		var cell: Control = _cursor_cells[_cursor_idx]
+		var cell_pos: Vector2 = cell.global_position - global_position
+		_context_menu.position = Vector2(cell_pos.x + EQUIP_CELL_SIZE + 4, cell_pos.y)
+
+	_context_menu.visible = true
+	_action_menu_open = true
+	_action_idx = 0
+	_update_action_highlight()
+
+func _add_action_button(text: String, callback: Callable) -> void:
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.custom_minimum_size = Vector2(80, 26)
+	btn.pressed.connect(callback)
+	_context_vbox.add_child(btn)
+	_action_buttons.append(btn)
+
+func _update_action_highlight() -> void:
+	for i in _action_buttons.size():
+		var btn: Button = _action_buttons[i]
+		if i == _action_idx:
+			btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+			btn.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.2))
+		else:
+			btn.remove_theme_color_override("font_color")
+			btn.remove_theme_color_override("font_hover_color")
+
+func _close_action_menu() -> void:
+	_context_menu.visible = false
+	_action_menu_open = false
+	_action_buttons.clear()
+	_context_item_id = ""
+	_context_slot_name = ""
 
 func _use_item(item_id: String, item_data: Dictionary) -> void:
 	if not _inventory or not _inventory.has_item(item_id):

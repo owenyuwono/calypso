@@ -18,7 +18,6 @@ const SettingsPanel = preload("res://scenes/ui/settings_panel.gd")
 # Styling constants
 const _COLOR_TAB_BG_INACTIVE := Color(0.12, 0.1, 0.08, 0.9)
 const _COLOR_TAB_BG_ACTIVE := Color(0.25, 0.2, 0.1, 0.95)
-const _COLOR_TAB_BG_HOVER := Color(0.18, 0.15, 0.1, 0.95)
 const _COLOR_BORDER_INACTIVE := Color(0.4, 0.35, 0.2)
 const _COLOR_BORDER_ACTIVE := Color(1.0, 0.85, 0.3)
 const _TAB_BUTTON_MIN_SIZE := Vector2(120, 40)
@@ -41,7 +40,6 @@ var _content_area: Control
 # Cached tab button StyleBoxes to avoid per-frame allocation
 var _tab_style_inactive: StyleBoxFlat
 var _tab_style_active: StyleBoxFlat
-var _tab_style_hover: StyleBoxFlat
 
 
 func _ready() -> void:
@@ -62,12 +60,6 @@ func _build_tab_styles() -> void:
 	_tab_style_active.border_color = _COLOR_BORDER_ACTIVE
 	UIHelper.set_border_width(_tab_style_active, 2)
 	UIHelper.set_corner_radius(_tab_style_active, 4)
-
-	_tab_style_hover = StyleBoxFlat.new()
-	_tab_style_hover.bg_color = _COLOR_TAB_BG_HOVER
-	_tab_style_hover.border_color = _COLOR_BORDER_INACTIVE
-	UIHelper.set_border_width(_tab_style_hover, 1)
-	UIHelper.set_corner_radius(_tab_style_hover, 4)
 
 
 func _build_ui() -> void:
@@ -184,10 +176,9 @@ func _create_tab_button(label_text: String, index: int) -> Button:
 	btn.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
 	btn.add_theme_font_size_override("font_size", 18)
 	btn.add_theme_stylebox_override("normal", _tab_style_inactive)
-	btn.add_theme_stylebox_override("hover", _tab_style_hover)
+	btn.add_theme_stylebox_override("hover", _tab_style_inactive)
 	btn.add_theme_stylebox_override("pressed", _tab_style_active)
 	btn.add_theme_stylebox_override("focus", _tab_style_inactive)
-	btn.pressed.connect(switch_tab.bind(index))
 	return btn
 
 
@@ -303,6 +294,10 @@ func _input(event: InputEvent) -> void:
 		if visible:
 			close()
 		else:
+			# Don't open menu while dialogue is active
+			var dialogue: Control = get_parent().get_node_or_null("DialoguePanel") if get_parent() else null
+			if dialogue and dialogue.visible:
+				return
 			open()
 		get_viewport().set_input_as_handled()
 		return
@@ -316,12 +311,13 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# Tab navigation via arrow keys
-	if event.is_action_pressed("ui_right"):
-		var next: int = (_last_active_tab + 1) % TAB_NAMES.size()
-		switch_tab(next)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_left"):
-		var prev: int = (_last_active_tab - 1 + TAB_NAMES.size()) % TAB_NAMES.size()
-		switch_tab(prev)
-		get_viewport().set_input_as_handled()
+	# Tab navigation via Q/E keys
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_E:
+			var next: int = (_last_active_tab + 1) % TAB_NAMES.size()
+			switch_tab(next)
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_Q:
+			var prev: int = (_last_active_tab - 1 + TAB_NAMES.size()) % TAB_NAMES.size()
+			switch_tab(prev)
+			get_viewport().set_input_as_handled()

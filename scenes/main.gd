@@ -126,6 +126,8 @@ func _spawn_merchant() -> void:
 		"items": {
 			"healing_potion": 20,
 			"bandage": 15,
+			"basic_sword": 5,
+			"iron_sword": 3,
 		},
 		"gold": 500,
 	})

@@ -10,8 +10,6 @@ const DialogueBubbleScene = preload("res://scenes/ui/dialogue_bubble.tscn")
 @export var npc_name: String = "Innkeeper"
 @export var npc_role: String = "innkeeper"  # "innkeeper" or "shopkeeper"
 @export var npc_color: Color = Color(0.6, 0.4, 0.3, 1.0)
-@export var model_path: String = "res://assets/models/characters/Knight.glb"
-@export var model_scale: float = 0.7
 
 const GREETINGS_INNKEEPER: Array[String] = [
 	"Welcome to the inn!",
@@ -81,7 +79,26 @@ func _setup_collision() -> void:
 func _setup_visuals() -> void:
 	_visuals = EntityVisuals.new()
 	add_child(_visuals)
-	_visuals.setup_model(model_path, model_scale, npc_color)
+	_visuals.setup_model_with_anims(
+		"res://assets/models/characters/player.fbx",
+		{
+			"Running": "res://assets/animation/player/running.fbx",
+			"Attack": "res://assets/animation/player/attack_slash.fbx",
+			"Hit": "res://assets/animation/player/hit_impact.fbx",
+			"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
+			"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
+			"Idle_Breathing_3": "res://assets/animation/player/idle_breathing_3.fbx",
+			"Idle_Rare_Happy": "res://assets/animation/player/idle_rare_happy.fbx",
+			"Idle_Rare_Bored": "res://assets/animation/player/idle_rare_bored.fbx",
+			"Idle_Rare_Looking": "res://assets/animation/player/idle_rare_looking_around.fbx",
+			"Idle_Rare_Look": "res://assets/animation/player/idle_rare_look_around.fbx",
+			"Idle_Tired_Sweat": "res://assets/animation/player/idle_tired_wiping_sweat.fbx",
+			"Idle_Tired_Shoulder": "res://assets/animation/player/idle_tired_shoulder_rub.fbx",
+			"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
+		},
+		1.5,
+		npc_color
+	)
 
 
 func _setup_name_label() -> void:

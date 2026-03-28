@@ -1,16 +1,21 @@
 extends Control
-## Player HUD showing HP bar, proficiency XP bar, total level, and gold with styled panel.
+## Player HUD: bare HP + stamina bars above the skill hotbar (bottom-center), no background panel.
 
 var _hp_bar: ProgressBar
-var _hp_label: Label
 var _sta_bar: ProgressBar
-var _sta_label: Label
 var _player: Node
 var _time_label: Label
 var _stats: Node
 var _stamina_comp: Node
 
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
+
+# Mirror hotbar constants so bars sit flush above it.
+const SLOT_SIZE: float = 64.0
+const BOTTOM_MARGIN: float = 16.0
+const BAR_HEIGHT: int = 14
+const BAR_WIDTH: float = 160.0
+const BAR_GAP: float = 8.0
 
 func _ready() -> void:
 	_build_ui()
@@ -25,53 +30,36 @@ func _ready() -> void:
 	_refresh_all()
 
 func _build_ui() -> void:
-	# Styled panel background
-	var panel := PanelContainer.new()
-	panel.position = Vector2(12, 12)
-	panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
-	add_child(panel)
+	# Bare horizontal row — no panel container, no background
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", int(BAR_GAP))
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var vbox := VBoxContainer.new()
-	vbox.custom_minimum_size = Vector2(180, 0)
-	panel.add_child(vbox)
-
-	# HP bar
-	var hp_row := HBoxContainer.new()
-	vbox.add_child(hp_row)
-
-	var hp_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/stat_hp.png", Vector2(16, 16))
-	if hp_icon:
-		hp_icon.custom_minimum_size = Vector2(20, 0)
-		hp_row.add_child(hp_icon)
+	# Anchor bottom-center, directly above the hotbar
+	var total_width := BAR_WIDTH * 2.0 + BAR_GAP
+	var hotbar_top_offset: float = -(SLOT_SIZE + BOTTOM_MARGIN)  # top edge of hotbar row
+	hbox.anchor_left = 0.5
+	hbox.anchor_right = 0.5
+	hbox.anchor_top = 1.0
+	hbox.anchor_bottom = 1.0
+	hbox.offset_left = -total_width * 0.5
+	hbox.offset_right = total_width * 0.5
+	hbox.offset_bottom = hotbar_top_offset - 4.0
+	hbox.offset_top = hotbar_top_offset - 4.0 - BAR_HEIGHT
 
 	_hp_bar = _create_styled_bar(
 		Color(0.85, 0.15, 0.15), Color(0.3, 0.05, 0.05),
-		Color(1.0, 0.4, 0.4), Color(0.1, 0, 0), 20
+		Color(1.0, 0.4, 0.4), Color(0.1, 0, 0)
 	)
-	hp_row.add_child(_hp_bar)
-
-	_hp_label = UIHelper.create_label("50/50", 12, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
-	_hp_label.custom_minimum_size = Vector2(60, 0)
-	hp_row.add_child(_hp_label)
-
-	# Stamina bar
-	var sta_row := HBoxContainer.new()
-	vbox.add_child(sta_row)
-
-	var sta_icon: TextureRect = UIHelper.create_icon("res://assets/textures/ui/stats/stat_stamina.png", Vector2(16, 16))
-	if sta_icon:
-		sta_icon.custom_minimum_size = Vector2(20, 0)
-		sta_row.add_child(sta_icon)
+	hbox.add_child(_hp_bar)
 
 	_sta_bar = _create_styled_bar(
 		Color(0.15, 0.65, 0.4), Color(0.05, 0.15, 0.1),
-		Color(0.3, 0.8, 0.55), Color(0, 0.05, 0.02), 18
+		Color(0.3, 0.8, 0.55), Color(0, 0.05, 0.02)
 	)
-	sta_row.add_child(_sta_bar)
+	hbox.add_child(_sta_bar)
 
-	_sta_label = UIHelper.create_label("100/100", 12, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
-	_sta_label.custom_minimum_size = Vector2(60, 0)
-	sta_row.add_child(_sta_label)
+	add_child(hbox)
 
 	# Time panel — separate panel to the left of the minimap
 	_build_time_panel()
@@ -96,9 +84,9 @@ func _build_time_panel() -> void:
 	var panel_w := time_panel.size.x
 	time_panel.position = Vector2(minimap_center_x - panel_w * 0.5, minimap_bottom - 8)
 
-func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color, bar_height: int) -> ProgressBar:
+func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, bg_border: Color) -> ProgressBar:
 	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(150, bar_height)
+	bar.custom_minimum_size = Vector2(BAR_WIDTH, BAR_HEIGHT)
 	bar.show_percentage = false
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -124,7 +112,6 @@ func _refresh_all() -> void:
 
 	_hp_bar.max_value = _stats.max_hp
 	_hp_bar.value = _stats.hp
-	_hp_label.text = "%d/%d" % [_stats.hp, _stats.max_hp]
 
 	_refresh_stamina()
 	_refresh_time()
@@ -151,7 +138,6 @@ func _refresh_stamina() -> void:
 	var max_sta: float = _stamina_comp.get_max_stamina()
 	_sta_bar.max_value = max_sta
 	_sta_bar.value = sta
-	_sta_label.text = "%d/%d" % [int(sta), int(max_sta)]
 
 func _refresh_time() -> void:
 	_time_label.text = "%s - Day %d (%s)" % [TimeManager.get_time_display(), TimeManager.get_day(), TimeManager.get_phase()]

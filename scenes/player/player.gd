@@ -799,7 +799,7 @@ func _is_ui_open() -> bool:
 
 func _on_entity_died(eid: String, _killer_id: String) -> void:
 	if eid == _attack_target:
-	
+		_attack_target = ""
 	if eid != "player":
 		return
 	_die()

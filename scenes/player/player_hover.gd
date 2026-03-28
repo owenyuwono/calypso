@@ -3,7 +3,7 @@ extends Node
 ## Shows [E] label + ground ring on the nearest interactable entity within range.
 ## Call setup(player) from player._ready() after adding as child.
 
-const PROXIMITY_RANGE: float = 2.0
+const PROXIMITY_RANGE: float = 3.0
 const PROXIMITY_CHECK_INTERVAL: float = 0.2
 const INTERACTABLE_TYPES: PackedStringArray = ["npc", "interior_npc", "tree", "rock", "fishing_spot", "crafting_station", "door"]
 
@@ -99,17 +99,9 @@ func _process_proximity(_delta: float) -> void:
 			best_node = node
 
 	if best_id != _proximity_target_id:
-		# Unhighlight old target
-		if _proximity_target_id != "":
-			var prev := WorldState.get_entity(_proximity_target_id)
-			if prev and is_instance_valid(prev) and prev.has_method("unhighlight"):
-				prev.unhighlight()
-
 		_proximity_target_id = best_id
 
 		if best_id != "":
-			if best_node and is_instance_valid(best_node) and best_node.has_method("highlight"):
-				best_node.highlight()
 			var data: Dictionary = WorldState.get_entity_data(best_id)
 			var etype: String = data.get("type", "")
 			_proximity_label.text = _get_action_text(etype)

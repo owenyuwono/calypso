@@ -63,16 +63,8 @@ func setup(target: Control, title_text: String, extra_right: Control = null) -> 
 	btn_style.content_margin_top = 2
 	btn_style.content_margin_bottom = 2
 	close_btn.add_theme_stylebox_override("normal", btn_style)
-	var btn_hover := StyleBoxFlat.new()
-	btn_hover.bg_color = Color(0.5, 0.2, 0.2, 0.9)
-	UIHelper.set_corner_radius(btn_hover, 3)
-	btn_hover.content_margin_left = 4
-	btn_hover.content_margin_right = 4
-	btn_hover.content_margin_top = 2
-	btn_hover.content_margin_bottom = 2
-	close_btn.add_theme_stylebox_override("hover", btn_hover)
+	close_btn.add_theme_stylebox_override("hover", btn_style)
 	close_btn.add_theme_color_override("font_color", Color(1, 0.6, 0.6))
-	close_btn.add_theme_color_override("font_hover_color", Color(1, 0.8, 0.8))
 	close_btn.pressed.connect(func(): close_pressed.emit())
 	hbox.add_child(close_btn)
 

@@ -69,7 +69,7 @@ func _ready() -> void:
 	anchor_right = 1.0
 	anchor_top = 1.0
 	anchor_bottom = 1.0
-	offset_left = 40
+	offset_left = 270    # make room for portrait on the left
 	offset_right = -40
 	offset_top = -180
 	offset_bottom = -20
@@ -145,15 +145,15 @@ func _build_portrait() -> void:
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
-	# Position: left side, above dialogue box
+	# Position: left side, beside dialogue box, touching screen bottom
 	_portrait.anchor_left = 0.0
 	_portrait.anchor_right = 0.0
 	_portrait.anchor_top = 1.0
 	_portrait.anchor_bottom = 1.0
-	_portrait.offset_left = 40       # match dialogue panel left margin
-	_portrait.offset_right = 320     # ~280px wide (2x bigger)
-	_portrait.offset_bottom = -180   # bottom touches dialogue box top
-	_portrait.offset_top = -650      # ~470px tall for portrait (2x bigger)
+	_portrait.offset_left = 20
+	_portrait.offset_right = 260     # 240px wide
+	_portrait.offset_bottom = 0      # touch screen bottom
+	_portrait.offset_top = -400      # 400px tall
 
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	get_parent().add_child(_portrait)
@@ -185,9 +185,11 @@ func _build_choices_container() -> void:
 
 
 var _shop_panel: Node
-var _buy_button: Button = null
 var _hud_elements: Array = []  # nodes to hide when dialogue is open
 var _charisma_xp_granted: bool = false
+
+var _choice_idx: int = 0
+var _choice_buttons: Array = []
 
 func set_player(player: Node) -> void:
 	_player = player
@@ -199,8 +201,6 @@ func set_shop_panel(shop: Node) -> void:
 	_shop_panel = shop
 	if _shop_panel and _shop_panel.has_signal("shop_closed"):
 		_shop_panel.shop_closed.connect(_on_shop_closed)
-	if _shop_panel and _shop_panel.has_signal("cart_changed"):
-		_shop_panel.cart_changed.connect(_on_cart_changed)
 
 
 func open_dialogue(npc_id: String, npc_node: Node) -> void:
@@ -285,14 +285,13 @@ func _record_conversation_event(npc_node: Node) -> void:
 
 
 func close_dialogue() -> void:
-	if _shop_panel and _shop_panel.has_signal("cart_changed") and _shop_panel.cart_changed.is_connected(_on_cart_changed):
-		_shop_panel.cart_changed.disconnect(_on_cart_changed)
-	_buy_button = null
 	_in_gift_mode = false
 	visible = false
 	_choices_container.visible = false
 	_portrait.visible = false
 	_clear_choices()
+	_choice_buttons.clear()
+	_choice_idx = 0
 	for elem in _hud_elements:
 		if elem and is_instance_valid(elem):
 			elem.visible = true
@@ -336,6 +335,9 @@ func _show_node(node_id: String) -> void:
 		btn.pressed.connect(close_dialogue)
 		_choices_container.add_child(btn)
 
+	_choice_idx = 0
+	_update_choice_highlight()
+
 
 func _show_generic_greeting(npc_node: Node) -> void:
 	var archetype: String = _get_archetype(npc_node)
@@ -359,6 +361,9 @@ func _show_generic_greeting(npc_node: Node) -> void:
 		var btn := _create_choice_button("Goodbye.")
 		btn.pressed.connect(close_dialogue)
 		_choices_container.add_child(btn)
+
+	_choice_idx = 0
+	_update_choice_highlight()
 
 
 func _maybe_inject_gift_choice(node_id: String, is_generic: bool) -> void:
@@ -419,6 +424,9 @@ func _show_gift_items() -> void:
 	cancel_btn.pressed.connect(_on_gift_cancelled)
 	_choices_container.add_child(cancel_btn)
 
+	_choice_idx = 0
+	_update_choice_highlight()
+
 
 func _on_gift_item_selected(item_id: String) -> void:
 	_in_gift_mode = false
@@ -460,6 +468,9 @@ func _on_gift_item_selected(item_id: String) -> void:
 	var ok_btn := _create_choice_button("You're welcome.")
 	ok_btn.pressed.connect(_restore_after_gift)
 	_choices_container.add_child(ok_btn)
+
+	_choice_idx = 0
+	_update_choice_highlight()
 
 
 func _on_gift_cancelled() -> void:
@@ -522,8 +533,8 @@ func _execute_action(action: String) -> void:
 
 	match action:
 		"trade":
-			_dialogue_text.text = "Take your time browsing..."
-			_show_trade_choices()
+			self.visible = false
+			_choices_container.visible = false
 			if _npc_node and is_instance_valid(_npc_node):
 				trade_requested.emit(_npc_node)
 		"follow":
@@ -555,6 +566,8 @@ func _apply_rewards(rewards: Dictionary) -> void:
 
 
 func _clear_choices() -> void:
+	_choice_buttons.clear()
+	_choice_idx = 0
 	for child in _choices_container.get_children():
 		_choices_container.remove_child(child)
 		child.queue_free()
@@ -587,10 +600,10 @@ func _create_choice_button(label_text: String, icon_path: String = "") -> Button
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, 32)
+	btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_theme_font_override("font", UIHelper.GAME_FONT)
 	btn.add_theme_font_size_override("font_size", 13)
 	btn.add_theme_color_override("font_color", Color(0.85, 0.82, 0.7))
-	btn.add_theme_color_override("font_hover_color", UIHelper.COLOR_GOLD)
 	btn.add_theme_color_override("font_pressed_color", Color(1.0, 0.95, 0.7))
 
 	var normal_style := StyleBoxFlat.new()
@@ -600,11 +613,6 @@ func _create_choice_button(label_text: String, icon_path: String = "") -> Button
 	normal_style.set_corner_radius_all(3)
 	normal_style.set_content_margin_all(8)
 	btn.add_theme_stylebox_override("normal", normal_style)
-
-	var hover_style := normal_style.duplicate()
-	hover_style.bg_color = Color(0.25, 0.2, 0.12, 0.95)
-	hover_style.border_color = UIHelper.COLOR_GOLD
-	btn.add_theme_stylebox_override("hover", hover_style)
 
 	var pressed_style := normal_style.duplicate()
 	pressed_style.bg_color = Color(0.3, 0.25, 0.15, 0.9)
@@ -617,6 +625,7 @@ func _create_choice_button(label_text: String, icon_path: String = "") -> Button
 		btn.icon = ImageTexture.create_from_image(img)
 		btn.expand_icon = false
 
+	_choice_buttons.append(btn)
 	return btn
 
 
@@ -640,44 +649,6 @@ func _get_mood(npc_node: Node) -> String:
 	return "neutral"
 
 
-func _show_trade_choices() -> void:
-	_clear_choices()
-
-	var total: int = _shop_panel.get_cart_total() if _shop_panel else 0
-	_buy_button = _create_choice_button("Buy (%dg)" % total)
-	_buy_button.disabled = total <= 0
-	_buy_button.pressed.connect(_on_buy_pressed)
-	_choices_container.add_child(_buy_button)
-
-	var close_btn := _create_choice_button("Close Shop")
-	close_btn.pressed.connect(_close_shop)
-	_choices_container.add_child(close_btn)
-
-	_choices_container.visible = true
-
-
-func _on_buy_pressed() -> void:
-	if _shop_panel and _shop_panel.purchase_cart():
-		AudioManager.play_ui_sfx("ui_buy_sell")
-		# Grant persuasion XP for completing a trade
-		if _player:
-			var prog: Node = _player.get_node_or_null("ProgressionComponent")
-			if prog:
-				prog.grant_proficiency_xp("persuasion", 3)
-		_show_trade_choices()
-
-
-func _on_cart_changed(total: int) -> void:
-	if not (_buy_button and is_instance_valid(_buy_button)):
-		return
-	_buy_button.text = "  Buy (%dg)  " % total
-	_buy_button.disabled = total <= 0
-	if total > 0 and _player:
-		var inv: Node = _player.get_node_or_null("InventoryComponent")
-		if inv and inv.get_gold_amount() < total:
-			_buy_button.disabled = true
-
-
 func _close_shop() -> void:
 	if _shop_panel and _shop_panel.is_open():
 		_shop_panel.close_shop()
@@ -692,15 +663,29 @@ const PARTING_WORDS: Array = [
 ]
 
 func _on_shop_closed() -> void:
-	if not visible or _npc_id.is_empty():
+	if _npc_id.is_empty():
 		return
+	self.visible = true
 	# Show parting words with a goodbye choice
 	_dialogue_text.text = PARTING_WORDS[randi() % PARTING_WORDS.size()]
 	_clear_choices()
 	var btn := _create_choice_button("Farewell.")
 	btn.pressed.connect(close_dialogue)
 	_choices_container.add_child(btn)
+
+	_choice_idx = 0
+	_update_choice_highlight()
+
 	_choices_container.visible = true
+
+
+func _update_choice_highlight() -> void:
+	for i in _choice_buttons.size():
+		var btn: Button = _choice_buttons[i]
+		if i == _choice_idx:
+			btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		else:
+			btn.add_theme_color_override("font_color", Color(0.92, 0.89, 0.82))
 
 
 func _exit_tree() -> void:
@@ -708,6 +693,32 @@ func _exit_tree() -> void:
 		_choices_container.queue_free()
 	if is_instance_valid(_portrait):
 		_portrait.queue_free()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or _choice_buttons.is_empty():
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+
+	match event.keycode:
+		KEY_W, KEY_UP:
+			_choice_idx = maxi(0, _choice_idx - 1)
+			_update_choice_highlight()
+			get_viewport().set_input_as_handled()
+		KEY_S, KEY_DOWN:
+			_choice_idx = mini(_choice_buttons.size() - 1, _choice_idx + 1)
+			_update_choice_highlight()
+			get_viewport().set_input_as_handled()
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			if _choice_idx >= 0 and _choice_idx < _choice_buttons.size():
+				_choice_buttons[_choice_idx].emit_signal("pressed")
+			get_viewport().set_input_as_handled()
+		KEY_ESCAPE:
+			if _shop_panel and _shop_panel.is_open():
+				return
+			close_dialogue()
+			get_viewport().set_input_as_handled()
 
 
 func _input(event: InputEvent) -> void:
