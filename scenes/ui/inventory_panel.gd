@@ -78,15 +78,16 @@ var _equipment: Node
 var _combat: Node
 var _stats: Node
 
-var _cursor_idx: int = 0
-var _cursor_cells: Array = []      # all navigable cells (equip + inventory)
-var _cursor_item_ids: Array = []   # item_id per cell ("" for empty)
-var _cursor_slot_names: Array = [] # slot_name for equip cells ("" for inventory)
-var _equip_cell_count: int = 0     # number of equip cells at start of arrays
+var _nav_zone: String = "inventory"  # "inventory" or "equipment"
+var _grid_idx: int = 0               # index into inventory grid cells
+var _equip_col: int = 0              # 0=left, 1=right
+var _equip_row: int = 0              # 0..3
+var _cursor_cells: Array = []        # inventory grid cells only
+var _cursor_item_ids: Array = []     # item_id per inventory grid cell ("" for empty)
 var _action_menu_open: bool = false
 var _action_idx: int = 0
 var _action_buttons: Array = []
-var _cursor_rect: Panel
+var _cursor_hand: TextureRect
 
 func _ready() -> void:
 	visible = false
@@ -136,24 +137,17 @@ func _build_ui() -> void:
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items_vbox.add_child(_grid)
 
-	# Cursor highlight overlay — repositioned over the active cell each frame
-	_cursor_rect = Panel.new()
-	_cursor_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cursor_rect.z_index = 10
-	_cursor_rect.visible = false
-	var cursor_style := StyleBoxFlat.new()
-	cursor_style.bg_color = Color(0, 0, 0, 0)
-	cursor_style.border_width_left = 2
-	cursor_style.border_width_right = 2
-	cursor_style.border_width_top = 2
-	cursor_style.border_width_bottom = 2
-	cursor_style.border_color = Color(1.0, 0.85, 0.2, 1.0)
-	cursor_style.corner_radius_top_left = 5
-	cursor_style.corner_radius_top_right = 5
-	cursor_style.corner_radius_bottom_left = 5
-	cursor_style.corner_radius_bottom_right = 5
-	_cursor_rect.add_theme_stylebox_override("panel", cursor_style)
-	add_child(_cursor_rect)
+	# Cursor hand — hand icon that floats left of the active cell
+	_cursor_hand = TextureRect.new()
+	var cursor_tex: Texture2D = load("res://assets/textures/ui/dialogue/cursor_hand.png") as Texture2D
+	if cursor_tex:
+		_cursor_hand.texture = cursor_tex
+	_cursor_hand.custom_minimum_size = Vector2(24, 24)
+	_cursor_hand.size = Vector2(24, 24)
+	_cursor_hand.visible = false
+	_cursor_hand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_hand.z_index = 10
+	add_child(_cursor_hand)
 
 	# --- Vertical separator ---
 	var vsep := VSeparator.new()
@@ -374,14 +368,18 @@ func _toggle() -> void:
 	visible = _is_open
 	if _is_open:
 		AudioManager.play_ui_sfx("ui_panel_open")
+		_nav_zone = "inventory"
+		_grid_idx = 0
+		_equip_col = 0
+		_equip_row = 0
 		_refresh()
 	else:
 		AudioManager.play_ui_sfx("ui_panel_close")
 		_tooltip.visible = false
 		_hide_desc()
 		_hide_context_menu()
-		if _cursor_rect:
-			_cursor_rect.visible = false
+		if _cursor_hand:
+			_cursor_hand.visible = false
 
 func is_open() -> bool:
 	return _is_open
@@ -437,44 +435,19 @@ func _refresh() -> void:
 		else:
 			_grid.add_child(_build_empty_cell())
 
-	# Rebuild cursor arrays: equipment cells first, then inventory grid
+	# Rebuild inventory cursor arrays (inventory grid cells only)
 	_cursor_cells.clear()
 	_cursor_item_ids.clear()
-	_cursor_slot_names.clear()
 
-	# Equipment cells (left column then right column)
-	for slot_name in LEFT_EQUIP:
-		var cell: Control = null
-		var idx: int = LEFT_EQUIP.find(slot_name)
-		if idx >= 0 and idx < _left_equip_vbox.get_child_count():
-			cell = _left_equip_vbox.get_child(idx)
-		if cell:
-			_cursor_cells.append(cell)
-			var eid: String = _equipment.get_slot(slot_name) if _equipment else ""
-			_cursor_item_ids.append(eid)
-			_cursor_slot_names.append(slot_name)
-	for slot_name in RIGHT_EQUIP:
-		var cell: Control = null
-		var idx: int = RIGHT_EQUIP.find(slot_name)
-		if idx >= 0 and idx < _right_equip_vbox.get_child_count():
-			cell = _right_equip_vbox.get_child(idx)
-		if cell:
-			_cursor_cells.append(cell)
-			var eid: String = _equipment.get_slot(slot_name) if _equipment else ""
-			_cursor_item_ids.append(eid)
-			_cursor_slot_names.append(slot_name)
-	_equip_cell_count = _cursor_cells.size()
-
-	# Inventory grid cells
 	for cell in _grid.get_children():
 		_cursor_cells.append(cell)
-		_cursor_slot_names.append("")
 	for i in range(sorted_items.size()):
 		_cursor_item_ids.append(sorted_items[i][0])
 	# Pad item_ids for empty inventory cells
 	while _cursor_item_ids.size() < _cursor_cells.size():
 		_cursor_item_ids.append("")
-	_cursor_idx = clampi(_cursor_idx, 0, max(0, _cursor_cells.size() - 1))
+
+	_grid_idx = clampi(_grid_idx, 0, max(0, _cursor_cells.size() - 1))
 	# Defer highlight so grid has processed layout and global_position is valid
 	call_deferred("_update_cursor_highlight")
 
@@ -820,43 +793,75 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _handle_grid_input(event: InputEventKey) -> void:
 	var key: int = event.keycode
-	var old_idx: int = _cursor_idx
+	var changed: bool = false
 
 	match key:
-		KEY_A:
-			if _cursor_idx > 0:
-				_cursor_idx -= 1
-		KEY_D:
-			if _cursor_idx + 1 < _cursor_cells.size():
-				_cursor_idx += 1
 		KEY_W:
-			if _cursor_idx >= _equip_cell_count:
-				# In inventory grid — go up by GRID_COLUMNS, or jump to last equip cell
-				var grid_idx: int = _cursor_idx - _equip_cell_count
-				if grid_idx >= GRID_COLUMNS:
-					_cursor_idx -= GRID_COLUMNS
-				elif _equip_cell_count > 0:
-					_cursor_idx = _equip_cell_count - 1
-			elif _cursor_idx > 0:
-				_cursor_idx -= 1
-		KEY_S:
-			if _cursor_idx >= _equip_cell_count:
-				# In inventory grid — go down by GRID_COLUMNS
-				if _cursor_idx + GRID_COLUMNS < _cursor_cells.size():
-					_cursor_idx += GRID_COLUMNS
-			elif _cursor_idx < _equip_cell_count - 1:
-				_cursor_idx += 1
+			if _nav_zone == "inventory":
+				var row: int = _grid_idx / GRID_COLUMNS
+				if row > 0:
+					_grid_idx -= GRID_COLUMNS
+					changed = true
 			else:
-				# Last equip cell — jump to first inventory cell
-				if _equip_cell_count < _cursor_cells.size():
-					_cursor_idx = _equip_cell_count
+				if _equip_row > 0:
+					_equip_row -= 1
+					changed = true
+		KEY_S:
+			if _nav_zone == "inventory":
+				if _grid_idx + GRID_COLUMNS < _cursor_cells.size():
+					_grid_idx += GRID_COLUMNS
+					changed = true
+			else:
+				var max_row: int = (LEFT_EQUIP.size() if _equip_col == 0 else RIGHT_EQUIP.size()) - 1
+				if _equip_row < max_row:
+					_equip_row += 1
+					changed = true
+		KEY_A:
+			if _nav_zone == "inventory":
+				var col: int = _grid_idx % GRID_COLUMNS
+				if col > 0:
+					_grid_idx -= 1
+					changed = true
+			else:
+				if _equip_col == 1:
+					_equip_col = 0
+					changed = true
+				else:
+					# Switch back to inventory — rightmost column of closest row
+					_nav_zone = "inventory"
+					var target_row: int = clampi(_equip_row, 0, (_cursor_cells.size() - 1) / GRID_COLUMNS)
+					_grid_idx = target_row * GRID_COLUMNS + (GRID_COLUMNS - 1)
+					_grid_idx = clampi(_grid_idx, 0, max(0, _cursor_cells.size() - 1))
+					changed = true
+		KEY_D:
+			if _nav_zone == "inventory":
+				var col: int = _grid_idx % GRID_COLUMNS
+				if col < GRID_COLUMNS - 1 and _grid_idx + 1 < _cursor_cells.size():
+					_grid_idx += 1
+					changed = true
+				else:
+					# Switch to equipment zone — left column, closest row
+					var current_row: int = _grid_idx / GRID_COLUMNS
+					_nav_zone = "equipment"
+					_equip_col = 0
+					_equip_row = clampi(current_row, 0, LEFT_EQUIP.size() - 1)
+					changed = true
+			else:
+				if _equip_col == 0:
+					_equip_col = 1
+					changed = true
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-			var slot_name: String = _cursor_slot_names[_cursor_idx] if _cursor_idx < _cursor_slot_names.size() else ""
-			var item_id: String = _cursor_item_ids[_cursor_idx] if _cursor_idx < _cursor_item_ids.size() else ""
-			if not slot_name.is_empty() and not item_id.is_empty():
-				_open_equip_action_menu(slot_name, item_id)
-			elif not item_id.is_empty():
-				_open_action_menu(item_id)
+			if _nav_zone == "inventory":
+				var item_id: String = _cursor_item_ids[_grid_idx] if _grid_idx < _cursor_item_ids.size() else ""
+				if not item_id.is_empty():
+					_open_action_menu(item_id)
+			else:
+				var slot_array: Array = LEFT_EQUIP if _equip_col == 0 else RIGHT_EQUIP
+				var slot_name: String = slot_array[_equip_row] if _equip_row < slot_array.size() else ""
+				if not slot_name.is_empty() and _equipment:
+					var item_id: String = _equipment.get_slot(slot_name)
+					if not item_id.is_empty():
+						_open_equip_action_menu(slot_name, item_id)
 			return
 		KEY_ESCAPE:
 			_toggle()
@@ -864,7 +869,7 @@ func _handle_grid_input(event: InputEventKey) -> void:
 		_:
 			return
 
-	if _cursor_idx != old_idx:
+	if changed:
 		_update_cursor_highlight()
 
 func _handle_action_menu_input(event: InputEventKey) -> void:
@@ -884,17 +889,41 @@ func _handle_action_menu_input(event: InputEventKey) -> void:
 			_close_action_menu()
 
 func _update_cursor_highlight() -> void:
-	if not _cursor_rect:
+	if not _cursor_hand:
 		return
-	if _cursor_idx < 0 or _cursor_idx >= _cursor_cells.size():
-		_cursor_rect.visible = false
+
+	var cell: Control = null
+	var item_id: String = ""
+
+	if _nav_zone == "inventory":
+		if _grid_idx < 0 or _grid_idx >= _cursor_cells.size():
+			_cursor_hand.visible = false
+			_tooltip.visible = false
+			return
+		cell = _cursor_cells[_grid_idx]
+		item_id = _cursor_item_ids[_grid_idx] if _grid_idx < _cursor_item_ids.size() else ""
+	else:
+		var equip_vbox: VBoxContainer = _left_equip_vbox if _equip_col == 0 else _right_equip_vbox
+		if _equip_row < 0 or _equip_row >= equip_vbox.get_child_count():
+			_cursor_hand.visible = false
+			_tooltip.visible = false
+			return
+		cell = equip_vbox.get_child(_equip_row)
+		var slot_array: Array = LEFT_EQUIP if _equip_col == 0 else RIGHT_EQUIP
+		var slot_name: String = slot_array[_equip_row] if _equip_row < slot_array.size() else ""
+		item_id = _equipment.get_slot(slot_name) if _equipment and not slot_name.is_empty() else ""
+
+	if not cell:
+		_cursor_hand.visible = false
 		_tooltip.visible = false
 		return
-	var cell: Control = _cursor_cells[_cursor_idx]
-	_cursor_rect.visible = true
-	_cursor_rect.global_position = cell.global_position
-	_cursor_rect.size = cell.size
-	var item_id: String = _cursor_item_ids[_cursor_idx] if _cursor_idx < _cursor_item_ids.size() else ""
+
+	_cursor_hand.visible = true
+	_cursor_hand.global_position = Vector2(
+		cell.global_position.x - 24,
+		cell.global_position.y + cell.size.y / 2.0 - 12.0
+	)
+
 	if not item_id.is_empty():
 		_tooltip_label.text = _format_tooltip(item_id)
 		_tooltip.position = cell.global_position - global_position + Vector2(0, -28)
@@ -921,8 +950,8 @@ func _open_action_menu(item_id: String) -> void:
 	_add_action_button("Cancel", _close_action_menu)
 
 	# Position next to the selected cell
-	if _cursor_idx >= 0 and _cursor_idx < _cursor_cells.size():
-		var cell: Control = _cursor_cells[_cursor_idx]
+	if _grid_idx >= 0 and _grid_idx < _cursor_cells.size():
+		var cell: Control = _cursor_cells[_grid_idx]
 		var cell_pos: Vector2 = cell.global_position - global_position
 		_context_menu.position = Vector2(cell_pos.x + CELL_SIZE + 4, cell_pos.y)
 
@@ -943,8 +972,9 @@ func _open_equip_action_menu(slot_name: String, item_id: String) -> void:
 	_add_action_button("Unequip", _ctx_unequip)
 	_add_action_button("Cancel", _close_action_menu)
 
-	if _cursor_idx >= 0 and _cursor_idx < _cursor_cells.size():
-		var cell: Control = _cursor_cells[_cursor_idx]
+	var equip_vbox: VBoxContainer = _left_equip_vbox if _equip_col == 0 else _right_equip_vbox
+	if _equip_row >= 0 and _equip_row < equip_vbox.get_child_count():
+		var cell: Control = equip_vbox.get_child(_equip_row)
 		var cell_pos: Vector2 = cell.global_position - global_position
 		_context_menu.position = Vector2(cell_pos.x + EQUIP_CELL_SIZE + 4, cell_pos.y)
 
