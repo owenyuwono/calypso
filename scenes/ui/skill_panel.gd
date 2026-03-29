@@ -56,6 +56,9 @@ var _sidebar_entries: Array = []       # corresponding sidebar wrapper Controls
 var _skill_row_controls: Array = []    # SkillDragSource controls in right panel
 var _skill_row_ids: Array = []         # skill IDs matching _skill_row_controls
 var _cursor_hand: TextureRect
+var _hotbar_mode: bool = false
+var _hotbar_slot_idx: int = 0
+var _hotbar_skill_id: String = ""
 
 
 func set_player(p: Node) -> void:
@@ -67,6 +70,8 @@ func set_player(p: Node) -> void:
 
 func set_active(active: bool) -> void:
 	_active = active
+	if _hotbar_mode:
+		_exit_hotbar_mode()
 	if active:
 		_nav_zone = "sidebar"
 		_sidebar_idx = _find_sidebar_idx_for_prof(_selected_prof_id)
@@ -179,6 +184,7 @@ func refresh() -> void:
 
 func _build_sidebar() -> void:
 	for child in _sidebar.get_children():
+		_sidebar.remove_child(child)
 		child.queue_free()
 	_prof_id_list.clear()
 	_sidebar_entries.clear()
@@ -334,6 +340,7 @@ func _on_prof_selected(prof_id: String) -> void:
 
 func _build_right_content(prof_id: String) -> void:
 	for child in _right_content.get_children():
+		_right_content.remove_child(child)
 		child.queue_free()
 
 	if not _progression:
@@ -544,6 +551,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	var key: int = event.keycode
+
+	# Hotbar assignment mode — intercept all keys
+	if _hotbar_mode:
+		_handle_hotbar_input(key)
+		get_viewport().set_input_as_handled()
+		return
+
 	match key:
 		KEY_W, KEY_S, KEY_A, KEY_D, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			_handle_nav_input(key)
@@ -600,6 +614,53 @@ func _handle_skills_nav(key: int) -> void:
 		KEY_A:
 			_nav_zone = "sidebar"
 			_update_nav_highlight()
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			if _skill_idx >= 0 and _skill_idx < _skill_row_ids.size():
+				_enter_hotbar_mode(_skill_row_ids[_skill_idx])
+
+
+func _enter_hotbar_mode(skill_id: String) -> void:
+	_hotbar_mode = true
+	_hotbar_slot_idx = 0
+	_hotbar_skill_id = skill_id
+	var hotbar_node: Control = _player.skill_hotbar if _player and "skill_hotbar" in _player else null
+	if hotbar_node:
+		hotbar_node.z_index = 100
+		hotbar_node.visible = true
+		hotbar_node.preview_skill_in_slot(0, skill_id)
+
+
+func _exit_hotbar_mode() -> void:
+	_hotbar_mode = false
+	_hotbar_skill_id = ""
+	var hotbar_node: Control = _player.skill_hotbar if _player and "skill_hotbar" in _player else null
+	if hotbar_node:
+		hotbar_node.z_index = 0
+		hotbar_node.clear_preview()
+		hotbar_node.clear_slot_highlights()
+
+
+func _handle_hotbar_input(key: int) -> void:
+	var hotbar_node: Control = _player.skill_hotbar if _player and "skill_hotbar" in _player else null
+	match key:
+		KEY_A:
+			_hotbar_slot_idx = maxi(0, _hotbar_slot_idx - 1)
+			if hotbar_node:
+				hotbar_node.preview_skill_in_slot(_hotbar_slot_idx, _hotbar_skill_id)
+		KEY_D:
+			_hotbar_slot_idx = mini(4, _hotbar_slot_idx + 1)
+			if hotbar_node:
+				hotbar_node.preview_skill_in_slot(_hotbar_slot_idx, _hotbar_skill_id)
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			if hotbar_node:
+				hotbar_node.clear_preview()
+			if _skills_comp:
+				_skills_comp.set_hotbar_slot(_hotbar_slot_idx, _hotbar_skill_id)
+			if hotbar_node:
+				hotbar_node.refresh()
+			_exit_hotbar_mode()
+		KEY_ESCAPE:
+			_exit_hotbar_mode()
 
 
 func _update_nav_highlight() -> void:
@@ -648,7 +709,8 @@ func _deferred_position_cursor(cell: Control) -> void:
 			_cursor_hand.visible = false
 		return
 	_scroll_into_view(cell)
-	_position_cursor_hand(cell)
+	# Defer cursor positioning again so global_position reflects the new scroll offset
+	call_deferred("_position_cursor_hand", cell)
 
 
 func _position_cursor_hand(cell: Control) -> void:
@@ -688,14 +750,16 @@ func _scroll_into_view(ctrl: Control) -> void:
 	if not scroll:
 		return
 	# Calculate position relative to scroll container's content
+	var item_h: float = ctrl.size.y + 4.0
 	var ctrl_top: float = ctrl.global_position.y - scroll.global_position.y + float(scroll.scroll_vertical)
 	var ctrl_bottom: float = ctrl_top + ctrl.size.y
 	var view_top: float = float(scroll.scroll_vertical)
 	var view_bottom: float = view_top + scroll.size.y
-	if ctrl_top < view_top:
-		scroll.scroll_vertical = int(maxf(0.0, ctrl_top - 4.0))
-	elif ctrl_bottom > view_bottom:
-		scroll.scroll_vertical = int(ctrl_bottom - scroll.size.y + 4.0)
+	# Scroll when cursor reaches second-to-last visible item
+	if ctrl_top < view_top + item_h:
+		scroll.scroll_vertical = int(maxf(0.0, ctrl_top - item_h))
+	elif ctrl_bottom > view_bottom - item_h:
+		scroll.scroll_vertical = int(ctrl_bottom - scroll.size.y + item_h)
 
 
 func _find_parent_scroll(ctrl: Control) -> ScrollContainer:

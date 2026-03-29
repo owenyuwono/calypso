@@ -210,9 +210,64 @@ func refresh() -> void:
 				_slots[i].name_label.visible = true
 
 
+var _preview_slot: int = -1
+var _preview_backup: Dictionary = {}  # backup of original slot visuals
+
+
 func highlight_slot(index: int) -> void:
 	for i in range(SLOT_COUNT):
 		_slots[i].panel.add_theme_stylebox_override("panel", _highlight_style if i == index else _normal_style)
+
+
+func preview_skill_in_slot(index: int, skill_id: String) -> void:
+	# Restore previous preview slot
+	_clear_preview_visual()
+	if index < 0 or index >= SLOT_COUNT or skill_id.is_empty():
+		return
+	# Backup current slot visuals
+	_preview_slot = index
+	_preview_backup = {
+		"icon_tex": _slots[index].icon_rect.texture,
+		"icon_vis": _slots[index].icon_rect.visible,
+		"name_text": _slots[index].name_label.text,
+		"name_vis": _slots[index].name_label.visible,
+	}
+	# Show preview
+	var icon_path: String = "res://assets/textures/ui/skills/" + skill_id + ".png"
+	if ResourceLoader.exists(icon_path):
+		_slots[index].icon_rect.texture = load(icon_path)
+		_slots[index].icon_rect.visible = true
+		_slots[index].name_label.visible = false
+	else:
+		var category: String = SkillDatabase.get_skill_category(skill_id)
+		var base_path: String = "res://assets/textures/ui/skills/bases/" + category + "_base.png"
+		if ResourceLoader.exists(base_path):
+			_slots[index].icon_rect.texture = load(base_path)
+			_slots[index].icon_rect.visible = true
+		else:
+			_slots[index].icon_rect.visible = false
+		var skill: Dictionary = SkillDatabase.get_skill(skill_id)
+		_slots[index].name_label.text = skill.get("name", skill_id)
+		_slots[index].name_label.visible = true
+	highlight_slot(index)
+
+
+func clear_preview() -> void:
+	_clear_preview_visual()
+	_preview_slot = -1
+	_preview_backup.clear()
+
+
+func _clear_preview_visual() -> void:
+	if _preview_slot < 0 or _preview_slot >= SLOT_COUNT:
+		return
+	if not _preview_backup.is_empty():
+		_slots[_preview_slot].icon_rect.texture = _preview_backup.get("icon_tex")
+		_slots[_preview_slot].icon_rect.visible = _preview_backup.get("icon_vis", false)
+		_slots[_preview_slot].name_label.text = _preview_backup.get("name_text", "")
+		_slots[_preview_slot].name_label.visible = _preview_backup.get("name_vis", false)
+	_preview_slot = -1
+	_preview_backup.clear()
 
 
 func clear_slot_highlights() -> void:
