@@ -12,6 +12,7 @@ signal entity_damaged(target_id: String, attacker_id: String, damage: int, remai
 signal entity_healed(entity_id: String, amount: int, current_hp: int)
 signal entity_died(entity_id: String, killer_id: String)
 signal entity_respawned(entity_id: String)
+signal damage_defended(target_id: String, attacker_id: String, amount_negated: int, defense_type: String)
 
 # Progression
 signal proficiency_xp_gained(entity_id: String, skill_id: String, amount: int, new_xp: int)

@@ -111,6 +111,7 @@ func _ready() -> void:
 	_auto_attack.name = "AutoAttackComponent"
 	add_child(_auto_attack)
 	_auto_attack.setup(_visuals, _combat, nav_agent)
+	_auto_attack.attack_started.connect(_on_auto_attack_started)
 	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
 	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
 
@@ -417,7 +418,13 @@ func _process_attacking(delta: float) -> void:
 	if result.get("is_chasing", false):
 		state = "aggro"
 
+func _on_auto_attack_started(_target_id: String) -> void:
+	if OS.is_debug_build():
+		_visuals.set_state_tint(Color(1.0, 0.5, 0.0, 0.5))
+
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
+	if OS.is_debug_build():
+		_visuals.clear_overlay()
 	_visuals.flash_target(target_id)
 	if _audio:
 		_audio.play_oneshot("combat_hit_generic")
@@ -429,6 +436,8 @@ func _drop_aggro() -> void:
 	aggro_target = ""
 	state = "idle"
 	_auto_attack.cancel()
+	if OS.is_debug_build():
+		_visuals.clear_overlay()
 	_wander_timer = randf_range(1.0, 3.0)
 	_last_nav_target_pos = Vector3.INF
 	# Return to spawn area

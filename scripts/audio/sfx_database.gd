@@ -55,6 +55,21 @@ const DATA: Dictionary = {
 		"volume_db": -6.0,
 		"pitch_variance": 0.0,
 	},
+	"combat_block": {
+		"path": "res://assets/audio/sfx/combat/hit_mace.ogg",
+		"volume_db": -1.0,
+		"pitch_variance": 0.15,
+	},
+	"combat_parry": {
+		"path": "res://assets/audio/sfx/combat/skill_activate.ogg",
+		"volume_db": 2.0,
+		"pitch_variance": 0.05,
+	},
+	"combat_guard_break": {
+		"path": "res://assets/audio/sfx/combat/entity_hurt.ogg",
+		"volume_db": 1.0,
+		"pitch_variance": 0.1,
+	},
 
 	# --- Gathering ---
 	"gather_tree_chop": {
