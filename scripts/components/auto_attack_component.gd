@@ -4,6 +4,7 @@ extends BaseComponent
 ## pending hit, attack timer, and damage dealing.
 ## Visual feedback (damage numbers, flash, shouts) is left to the owner via signals.
 
+signal attack_started(target_id: String)
 signal attack_landed(target_id: String, damage: int, target_pos: Vector3)
 signal target_lost()
 
@@ -104,6 +105,7 @@ func process_attack(
 			_visuals.play_anim(ATTACK_ANIM, true)
 			_pending_hit = true
 			_hit_time = _visuals.get_hit_delay(ATTACK_ANIM)
+			attack_started.emit(target_id)
 
 	return {"is_moving": false, "is_chasing": false}
 

@@ -85,6 +85,7 @@ var _quest_comp: Node
 # Child subsystem nodes
 var _hover: Node
 var _player_input: Node
+var _debug_block_ring: MeshInstance3D = null
 
 # UI references (set by main scene setup)
 var shop_panel: Control
@@ -171,6 +172,7 @@ func _ready() -> void:
 	add_child(stamina_comp)
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 	_stamina = stamina_comp
+	_combat.set_stamina(_stamina)
 
 	var quest_comp: Node = QuestComponent.new()
 	quest_comp.name = "QuestComponent"
@@ -202,6 +204,7 @@ func _ready() -> void:
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
+	GameEvents.damage_defended.connect(_on_damage_defended)
 
 	_last_position = global_position
 
@@ -228,6 +231,43 @@ func _physics_process(delta: float) -> void:
 		_knockback_velocity = _knockback_velocity.lerp(Vector3.ZERO, 0.15)
 		move_and_slide()
 		return
+
+	# Block/parry input (F key)
+	var was_blocking: bool = _combat.is_blocking()
+	if not _is_ui_open():
+		if Input.is_action_pressed("defend"):
+			if not _combat.is_blocking() and not _combat.is_guard_broken():
+				_combat.start_blocking()
+				if not _attack_target.is_empty():
+					_cancel_attack()
+				if not _harvest_target.is_empty():
+					_cancel_harvest()
+				_is_attacking = false
+		elif _combat.is_blocking():
+			_combat.stop_blocking()
+			_visuals.clear_overlay()
+	elif _combat.is_blocking():
+		_combat.stop_blocking()
+		_visuals.clear_overlay()
+
+	# Update block tint every frame based on parry window state
+	if _combat.is_blocking():
+		if _combat.is_in_parry_window():
+			_visuals.set_state_tint(Color(0.0, 0.9, 1.0, 0.5))
+		else:
+			_visuals.set_state_tint(Color(0.3, 0.5, 1.0, 0.4))
+
+	if _combat.is_blocking() or _combat.is_guard_broken():
+		_combat.tick_block(delta)
+		# Check if guard just broke
+		if was_blocking and not _combat.is_blocking() and _combat.is_guard_broken():
+			_visuals.set_state_tint(Color(1.0, 0.2, 0.1, 0.5))
+			if _audio:
+				_audio.play_oneshot("combat_guard_break")
+			var tween := create_tween()
+			tween.tween_callback(_visuals.clear_overlay).set_delay(0.5)
+
+	_update_debug_block_ring()
 
 	var is_moving := false
 
@@ -261,7 +301,9 @@ func _physics_process(delta: float) -> void:
 		var effective_speed: float = SPEED * _stats.move_speed
 		if _stamina:
 			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
-		if Input.is_action_pressed("sprint"):
+		if _combat.is_blocking():
+			effective_speed *= _combat.get_block_move_speed_mult()
+		elif Input.is_action_pressed("sprint"):
 			effective_speed *= 1.5
 		velocity.x = move_dir.x * effective_speed
 		velocity.z = move_dir.z * effective_speed
@@ -433,6 +475,38 @@ func _show_debug_hitbox(half_width: float, depth: float, forward_offset: float, 
 	var tween := create_tween()
 	tween.tween_property(mat, "albedo_color:a", 0.0, duration)
 	tween.tween_callback(mesh_inst.queue_free)
+
+func _update_debug_block_ring() -> void:
+	if not OS.is_debug_build():
+		return
+	var should_show: bool = _combat.is_blocking() or _combat.is_guard_broken()
+	if should_show:
+		if not _debug_block_ring or not is_instance_valid(_debug_block_ring):
+			_debug_block_ring = MeshInstance3D.new()
+			var torus := TorusMesh.new()
+			torus.inner_radius = 1.2
+			torus.outer_radius = 1.5
+			torus.rings = 32
+			torus.ring_segments = 16
+			_debug_block_ring.mesh = torus
+			var mat := StandardMaterial3D.new()
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			_debug_block_ring.material_override = mat
+			get_tree().current_scene.add_child(_debug_block_ring)
+		_debug_block_ring.global_position = global_position + Vector3(0, 0.05, 0)
+		_debug_block_ring.rotation.x = -PI / 2.0  # Lay flat
+		var mat: StandardMaterial3D = _debug_block_ring.material_override
+		if _combat.is_guard_broken():
+			mat.albedo_color = Color(1.0, 0.2, 0.1, 0.35)
+		elif _combat.is_in_parry_window():
+			mat.albedo_color = Color(0.0, 1.0, 1.0, 0.4)
+		else:
+			mat.albedo_color = Color(0.2, 0.4, 1.0, 0.25)
+	elif _debug_block_ring and is_instance_valid(_debug_block_ring):
+		_debug_block_ring.queue_free()
+		_debug_block_ring = null
 
 func _resolve_melee_hit() -> void:
 	if not _perception or not _combat:
@@ -666,6 +740,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if not _is_ui_open():
+		if _combat.is_blocking():
+			get_viewport().set_input_as_handled()
+			return
 		# Left-click basic attack (requires equipped weapon)
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			if not _is_attacking and not (_skills_comp and _skills_comp.is_skill_pending()):
@@ -802,6 +879,12 @@ func _respawn() -> void:
 
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
+		if _combat.is_blocking():
+			# Block absorbs hit reaction — no stagger/knockback
+			_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
+			_last_damage_time = Time.get_ticks_msec()
+			_hp_regen_accumulator = 0.0
+			return
 		flash_hit()
 		_stagger_timer = 0.3
 		_hitstop_timer = 0.1
@@ -815,6 +898,28 @@ func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _r
 		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 		_last_damage_time = Time.get_ticks_msec()
 		_hp_regen_accumulator = 0.0
+
+func _on_damage_defended(target_id: String, _attacker_id: String, _amount_negated: int, defense_type: String) -> void:
+	if target_id != "player":
+		return
+	if defense_type == "parried":
+		_visuals.set_state_tint(Color(0.0, 1.0, 1.0, 0.7))
+		var tween := create_tween()
+		tween.tween_callback(_restore_block_tint).set_delay(0.3)
+		_spawn_defense_text("PARRY", Color(0.0, 1.0, 1.0))
+		if _audio:
+			_audio.play_oneshot("combat_parry")
+	elif defense_type == "blocked":
+		_spawn_defense_text("BLOCK", Color(0.7, 0.8, 1.0))
+		if _audio:
+			_audio.play_oneshot("combat_block")
+	elif defense_type == "guard_break":
+		_visuals.set_state_tint(Color(1.0, 0.2, 0.1, 0.5))
+		var tween := create_tween()
+		tween.tween_callback(_visuals.clear_overlay).set_delay(0.5)
+		_spawn_defense_text("GUARD BREAK", Color(1.0, 0.3, 0.1))
+		if _audio:
+			_audio.play_oneshot("combat_guard_break")
 
 func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
 	_visuals.flash_target(target_id)
@@ -846,6 +951,22 @@ func _on_equipment_changed(slot: String, item_id: String) -> void:
 
 func flash_hit() -> void:
 	_visuals.flash_hit()
+
+func _restore_block_tint() -> void:
+	if _combat.is_blocking():
+		if _combat.is_in_parry_window():
+			_visuals.set_state_tint(Color(0.0, 0.9, 1.0, 0.5))
+		else:
+			_visuals.set_state_tint(Color(0.3, 0.5, 1.0, 0.4))
+	else:
+		_visuals.clear_overlay()
+
+func _spawn_defense_text(text: String, color: Color) -> void:
+	var dmg_scene: PackedScene = preload("res://scenes/ui/damage_number.tscn")
+	var dmg: Node3D = dmg_scene.instantiate()
+	get_tree().current_scene.add_child(dmg)
+	dmg.global_position = global_position + Vector3(0, 2.2, 0)
+	dmg.setup_text(text, color)
 
 func _pick_idle_anim() -> String:
 	# If stamina is low, use tired idles
