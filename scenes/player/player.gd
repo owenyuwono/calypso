@@ -1,5 +1,5 @@
 extends CharacterBody3D
-## Player controller with point-and-click movement, click-to-attack/interact, and death/respawn.
+## Player controller with WASD movement, left-click melee attack, skill hotbar, and death/respawn.
 ## Uses Meshy AI swordsman model with separate animation files.
 
 const SPEED: float = 7.2
@@ -290,7 +290,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
 	elif wasd_active:
-		# WASD cancels any click-based navigation/combat/harvest
+		# WASD cancels any active navigation/combat/harvest
 		if _is_navigating:
 			_stop_navigation()
 		if not _attack_target.is_empty():
