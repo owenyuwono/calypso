@@ -5,6 +5,9 @@ extends RefCounted
 const DEFAULT_ANIM_PATHS: Dictionary = {
 	"Running": "res://assets/animation/player/running.fbx",
 	"Attack": "res://assets/animation/player/attack_slash.fbx",
+	"Attack_Slash_02": "res://assets/animation/player/attack_slash_02.fbx",
+	"Punch_01": "res://assets/animation/player/punch_01.fbx",
+	"Punch_02": "res://assets/animation/player/punch_02.fbx",
 	"Hit": "res://assets/animation/player/hit_impact.fbx",
 	"Idle_Breathing": "res://assets/animation/player/idle_breathing.fbx",
 	"Idle_Breathing_2": "res://assets/animation/player/idle_breathing_2.fbx",
@@ -19,7 +22,7 @@ const DEFAULT_ANIM_PATHS: Dictionary = {
 }
 
 const ANIM_WHITELIST: PackedStringArray = [
-	"Idle", "Running", "Attack", "Hit", "Death_A", "RESET",
+	"Idle", "Running", "Attack", "Attack_Slash_02", "Punch_01", "Punch_02", "Hit", "Death_A", "RESET",
 	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",
 	"Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look",
 	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",

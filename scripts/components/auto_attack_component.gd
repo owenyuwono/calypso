@@ -186,8 +186,10 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	if crit_result["is_crit"] and damage > 0:
 		damage = maxi(1, int(damage * crit_result["multiplier"]))
 
-	# Apply and emit
+	# Apply and emit — use actual damage dealt (0 if parried, reduced if blocked)
+	var actual_damage: int = 0
 	if damage > 0:
-		_combat.apply_flat_damage_to(target_id, damage)
-	_visuals.spawn_styled_damage_number(target_id, damage, hit_type, crit_result["is_crit"] and damage > 0, target_pos)
-	attack_landed.emit(target_id, damage, target_pos)
+		actual_damage = _combat.apply_flat_damage_to(target_id, damage)
+	if actual_damage > 0:
+		_visuals.spawn_styled_damage_number(target_id, actual_damage, hit_type, crit_result["is_crit"] and actual_damage > 0, target_pos)
+	attack_landed.emit(target_id, actual_damage, target_pos)

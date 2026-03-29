@@ -189,13 +189,12 @@ func get_equipped_phys_type() -> String:
 
 func apply_flat_damage_to(target_id: String, amount: int) -> int:
 	## Applies a pre-computed damage amount directly, bypassing DEF calculation.
-	## Used by SkillEffectResolver after it has resolved the full damage pipeline.
+	## Returns actual damage dealt (0 if parried, reduced if blocked).
 	var target_entity = WorldState.get_entity(target_id)
 	if not target_entity or not is_instance_valid(target_entity):
 		return 0
 	var clamped: int = maxi(1, amount)
-	_apply_damage_to(target_id, clamped)
-	return clamped
+	return _apply_damage_to(target_id, clamped)
 
 func heal(amount: int) -> int:
 	var healed: int = _stats.heal(amount)
@@ -205,15 +204,15 @@ func heal(amount: int) -> int:
 			GameEvents.entity_healed.emit(eid, healed, _stats.hp)
 	return healed
 
-func _apply_damage_to(target_id: String, damage: int) -> void:
+func _apply_damage_to(target_id: String, damage: int) -> int:
 	var target_entity = WorldState.get_entity(target_id)
 	if not target_entity or not is_instance_valid(target_entity):
-		return
+		return 0
 	var attacker_id := _get_entity_id()
 	var target_stats = target_entity.get_node_or_null("StatsComponent")
 	if not target_stats:
 		push_warning("CombatComponent: target '%s' has no StatsComponent — damage dropped" % target_id)
-		return
+		return 0
 
 	# Block/parry interception on target
 	var final_damage: int = damage
@@ -226,8 +225,7 @@ func _apply_damage_to(target_id: String, damage: int) -> void:
 
 	if defense_result == "parried":
 		GameEvents.damage_defended.emit(target_id, attacker_id, damage, "parried")
-		# No damage taken, no entity_damaged signal
-		return
+		return 0
 
 	if defense_result == "blocked" or defense_result == "guard_break":
 		var negated: int = damage - final_damage
@@ -238,6 +236,7 @@ func _apply_damage_to(target_id: String, damage: int) -> void:
 	GameEvents.entity_damaged.emit(target_id, attacker_id, final_damage, target_stats.hp)
 	if not target_stats.is_alive():
 		GameEvents.entity_died.emit(target_id, attacker_id)
+	return final_damage
 
 # --- Private helpers ---
 

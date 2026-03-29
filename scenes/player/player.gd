@@ -48,6 +48,12 @@ var _attack_anim_timer: float = 0.0
 var _attack_hit_pending: bool = false
 var _attack_hit_timer: float = 0.0
 
+# Combo system
+var _combo_step: int = 0
+var _combo_window_timer: float = 0.0
+var _combo_buffered: bool = false
+const COMBO_WINDOW: float = 0.4
+
 # Idle variation
 var _idle_timer: float = 0.0
 var _idle_next_variation: float = 0.0
@@ -292,6 +298,9 @@ func _physics_process(delta: float) -> void:
 		if not _harvest_target.is_empty():
 			_cancel_harvest()
 		_is_attacking = false
+		_combo_step = 0
+		_combo_window_timer = 0.0
+		_combo_buffered = false
 		# Camera-relative direction
 		var cam := get_viewport().get_camera_3d()
 		var cam_basis := cam.global_transform.basis
@@ -391,7 +400,22 @@ func _physics_process(delta: float) -> void:
 			var ap: AnimationPlayer = _visuals.get_anim_player() if _visuals else null
 			if ap:
 				ap.speed_scale = 1.0
-			_visuals.crossfade_anim("Idle", 0.15)
+			# Check for buffered combo input
+			if _combo_buffered and _combo_step == 0:
+				_start_attack(1)
+			elif _combo_step == 0:
+				_combo_window_timer = COMBO_WINDOW
+				_visuals.crossfade_anim("Idle", 0.15)
+			else:
+				_combo_step = 0
+				_combo_window_timer = 0.0
+				_visuals.crossfade_anim("Idle", 0.15)
+
+	# Tick combo window timer
+	if _combo_window_timer > 0.0 and not _is_attacking:
+		_combo_window_timer -= delta
+		if _combo_window_timer <= 0.0:
+			_combo_step = 0
 
 	# Skill animation lock — tick pending hit each frame
 	if _skills_comp and _skills_comp.is_skill_pending():
@@ -447,8 +471,31 @@ func _cancel_attack() -> void:
 	_player_input.cancel_pending()
 
 	_combat_distance_traveled = 0.0
+	_combo_step = 0
+	_combo_window_timer = 0.0
+	_combo_buffered = false
 	if _audio:
 		_audio.stop_combat_loop()
+
+func _get_attack_anim(combo_step: int) -> String:
+	if _equipment and not _equipment.get_weapon().is_empty():
+		return "Attack" if combo_step == 0 else "Attack_Slash_02"
+	else:
+		return "Punch_01" if combo_step == 0 else "Punch_02"
+
+func _start_attack(step: int) -> void:
+	var anim_name: String = _get_attack_anim(step)
+	_visuals.play_anim(anim_name, true, 2.0)
+	_is_attacking = true
+	_combo_step = step
+	_combo_buffered = false
+	_combo_window_timer = 0.0
+	var hit_delay: float = _visuals.get_hit_delay(anim_name) * 0.5
+	_attack_anim_timer = hit_delay * 2.0
+	_attack_hit_pending = true
+	_attack_hit_timer = hit_delay
+	if _audio:
+		_audio.start_combat_loop()
 
 func _get_facing_dir() -> Vector3:
 	if _visuals and _visuals.get_model():
@@ -512,6 +559,9 @@ func _resolve_melee_hit() -> void:
 	if not _perception or not _combat:
 		return
 	var attack_range: float = _stats.attack_range if _stats else 3.0
+	var is_unarmed: bool = not _equipment or _equipment.get_weapon().is_empty()
+	if is_unarmed:
+		attack_range *= 0.5
 	var facing: Vector3 = _get_facing_dir()
 	var half_width: float = attack_range * 0.5
 	var depth: float = attack_range
@@ -573,18 +623,20 @@ func _resolve_melee_hit() -> void:
 		if crit_result["is_crit"] and damage > 0:
 			damage = maxi(1, int(damage * crit_result["multiplier"]))
 
-		# Apply damage
+		# Apply damage — use actual damage dealt (respects block/parry)
+		var actual_damage: int = 0
 		if damage > 0:
-			_combat.apply_flat_damage_to(eid, damage)
-			if not hit_landed:
+			actual_damage = _combat.apply_flat_damage_to(eid, damage)
+			if actual_damage > 0 and not hit_landed:
 				_hitstop_timer = 0.1
 				hit_landed = true
 
 		# VFX, damage numbers and flash
-		var hit_vfx_pos: Vector3 = target_node.global_position + Vector3(0, 1.0, 0)
-		HitVFX.spawn_hit_effect(self, hit_vfx_pos, facing)
-		_visuals.spawn_styled_damage_number(eid, damage, hit_type, crit_result["is_crit"] and damage > 0, target_pos)
-		_visuals.flash_target(eid)
+		if actual_damage > 0:
+			var hit_vfx_pos: Vector3 = target_node.global_position + Vector3(0, 1.0, 0)
+			HitVFX.spawn_hit_effect(self, hit_vfx_pos, facing)
+			_visuals.spawn_styled_damage_number(eid, actual_damage, hit_type, crit_result["is_crit"] and actual_damage > 0, target_pos)
+			_visuals.flash_target(eid)
 
 		# XP grants (weapon, STR, DEX)
 		if _progression:
@@ -743,21 +795,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _combat.is_blocking():
 			get_viewport().set_input_as_handled()
 			return
-		# Left-click basic attack (requires equipped weapon)
+		# Left-click basic attack (weapon or unarmed)
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if not _is_attacking and not (_skills_comp and _skills_comp.is_skill_pending()):
-				if _equipment and not _equipment.get_weapon().is_empty():
-					var anim_name: String = "Attack"
-					_visuals.play_anim(anim_name, true, 2.0)
-					_is_attacking = true
-					var hit_delay: float = _visuals.get_hit_delay(anim_name) * 0.5
-					_attack_anim_timer = hit_delay * 2.0
-					_attack_hit_pending = true
-					_attack_hit_timer = hit_delay
-					if _audio:
-						_audio.start_combat_loop()
-					get_viewport().set_input_as_handled()
-					return
+			if _skills_comp and _skills_comp.is_skill_pending():
+				get_viewport().set_input_as_handled()
+				return
+			if _is_attacking:
+				_combo_buffered = true
+				get_viewport().set_input_as_handled()
+				return
+			if _combo_window_timer > 0.0:
+				_start_attack(1)
+				get_viewport().set_input_as_handled()
+				return
+			_start_attack(0)
+			get_viewport().set_input_as_handled()
+			return
 
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
