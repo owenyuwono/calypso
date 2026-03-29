@@ -89,12 +89,13 @@ func setup_custom_model(model: Node3D, mesh_instances: Array[MeshInstance3D]) ->
 
 # --- Animation ---
 
-func play_anim(anim_name: String, force: bool = false) -> void:
+func play_anim(anim_name: String, force: bool = false, speed: float = 1.0) -> void:
 	if not _anim_player:
 		return
 	if not force and _current_anim == anim_name and _anim_player.is_playing():
 		return
 	if _anim_player.has_animation(anim_name):
+		_anim_player.speed_scale = speed
 		_anim_player.play(anim_name)
 		_current_anim = anim_name
 
@@ -171,12 +172,23 @@ func _show_weapon() -> void:
 	var skeleton: Skeleton3D = ModelHelper.find_skeleton_3d(_model)
 	if not skeleton:
 		return
-	var bone_idx: int = skeleton.find_bone("RightHand")
-	if bone_idx == -1:
+	var bone_name: String = ""
+	for candidate in ["RightHand", "Right_Hand", "right_hand", "RightHandIndex1", "Hand_R", "hand_r"]:
+		if skeleton.find_bone(candidate) != -1:
+			bone_name = candidate
+			break
+	if bone_name.is_empty():
+		# Search for any bone containing "hand" and "right" (case-insensitive)
+		for i in skeleton.get_bone_count():
+			var bname: String = skeleton.get_bone_name(i).to_lower()
+			if "hand" in bname and "right" in bname:
+				bone_name = skeleton.get_bone_name(i)
+				break
+	if bone_name.is_empty():
 		return
 	_weapon_attachment = BoneAttachment3D.new()
 	_weapon_attachment.name = "WeaponAttachment"
-	_weapon_attachment.bone_name = "RightHand"
+	_weapon_attachment.bone_name = bone_name
 	skeleton.add_child(_weapon_attachment)
 	_weapon_mesh = ModelHelper.create_procedural_sword()
 	_weapon_attachment.add_child(_weapon_mesh)

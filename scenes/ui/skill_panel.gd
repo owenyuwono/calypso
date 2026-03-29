@@ -46,12 +46,34 @@ var _right_content: VBoxContainer
 var _detail_panel: Control = null
 var _content_parent: Control = null
 
+# --- WASD navigation state ---
+var _active: bool = false
+var _nav_zone: String = "sidebar"
+var _sidebar_idx: int = 0
+var _skill_idx: int = 0
+var _prof_id_list: Array = []          # flat list of prof IDs in sidebar order
+var _sidebar_entries: Array = []       # corresponding sidebar wrapper Controls
+var _skill_row_controls: Array = []    # SkillDragSource controls in right panel
+var _skill_row_ids: Array = []         # skill IDs matching _skill_row_controls
+var _cursor_hand: TextureRect
+
 
 func set_player(p: Node) -> void:
 	_player = p
 	_combat = p.get_node_or_null("CombatComponent")
 	_progression = p.get_node_or_null("ProgressionComponent")
 	_skills_comp = p.get_node_or_null("SkillsComponent")
+
+
+func set_active(active: bool) -> void:
+	_active = active
+	if active:
+		_nav_zone = "sidebar"
+		_sidebar_idx = _find_sidebar_idx_for_prof(_selected_prof_id)
+		_skill_idx = 0
+		call_deferred("_update_nav_highlight")
+	else:
+		_clear_nav_highlight()
 
 
 func _ready() -> void:
@@ -116,6 +138,18 @@ func build_content(parent: Control) -> void:
 	_right_content.add_theme_constant_override("separation", 6)
 	right_margin.add_child(_right_content)
 
+	# Cursor hand icon
+	_cursor_hand = TextureRect.new()
+	var cursor_tex: Texture2D = load("res://assets/textures/ui/dialogue/cursor_hand.png") as Texture2D
+	if cursor_tex:
+		_cursor_hand.texture = cursor_tex
+	_cursor_hand.custom_minimum_size = Vector2(24, 24)
+	_cursor_hand.size = Vector2(24, 24)
+	_cursor_hand.visible = false
+	_cursor_hand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_hand.z_index = 10
+	add_child(_cursor_hand)
+
 	# Create the detail panel overlay (not parented to parent — returned via get_overlay_nodes)
 	var DetailPanel: GDScript = preload("res://scenes/ui/skill_detail_panel.gd")
 	_detail_panel = DetailPanel.new()
@@ -125,6 +159,8 @@ func build_content(parent: Control) -> void:
 
 func get_overlay_nodes() -> Array[Control]:
 	var result: Array[Control] = []
+	if _cursor_hand:
+		result.append(_cursor_hand)
 	if _detail_panel:
 		result.append(_detail_panel)
 	return result
@@ -144,6 +180,8 @@ func refresh() -> void:
 func _build_sidebar() -> void:
 	for child in _sidebar.get_children():
 		child.queue_free()
+	_prof_id_list.clear()
+	_sidebar_entries.clear()
 
 	for category in ProficiencyDatabase.CATEGORIES:
 		var prof_ids: Array = _get_prof_ids_in_category(category)
@@ -156,7 +194,10 @@ func _build_sidebar() -> void:
 		_sidebar.add_child(cat_label)
 
 		for prof_id in prof_ids:
-			_sidebar.add_child(_build_sidebar_entry(prof_id))
+			var entry: Control = _build_sidebar_entry(prof_id)
+			_sidebar.add_child(entry)
+			_prof_id_list.append(prof_id)
+			_sidebar_entries.append(entry)
 
 		_sidebar.add_child(HSeparator.new())
 
@@ -349,12 +390,16 @@ func _build_right_content(prof_id: String) -> void:
 	if category == "weapon" or category == "magic":
 		_build_weapon_skills_section(prof_id)
 	else:
+		_skill_row_controls.clear()
+		_skill_row_ids.clear()
 		var desc_label: Label = UIHelper.create_label(prof_def.get("description", ""), 12, Color(0.6, 0.6, 0.6))
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_right_content.add_child(desc_label)
 
 
 func _build_weapon_skills_section(weapon_type: String) -> void:
+	_skill_row_controls.clear()
+	_skill_row_ids.clear()
 	var skill_ids: Array = SkillDatabase.get_skills_for_proficiency(weapon_type)
 	if skill_ids.is_empty():
 		var empty_label: Label = UIHelper.create_label("No skills for this weapon type.", 13, UIHelper.COLOR_DISABLED)
@@ -394,6 +439,8 @@ func _build_skill_row(skill_id: String) -> void:
 	drag_source.mouse_entered.connect(_on_skill_row_hover.bind(drag_source, skill_id))
 	drag_source.mouse_exited.connect(_on_skill_row_unhover.bind(drag_source, skill_id))
 	_right_content.add_child(drag_source)
+	_skill_row_controls.append(drag_source)
+	_skill_row_ids.append(skill_id)
 
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -486,6 +533,178 @@ func _effectiveness_row_color(eff_percent: int) -> Color:
 	elif eff_percent >= 30:
 		return Color(1.0, 0.6, 0.2)
 	return Color(1.0, 0.2, 0.2)
+
+
+# --- WASD keyboard navigation ---
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _active:
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+
+	var key: int = event.keycode
+	match key:
+		KEY_W, KEY_S, KEY_A, KEY_D, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			_handle_nav_input(key)
+			get_viewport().set_input_as_handled()
+
+
+func _handle_nav_input(key: int) -> void:
+	if _nav_zone == "sidebar":
+		_handle_sidebar_nav(key)
+	else:
+		_handle_skills_nav(key)
+
+
+func _handle_sidebar_nav(key: int) -> void:
+	if _prof_id_list.is_empty():
+		return
+
+	match key:
+		KEY_W:
+			if _sidebar_idx > 0:
+				_sidebar_idx -= 1
+				_on_prof_selected(_prof_id_list[_sidebar_idx])
+				call_deferred("_update_nav_highlight")
+		KEY_S:
+			if _sidebar_idx < _prof_id_list.size() - 1:
+				_sidebar_idx += 1
+				_on_prof_selected(_prof_id_list[_sidebar_idx])
+				call_deferred("_update_nav_highlight")
+		KEY_D:
+			if not _skill_row_controls.is_empty():
+				_nav_zone = "skills"
+				_skill_idx = 0
+				_update_nav_highlight()
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			_on_prof_selected(_prof_id_list[_sidebar_idx])
+			call_deferred("_update_nav_highlight")
+
+
+func _handle_skills_nav(key: int) -> void:
+	if _skill_row_controls.is_empty():
+		_nav_zone = "sidebar"
+		_update_nav_highlight()
+		return
+
+	match key:
+		KEY_W:
+			if _skill_idx > 0:
+				_skill_idx -= 1
+				_update_nav_highlight()
+		KEY_S:
+			if _skill_idx < _skill_row_controls.size() - 1:
+				_skill_idx += 1
+				_update_nav_highlight()
+		KEY_A:
+			_nav_zone = "sidebar"
+			_update_nav_highlight()
+
+
+func _update_nav_highlight() -> void:
+	# Clear all skill row highlights
+	for ctrl in _skill_row_controls:
+		if is_instance_valid(ctrl):
+			var style: StyleBoxFlat = ctrl.get_meta("bg_style") as StyleBoxFlat
+			if style:
+				style.bg_color = Color(0.12, 0.11, 0.09, 0.0)
+				style.border_color = Color(0.0, 0.0, 0.0, 0.0)
+	if _detail_panel:
+		_detail_panel.hide_skill()
+
+	if _nav_zone == "sidebar":
+		_sidebar_idx = clampi(_sidebar_idx, 0, max(0, _prof_id_list.size() - 1))
+		if _sidebar_idx >= 0 and _sidebar_idx < _sidebar_entries.size():
+			var entry: Control = _sidebar_entries[_sidebar_idx]
+			if is_instance_valid(entry):
+				# Defer cursor positioning to let layout settle after rebuild
+				call_deferred("_deferred_position_cursor", entry)
+		else:
+			if _cursor_hand:
+				_cursor_hand.visible = false
+	else:
+		_skill_idx = clampi(_skill_idx, 0, max(0, _skill_row_controls.size() - 1))
+		if _skill_idx >= 0 and _skill_idx < _skill_row_controls.size():
+			var ctrl: Control = _skill_row_controls[_skill_idx]
+			if is_instance_valid(ctrl):
+				var style: StyleBoxFlat = ctrl.get_meta("bg_style") as StyleBoxFlat
+				if style:
+					style.bg_color = Color(0.18, 0.16, 0.13)
+					style.border_color = Color(0.7, 0.6, 0.3, 0.8)
+				if _detail_panel and _skill_idx < _skill_row_ids.size():
+					var row_global: Vector2 = ctrl.global_position
+					var anchor_pos: Vector2 = Vector2(_content_parent.global_position.x + _content_parent.size.x + 8, row_global.y)
+					_detail_panel.show_skill(_skill_row_ids[_skill_idx], anchor_pos)
+				call_deferred("_deferred_position_cursor", ctrl)
+		else:
+			if _cursor_hand:
+				_cursor_hand.visible = false
+
+
+func _deferred_position_cursor(cell: Control) -> void:
+	if not is_instance_valid(cell):
+		if _cursor_hand:
+			_cursor_hand.visible = false
+		return
+	_scroll_into_view(cell)
+	_position_cursor_hand(cell)
+
+
+func _position_cursor_hand(cell: Control) -> void:
+	if not _cursor_hand:
+		return
+	_cursor_hand.visible = true
+	_cursor_hand.global_position = Vector2(
+		cell.global_position.x - 24,
+		cell.global_position.y + cell.size.y / 2.0 - 12.0
+	)
+
+
+func _clear_nav_highlight() -> void:
+	if _cursor_hand:
+		_cursor_hand.visible = false
+	for ctrl in _skill_row_controls:
+		if is_instance_valid(ctrl):
+			var style: StyleBoxFlat = ctrl.get_meta("bg_style") as StyleBoxFlat
+			if style:
+				style.bg_color = Color(0.12, 0.11, 0.09, 0.0)
+				style.border_color = Color(0.0, 0.0, 0.0, 0.0)
+	if _detail_panel:
+		_detail_panel.hide_skill()
+
+
+func _find_sidebar_idx_for_prof(prof_id: String) -> int:
+	for i in _prof_id_list.size():
+		if _prof_id_list[i] == prof_id:
+			return i
+	return 0
+
+
+func _scroll_into_view(ctrl: Control) -> void:
+	if not is_instance_valid(ctrl):
+		return
+	var scroll: ScrollContainer = _find_parent_scroll(ctrl)
+	if not scroll:
+		return
+	# Calculate position relative to scroll container's content
+	var ctrl_top: float = ctrl.global_position.y - scroll.global_position.y + float(scroll.scroll_vertical)
+	var ctrl_bottom: float = ctrl_top + ctrl.size.y
+	var view_top: float = float(scroll.scroll_vertical)
+	var view_bottom: float = view_top + scroll.size.y
+	if ctrl_top < view_top:
+		scroll.scroll_vertical = int(maxf(0.0, ctrl_top - 4.0))
+	elif ctrl_bottom > view_bottom:
+		scroll.scroll_vertical = int(ctrl_bottom - scroll.size.y + 4.0)
+
+
+func _find_parent_scroll(ctrl: Control) -> ScrollContainer:
+	var node: Node = ctrl.get_parent()
+	while node:
+		if node is ScrollContainer:
+			return node as ScrollContainer
+		node = node.get_parent()
+	return null
 
 
 func _exit_tree() -> void:

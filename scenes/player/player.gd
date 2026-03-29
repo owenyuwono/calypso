@@ -123,7 +123,7 @@ func _ready() -> void:
 	_inventory = InventoryComponent.new()
 	_inventory.name = "InventoryComponent"
 	add_child(_inventory)
-	_inventory.setup({}, LevelData.BASE_PLAYER_STATS.get("gold", 100))
+	_inventory.setup({"basic_sword": 1}, LevelData.BASE_PLAYER_STATS.get("gold", 100))
 
 	_equipment = EquipmentComponent.new()
 	_equipment.name = "EquipmentComponent"
@@ -346,6 +346,9 @@ func _physics_process(delta: float) -> void:
 				_resolve_melee_hit()
 		if _attack_anim_timer <= 0.0:
 			_is_attacking = false
+			var ap: AnimationPlayer = _visuals.get_anim_player() if _visuals else null
+			if ap:
+				ap.speed_scale = 1.0
 			_visuals.crossfade_anim("Idle", 0.15)
 
 	# Skill animation lock — tick pending hit each frame
@@ -663,6 +666,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if not _is_ui_open():
+		# Left-click basic attack (requires equipped weapon)
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if not _is_attacking and not (_skills_comp and _skills_comp.is_skill_pending()):
+				if _equipment and not _equipment.get_weapon().is_empty():
+					var anim_name: String = "Attack"
+					_visuals.play_anim(anim_name, true, 2.0)
+					_is_attacking = true
+					var hit_delay: float = _visuals.get_hit_delay(anim_name) * 0.5
+					_attack_anim_timer = hit_delay * 2.0
+					_attack_hit_pending = true
+					_attack_hit_timer = hit_delay
+					if _audio:
+						_audio.start_combat_loop()
+					get_viewport().set_input_as_handled()
+					return
+
 		for i in range(5):
 			if event.is_action_pressed("hotbar_%d" % (i + 1)):
 				if _is_attacking or (_skills_comp and _skills_comp.is_skill_pending()):

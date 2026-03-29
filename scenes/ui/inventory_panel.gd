@@ -8,8 +8,8 @@ const ModelHelper = preload("res://scripts/utils/model_helper.gd")
 const LootHelper = preload("res://scripts/utils/loot_helper.gd")
 
 const GRID_COLUMNS := 5
-const MIN_SLOTS := 35
-const CELL_SIZE := 64
+const MIN_SLOTS := 20
+const CELL_SIZE := 96
 const EQUIP_CELL_SIZE := 68
 
 const LEFT_EQUIP: Array = ["head", "torso", "gloves", "feet"]
@@ -61,12 +61,10 @@ var _gold_label: Label
 var _gold_icon: TextureRect
 var _tooltip: PanelContainer
 var _tooltip_label: Label
-var _is_open: bool = false
 var _preview_model_root: Node3D
 var _preview_viewport: SubViewport
 
-var _desc_panel: PanelContainer
-var _desc_vbox: VBoxContainer
+var _detail_container: VBoxContainer
 var _context_menu: PanelContainer
 var _context_vbox: VBoxContainer
 var _context_item_id: String = ""
@@ -84,6 +82,7 @@ var _equip_col: int = 0              # 0=left, 1=right
 var _equip_row: int = 0              # 0..3
 var _cursor_cells: Array = []        # inventory grid cells only
 var _cursor_item_ids: Array = []     # item_id per inventory grid cell ("" for empty)
+var _active: bool = false
 var _action_menu_open: bool = false
 var _action_idx: int = 0
 var _action_buttons: Array = []
@@ -132,10 +131,21 @@ func _build_ui() -> void:
 
 	_grid = GridContainer.new()
 	_grid.columns = GRID_COLUMNS
-	_grid.add_theme_constant_override("h_separation", 4)
-	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.add_theme_constant_override("h_separation", 8)
+	_grid.add_theme_constant_override("v_separation", 8)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items_vbox.add_child(_grid)
+
+	# --- Item detail section below grid ---
+	var detail_sep := HSeparator.new()
+	detail_sep.add_theme_color_override("separator", Color(0.4, 0.35, 0.25, 0.5))
+	items_vbox.add_child(detail_sep)
+
+	_detail_container = VBoxContainer.new()
+	_detail_container.add_theme_constant_override("separation", 4)
+	_detail_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_detail_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	items_vbox.add_child(_detail_container)
 
 	# Cursor hand — hand icon that floats left of the active cell
 	_cursor_hand = TextureRect.new()
@@ -260,7 +270,6 @@ func _build_ui() -> void:
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tooltip)
 
-	_build_desc_panel()
 	_build_context_menu()
 
 func _update_mesh_preview() -> void:
@@ -274,7 +283,6 @@ func _update_mesh_preview() -> void:
 	var mesh_path: String = visuals.get("_mesh_path")
 	if mesh_path.is_empty():
 		return
-	# Load mesh only (no animations) for the preview — faster and avoids loading all anim FBX files
 	var result: Dictionary = ModelHelper.instantiate_model(mesh_path, 1.0)
 	var model: Node3D = result.get("model")
 	if not model:
@@ -284,27 +292,26 @@ func _update_mesh_preview() -> void:
 	var anim_player: AnimationPlayer = result.get("anim_player")
 	if anim_player and anim_player.has_animation("Idle"):
 		anim_player.play("Idle")
-
-func _build_desc_panel() -> void:
-	_desc_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
-	style.border_color = Color(0.55, 0.45, 0.25)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	_desc_panel.add_theme_stylebox_override("panel", style)
-	_desc_panel.custom_minimum_size = Vector2(280, 0)
-	_desc_panel.visible = false
-	_desc_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(_desc_panel)
-
-	_desc_vbox = VBoxContainer.new()
-	_desc_vbox.add_theme_constant_override("separation", 4)
-	_desc_panel.add_child(_desc_vbox)
+	# Show equipped weapon on preview model
+	if _equipment and not _equipment.get_weapon().is_empty():
+		var skeleton: Skeleton3D = ModelHelper.find_skeleton_3d(model)
+		if skeleton:
+			var bone_name: String = ""
+			for candidate in ["RightHand", "Right_Hand", "right_hand", "Hand_R"]:
+				if skeleton.find_bone(candidate) != -1:
+					bone_name = candidate
+					break
+			if bone_name.is_empty():
+				for i in skeleton.get_bone_count():
+					var bname: String = skeleton.get_bone_name(i).to_lower()
+					if "hand" in bname and "right" in bname:
+						bone_name = skeleton.get_bone_name(i)
+						break
+			if not bone_name.is_empty():
+				var attachment := BoneAttachment3D.new()
+				attachment.bone_name = bone_name
+				skeleton.add_child(attachment)
+				attachment.add_child(ModelHelper.create_procedural_sword())
 
 func _build_context_menu() -> void:
 	_context_menu = PanelContainer.new()
@@ -336,15 +343,34 @@ func build_content(container: Control) -> void:
 	if _player:
 		_refresh()
 
+func set_active(active: bool) -> void:
+	_active = active
+	if not active:
+		if _cursor_hand:
+			_cursor_hand.visible = false
+		if _tooltip:
+			_tooltip.visible = false
+		_hide_context_menu()
+	else:
+		_nav_zone = "inventory"
+		_grid_idx = 0
+		_equip_col = 0
+		_equip_row = 0
+		call_deferred("_update_cursor_highlight")
+
 func refresh() -> void:
+	_nav_zone = "inventory"
+	_grid_idx = 0
+	_equip_col = 0
+	_equip_row = 0
 	_refresh()
 
 func get_overlay_nodes() -> Array:
 	var overlays: Array = []
+	if _cursor_hand:
+		overlays.append(_cursor_hand)
 	if _tooltip:
 		overlays.append(_tooltip)
-	if _desc_panel:
-		overlays.append(_desc_panel)
 	if _context_menu:
 		overlays.append(_context_menu)
 	return overlays
@@ -364,9 +390,9 @@ func toggle() -> void:
 	_toggle()
 
 func _toggle() -> void:
-	_is_open = not _is_open
-	visible = _is_open
-	if _is_open:
+	var opening: bool = not visible
+	visible = opening
+	if opening:
 		AudioManager.play_ui_sfx("ui_panel_open")
 		_nav_zone = "inventory"
 		_grid_idx = 0
@@ -376,17 +402,18 @@ func _toggle() -> void:
 	else:
 		AudioManager.play_ui_sfx("ui_panel_close")
 		_tooltip.visible = false
-		_hide_desc()
+		_clear_detail()
 		_hide_context_menu()
 		if _cursor_hand:
 			_cursor_hand.visible = false
 
 func is_open() -> bool:
-	return _is_open
+	return _panel and _panel.is_visible_in_tree()
 
 func _refresh() -> void:
-	_hide_desc()
+	_clear_detail()
 	_hide_context_menu()
+	_update_mesh_preview()
 
 	if not _player:
 		return
@@ -400,6 +427,7 @@ func _refresh() -> void:
 
 	# Rebuild left equipment column (head, torso, gloves, feet)
 	for child in _left_equip_vbox.get_children():
+		_left_equip_vbox.remove_child(child)
 		child.queue_free()
 	for slot_name in LEFT_EQUIP:
 		var item_id: String = _equipment.get_slot(slot_name)
@@ -410,6 +438,7 @@ func _refresh() -> void:
 
 	# Rebuild right equipment column (back, legs, main_hand, off_hand)
 	for child in _right_equip_vbox.get_children():
+		_right_equip_vbox.remove_child(child)
 		child.queue_free()
 	for slot_name in RIGHT_EQUIP:
 		var item_id: String = _equipment.get_slot(slot_name)
@@ -420,6 +449,7 @@ func _refresh() -> void:
 
 	# Rebuild inventory grid
 	for child in _grid.get_children():
+		_grid.remove_child(child)
 		child.queue_free()
 
 	var inv: Dictionary = _inventory.get_items()
@@ -550,7 +580,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 func _build_cell(item_id: String, count: int) -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cell.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
 	var item_data: Dictionary = ItemDatabase.get_item(item_id)
 	var type_str: String = item_data.get("type", "")
@@ -570,17 +600,34 @@ func _build_cell(item_id: String, count: int) -> Control:
 	margin.add_theme_constant_override("margin_bottom", 4)
 	cell.add_child(margin)
 
-	var item_name: String = item_data.get("name", "?")
-	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
-	var letter := Label.new()
-	letter.text = abbrev
-	letter.add_theme_font_size_override("font_size", 18)
-	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
-	letter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	letter.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(letter)
+	# Try icon texture, fall back to 2-letter abbreviation
+	var icon_path: String = item_data.get("icon", "")
+	var icon_tex: Texture2D = null
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+		icon_tex = load(icon_path) as Texture2D
+
+	if icon_tex:
+		var icon := TextureRect.new()
+		icon.texture = icon_tex
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		icon.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		icon.texture_filter = TEXTURE_FILTER_NEAREST
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_child(icon)
+	else:
+		var item_name: String = item_data.get("name", "?")
+		var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
+		var letter := Label.new()
+		letter.text = abbrev
+		letter.add_theme_font_size_override("font_size", 18)
+		letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+		letter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		letter.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		margin.add_child(letter)
 
 	if count > 1:
 		var badge := PanelContainer.new()
@@ -612,7 +659,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 func _build_empty_cell() -> Control:
 	var cell := PanelContainer.new()
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cell.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.09, 0.07)
 	style.border_color = Color(0.22, 0.2, 0.16)
@@ -637,100 +684,110 @@ func _format_tooltip(item_id: String) -> String:
 	return name + extra
 
 
-func _show_desc(item_id: String) -> void:
-	_hide_context_menu()
-	for child in _desc_vbox.get_children():
+func _update_detail(item_id: String) -> void:
+	if not _detail_container:
+		return
+	for child in _detail_container.get_children():
+		_detail_container.remove_child(child)
 		child.queue_free()
+
+	if item_id.is_empty():
+		return
 
 	var item: Dictionary = ItemDatabase.get_item(item_id)
 	if item.is_empty():
-		_desc_panel.visible = false
 		return
 
 	var type_str: String = item.get("type", "")
 	var type_color: Color = TYPE_COLORS.get(type_str, Color(0.5, 0.5, 0.5))
 
-	# Item name (large, colored)
+	# Header row: name + type
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	_detail_container.add_child(header)
+
 	var name_label := Label.new()
 	name_label.text = item.get("name", item_id)
-	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_font_size_override("font_size", 15)
 	name_label.add_theme_color_override("font_color", type_color.lightened(0.4))
-	_desc_vbox.add_child(name_label)
+	header.add_child(name_label)
 
-	# Type label
 	var type_label := Label.new()
 	type_label.text = type_str.capitalize()
 	type_label.add_theme_font_size_override("font_size", 11)
 	type_label.add_theme_color_override("font_color", Color(0.6, 0.55, 0.45))
-	_desc_vbox.add_child(type_label)
+	type_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(type_label)
 
-	_desc_vbox.add_child(HSeparator.new())
+	# Description
+	var desc_text: String = item.get("description", "")
+	if not desc_text.is_empty():
+		var desc_label := Label.new()
+		desc_label.text = desc_text
+		desc_label.add_theme_font_size_override("font_size", 11)
+		desc_label.add_theme_color_override("font_color", Color(0.65, 0.6, 0.5))
+		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_detail_container.add_child(desc_label)
 
-	# Stats
+	# Stats row
+	var stats_row := HBoxContainer.new()
+	stats_row.add_theme_constant_override("separation", 16)
+	_detail_container.add_child(stats_row)
+
 	if item.has("atk_bonus"):
-		_add_desc_stat("ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
+		_add_detail_stat(stats_row, "ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
 	if item.has("def_bonus"):
-		_add_desc_stat("DEF", "+%d" % item["def_bonus"], Color(0.3, 0.6, 0.9))
+		_add_detail_stat(stats_row, "DEF", "+%d" % item["def_bonus"], Color(0.3, 0.6, 0.9))
+	if item.has("matk_bonus"):
+		_add_detail_stat(stats_row, "MATK", "+%d" % item["matk_bonus"], Color(0.6, 0.4, 0.9))
+	if item.has("mdef_bonus"):
+		_add_detail_stat(stats_row, "MDEF", "+%d" % item["mdef_bonus"], Color(0.4, 0.5, 0.9))
 	if item.has("heal"):
-		_add_desc_stat("Heal", "%d HP" % item["heal"], Color(0.3, 0.8, 0.3))
-	if item.has("value"):
-		_add_desc_stat("Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
-
-	# Weapon type
+		_add_detail_stat(stats_row, "Heal", "%d HP" % item["heal"], Color(0.3, 0.8, 0.3))
 	if item.has("weapon_type"):
-		_add_desc_stat("Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
-
-	# Proficiency requirement
+		_add_detail_stat(stats_row, "Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
+	if item.has("attack_speed"):
+		_add_detail_stat(stats_row, "Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
 	if item.has("required_skill") and item.has("required_level"):
 		var req_text: String = "%s Lv. %d" % [item["required_skill"].capitalize(), item["required_level"]]
-		_add_desc_stat("Requires", req_text, Color(0.7, 0.6, 0.4))
+		_add_detail_stat(stats_row, "Requires", req_text, Color(0.7, 0.6, 0.4))
+	if item.has("value"):
+		_add_detail_stat(stats_row, "Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
 
-	# Attack speed (daggers)
-	if item.has("attack_speed"):
-		_add_desc_stat("Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
-
-	# Close button
-	var close_btn := Button.new()
-	close_btn.text = "Close"
-	close_btn.add_theme_font_size_override("font_size", 11)
-	close_btn.pressed.connect(_hide_desc)
-	_desc_vbox.add_child(close_btn)
-
-	# Position near center of panel
-	_desc_panel.position = Vector2(60, 180)
-	_desc_panel.visible = true
-
-func _add_desc_stat(label_text: String, value_text: String, color: Color) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	_desc_vbox.add_child(row)
+func _add_detail_stat(parent: HBoxContainer, label_text: String, value_text: String, color: Color) -> void:
+	var pair := HBoxContainer.new()
+	pair.add_theme_constant_override("separation", 4)
+	parent.add_child(pair)
 
 	var icon_file: String = STAT_ICON_MAP.get(label_text, "")
 	if not icon_file.is_empty():
 		var icon := TextureRect.new()
 		icon.texture = load(STAT_ICON_DIR + icon_file) as Texture2D
-		icon.custom_minimum_size = Vector2(16, 16)
+		icon.custom_minimum_size = Vector2(14, 14)
 		icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = TEXTURE_FILTER_NEAREST
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
+		pair.add_child(icon)
 
 	var lbl := Label.new()
 	lbl.text = label_text + ":"
-	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_font_size_override("font_size", 11)
 	lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
-	lbl.custom_minimum_size.x = 60
-	row.add_child(lbl)
+	pair.add_child(lbl)
 	var val := Label.new()
 	val.text = value_text
-	val.add_theme_font_size_override("font_size", 12)
+	val.add_theme_font_size_override("font_size", 11)
 	val.add_theme_color_override("font_color", color)
-	row.add_child(val)
+	pair.add_child(val)
 
-func _hide_desc() -> void:
-	_desc_panel.visible = false
+func _clear_detail() -> void:
+	if not _detail_container:
+		return
+	for child in _detail_container.get_children():
+		_detail_container.remove_child(child)
+		child.queue_free()
 
 
 func _hide_context_menu() -> void:
@@ -778,7 +835,7 @@ func _ctx_discard() -> void:
 	_refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _is_open:
+	if not _active:
 		return
 
 	# --- Keyboard/Gamepad Navigation ---
@@ -863,9 +920,6 @@ func _handle_grid_input(event: InputEventKey) -> void:
 					if not item_id.is_empty():
 						_open_equip_action_menu(slot_name, item_id)
 			return
-		KEY_ESCAPE:
-			_toggle()
-			return
 		_:
 			return
 
@@ -928,11 +982,12 @@ func _update_cursor_highlight() -> void:
 		_tooltip_label.text = _format_tooltip(item_id)
 		_tooltip.position = cell.global_position - global_position + Vector2(0, -28)
 		_tooltip.visible = true
+		_update_detail(item_id)
 	else:
 		_tooltip.visible = false
+		_clear_detail()
 
 func _open_action_menu(item_id: String) -> void:
-	_hide_desc()
 	_context_item_id = item_id
 	_context_slot_name = ""
 
@@ -961,7 +1016,7 @@ func _open_action_menu(item_id: String) -> void:
 	_update_action_highlight()
 
 func _open_equip_action_menu(slot_name: String, item_id: String) -> void:
-	_hide_desc()
+	_clear_detail()
 	_context_item_id = item_id
 	_context_slot_name = slot_name
 

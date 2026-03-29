@@ -213,11 +213,13 @@ func _setup_builders() -> void:
 		var container: Control = _content_containers[i]
 		builder.build_content(container)
 
-		# Wire overlay nodes (tooltips, popups) to the overlay container
+		# Wire overlay nodes (tooltips, popups, cursors) to the overlay container
 		if builder.has_method("get_overlay_nodes"):
 			var overlays: Array = builder.get_overlay_nodes()
 			for overlay in overlays:
-				if overlay and not overlay.is_inside_tree():
+				if overlay:
+					if overlay.get_parent():
+						overlay.get_parent().remove_child(overlay)
 					_overlay_container.add_child(overlay)
 
 	_builders_ready = true
@@ -225,21 +227,18 @@ func _setup_builders() -> void:
 
 func open(tab_index: int = -1) -> void:
 	visible = true
-	if tab_index >= 0 and tab_index < TAB_NAMES.size():
-		# switch_tab would play SFX — use internal helpers to avoid double-play
-		_last_active_tab = tab_index
-		_show_tab_content(tab_index)
-		_apply_tab_styles(tab_index)
-		_refresh_active_builder(tab_index)
-	else:
-		_show_tab_content(_last_active_tab)
-		_apply_tab_styles(_last_active_tab)
-		_refresh_active_builder(_last_active_tab)
+	var active_tab: int = tab_index if (tab_index >= 0 and tab_index < TAB_NAMES.size()) else _last_active_tab
+	_last_active_tab = active_tab
+	_show_tab_content(active_tab)
+	_apply_tab_styles(active_tab)
+	_refresh_active_builder(active_tab)
+	_notify_builders_active(active_tab)
 	AudioManager.play_ui_sfx("ui_panel_open")
 	get_viewport().set_input_as_handled()
 
 
 func close() -> void:
+	_notify_builders_active(-1)
 	visible = false
 	AudioManager.play_ui_sfx("ui_panel_close")
 
@@ -249,6 +248,7 @@ func switch_tab(index: int) -> void:
 	_show_tab_content(index)
 	_apply_tab_styles(index)
 	_refresh_active_builder(index)
+	_notify_builders_active(index)
 	AudioManager.play_ui_sfx("ui_panel_open")
 
 
@@ -261,6 +261,14 @@ func _refresh_active_builder(index: int) -> void:
 		return
 	if index < _builders.size() and _builders[index] and _builders[index].has_method("refresh"):
 		_builders[index].refresh()
+
+
+func _notify_builders_active(active_index: int) -> void:
+	if not _builders_ready:
+		return
+	for i in _builders.size():
+		if _builders[i] and _builders[i].has_method("set_active"):
+			_builders[i].set_active(i == active_index)
 
 
 func _show_tab_content(index: int) -> void:
