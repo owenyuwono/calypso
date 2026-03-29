@@ -27,6 +27,7 @@ var _merchant_rows: Array = []
 var _cart_rows: Array = []
 var _merchant_item_ids: Array = []
 var _cart_item_ids: Array = []
+var _action_cursor: TextureRect
 var _action_buttons: Array = []
 var _buy_button: Button
 var _close_button: Button
@@ -172,6 +173,18 @@ func _build_ui() -> void:
 
 	_action_buttons = [_buy_button, _close_button]
 
+	# Action cursor — hand icon next to active action button
+	_action_cursor = TextureRect.new()
+	var cursor_tex: Texture2D = load("res://assets/textures/ui/dialogue/cursor_hand.png")
+	if cursor_tex:
+		_action_cursor.texture = cursor_tex
+	_action_cursor.custom_minimum_size = Vector2(24, 24)
+	_action_cursor.size = Vector2(24, 24)
+	_action_cursor.visible = false
+	_action_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_action_cursor.z_index = 10
+	add_child(_action_cursor)
+
 
 func _position_panel() -> void:
 	_panel.anchor_left = 0.0
@@ -208,6 +221,8 @@ func open_shop(vendor: Node) -> void:
 func close_shop() -> void:
 	_is_open = false
 	visible = false
+	if _action_cursor:
+		_action_cursor.visible = false
 	_vendor = null
 	_cart.clear()
 	_discount = 0.0
@@ -490,6 +505,13 @@ func _update_action_highlight() -> void:
 			btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 		else:
 			btn.add_theme_color_override("font_color", Color(0.92, 0.89, 0.82))
+	# Position hand cursor next to active action button
+	if _action_cursor and _active_column == 2 and _action_idx >= 0 and _action_idx < _action_buttons.size():
+		_action_cursor.visible = true
+		var btn: Button = _action_buttons[_action_idx]
+		_action_cursor.global_position = Vector2(btn.global_position.x - 24, btn.global_position.y + 6)
+	elif _action_cursor:
+		_action_cursor.visible = false
 
 
 func _set_row_style(row: PanelContainer, selected: bool) -> void:

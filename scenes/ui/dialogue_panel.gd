@@ -183,12 +183,13 @@ func _build_choices_container() -> void:
 
 	get_parent().add_child(_choices_container)
 
-	# Choice cursor — golden "▶" that floats left of the active button
-	_choice_cursor = Label.new()
-	_choice_cursor.text = "▶"
-	_choice_cursor.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
-	_choice_cursor.add_theme_font_size_override("font_size", 16)
-	_choice_cursor.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	# Choice cursor — hand icon that floats left of the active button
+	_choice_cursor = TextureRect.new()
+	var cursor_tex: Texture2D = load("res://assets/textures/ui/dialogue/cursor_hand.png")
+	if cursor_tex:
+		_choice_cursor.texture = cursor_tex
+	_choice_cursor.custom_minimum_size = Vector2(24, 24)
+	_choice_cursor.size = Vector2(24, 24)
 	_choice_cursor.visible = false
 	_choice_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_choice_cursor.z_index = 10
@@ -201,7 +202,7 @@ var _charisma_xp_granted: bool = false
 
 var _choice_idx: int = 0
 var _choice_buttons: Array = []
-var _choice_cursor: Label  # "▶" indicator next to active choice
+var _choice_cursor: TextureRect  # hand icon next to active choice
 
 func set_player(player: Node) -> void:
 	_player = player

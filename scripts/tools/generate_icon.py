@@ -16,7 +16,7 @@ from pathlib import Path
 from PIL import Image
 from io import BytesIO
 
-API_KEY = "AIzaSyBou5tRG35krsSkXVIgD2aHyJMPIqtDuxc"
+API_KEY = "AIzaSyBb2bI4mVlr1N9WHTqXTR7gwr1gm8OMfOM"
 MODEL = "gemini-3.1-flash-image-preview"
 ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 
