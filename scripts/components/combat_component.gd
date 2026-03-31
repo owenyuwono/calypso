@@ -156,10 +156,10 @@ func roll_crit() -> Dictionary:
 func get_attack_speed_multiplier() -> float:
 	## Returns the speed multiplier for the equipped weapon (penalty-adjusted).
 	if not _equipment:
-		return 1.0
+		return 1.5  # Unarmed: fast flurry
 	var weapon_id: String = _equipment.get_weapon()
 	if weapon_id.is_empty():
-		return 1.0
+		return 1.5  # Unarmed: fast flurry
 	var item: Dictionary = ItemDatabase.get_item(weapon_id)
 	var penalty: Dictionary = _get_item_penalty(weapon_id)
 	var base_speed: float = item.get("attack_speed", 1.0)

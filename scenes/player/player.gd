@@ -485,7 +485,9 @@ func _get_attack_anim(combo_step: int) -> String:
 
 func _start_attack(step: int) -> void:
 	var anim_name: String = _get_attack_anim(step)
-	_visuals.play_anim(anim_name, true, 2.0)
+	var is_unarmed: bool = not _equipment or _equipment.get_weapon().is_empty()
+	var anim_speed: float = 2.5 if is_unarmed else 2.0
+	_visuals.play_anim(anim_name, true, anim_speed)
 	_is_attacking = true
 	_combo_step = step
 	_combo_buffered = false
@@ -561,7 +563,7 @@ func _resolve_melee_hit() -> void:
 	var attack_range: float = _stats.attack_range if _stats else 3.0
 	var is_unarmed: bool = not _equipment or _equipment.get_weapon().is_empty()
 	if is_unarmed:
-		attack_range *= 0.5
+		attack_range *= 0.75
 	var facing: Vector3 = _get_facing_dir()
 	var half_width: float = attack_range * 0.5
 	var depth: float = attack_range
