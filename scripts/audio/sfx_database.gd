@@ -70,38 +70,6 @@ const DATA: Dictionary = {
 		"pitch_variance": 0.1,
 	},
 
-	# --- Gathering ---
-	"gather_tree_chop": {
-		"path": "res://assets/audio/sfx/gathering/tree_chop.ogg",
-		"volume_db": 0.0,
-		"pitch_variance": 0.1,
-	},
-	"gather_rock_mine": {
-		"path": "res://assets/audio/sfx/gathering/rock_mine.ogg",
-		"volume_db": 0.0,
-		"pitch_variance": 0.1,
-	},
-	"gather_fishing_cast": {
-		"path": "res://assets/audio/sfx/gathering/fishing_cast.ogg",
-		"volume_db": -2.0,
-		"pitch_variance": 0.08,
-	},
-	"gather_tree_fall": {
-		"path": "res://assets/audio/sfx/gathering/tree_fall.ogg",
-		"volume_db": 4.0,
-		"pitch_variance": 0.05,
-	},
-	"gather_rock_break": {
-		"path": "res://assets/audio/sfx/gathering/rock_break.ogg",
-		"volume_db": 2.0,
-		"pitch_variance": 0.08,
-	},
-	"gather_fish_catch": {
-		"path": "res://assets/audio/sfx/gathering/fishing_catch.ogg",
-		"volume_db": -1.0,
-		"pitch_variance": 0.1,
-	},
-
 	# --- Movement ---
 	"footstep_stone": {
 		"path": "res://assets/audio/sfx/movement/footstep_stone.ogg",
@@ -117,18 +85,6 @@ const DATA: Dictionary = {
 		"path": "res://assets/audio/sfx/movement/footstep_dirt.ogg",
 		"volume_db": -9.0,
 		"pitch_variance": 0.05,
-	},
-
-	# --- Presence ---
-	"presence_monster_idle": {
-		"path": "res://assets/audio/sfx/presence/monster_idle.ogg",
-		"volume_db": -12.0,
-		"pitch_variance": 0.02,
-	},
-	"presence_npc_ambient": {
-		"path": "res://assets/audio/sfx/presence/npc_ambient.ogg",
-		"volume_db": -16.0,
-		"pitch_variance": 0.02,
 	},
 
 	# --- UI ---
@@ -147,41 +103,16 @@ const DATA: Dictionary = {
 		"volume_db": -6.0,
 		"pitch_variance": 0.0,
 	},
-	"ui_level_up": {
-		"path": "res://assets/audio/sfx/ui/level_up.ogg",
-		"volume_db": 0.0,
-		"pitch_variance": 0.0,
-	},
 	"ui_item_equip": {
 		"path": "res://assets/audio/sfx/ui/item_equip.ogg",
 		"volume_db": -4.0,
 		"pitch_variance": 0.05,
-	},
-	"ui_buy_sell": {
-		"path": "res://assets/audio/sfx/ui/buy_sell.ogg",
-		"volume_db": -2.0,
-		"pitch_variance": 0.05,
-	},
-	"ui_craft_complete": {
-		"path": "res://assets/audio/sfx/ui/craft_complete.ogg",
-		"volume_db": -2.0,
-		"pitch_variance": 0.0,
 	},
 
 	# --- Ambient ---
 	"ambient_fountain": {
 		"path": "res://assets/audio/ambient/fountain_loop.ogg",
 		"volume_db": -6.0,
-		"pitch_variance": 0.0,
-	},
-	"ambient_forge": {
-		"path": "res://assets/audio/ambient/forge_hammer_loop.ogg",
-		"volume_db": -4.0,
-		"pitch_variance": 0.0,
-	},
-	"ambient_market": {
-		"path": "res://assets/audio/ambient/market_chatter_loop.ogg",
-		"volume_db": -8.0,
 		"pitch_variance": 0.0,
 	},
 	"ambient_birds_day": {

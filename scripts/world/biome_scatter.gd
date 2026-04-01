@@ -217,16 +217,8 @@ static func _spawn_recipe(ctx: WorldBuilderContext, recipe: Dictionary, x: float
 	match type:
 		"tree":
 			AssetSpawner.spawn_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, color)
-		"choppable_tree":
-			var tier: String = recipe.get("tier", "normal")
-			var leaf_colors: Array = recipe.get("leaf_colors", colors)
-			var leaf_color: Color = leaf_colors[rng.randi() % leaf_colors.size()] if leaf_colors.size() > 0 else Color.WHITE
-			AssetSpawner.spawn_choppable_tree(ctx, file, Vector3(x, 0, z), rot_y, scale_val, leaf_color, tier)
 		"foliage":
 			AssetSpawner.spawn_foliage(ctx, file, Vector3(x, 0, z), color, rot_y, scale_val)
-		"mineable_rock":
-			var tier: String = recipe.get("tier", "copper")
-			AssetSpawner.spawn_mineable_rock(ctx, Vector3(x, 0, z), rot_y, scale_val, tier)
 		"rock_cluster":
 			create_rock_cluster(ctx, Vector3(x, 0, z))
 		"stump", "fallen":

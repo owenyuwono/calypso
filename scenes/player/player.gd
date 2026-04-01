@@ -66,13 +66,6 @@ const IDLE_ANIMS: PackedStringArray = ["Idle", "Idle_Breathing", "Idle_Breathing
 const IDLE_RARE_ANIMS: PackedStringArray = ["Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look"]
 const IDLE_TIRED_ANIMS: PackedStringArray = ["Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck"]
 
-# Harvesting
-var _harvest_target: String = ""
-var _chop_timer: float = 0.0
-var _chop_interval: float = 2.0
-var _chop_hit_pending: bool = false
-var _chop_hit_timer: float = 0.0
-
 # Audio component
 var _audio: Node
 
@@ -217,8 +210,6 @@ func _physics_process(delta: float) -> void:
 				_combat.start_blocking()
 				if not _attack_target.is_empty():
 					_cancel_attack()
-				if not _harvest_target.is_empty():
-					_cancel_harvest()
 				_is_attacking = false
 		elif _combat.is_blocking():
 			_combat.stop_blocking()
@@ -260,13 +251,11 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, SPEED)
 		velocity.z = move_toward(velocity.z, 0.0, SPEED)
 	elif wasd_active:
-		# WASD cancels any active navigation/combat/harvest
+		# WASD cancels any active navigation/combat
 		if _is_navigating:
 			_stop_navigation()
 		if not _attack_target.is_empty():
 			_cancel_attack()
-		if not _harvest_target.is_empty():
-			_cancel_harvest()
 		_is_attacking = false
 		_combo_step = 0
 		_combo_window_timer = 0.0
@@ -290,8 +279,6 @@ func _physics_process(delta: float) -> void:
 		is_moving = true
 	elif not _attack_target.is_empty():
 		is_moving = _process_combat(delta)
-	elif not _harvest_target.is_empty():
-		is_moving = _process_harvesting(delta)
 	elif _is_navigating and not nav_agent.is_navigation_finished():
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position)
@@ -378,7 +365,7 @@ func _physics_process(delta: float) -> void:
 			_combo_step = 0
 
 	# Update animation
-	if not _is_attacking and _attack_target.is_empty() and _harvest_target.is_empty():
+	if not _is_attacking and _attack_target.is_empty():
 		if is_moving:
 			_idle_timer = 0.0
 			_visuals.play_anim("Running")
@@ -629,96 +616,6 @@ func _get_approach_pos(target_pos: Vector3, standoff: float) -> Vector3:
 		offset = Vector3(1.0, 0.0, 0.0)
 	return target_pos + offset.normalized() * standoff
 
-func _cancel_harvest() -> void:
-	_harvest_target = ""
-	_chop_timer = _chop_interval
-	_chop_hit_pending = false
-	_chop_hit_timer = 0.0
-
-
-func _process_harvesting(delta: float) -> bool:
-	# Validate target still exists and is harvestable
-	if not WorldState.get_entity(_harvest_target):
-		_cancel_harvest()
-		return false
-
-	var resource_node: Node = WorldState.get_entity(_harvest_target)
-	if not is_instance_valid(resource_node):
-		_cancel_harvest()
-		return false
-
-	var harvestable: Node = resource_node.get_node_or_null("HarvestableComponent")
-	if not harvestable:
-		_cancel_harvest()
-		return false
-
-	if not harvestable.can_harvest("player"):
-		_cancel_harvest()
-		return false
-
-	# Move toward resource if out of range
-	var dist: float = global_position.distance_to(resource_node.global_position)
-	if dist > 3.0:
-		nav_agent.target_position = _get_approach_pos(resource_node.global_position, 2.5)
-		_is_navigating = true
-		_last_nav_pos = global_position
-		var next_pos: Vector3 = nav_agent.get_next_path_position()
-		var dir: Vector3 = next_pos - global_position
-		dir.y = 0.0
-		if dir.length_squared() > 0.01:
-			dir = dir.normalized()
-			var harvest_speed: float = SPEED * _stats.move_speed
-			if _stamina:
-				harvest_speed *= _stamina.get_fatigue_multiplier("move_speed")
-			velocity.x = dir.x * harvest_speed
-			velocity.z = dir.z * harvest_speed
-			_visuals.face_direction(dir)
-		return true
-
-	# In range — stop moving and chop
-	_is_navigating = false
-	velocity.x = move_toward(velocity.x, 0.0, SPEED)
-	velocity.z = move_toward(velocity.z, 0.0, SPEED)
-
-	# Face the resource
-	var face_dir: Vector3 = resource_node.global_position - global_position
-	face_dir.y = 0.0
-	if face_dir.length_squared() > 0.01:
-		_visuals.face_direction(face_dir.normalized())
-
-	# Advance chop timer
-	_chop_timer += delta
-	if _chop_timer >= _chop_interval:
-		_chop_timer = 0.0
-		_visuals.play_anim("Attack")
-		_chop_hit_pending = true
-		_chop_hit_timer = _visuals.get_hit_delay("Attack")
-
-	# Resolve hit frame
-	if _chop_hit_pending:
-		_chop_hit_timer -= delta
-		if _chop_hit_timer <= 0.0:
-			_chop_hit_pending = false
-			var result: Dictionary = harvestable.process_chop("player")
-			if result.is_empty():
-				_cancel_harvest()
-				return false
-			var skill_id: String = harvestable.get_skill_id()
-			resource_node.last_chopper_pos = global_position
-			resource_node.shake()
-			if _audio:
-				var gather_key: String = ""
-				match skill_id:
-					"woodcutting": gather_key = "gather_tree_chop"
-					"mining": gather_key = "gather_rock_mine"
-				if gather_key != "":
-					_audio.play_oneshot(gather_key)
-			if result.depleted:
-				resource_node.spawn_loot(result.item_id, result.bonus_item)
-				_cancel_harvest()
-
-	return false
-
 func _stop_navigation() -> void:
 	_is_navigating = false
 
@@ -762,12 +659,7 @@ func _interact_with_nearest() -> void:
 	var target_node := WorldState.get_entity(target_id)
 	if not target_node or not is_instance_valid(target_node):
 		return
-
-	match etype:
-		"tree", "rock":
-			_cancel_attack()
-			_cancel_harvest()
-			_harvest_target = target_id
+	# Additional interact types (npc, door, etc.) handled by their own systems
 
 func _is_ui_open() -> bool:
 	if game_menu and game_menu.is_open():
@@ -786,7 +678,6 @@ func _on_entity_died(eid: String, _killer_id: String) -> void:
 func _die() -> void:
 	_is_dead = true
 	_cancel_attack()
-	_cancel_harvest()
 	_stop_navigation()
 	velocity = Vector3.ZERO
 	if _audio:
@@ -821,13 +712,13 @@ func _respawn() -> void:
 	if loaded_zone and "zone_id" in loaded_zone:
 		current_zone_id = loaded_zone.zone_id
 
-	if current_zone_id == "city":
-		# Already in city — just teleport to spawn point
+	if current_zone_id == "zone_suburb":
+		# Already in suburb — just teleport to spawn point
 		global_position = city_spawn
 		velocity = Vector3.ZERO
 	elif not ZoneManager.is_transitioning():
-		# In a field or unknown zone — load city
-		ZoneManager.load_zone("city", city_spawn)
+		# In a field or unknown zone — load suburb
+		ZoneManager.load_zone("zone_suburb", city_spawn)
 
 func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _remaining_hp: int) -> void:
 	if target_id == "player":
@@ -882,7 +773,6 @@ func _on_auto_attack_landed(target_id: String, _damage: int, _target_pos: Vector
 
 func _on_auto_attack_target_lost() -> void:
 	_cancel_attack()
-	_cancel_harvest()
 
 func _on_equipment_changed(slot: String, item_id: String) -> void:
 	if slot == "main_hand":

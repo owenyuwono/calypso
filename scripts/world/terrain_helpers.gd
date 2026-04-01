@@ -1,5 +1,5 @@
 class_name TerrainHelpers
-## Shared terrain utilities — noise init, shader params, portal creation, and navmesh bake setup.
+## Shared terrain utilities — noise init, shader params, and navmesh bake setup.
 ## Extracted from zone files to eliminate per-zone duplication.
 
 
@@ -22,12 +22,6 @@ static func apply_standard_shader_params(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("uv_scale_cobble", 0.5)
 	mat.set_shader_parameter("uv_scale_earth", 0.5)
 	mat.set_shader_parameter("blend_sharpness", 1.5)
-
-
-static func create_portals(parent: Node3D, zone_id: String) -> void:
-	## Instantiates zone portal nodes for zone_id and adds them to parent.
-	## Portal definitions are passed externally — ZoneDatabase is not available.
-	pass
 
 
 static func begin_navmesh_bake(nav_region: NavigationRegion3D, on_baked: Callable) -> void:
