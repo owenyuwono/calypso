@@ -121,7 +121,6 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	var monsters: Array = []
 	var items: Array = []
 	var objects: Array = []
-	var trees: Array = []
 	var locations: Array = []
 	var vendors: Array = []
 
@@ -192,23 +191,6 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 	objects.sort_custom(func(a, b): return a.distance < b.distance)
 	vendors.sort_custom(func(a, b): return a.distance < b.distance)
 
-	# Trees are not tracked via Area3D — use the cached tree registry for O(1) lookup
-	for tree_id in WorldState.tree_entities:
-		var tree_node: Node3D = WorldState.tree_entities[tree_id]
-		if not is_instance_valid(tree_node):
-			continue
-		var tree_dist: float = own_pos.distance_to(tree_node.global_position)
-		if tree_dist <= radius:
-			var tree_data: Dictionary = WorldState.entity_data.get(tree_id, {})
-			trees.append({
-				"id": tree_id,
-				"distance": snapped(tree_dist, 0.1),
-				"name": tree_data.get("name", tree_id),
-				"tree_tier": tree_data.get("tree_tier", ""),
-				"harvestable": tree_data.get("harvestable", false),
-			})
-	trees.sort_custom(func(a, b): return a.distance < b.distance)
-
 	# Location markers are not tracked via Area3D — scan directly from WorldState
 	for loc_id in WorldState.location_markers:
 		var dist: float = own_pos.distance_to(WorldState.location_markers[loc_id])
@@ -221,7 +203,6 @@ func get_perception(radius: float = 15.0) -> Dictionary:
 		"monsters": monsters,
 		"items": items,
 		"objects": objects,
-		"trees": trees,
 		"locations": locations,
 		"vendors": vendors,
 	}

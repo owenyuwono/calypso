@@ -1,0 +1,132 @@
+<h2>Menu Consolidation — 3 Approaches</h2>
+<p class="subtitle">How should we restructure the 7 keyboard panels into fewer, more complete ones?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tabbed Character Sheet (Recommended)</h3>
+      <p><strong>3 panels total.</strong> One unified Character panel (Tab key) with internal tabs: Stats | Equipment | Skills. Quest Log (J) and Settings (Esc) stay separate. World Map stays on minimap compass.</p>
+      <div class="mockup" style="margin-top:12px; font-family:monospace; font-size:13px; line-height:1.4; background:#1a1a2e; padding:16px; border-radius:8px; color:#c8b896;">
+        <div style="color:#d4a850; font-weight:bold; margin-bottom:8px;">╔══════════════════════════════════════╗</div>
+        <div style="display:flex; gap:4px; margin-bottom:12px;">
+          <span style="background:#3a2a10; color:#d4a850; padding:2px 12px; border-radius:4px 4px 0 0; border:1px solid #d4a850;">📊 Stats</span>
+          <span style="background:#2a2a3e; color:#888; padding:2px 12px; border-radius:4px 4px 0 0; border:1px solid #444;">⚔️ Equip</span>
+          <span style="background:#2a2a3e; color:#888; padding:2px 12px; border-radius:4px 4px 0 0; border:1px solid #444;">✨ Skills</span>
+        </div>
+        <div style="border:1px solid #444; padding:12px; border-radius:0 4px 4px 4px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div>
+              <div style="color:#d4a850; font-size:11px;">OFFENSIVE</div>
+              <div>ATK: 42 &nbsp; MATK: 18</div>
+              <div>Accuracy: 90 &nbsp; Crit: 7%</div>
+            </div>
+            <div>
+              <div style="color:#d4a850; font-size:11px;">DEFENSIVE</div>
+              <div>HP: 125/125 &nbsp; DEF: 28</div>
+              <div>MDEF: 12 &nbsp; Evasion: 9</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid #444; margin-top:8px; padding-top:8px; color:#888; font-size:11px;">
+            ── Proficiency Levels ──<br>
+            Sword ★★★ | STR ★★ | Mining ★★★★
+          </div>
+        </div>
+        <div style="color:#d4a850; font-weight:bold; margin-top:8px;">╚══════════════════════════════════════╝</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Only 3 keybinds: Tab, J, Esc</li>
+          <li>All character info in one place</li>
+          <li>Tabs feel natural and modern</li>
+          <li>Easy to add future tabs</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Larger panel = more screen coverage</li>
+          <li>Slightly more clicks to reach specific info</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>JRPG Full-Screen Menu</h3>
+      <p><strong>1 panel.</strong> Single Esc/Tab opens a full-screen menu with sidebar: Status, Items, Skills, Quests, Map, Settings. Everything in one place.</p>
+      <div class="mockup" style="margin-top:12px; font-family:monospace; font-size:13px; line-height:1.4; background:#1a1a2e; padding:16px; border-radius:8px; color:#c8b896;">
+        <div style="display:flex; gap:16px;">
+          <div style="border-right:1px solid #444; padding-right:16px; min-width:100px;">
+            <div style="color:#d4a850; font-weight:bold; margin-bottom:8px;">MENU</div>
+            <div style="color:#d4a850;">▸ Status</div>
+            <div style="color:#888;">&nbsp; Items</div>
+            <div style="color:#888;">&nbsp; Skills</div>
+            <div style="color:#888;">&nbsp; Quests</div>
+            <div style="color:#888;">&nbsp; Map</div>
+            <div style="color:#888;">&nbsp; Settings</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:#d4a850; font-size:11px; margin-bottom:8px;">CHARACTER STATUS</div>
+            <div>HP: 125/125 &nbsp; ATK: 42 &nbsp; DEF: 28</div>
+            <div>MATK: 18 &nbsp; MDEF: 12</div>
+            <div style="margin-top:8px; color:#888; font-size:11px;">Proficiencies, equipment summary...</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>1 keybind for everything</li>
+          <li>Classic RPG feel (Final Fantasy, Persona)</li>
+          <li>Maximum consolidation</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Full-screen = can't see the game world</li>
+          <li>Doesn't fit the MMO/RO aesthetic</li>
+          <li>More navigation depth to reach anything</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Smart Merge (4 panels)</h3>
+      <p><strong>4 panels.</strong> Character = Stats + Equipment + Inventory. Skills = Proficiencies + Active Skills + Hotbar. Quest Log stays. Settings stays. No tabs — each panel is a single view.</p>
+      <div class="mockup" style="margin-top:12px; font-family:monospace; font-size:13px; line-height:1.4; background:#1a1a2e; padding:16px; border-radius:8px; color:#c8b896;">
+        <div style="display:flex; gap:16px;">
+          <div style="border:1px solid #444; padding:12px; flex:1; border-radius:4px;">
+            <div style="color:#d4a850; font-weight:bold; margin-bottom:4px;">CHARACTER (C)</div>
+            <div style="font-size:11px;">Stats + Equipment + Items</div>
+            <div style="color:#888; font-size:11px; margin-top:4px;">Left: equip slots + stats<br>Right: item grid</div>
+          </div>
+          <div style="border:1px solid #444; padding:12px; flex:1; border-radius:4px;">
+            <div style="color:#d4a850; font-weight:bold; margin-bottom:4px;">SKILLS (S)</div>
+            <div style="font-size:11px;">Proficiencies + Skills + Hotbar</div>
+            <div style="color:#888; font-size:11px; margin-top:4px;">Prof list → drill-down<br>Hotbar assignment</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:16px; margin-top:8px;">
+          <div style="border:1px solid #444; padding:8px; flex:1; border-radius:4px; text-align:center; color:#888;">
+            QUESTS (J)
+          </div>
+          <div style="border:1px solid #444; padding:8px; flex:1; border-radius:4px; text-align:center; color:#888;">
+            SETTINGS (Esc)
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>4 keybinds: C, S, J, Esc</li>
+          <li>Each panel is self-contained, no tabs</li>
+          <li>Closest to current structure (less rework)</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Character panel gets very dense</li>
+          <li>Still 4 keys to remember</li>
+          <li>Stats + inventory in one panel may feel crowded</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

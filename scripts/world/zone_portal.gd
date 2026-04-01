@@ -66,7 +66,7 @@ func _create_ground_ring() -> void:
 
 func _create_destination_label() -> void:
 	var label: Label3D = Label3D.new()
-	label.text = "To " + ZoneDatabase.get_zone_name(target_zone)
+	label.text = "To " + target_zone.capitalize()
 	label.position = Vector3(0.0, 1.5, 0.0)
 	label.font_size = 48
 	label.pixel_size = 0.01

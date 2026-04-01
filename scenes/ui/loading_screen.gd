@@ -101,8 +101,7 @@ func _build_ui() -> void:
 	content_vbox.add_child(_progress_bar)
 
 func show_loading(zone_id: String) -> void:
-	var zone_data: Dictionary = ZoneDatabase.get_zone(zone_id)
-	await _show(ZoneDatabase.get_zone_name(zone_id), zone_data.get("loading_art", ""))
+	await _show(zone_id.capitalize(), "")
 
 
 func show_custom(display_name: String, art_path: String = "") -> void:

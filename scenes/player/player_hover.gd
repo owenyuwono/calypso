@@ -5,7 +5,7 @@ extends Node
 
 const PROXIMITY_RANGE: float = 3.0
 const PROXIMITY_CHECK_INTERVAL: float = 0.2
-const INTERACTABLE_TYPES: PackedStringArray = ["npc", "interior_npc", "tree", "rock", "fishing_spot", "crafting_station", "door"]
+const INTERACTABLE_TYPES: PackedStringArray = ["rock", "loot_drop"]
 
 var _player: Node3D
 
@@ -116,16 +116,8 @@ func _process_proximity(_delta: float) -> void:
 
 static func _get_action_text(entity_type: String) -> String:
 	match entity_type:
-		"npc", "interior_npc":
-			return "[E] Talk"
-		"tree":
-			return "[E] Chop"
 		"rock":
-			return "[E] Mine"
-		"fishing_spot":
-			return "[E] Fish"
-		"crafting_station":
-			return "[E] Craft"
-		"door":
-			return "[E] Enter"
+			return "[E] Search"
+		"loot_drop":
+			return "[E] Pick Up"
 	return "[E] Interact"

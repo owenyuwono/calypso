@@ -2,16 +2,13 @@ extends Control
 ## BotW-style full-screen menu with a horizontal tab bar.
 ## Builds its entire scene tree in code.
 
-enum Tab { STATUS, INVENTORY, SKILLS, MAP, QUESTS, SYSTEM }
+enum Tab { STATUS, INVENTORY, SYSTEM }
 
-const TAB_NAMES: Array = ["Status", "Inventory", "Skills", "Map", "Quests", "System"]
+const TAB_NAMES: Array = ["Status", "Inventory", "System"]
 
 # Panel builder scripts — one per Tab enum value
 const StatusPanel = preload("res://scenes/ui/status_panel.gd")
 const InventoryPanel = preload("res://scenes/ui/inventory_panel.gd")
-const SkillPanel = preload("res://scenes/ui/skill_panel.gd")
-const WorldMapPanel = preload("res://scenes/ui/world_map_panel.gd")
-const QuestLogPanel = preload("res://scenes/ui/quest_log_panel.gd")
 const SettingsPanel = preload("res://scenes/ui/settings_panel.gd")
 
 # Styling constants
@@ -191,9 +188,6 @@ func _setup_builders() -> void:
 	var builder_scripts: Array = [
 		StatusPanel,
 		InventoryPanel,
-		SkillPanel,
-		WorldMapPanel,
-		QuestLogPanel,
 		SettingsPanel,
 	]
 

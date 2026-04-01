@@ -1,7 +1,6 @@
 class_name SfxDatabase
 extends RefCounted
 ## Static SFX definitions mapping string keys to audio stream metadata.
-## Pattern mirrors OreDatabase, SkillDatabase, etc.
 
 const DATA: Dictionary = {
 	# --- Combat ---

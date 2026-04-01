@@ -1,0 +1,136 @@
+<h2>Arcadia City — Current Layout (4 Gates)</h2>
+<p class="subtitle">Adding north + south gates. Click which areas need the most building work.</p>
+
+<style>
+  .city-map {
+    font-family: monospace;
+    font-size: 10.5px;
+    line-height: 1.35;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre;
+    margin-bottom: 24px;
+  }
+  .city-map .wall { color: #8b7355; }
+  .city-map .building { color: #e8a838; }
+  .city-map .prop { color: #6b8e6b; }
+  .city-map .lbl { color: #7eb8da; font-weight: bold; }
+  .city-map .empty { color: #555; }
+  .city-map .gate { color: #cd5c5c; font-weight: bold; }
+  .district-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .district-card { background: #1e1e2e; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .district-card h4 { margin: 0 0 6px 0; color: #7eb8da; }
+  .district-card .stats { font-size: 12px; color: #aaa; }
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 6px; }
+  .tag-empty { background: #5c2020; color: #ff8888; }
+  .tag-sparse { background: #5c4a20; color: #ffcc88; }
+  .tag-medium { background: #2a4a2a; color: #88cc88; }
+  .tag-full { background: #204a5c; color: #88ccff; }
+</style>
+
+<div class="city-map">                            <span class="gate">NORTH GATE</span>
+<span class="wall">  ╔═══════════════════════╦═══</span><span class="gate">⊏    ⊐</span><span class="wall">═══╦══════════════════════╗</span>
+<span class="wall">  ║</span> <span class="lbl">RESIDENTIAL</span>           <span class="wall">║</span>  <span class="lbl">NOBLE/TEMPLE</span>   <span class="wall">║</span> <span class="lbl">PARK / GARDENS</span>       <span class="wall">║</span>
+<span class="wall">  ║</span> x:-70..-20            <span class="wall">║</span>  x:-20..25       <span class="wall">║</span> x:25..70              <span class="wall">║</span>
+<span class="wall">  ║</span> z:-50..-10            <span class="wall">║</span>  z:-50..-10      <span class="wall">║</span> z:-50..-10            <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span>                  <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="building">◼H1</span>    <span class="building">◼H3</span>   <span class="building">◼H8</span>   <span class="wall">║</span> <span class="building">◼Temple(8×10)</span>  <span class="wall">║</span>  <span class="prop">☘ ☘ ☘</span> trees          <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> <span class="building">◼GuildHall</span>       <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="building">◼H4</span>   <span class="building">██INN██</span>       <span class="wall">║</span> <span class="building">◼Library</span> <span class="building">◼C1</span>   <span class="wall">║</span>    <span class="building">◼Gazebo</span>            <span class="wall">║</span>
+<span class="wall">  ║</span>        <span class="building">██████</span> <span class="prop">⊙well</span> <span class="wall">║</span> <span class="building">◼Manor</span> <span class="prop">⊕statue</span> <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span>    <span class="building">◼H2</span>               <span class="wall">║</span>      <span class="building">◼C2 ◼Chapel</span> <span class="wall">║</span>   <span class="prop">⊙Fountain</span> <span class="prop">⊕⊕⊕</span>     <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="building">◼H7</span> <span class="building">◼H5</span>              <span class="wall">║</span>                  <span class="wall">║</span>     <span class="building">◼Cottage</span>           <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="building">◼B1◼B2◼B3</span>            <span class="wall">║</span>                  <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="gate">W </span><span class="wall">╠═══════════════════════╬══════════════════╬═══════════╤═══════════╣</span><span class="gate"> E</span>
+<span class="gate">E </span><span class="wall">║</span> <span class="lbl">MARKET</span>                <span class="wall">║</span> <span class="lbl">CENTRAL PLAZA</span>    <span class="wall">║</span> <span class="lbl">GATE</span>      <span class="wall">│</span>           <span class="wall">║</span><span class="gate"> A</span>
+<span class="gate">S </span><span class="wall">║</span> x:-70..-20            <span class="wall">║</span> x:-15..20        <span class="wall">║</span> <span class="building">◼F1◼F2</span>   <span class="wall">│</span>           <span class="wall">║</span><span class="gate"> S</span>
+<span class="gate">T </span><span class="wall">║</span> z:-10..50             <span class="wall">║</span> z:-10..10        <span class="wall">║</span> <span class="building">◼GS</span>      <span class="wall">│</span>           <span class="wall">║</span><span class="gate"> T</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span>                  <span class="wall">║</span> <span class="building">◼GP ◼GP</span>  <span class="wall">│</span>           <span class="wall">║</span>
+<span class="gate">G </span><span class="wall">║</span> <span class="building">◼A1◼A2◼A3</span> offices    <span class="wall">║</span>  <span class="prop">☀</span>          <span class="prop">☀</span>  <span class="wall">╧═══════════╪═══════════╣</span><span class="gate"> G</span>
+<span class="gate">A </span><span class="wall">║</span>                       <span class="wall">║</span>                  <span class="wall">║</span> <span class="lbl">GARRISON</span>              <span class="wall">║</span><span class="gate"> A</span>
+<span class="gate">T </span><span class="wall">║</span> <span class="prop">⊞stall</span> <span class="building">◼Storage</span>      <span class="wall">║</span>    <span class="prop">⊙Fountain</span>   <span class="wall">║</span> x:25..70              <span class="wall">║</span><span class="gate"> T</span>
+<span class="gate">E </span><span class="wall">║</span> <span class="building">◼WeaponShop</span>           <span class="wall">║</span>                  <span class="wall">║</span> z:10..50              <span class="wall">║</span><span class="gate"> E</span>
+<span class="wall">  ║</span>      <span class="prop">⊞stall</span>          <span class="wall">║</span>  <span class="prop">☀</span>          <span class="prop">☀</span>  <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="building">◼ItemShop</span> <span class="building">◼Bakery</span>   <span class="wall">║</span>                  <span class="wall">║</span> <span class="building">◼QM</span>   <span class="building">◼GuardTower</span>    <span class="wall">║</span>
+<span class="wall">  ║</span>      <span class="prop">⊞stall</span>          <span class="wall">╠══════════════════╣</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="prop">⊞stall</span>  <span class="prop">⊞stall</span>       <span class="wall">║</span> <span class="lbl">CRAFT/WORKSHOP</span>   <span class="wall">║</span> <span class="building">████BARRACKS████</span>   <span class="wall">║</span>
+<span class="wall">  ║</span> <span class="prop">🛢🛢🛢</span> barrels        <span class="wall">║</span> x:-20..25        <span class="wall">║</span> <span class="building">◼MH</span>   <span class="building">◼Armory</span>        <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> z:10..50         <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span>                  <span class="wall">║</span> <span class="prop">⚔⚔⚔</span> 6 dummies        <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> <span class="building">◼Stables</span> <span class="building">◼D1</span>    <span class="wall">║</span> <span class="prop">⊞⊞⊞</span> weapon racks     <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> <span class="building">◼Wkshp1</span>  <span class="building">◼D2</span>    <span class="wall">║</span> <span class="prop">◎◎</span>  archery targets  <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> <span class="building">◼Forge</span>   <span class="building">◼D3</span>    <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ║</span>                       <span class="wall">║</span> <span class="building">◼Wkshp2</span>  <span class="building">◼StorH</span> <span class="wall">║</span>                       <span class="wall">║</span>
+<span class="wall">  ╚═══════════════════════╩═══</span><span class="gate">⊏    ⊐</span><span class="wall">═══╩═══════════════════════╝</span>
+                            <span class="gate">SOUTH GATE</span></div>
+
+<h3>District Density Ratings</h3>
+<div class="district-grid">
+  <div class="district-card">
+    <h4>Central Plaza <span class="tag tag-empty">EMPTY</span></h4>
+    <div class="stats">35×20 units — <strong>0 buildings</strong><br>Only fountain, 4 benches, 4 lamps, 4 pillars</div>
+  </div>
+  <div class="district-card">
+    <h4>Park / Gardens <span class="tag tag-empty">VERY SPARSE</span></h4>
+    <div class="stats">45×40 units — <strong>2 buildings</strong> (cottage + gazebo)<br>Mostly trees and a fountain. Huge empty area</div>
+  </div>
+  <div class="district-card">
+    <h4>Residential <span class="tag tag-sparse">SPARSE</span></h4>
+    <div class="stats">50×40 units — <strong>10 buildings</strong> (7 houses + inn + 3 cluster)<br>Big gaps between houses</div>
+  </div>
+  <div class="district-card">
+    <h4>Gate Area <span class="tag tag-sparse">SPARSE</span></h4>
+    <div class="stats">15×20 units — <strong>5 tiny buildings</strong><br>Functional but barren. Now needs north/south gate areas too</div>
+  </div>
+  <div class="district-card">
+    <h4>Market <span class="tag tag-medium">MEDIUM</span></h4>
+    <div class="stats">50×60 units — <strong>7 buildings + 5 stalls</strong> + many props<br>Best density, still has open patches</div>
+  </div>
+  <div class="district-card">
+    <h4>Craft / Workshop <span class="tag tag-medium">MEDIUM</span></h4>
+    <div class="stats">45×40 units — <strong>8 buildings</strong><br>Forge area decent, south side empty</div>
+  </div>
+  <div class="district-card">
+    <h4>Noble / Temple <span class="tag tag-medium">MEDIUM</span></h4>
+    <div class="stats">45×40 units — <strong>9 buildings</strong><br>Temple dominates, some gaps remain</div>
+  </div>
+  <div class="district-card">
+    <h4>Garrison <span class="tag tag-full">MEDIUM-HIGH</span></h4>
+    <div class="stats">45×40 units — <strong>5 buildings + training props</strong><br>Best filled district. Barracks + training grounds</div>
+  </div>
+</div>
+
+<h3>What needs the most building work?</h3>
+<div class="options">
+  <div class="option" data-choice="plaza-park" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Central Plaza + Park (most empty)</h3>
+      <p>Plaza has ZERO buildings. Park is a 45×40 area with just a cottage and gazebo. These are the most visually empty.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="residential-gate" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Residential + Gate areas</h3>
+      <p>Residential has tiny houses scattered in a huge area. Gate approach to the city feels dead. Both need density.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="all-districts" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>All districts need more buildings</h3>
+      <p>Even "medium" districts are sparse by Prontera standards. Add buildings across the board for proper town density.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="landmarks" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Focus on key landmarks first</h3>
+      <p>Add a few iconic structures (castle, cathedral, grand market hall, clock tower) that define the city's skyline before filling gaps.</p>
+    </div>
+  </div>
+</div>

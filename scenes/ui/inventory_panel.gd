@@ -5,7 +5,6 @@ extends Control
 
 const ItemDatabase = preload("res://scripts/data/item_database.gd")
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
-const LootHelper = preload("res://scripts/utils/loot_helper.gd")
 
 const GRID_COLUMNS := 5
 const MIN_SLOTS := 20
@@ -59,8 +58,6 @@ var _right_equip_vbox: VBoxContainer
 var _grid: GridContainer
 var _gold_label: Label
 var _gold_icon: TextureRect
-var _tooltip: PanelContainer
-var _tooltip_label: Label
 var _preview_model_root: Node3D
 var _preview_viewport: SubViewport
 
@@ -245,30 +242,10 @@ func _build_ui() -> void:
 	gold_hbox.add_child(_gold_icon)
 
 	_gold_label = Label.new()
-	_gold_label.add_theme_font_size_override("font_size", 13)
+	_gold_label.add_theme_font_size_override("font_size", 20)
 	_gold_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
 	_gold_label.text = "0"
 	gold_hbox.add_child(_gold_label)
-
-	# Tooltip — child of root Control so it overlays everything
-	_tooltip = PanelContainer.new()
-	var tooltip_style := StyleBoxFlat.new()
-	tooltip_style.bg_color = Color(0.06, 0.05, 0.04, 0.96)
-	tooltip_style.border_color = Color(0.55, 0.45, 0.25)
-	tooltip_style.set_border_width_all(1)
-	tooltip_style.set_corner_radius_all(3)
-	tooltip_style.content_margin_left = 6
-	tooltip_style.content_margin_right = 6
-	tooltip_style.content_margin_top = 2
-	tooltip_style.content_margin_bottom = 2
-	_tooltip.add_theme_stylebox_override("panel", tooltip_style)
-	_tooltip_label = Label.new()
-	_tooltip_label.add_theme_font_size_override("font_size", 12)
-	_tooltip_label.add_theme_color_override("font_color", Color.WHITE)
-	_tooltip.add_child(_tooltip_label)
-	_tooltip.visible = false
-	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_tooltip)
 
 	_build_context_menu()
 
@@ -348,8 +325,6 @@ func set_active(active: bool) -> void:
 	if not active:
 		if _cursor_hand:
 			_cursor_hand.visible = false
-		if _tooltip:
-			_tooltip.visible = false
 		_hide_context_menu()
 	else:
 		_nav_zone = "inventory"
@@ -369,8 +344,6 @@ func get_overlay_nodes() -> Array:
 	var overlays: Array = []
 	if _cursor_hand:
 		overlays.append(_cursor_hand)
-	if _tooltip:
-		overlays.append(_tooltip)
 	if _context_menu:
 		overlays.append(_context_menu)
 	return overlays
@@ -401,7 +374,6 @@ func _toggle() -> void:
 		_refresh()
 	else:
 		AudioManager.play_ui_sfx("ui_panel_close")
-		_tooltip.visible = false
 		_clear_detail()
 		_hide_context_menu()
 		if _cursor_hand:
@@ -565,7 +537,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 	var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
 	var letter := Label.new()
 	letter.text = abbrev
-	letter.add_theme_font_size_override("font_size", 16)
+	letter.add_theme_font_size_override("font_size", 24)
 	letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -621,7 +593,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 		var abbrev: String = item_name.substr(0, 2) if item_name.length() >= 2 else item_name
 		var letter := Label.new()
 		letter.text = abbrev
-		letter.add_theme_font_size_override("font_size", 18)
+		letter.add_theme_font_size_override("font_size", 27)
 		letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		letter.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
@@ -647,7 +619,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var count_label := Label.new()
 		count_label.text = "x%d" % count
-		count_label.add_theme_font_size_override("font_size", 10)
+		count_label.add_theme_font_size_override("font_size", 15)
 		count_label.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
 		badge.add_child(count_label)
 		cell.add_child(badge)
@@ -708,13 +680,13 @@ func _update_detail(item_id: String) -> void:
 
 	var name_label := Label.new()
 	name_label.text = item.get("name", item_id)
-	name_label.add_theme_font_size_override("font_size", 15)
+	name_label.add_theme_font_size_override("font_size", 23)
 	name_label.add_theme_color_override("font_color", type_color.lightened(0.4))
 	header.add_child(name_label)
 
 	var type_label := Label.new()
 	type_label.text = type_str.capitalize()
-	type_label.add_theme_font_size_override("font_size", 11)
+	type_label.add_theme_font_size_override("font_size", 17)
 	type_label.add_theme_color_override("font_color", Color(0.6, 0.55, 0.45))
 	type_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(type_label)
@@ -724,7 +696,7 @@ func _update_detail(item_id: String) -> void:
 	if not desc_text.is_empty():
 		var desc_label := Label.new()
 		desc_label.text = desc_text
-		desc_label.add_theme_font_size_override("font_size", 11)
+		desc_label.add_theme_font_size_override("font_size", 17)
 		desc_label.add_theme_color_override("font_color", Color(0.65, 0.6, 0.5))
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_detail_container.add_child(desc_label)
@@ -773,12 +745,12 @@ func _add_detail_stat(parent: HBoxContainer, label_text: String, value_text: Str
 
 	var lbl := Label.new()
 	lbl.text = label_text + ":"
-	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.add_theme_font_size_override("font_size", 17)
 	lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
 	pair.add_child(lbl)
 	var val := Label.new()
 	val.text = value_text
-	val.add_theme_font_size_override("font_size", 11)
+	val.add_theme_font_size_override("font_size", 17)
 	val.add_theme_color_override("font_color", color)
 	pair.add_child(val)
 
@@ -827,10 +799,6 @@ func _ctx_discard() -> void:
 		return
 	var discard_id: String = _context_item_id
 	_inventory.remove_item(discard_id)
-	# Spawn loot drop at player position
-	if _player:
-		var offset := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-		LootHelper.spawn_drop(_player.global_position + offset, discard_id, 1, 0)
 	_hide_context_menu()
 	_refresh()
 
@@ -952,7 +920,6 @@ func _update_cursor_highlight() -> void:
 	if _nav_zone == "inventory":
 		if _grid_idx < 0 or _grid_idx >= _cursor_cells.size():
 			_cursor_hand.visible = false
-			_tooltip.visible = false
 			return
 		cell = _cursor_cells[_grid_idx]
 		item_id = _cursor_item_ids[_grid_idx] if _grid_idx < _cursor_item_ids.size() else ""
@@ -960,7 +927,6 @@ func _update_cursor_highlight() -> void:
 		var equip_vbox: VBoxContainer = _left_equip_vbox if _equip_col == 0 else _right_equip_vbox
 		if _equip_row < 0 or _equip_row >= equip_vbox.get_child_count():
 			_cursor_hand.visible = false
-			_tooltip.visible = false
 			return
 		cell = equip_vbox.get_child(_equip_row)
 		var slot_array: Array = LEFT_EQUIP if _equip_col == 0 else RIGHT_EQUIP
@@ -969,7 +935,6 @@ func _update_cursor_highlight() -> void:
 
 	if not cell:
 		_cursor_hand.visible = false
-		_tooltip.visible = false
 		return
 
 	_cursor_hand.visible = true
@@ -979,12 +944,8 @@ func _update_cursor_highlight() -> void:
 	)
 
 	if not item_id.is_empty():
-		_tooltip_label.text = _format_tooltip(item_id)
-		_tooltip.position = cell.global_position - global_position + Vector2(0, -28)
-		_tooltip.visible = true
 		_update_detail(item_id)
 	else:
-		_tooltip.visible = false
 		_clear_detail()
 
 func _open_action_menu(item_id: String) -> void:
@@ -1041,7 +1002,7 @@ func _open_equip_action_menu(slot_name: String, item_id: String) -> void:
 func _add_action_button(text: String, callback: Callable) -> void:
 	var btn := Button.new()
 	btn.text = text
-	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_font_size_override("font_size", 18)
 	btn.custom_minimum_size = Vector2(80, 26)
 	btn.pressed.connect(callback)
 	_context_vbox.add_child(btn)

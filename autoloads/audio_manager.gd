@@ -16,12 +16,6 @@ func _ready() -> void:
 		player.bus = &"UI"
 		add_child(player)
 		_pool_ui.append(player)
-	GameEvents.proficiency_level_up.connect(_on_proficiency_level_up)
-
-
-func _on_proficiency_level_up(entity_id: String, _skill_id: String, _new_level: int) -> void:
-	if entity_id == "player":
-		play_ui_sfx("ui_level_up")
 
 
 func play_ui_sfx(sfx_key: String) -> void:

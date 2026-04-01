@@ -86,7 +86,7 @@ func _build_sidebar() -> VBoxContainer:
 		btn.flat = true
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.add_theme_font_override("font", UIHelper.GAME_FONT)
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_font_size_override("font_size", 21)
 		btn.pressed.connect(_show_category.bind(category))
 		sidebar.add_child(btn)
 		_sidebar_buttons[category] = btn
@@ -138,7 +138,7 @@ func _build_game_content() -> void:
 
 func _add_volume_row(parent: Control, label_text: String, bus_name: String) -> HSlider:
 	var hbox: HBoxContainer = HBoxContainer.new()
-	var label: Label = UIHelper.create_label(label_text, 14, Color.WHITE)
+	var label: Label = UIHelper.create_label(label_text, 21, Color.WHITE)
 	label.custom_minimum_size.x = 60
 	hbox.add_child(label)
 	var slider: HSlider = HSlider.new()

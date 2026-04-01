@@ -1,12 +1,11 @@
 extends CharacterBody3D
-## Player controller with WASD movement, left-click melee attack, skill hotbar, and death/respawn.
+## Player controller with WASD movement, left-click melee attack, and death/respawn.
 ## Uses Meshy AI swordsman model with separate animation files.
 
 const SPEED: float = 7.2
 const GRAVITY: float = 9.8
 const MODEL_SCALE: float = 1.5
 const DEATH_GOLD_PENALTY_RATIO: float = 0.1
-const CONSTITUTION_XP_PER_HIT: int = 3
 const RESPAWN_TIME: float = 3.0
 
 const ModelHelper = preload("res://scripts/utils/model_helper.gd")
@@ -15,14 +14,20 @@ const StatsComponent = preload("res://scripts/components/stats_component.gd")
 const InventoryComponent = preload("res://scripts/components/inventory_component.gd")
 const EquipmentComponent = preload("res://scripts/components/equipment_component.gd")
 const CombatComponent = preload("res://scripts/components/combat_component.gd")
-const ProgressionComponent = preload("res://scripts/components/progression_component.gd")
-const SkillsComponent = preload("res://scripts/components/skills_component.gd")
 const AutoAttackComponent = preload("res://scripts/components/auto_attack_component.gd")
 const PerceptionComponent = preload("res://scripts/components/perception_component.gd")
-const LevelData = preload("res://scripts/data/level_data.gd")
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
-const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
 const HitVFX = preload("res://scripts/vfx/hit_vfx.gd")
+
+# Armor/phys-type resistance table (inlined from deleted SkillEffectResolver)
+const _RESISTANCE_MULTIPLIERS: Dictionary = {
+	"fatal": 2.0, "weak": 1.5, "neutral": 1.0, "resist": 0.5, "immune": 0.0
+}
+const _ARMOR_PHYS_TYPE_TABLE: Dictionary = {
+	"heavy":  {"slash": "resist", "pierce": "neutral", "blunt": "weak"},
+	"medium": {"slash": "neutral", "pierce": "weak",   "blunt": "neutral"},
+	"light":  {"slash": "weak",   "pierce": "neutral", "blunt": "neutral"},
+}
 
 var entity_id: String = "player"
 
@@ -61,10 +66,6 @@ const IDLE_ANIMS: PackedStringArray = ["Idle", "Idle_Breathing", "Idle_Breathing
 const IDLE_RARE_ANIMS: PackedStringArray = ["Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look"]
 const IDLE_TIRED_ANIMS: PackedStringArray = ["Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck"]
 
-# AGI travel XP
-var _combat_distance_traveled: float = 0.0
-var _last_position: Vector3
-
 # Harvesting
 var _harvest_target: String = ""
 var _chop_timer: float = 0.0
@@ -81,26 +82,16 @@ var _stats: Node
 var _inventory: Node
 var _equipment: Node
 var _combat: Node
-var _progression: Node
-var _skills_comp: Node
 var _auto_attack: Node
 var _perception: Node
 var _stamina: Node
-var _quest_comp: Node
 
 # Child subsystem nodes
 var _hover: Node
-var _player_input: Node
 var _debug_block_ring: MeshInstance3D = null
 
 # UI references (set by main scene setup)
-var shop_panel: Control
-var skill_hotbar: Control
-var dialogue_panel: Node
-var crafting_panel: Control
 var game_menu: Node
-var interior_manager: Node
-var relationship_panel: Control
 
 
 func _ready() -> void:
@@ -122,15 +113,23 @@ func _ready() -> void:
 	add_child(_audio)
 	_audio.setup(self)
 
+	var base_stats: Dictionary = {
+		"hp": 50, "max_hp": 50, "atk": 5, "def": 3, "matk": 5, "mdef": 3,
+		"crit_rate": 5, "crit_damage": 150, "attack_speed": 1.5, "attack_speed_mult": 1.0,
+		"attack_range": 2.5, "move_speed": 1.0, "cast_speed": 1.0,
+		"max_stamina": 100, "stamina_regen": 1.0, "hp_regen": 0.0, "cooldown_reduction": 0,
+		"level": 1, "gold": 100,
+	}
+
 	_stats = StatsComponent.new()
 	_stats.name = "StatsComponent"
 	add_child(_stats)
-	_stats.setup(LevelData.BASE_PLAYER_STATS)
+	_stats.setup(base_stats)
 
 	_inventory = InventoryComponent.new()
 	_inventory.name = "InventoryComponent"
 	add_child(_inventory)
-	_inventory.setup({"basic_sword": 1}, LevelData.BASE_PLAYER_STATS.get("gold", 100))
+	_inventory.setup({"basic_sword": 1}, base_stats.get("gold", 100))
 
 	_equipment = EquipmentComponent.new()
 	_equipment.name = "EquipmentComponent"
@@ -141,20 +140,10 @@ func _ready() -> void:
 	}, _inventory)
 	_equipment.equipment_changed.connect(_on_equipment_changed)
 
-	_progression = ProgressionComponent.new()
-	_progression.name = "ProgressionComponent"
-	add_child(_progression)
-	_progression.setup(_stats, {}, _equipment)
-
 	_combat = CombatComponent.new()
 	_combat.name = "CombatComponent"
 	add_child(_combat)
-	_combat.setup(_stats, _equipment, _progression)
-
-	_skills_comp = SkillsComponent.new()
-	_skills_comp.name = "SkillsComponent"
-	add_child(_skills_comp)
-	_skills_comp.setup({}, ["", "", "", "", ""])
+	_combat.setup(_stats, _equipment)
 
 	_auto_attack = AutoAttackComponent.new()
 	_auto_attack.name = "AutoAttackComponent"
@@ -163,14 +152,12 @@ func _ready() -> void:
 	_auto_attack.attack_landed.connect(_on_auto_attack_landed)
 	_auto_attack.target_lost.connect(_on_auto_attack_target_lost)
 
-	var stats := LevelData.BASE_PLAYER_STATS.duplicate()
-	stats["type"] = "player"
-	stats["name"] = "Player"
-	stats["inventory"] = {}
-	stats["equipment"] = {"head": "", "torso": "", "legs": "", "gloves": "", "feet": "", "back": "", "main_hand": "", "off_hand": ""}
-	stats["skills"] = {}
-	stats["hotbar"] = ["", "", "", "", ""]
-	WorldState.register_entity("player", self, stats)
+	var entity_stats: Dictionary = base_stats.duplicate()
+	entity_stats["type"] = "player"
+	entity_stats["name"] = "Player"
+	entity_stats["inventory"] = {}
+	entity_stats["equipment"] = {"head": "", "torso": "", "legs": "", "gloves": "", "feet": "", "back": "", "main_hand": "", "off_hand": ""}
+	WorldState.register_entity("player", self, entity_stats)
 
 	# Add StaminaComponent
 	var stamina_comp := preload("res://scripts/components/stamina_component.gd").new()
@@ -179,11 +166,6 @@ func _ready() -> void:
 	stamina_comp.setup_rest_spots(["TownWell", "TownInn"])
 	_stamina = stamina_comp
 	_combat.set_stamina(_stamina)
-
-	var quest_comp: Node = QuestComponent.new()
-	quest_comp.name = "QuestComponent"
-	add_child(quest_comp)
-	_quest_comp = quest_comp
 
 	var perception_comp := PerceptionComponent.new()
 	perception_comp.name = "PerceptionComponent"
@@ -197,22 +179,11 @@ func _ready() -> void:
 	add_child(_hover)
 	_hover.setup(self)
 
-	_skills_comp.setup_execution(_combat, _stats, _progression, _visuals, _perception, _auto_attack)
-
-	# Skills input adapter
-	_player_input = preload("res://scripts/components/player_input_component.gd").new()
-	_player_input.name = "PlayerInputComponent"
-	add_child(_player_input)
-	_player_input.setup(self, _skills_comp)
-
-
 	# Player HP is shown in HUD, no 3D bar needed
 
 	GameEvents.entity_died.connect(_on_entity_died)
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.damage_defended.connect(_on_damage_defended)
-
-	_last_position = global_position
 
 func _physics_process(delta: float) -> void:
 	if _hitstop_timer > 0.0:
@@ -282,8 +253,7 @@ func _physics_process(delta: float) -> void:
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_forward", "move_back")
 	)
-	var skill_pending: bool = _skills_comp != null and _skills_comp.is_skill_pending()
-	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open() and not skill_pending
+	var wasd_active: bool = input_dir.length_squared() > 0.01 and not _is_ui_open()
 
 	if _is_ui_open():
 		_stop_navigation()
@@ -361,19 +331,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	# Safety teleport if fallen off the world (skip when inside an interior at Y=-50)
-	if global_position.y < -10.0 and not (interior_manager and interior_manager.is_inside()):
+	if global_position.y < -10.0:
 		global_position = Vector3(0.0, 2.0, 0.0)
 		velocity = Vector3.ZERO
-
-	# AGI travel XP: 1 XP per 10m traveled while in combat
-	if not _attack_target.is_empty():
-		var dist: float = global_position.distance_to(_last_position)
-		_combat_distance_traveled += dist
-		if _combat_distance_traveled >= 10.0:
-			if _progression:
-				_progression.grant_proficiency_xp("agi", 1)
-			_combat_distance_traveled -= 10.0
-	_last_position = global_position
 
 	# HP Regen (out of combat only, 5 second delay after last damage)
 	if _stats and _stats.hp_regen > 0 and _stats.hp < _stats.max_hp:
@@ -417,12 +377,8 @@ func _physics_process(delta: float) -> void:
 		if _combo_window_timer <= 0.0:
 			_combo_step = 0
 
-	# Skill animation lock — tick pending hit each frame
-	if _skills_comp and _skills_comp.is_skill_pending():
-		_skills_comp.tick_pending_hit(delta)
-
 	# Update animation
-	if not _is_attacking and not (_skills_comp and _skills_comp.is_skill_pending()) and _attack_target.is_empty() and _harvest_target.is_empty():
+	if not _is_attacking and _attack_target.is_empty() and _harvest_target.is_empty():
 		if is_moving:
 			_idle_timer = 0.0
 			_visuals.play_anim("Running")
@@ -468,9 +424,6 @@ func _cancel_attack() -> void:
 	_hide_target_hp_bar(_attack_target)
 	_attack_target = ""
 	_auto_attack.cancel()
-	_player_input.cancel_pending()
-
-	_combat_distance_traveled = 0.0
 	_combo_step = 0
 	_combo_window_timer = 0.0
 	_combo_buffered = false
@@ -602,13 +555,15 @@ func _resolve_melee_hit() -> void:
 		# Physical type modifier (weapon phys_type vs target armor type)
 		var phys_type: String = _combat.get_equipped_phys_type()
 		var armor_type: String = target_combat.get_armor_type() if target_combat else "light"
-		var phys_mod: float = SkillEffectResolver.get_phys_type_modifier(phys_type, armor_type)
+		var armor_table: Dictionary = _ARMOR_PHYS_TYPE_TABLE.get(armor_type, {})
+		var phys_level: String = armor_table.get(phys_type, "neutral")
+		var phys_mod: float = _RESISTANCE_MULTIPLIERS.get(phys_level, 1.0)
 
 		# Element resistance (auto-attacks use target's per-phys_type resistance)
 		var target_resistances: Dictionary = edata.get("resistances", {})
 		var resist_mod: float = 1.0
 		if target_resistances.has(phys_type):
-			resist_mod = SkillEffectResolver.RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
+			resist_mod = _RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
 
 		# Combine modifiers and determine hit_type label
 		var combined_mod: float = phys_mod * resist_mod
@@ -639,13 +594,6 @@ func _resolve_melee_hit() -> void:
 			HitVFX.spawn_hit_effect(self, hit_vfx_pos, facing)
 			_visuals.spawn_styled_damage_number(eid, actual_damage, hit_type, crit_result["is_crit"] and actual_damage > 0, target_pos)
 			_visuals.flash_target(eid)
-
-		# XP grants (weapon, STR, DEX)
-		if _progression:
-			var weapon_type: String = _combat.get_equipped_weapon_type()
-			_progression.grant_proficiency_xp(weapon_type, 3)
-			_progression.grant_proficiency_xp("str", 3)
-			_progression.grant_proficiency_xp("dex", 2)
 
 		# SFX
 		if _audio:
@@ -756,7 +704,6 @@ func _process_harvesting(delta: float) -> bool:
 				_cancel_harvest()
 				return false
 			var skill_id: String = harvestable.get_skill_id()
-			_progression.grant_proficiency_xp(skill_id, result.xp)
 			resource_node.last_chopper_pos = global_position
 			resource_node.shake()
 			if _audio:
@@ -764,7 +711,6 @@ func _process_harvesting(delta: float) -> bool:
 				match skill_id:
 					"woodcutting": gather_key = "gather_tree_chop"
 					"mining": gather_key = "gather_rock_mine"
-					"fishing": gather_key = "gather_fishing_cast"
 				if gather_key != "":
 					_audio.play_oneshot(gather_key)
 			if result.depleted:
@@ -780,13 +726,6 @@ func _stop_navigation() -> void:
 func _input(event: InputEvent) -> void:
 	if _is_dead:
 		return
-	if event.is_action_pressed("ui_cancel") and dialogue_panel and dialogue_panel.visible:
-		dialogue_panel.close_dialogue()
-		get_viewport().set_input_as_handled()
-		return
-	if event.is_action_pressed("ui_cancel") and interior_manager and interior_manager.is_inside():
-		interior_manager.exit_interior()
-		get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -799,9 +738,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Left-click basic attack (weapon or unarmed)
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if _skills_comp and _skills_comp.is_skill_pending():
-				get_viewport().set_input_as_handled()
-				return
 			if _is_attacking:
 				_combo_buffered = true
 				get_viewport().set_input_as_handled()
@@ -813,15 +749,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start_attack(0)
 			get_viewport().set_input_as_handled()
 			return
-
-		for i in range(5):
-			if event.is_action_pressed("hotbar_%d" % (i + 1)):
-				if _is_attacking or (_skills_comp and _skills_comp.is_skill_pending()):
-					get_viewport().set_input_as_handled()
-					return
-				_player_input.try_use_hotbar_slot(i)
-				get_viewport().set_input_as_handled()
-				return
 
 	if event.is_action_pressed("interact") and not _is_ui_open():
 		_interact_with_nearest()
@@ -837,43 +764,13 @@ func _interact_with_nearest() -> void:
 		return
 
 	match etype:
-		"npc", "interior_npc":
-			if dialogue_panel:
-				_cancel_attack()
-				_cancel_harvest()
-				dialogue_panel.open_dialogue(target_id, target_node)
-		"tree", "rock", "fishing_spot":
+		"tree", "rock":
 			_cancel_attack()
 			_cancel_harvest()
 			_harvest_target = target_id
-		"crafting_station":
-			if crafting_panel:
-				_cancel_attack()
-				_cancel_harvest()
-				var stype: String = data.get("station_type", "")
-				var sname: String = data.get("name", "Crafting")
-				crafting_panel.open(stype, sname)
-		"door":
-			if interior_manager:
-				var btype: String = data.get("building_type", "")
-				interior_manager.enter_interior(btype, target_node.global_position)
-
-func enter_vending_state() -> void:
-	_cancel_attack()
-	_cancel_harvest()
-	_stop_navigation()
-	velocity = Vector3.ZERO
 
 func _is_ui_open() -> bool:
-	if dialogue_panel and dialogue_panel.visible:
-		return true
 	if game_menu and game_menu.is_open():
-		return true
-	if shop_panel and shop_panel.is_open():
-		return true
-	if crafting_panel and crafting_panel.is_open():
-		return true
-	if relationship_panel and relationship_panel.is_open():
 		return true
 	return false
 
@@ -918,7 +815,7 @@ func _respawn() -> void:
 
 	GameEvents.entity_respawned.emit("player")
 
-	var city_spawn: Vector3 = ZoneDatabase.ZONES["city"]["spawn_point"]
+	var city_spawn: Vector3 = Vector3(0.0, 1.0, 0.0)
 	var loaded_zone: Node3D = ZoneManager.get_loaded_zone()
 	var current_zone_id: String = ""
 	if loaded_zone and "zone_id" in loaded_zone:
@@ -936,7 +833,6 @@ func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _r
 	if target_id == "player":
 		if _combat.is_blocking():
 			# Block absorbs hit reaction — no stagger/knockback
-			_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 			_last_damage_time = Time.get_ticks_msec()
 			_hp_regen_accumulator = 0.0
 			return
@@ -950,7 +846,6 @@ func _on_entity_damaged(target_id: String, attacker_id: String, _damage: int, _r
 			if dir.length_squared() > 0.01:
 				_knockback_velocity = dir.normalized() * 5.0
 		_visuals.play_anim("Hit", true)
-		_progression.grant_proficiency_xp("con", CONSTITUTION_XP_PER_HIT)
 		_last_damage_time = Time.get_ticks_msec()
 		_hp_regen_accumulator = 0.0
 
@@ -976,18 +871,9 @@ func _on_damage_defended(target_id: String, _attacker_id: String, _amount_negate
 		if _audio:
 			_audio.play_oneshot("combat_guard_break")
 
-func _on_auto_attack_landed(target_id: String, damage: int, target_pos: Vector3) -> void:
+func _on_auto_attack_landed(target_id: String, _damage: int, _target_pos: Vector3) -> void:
 	_visuals.flash_target(target_id)
 	var weapon_type: String = _combat.get_equipped_weapon_type() if _combat else "generic"
-	var target_data: Dictionary = WorldState.get_entity_data(target_id)
-	var monster_type: String = target_data.get("monster_type", "")
-	if not monster_type.is_empty():
-		_progression.grant_combat_xp(monster_type, weapon_type)
-	# STR XP: 3 per physical auto-attack hit
-	if _progression:
-		_progression.grant_proficiency_xp("str", 3)
-		# DEX XP: 2 per hit landed
-		_progression.grant_proficiency_xp("dex", 2)
 	if _audio:
 		var hit_key: String = "combat_hit_" + weapon_type
 		if SfxDatabase.get_sfx(hit_key).is_empty():

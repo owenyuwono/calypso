@@ -15,8 +15,6 @@ var _node_to_id: Dictionary = {}
 var location_markers: Dictionary = {}
 # Entity metadata: id -> Dictionary with type, stats, inventory, etc.
 var entity_data: Dictionary = {}
-# Cached tree entity ids for fast perception lookups (avoids O(N) scan of all entities)
-var tree_entities: Dictionary = {}
 
 # --- Entity Registry ---
 
@@ -24,8 +22,6 @@ func register_entity(id: String, node: Node3D, data: Dictionary = {}) -> void:
 	entities[id] = node
 	_node_to_id[node] = id
 	entity_data[id] = data
-	if data.get("type", "") == "tree":
-		tree_entities[id] = node
 
 func unregister_entity(id: String) -> void:
 	var node = entities.get(id)
@@ -33,7 +29,6 @@ func unregister_entity(id: String) -> void:
 		_node_to_id.erase(node)
 	entities.erase(id)
 	entity_data.erase(id)
-	tree_entities.erase(id)
 
 func get_entity(id: String) -> Node3D:
 	return entities.get(id)

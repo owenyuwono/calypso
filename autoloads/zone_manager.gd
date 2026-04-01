@@ -60,9 +60,9 @@ func load_zone(zone_id: String, spawn_position: Vector3) -> void:
 	if _loaded_zone:
 		await _unload_current_zone()
 
-	# Load new zone
-	var zone_data: Dictionary = ZoneDatabase.get_zone(zone_id)
-	var scene: PackedScene = load(zone_data["scene_path"])
+	# Load new zone — derive scene path directly from zone_id
+	var scene_path: String = "res://scenes/zones/" + zone_id + ".tscn"
+	var scene: PackedScene = load(scene_path)
 	var zone_node: Node3D = scene.instantiate()
 	_zone_anchor.add_child(zone_node)
 	_loaded_zone = zone_node

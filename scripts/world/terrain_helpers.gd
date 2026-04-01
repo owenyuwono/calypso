@@ -26,13 +26,8 @@ static func apply_standard_shader_params(mat: ShaderMaterial) -> void:
 
 static func create_portals(parent: Node3D, zone_id: String) -> void:
 	## Instantiates zone portal nodes for zone_id and adds them to parent.
-	var portals: Array = ZoneDatabase.get_portals(zone_id)
-	var portal_script: Script = preload("res://scripts/world/zone_portal.gd")
-	for portal_def in portals:
-		var portal: Area3D = Area3D.new()
-		portal.set_script(portal_script)
-		parent.add_child(portal)
-		portal.setup(portal_def)
+	## Portal definitions are passed externally — ZoneDatabase is not available.
+	pass
 
 
 static func begin_navmesh_bake(nav_region: NavigationRegion3D, on_baked: Callable) -> void:

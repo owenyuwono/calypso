@@ -7,15 +7,12 @@ const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 var _stats: Node       # StatsComponent ref (required)
 var _equipment: Node   # EquipmentComponent ref (optional — monsters don't have equipment)
-var _progression: Node # ProgressionComponent ref (optional — for item penalty calculation)
 
 # --- Block/Parry constants ---
 const BLOCK_REDUCTION_BASE: float = 0.30
 const BLOCK_REDUCTION_SHIELD_MIN: float = 0.50
 const BLOCK_REDUCTION_SHIELD_MAX: float = 0.70
 const PARRY_WINDOW_BASE_MS: int = 200
-const PARRY_WINDOW_PER_PROF_LEVEL_MS: int = 20
-const PARRY_WINDOW_MAX_MS: int = 400
 const BLOCK_STAMINA_DRAIN_PER_SEC: float = 2.0
 const BLOCK_STAMINA_HIT_RATIO: float = 0.5
 const PARRY_STAMINA_RESTORE: float = 10.0
@@ -30,10 +27,9 @@ var _guard_broken: bool = false
 var _guard_break_timer: float = 0.0
 var _stamina_ref: Node = null
 
-func setup(stats_component: Node, equipment_component: Node = null, progression_component: Node = null) -> void:
+func setup(stats_component: Node, equipment_component: Node = null) -> void:
 	_stats = stats_component
 	_equipment = equipment_component
-	_progression = progression_component
 
 func set_stamina(stamina_comp: Node) -> void:
 	_stamina_ref = stamina_comp
@@ -113,24 +109,13 @@ func receive_damage(incoming_damage: int, attacker_id: String) -> Dictionary:
 func get_effective_atk() -> int:
 	var base: int = _stats.atk
 	if _equipment:
-		var weapon_id: String = _equipment.get_weapon()
-		if not weapon_id.is_empty():
-			var item: Dictionary = ItemDatabase.get_item(weapon_id)
-			var atk_bonus: int = item.get("atk_bonus", 0)
-			var penalty: Dictionary = _get_item_penalty(weapon_id)
-			base += floori(atk_bonus * penalty.stat_mult)
-		# else unarmed — no equipment bonus
+		base += _equipment.get_atk_bonus()
 	return base
 
 func get_effective_def() -> int:
 	var base: int = _stats.def
 	if _equipment:
-		var armor_id: String = _equipment.get_armor()
-		if not armor_id.is_empty():
-			var item: Dictionary = ItemDatabase.get_item(armor_id)
-			var def_bonus: int = item.get("def_bonus", 0)
-			var penalty: Dictionary = _get_item_penalty(armor_id)
-			base += floori(def_bonus * penalty.stat_mult)
+		base += _equipment.get_def_bonus()
 	return base
 
 func get_effective_matk() -> int:
@@ -154,16 +139,14 @@ func roll_crit() -> Dictionary:
 	return {"is_crit": is_crit, "multiplier": multiplier}
 
 func get_attack_speed_multiplier() -> float:
-	## Returns the speed multiplier for the equipped weapon (penalty-adjusted).
+	## Returns the speed multiplier for the equipped weapon.
 	if not _equipment:
 		return 1.5  # Unarmed: fast flurry
 	var weapon_id: String = _equipment.get_weapon()
 	if weapon_id.is_empty():
 		return 1.5  # Unarmed: fast flurry
 	var item: Dictionary = ItemDatabase.get_item(weapon_id)
-	var penalty: Dictionary = _get_item_penalty(weapon_id)
-	var base_speed: float = item.get("attack_speed", 1.0)
-	return base_speed * penalty.speed_mult
+	return item.get("attack_speed", 1.0)
 
 func get_equipped_weapon_type() -> String:
 	## Returns the weapon_type of the equipped weapon, or "mace" for unarmed.
@@ -240,30 +223,8 @@ func _apply_damage_to(target_id: String, damage: int) -> int:
 
 # --- Private helpers ---
 
-func _get_item_penalty(item_id: String) -> Dictionary:
-	## Calculate penalty for using an item above your proficiency level.
-	var item: Dictionary = ItemDatabase.get_item(item_id)
-	var required_skill: String = item.get("required_skill", "")
-	var required_level: int = item.get("required_level", 1)
-	if required_skill.is_empty():
-		return {"stat_mult": 1.0, "speed_mult": 1.0}
-
-	if not _progression:
-		return {"stat_mult": 1.0, "speed_mult": 1.0}
-
-	var prof_level: int = _progression.get_proficiency_level(required_skill)
-	var level_gap: int = maxi(0, required_level - prof_level)
-	var stat_mult: float = maxf(0.25, 1.0 - level_gap * 0.15)
-	var speed_mult: float = minf(1.75, 1.0 + level_gap * 0.15)
-	return {"stat_mult": stat_mult, "speed_mult": speed_mult}
-
 func _get_parry_window_ms() -> int:
-	var weapon_type: String = get_equipped_weapon_type()
-	var prof_level: int = 0
-	if _progression:
-		prof_level = _progression.get_proficiency_level(weapon_type)
-	var window: int = PARRY_WINDOW_BASE_MS + prof_level * PARRY_WINDOW_PER_PROF_LEVEL_MS
-	return mini(window, PARRY_WINDOW_MAX_MS)
+	return PARRY_WINDOW_BASE_MS
 
 func _get_block_reduction() -> float:
 	if not _equipment:

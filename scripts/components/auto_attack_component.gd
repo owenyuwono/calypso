@@ -8,9 +8,17 @@ signal attack_started(target_id: String)
 signal attack_landed(target_id: String, damage: int, target_pos: Vector3)
 signal target_lost()
 
-const SkillEffectResolver = preload("res://scripts/skills/skill_effect_resolver.gd")
-
 const ATTACK_ANIM: String = "1H_Melee_Attack_Chop"
+
+# Armor/phys-type resistance table (inlined from deleted SkillEffectResolver)
+const _RESISTANCE_MULTIPLIERS: Dictionary = {
+	"fatal": 2.0, "weak": 1.5, "neutral": 1.0, "resist": 0.5, "immune": 0.0
+}
+const _ARMOR_PHYS_TYPE_TABLE: Dictionary = {
+	"heavy":  {"slash": "resist", "pierce": "neutral", "blunt": "weak"},
+	"medium": {"slash": "neutral", "pierce": "weak",   "blunt": "neutral"},
+	"light":  {"slash": "weak",   "pierce": "neutral", "blunt": "neutral"},
+}
 
 var _visuals: Node          # EntityVisuals ref
 var _combat: Node           # CombatComponent ref
@@ -160,7 +168,9 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Physical type modifier (weapon phys_type vs target armor type)
 	var phys_type: String = _combat.get_equipped_phys_type()
 	var armor_type: String = target_combat.get_armor_type() if target_combat else "light"
-	var phys_mod: float = SkillEffectResolver.get_phys_type_modifier(phys_type, armor_type)
+	var armor_table: Dictionary = _ARMOR_PHYS_TYPE_TABLE.get(armor_type, {})
+	var phys_level: String = armor_table.get(phys_type, "neutral")
+	var phys_mod: float = _RESISTANCE_MULTIPLIERS.get(phys_level, 1.0)
 
 	# Element resistance (auto-attacks use target's resistances for phys_type)
 	var target_resistances: Dictionary = {}
@@ -169,7 +179,7 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 		target_resistances = entity_data["resistances"]
 	var resist_mod: float = 1.0
 	if target_resistances.has(phys_type):
-		resist_mod = SkillEffectResolver.RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
+		resist_mod = _RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
 
 	# Combine modifiers and determine hit_type
 	var combined_mod: float = phys_mod * resist_mod

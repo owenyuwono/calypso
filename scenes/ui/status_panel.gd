@@ -60,8 +60,6 @@ func _ready() -> void:
 
 	GameEvents.entity_damaged.connect(func(_a, _b, _c, _d): refresh())
 	GameEvents.entity_healed.connect(func(_a, _b, _c): refresh())
-	GameEvents.proficiency_xp_gained.connect(func(_a, _b, _c, _d): refresh())
-	GameEvents.proficiency_level_up.connect(func(_a, _b, _c): refresh())
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 
 func _build_ui() -> void:
@@ -78,13 +76,13 @@ func _build_ui() -> void:
 
 	_name_label = Label.new()
 	_name_label.text = "Player"
-	_name_label.add_theme_font_size_override("font_size", 18)
+	_name_label.add_theme_font_size_override("font_size", 27)
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_row.add_child(_name_label)
 
 	_level_label = Label.new()
 	_level_label.text = "Lv. 1"
-	_level_label.add_theme_font_size_override("font_size", 18)
+	_level_label.add_theme_font_size_override("font_size", 27)
 	_level_label.add_theme_color_override("font_color", Color(1, 1, 0.8))
 	name_row.add_child(_level_label)
 
@@ -181,7 +179,7 @@ func _build_ui() -> void:
 func _add_column_header(vbox: VBoxContainer, title: String) -> void:
 	var header := Label.new()
 	header.text = title
-	header.add_theme_font_size_override("font_size", 16)
+	header.add_theme_font_size_override("font_size", 24)
 	header.add_theme_color_override("font_color", _COLOR_SECTION)
 	vbox.add_child(header)
 
@@ -201,17 +199,17 @@ func _create_stat_row(stat_name: String, has_bonus: bool) -> Dictionary:
 
 	var name_lbl := Label.new()
 	name_lbl.text = stat_name
-	name_lbl.add_theme_font_size_override("font_size", 15)
+	name_lbl.add_theme_font_size_override("font_size", 23)
 	name_lbl.custom_minimum_size.x = 68
 	hbox.add_child(name_lbl)
 
 	var value_lbl := Label.new()
-	value_lbl.add_theme_font_size_override("font_size", 15)
+	value_lbl.add_theme_font_size_override("font_size", 23)
 	value_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(value_lbl)
 
 	var bonus_lbl := Label.new()
-	bonus_lbl.add_theme_font_size_override("font_size", 15)
+	bonus_lbl.add_theme_font_size_override("font_size", 23)
 	bonus_lbl.add_theme_color_override("font_color", _COLOR_BONUS)
 	bonus_lbl.visible = has_bonus
 	hbox.add_child(bonus_lbl)

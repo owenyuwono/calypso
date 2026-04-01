@@ -2,8 +2,6 @@
 class_name BuildingHelper
 
 const TerrainGenerator = preload("res://scripts/utils/terrain_generator.gd")
-const InteriorDatabase = preload("res://scripts/data/interior_database.gd")
-const DoorTrigger = preload("res://scripts/world/door_trigger.gd")
 
 
 ## Return the terrain height at (x, z) — used to snap props to ground.
@@ -121,25 +119,16 @@ static func create_building(ctx: WorldBuilderContext, nav_region: Node3D, pos: V
 	if has_door:
 		# Door position: front face of the building, vertically centered at mid-door height.
 		var door_pos := Vector3(0, 0.8, wall_size.z * 0.5 + 0.05)
-		if not building_type.is_empty() and InteriorDatabase.has_interior(building_type):
-			# Clickable DoorTrigger for buildings with interiors.
-			var trigger: StaticBody3D = StaticBody3D.new()
-			trigger.set_script(DoorTrigger)
-			trigger.position = door_pos
-			building.add_child(trigger)
-			var did: String = "door_%s_%d_%d" % [building_type, int(pos.x), int(pos.z)]
-			trigger.setup(building_type, did)
-		else:
-			# Decorative-only door mesh for buildings without interiors.
-			var door := MeshInstance3D.new()
-			var door_mesh := BoxMesh.new()
-			door_mesh.size = Vector3(0.8, 1.6, 0.1)
-			door.mesh = door_mesh
-			door.position = door_pos
-			var door_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, wall_color * 0.6)
-			door.set_surface_override_material(0, door_mat)
-			door.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			building.add_child(door)
+		# Decorative door mesh.
+		var door := MeshInstance3D.new()
+		var door_mesh := BoxMesh.new()
+		door_mesh.size = Vector3(0.8, 1.6, 0.1)
+		door.mesh = door_mesh
+		door.position = door_pos
+		var door_mat: StandardMaterial3D = AssetSpawner.get_or_create_color_mat(ctx, wall_color * 0.6)
+		door.set_surface_override_material(0, door_mat)
+		door.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		building.add_child(door)
 
 	# --- Chimney ---
 	if has_chimney:
