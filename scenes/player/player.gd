@@ -53,6 +53,16 @@ var _attack_anim_timer: float = 0.0
 var _attack_hit_pending: bool = false
 var _attack_hit_timer: float = 0.0
 
+# Gun mode
+var _combat_mode: String = "melee"  # "melee" or "gun"
+var _gun_cooldown_timer: float = 0.0
+var _player_yaw: float = 0.0  # mouse-controlled facing angle
+const MOUSE_SENSITIVITY: float = 0.003
+var _gun_fire_rate: float = 0.3  # seconds between shots
+var _crosshair: Label = null
+var _mode_label: Label = null
+var _mode_label_timer: float = 0.0
+
 # Combo system
 var _combo_step: int = 0
 var _combo_window_timer: float = 0.0
@@ -178,7 +188,39 @@ func _ready() -> void:
 	GameEvents.entity_damaged.connect(_on_entity_damaged)
 	GameEvents.damage_defended.connect(_on_damage_defended)
 
+	# Crosshair (only visible in gun mode)
+	_crosshair = Label.new()
+	_crosshair.text = "+"
+	_crosshair.add_theme_font_size_override("font_size", 32)
+	_crosshair.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+	_crosshair.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_crosshair.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_crosshair.anchors_preset = Control.PRESET_CENTER
+	_crosshair.visible = false
+	# Need a CanvasLayer to show it on screen
+	var crosshair_layer := CanvasLayer.new()
+	crosshair_layer.layer = 10
+	add_child(crosshair_layer)
+	crosshair_layer.add_child(_crosshair)
+
+	# Mode label (temporary popup)
+	_mode_label = Label.new()
+	_mode_label.add_theme_font_size_override("font_size", 24)
+	_mode_label.add_theme_color_override("font_color", Color(1, 1, 0.5))
+	_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mode_label.anchors_preset = Control.PRESET_CENTER_TOP
+	_mode_label.position.y = 60
+	_mode_label.visible = false
+	crosshair_layer.add_child(_mode_label)
+
 func _physics_process(delta: float) -> void:
+	if _gun_cooldown_timer > 0.0:
+		_gun_cooldown_timer -= delta
+	if _mode_label_timer > 0.0:
+		_mode_label_timer -= delta
+		if _mode_label_timer <= 0.0:
+			_mode_label.visible = false
+
 	if _hitstop_timer > 0.0:
 		_hitstop_timer -= delta
 		# Freeze animation for hit stop effect
@@ -237,6 +279,9 @@ func _physics_process(delta: float) -> void:
 
 	_update_debug_block_ring()
 
+	# Face mouse cursor — raycast from camera through mouse position to ground plane (Y=0)
+	_update_facing_to_mouse()
+
 	var is_moving := false
 
 	# WASD input (camera-relative direct movement)
@@ -260,12 +305,8 @@ func _physics_process(delta: float) -> void:
 		_combo_step = 0
 		_combo_window_timer = 0.0
 		_combo_buffered = false
-		# Camera-relative direction
-		var cam := get_viewport().get_camera_3d()
-		var cam_basis := cam.global_transform.basis
-		var cam_fwd := Vector3(-cam_basis.z.x, 0.0, -cam_basis.z.z).normalized()
-		var cam_right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
-		var move_dir := (cam_right * input_dir.x + cam_fwd * -input_dir.y).normalized()
+		# Absolute direction (W=north, S=south, A=west, D=east)
+		var move_dir := Vector3(input_dir.x, 0.0, input_dir.y).normalized()
 		var effective_speed: float = SPEED * _stats.move_speed
 		if _stamina:
 			effective_speed *= _stamina.get_fatigue_multiplier("move_speed")
@@ -275,7 +316,6 @@ func _physics_process(delta: float) -> void:
 			effective_speed *= 1.5
 		velocity.x = move_dir.x * effective_speed
 		velocity.z = move_dir.z * effective_speed
-		_visuals.face_direction(move_dir)
 		is_moving = true
 	elif not _attack_target.is_empty():
 		is_moving = _process_combat(delta)
@@ -439,11 +479,31 @@ func _start_attack(step: int) -> void:
 	if _audio:
 		_audio.start_combat_loop()
 
+func _update_facing_to_mouse() -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if not camera:
+		return
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	var ray_from: Vector3 = camera.project_ray_origin(mouse_pos)
+	var ray_dir: Vector3 = camera.project_ray_normal(mouse_pos)
+	# Intersect with Y=0 ground plane
+	if absf(ray_dir.y) < 0.001:
+		return
+	var t: float = -ray_from.y / ray_dir.y
+	if t < 0.0:
+		return
+	var ground_point: Vector3 = ray_from + ray_dir * t
+	var dir: Vector3 = ground_point - global_position
+	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		return
+	dir = dir.normalized()
+	_player_yaw = atan2(dir.x, dir.z)
+	_visuals.face_direction(dir)
+
+
 func _get_facing_dir() -> Vector3:
-	if _visuals and _visuals.get_model():
-		var yaw: float = _visuals.get_model().rotation.y
-		return Vector3(sin(yaw), 0.0, cos(yaw))
-	return Vector3.FORWARD
+	return Vector3(sin(_player_yaw), 0.0, cos(_player_yaw))
 
 func _show_debug_hitbox(half_width: float, depth: float, forward_offset: float, duration: float = 0.2) -> void:
 	var mesh_inst := MeshInstance3D.new()
@@ -590,6 +650,62 @@ func _resolve_melee_hit() -> void:
 				hit_key = "combat_hit_generic"
 			_audio.play_oneshot(hit_key)
 
+func _fire_gun() -> void:
+	if _gun_cooldown_timer > 0.0:
+		return
+	if not _stats or not _stats.is_alive():
+		return
+
+	_gun_cooldown_timer = _gun_fire_rate
+	_visuals.play_anim("Punch_01", true, 3.0)
+
+	# Bullet fires in player's facing direction
+	var facing: Vector3 = _get_facing_dir()
+	var muzzle_pos: Vector3 = global_position + facing * 1.0 + Vector3(0, 1.2, 0)
+
+	_spawn_muzzle_flash(muzzle_pos)
+	if _audio:
+		_audio.play_oneshot("combat_hit_generic")
+
+	# Spawn bullet — it detects enemies on its own as it flies
+	var bullet_script: GDScript = preload("res://scenes/projectiles/bullet.gd")
+	var bullet: Node3D = Node3D.new()
+	bullet.set_script(bullet_script)
+	bullet.direction = facing
+	bullet.shooter_node = self
+	bullet.shooter_rid = get_rid()
+	bullet.atk = _combat.get_effective_atk()
+	get_tree().current_scene.add_child(bullet)
+	bullet.global_position = muzzle_pos
+
+
+func _spawn_muzzle_flash(pos: Vector3) -> void:
+	var mesh_inst := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.15
+	sphere.height = 0.3
+	mesh_inst.mesh = sphere
+	mesh_inst.position = pos
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.9, 0.4, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.7, 0.2)
+	mat.emission_energy_multiplier = 5.0
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh_inst.material_override = mat
+	get_tree().current_scene.add_child(mesh_inst)
+	var tween := mesh_inst.create_tween()
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.1)
+	tween.tween_callback(mesh_inst.queue_free)
+
+
+func _show_mode_label() -> void:
+	_mode_label.text = "GUN" if _combat_mode == "gun" else "FISTS"
+	_mode_label.visible = true
+	_mode_label_timer = 1.5
+
+
 func _show_target_hp_bar(target_id: String) -> void:
 	var target: Node3D = WorldState.get_entity(target_id)
 	if target:
@@ -629,12 +745,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _is_dead:
 		return
 
+	if event is InputEventKey and event.pressed and event.keycode == KEY_T:
+		if _combat_mode == "melee":
+			_combat_mode = "gun"
+			_crosshair.visible = true
+		else:
+			_combat_mode = "melee"
+			_crosshair.visible = false
+		_show_mode_label()
+		get_viewport().set_input_as_handled()
+		return
+
 	if not _is_ui_open():
 		if _combat.is_blocking():
 			get_viewport().set_input_as_handled()
 			return
 		# Left-click basic attack (weapon or unarmed)
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if _combat_mode == "gun":
+				_fire_gun()
+				get_viewport().set_input_as_handled()
+				return
 			if _is_attacking:
 				_combo_buffered = true
 				get_viewport().set_input_as_handled()

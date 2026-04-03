@@ -65,6 +65,9 @@ func _update_dots() -> void:
 				color = Color.WHITE
 				radius = 4.0
 				is_player = true
+			"monster":
+				color = Color(0.9, 0.2, 0.2)
+				radius = 3.0
 			"loot_drop":
 				color = Color(1.0, 0.9, 0.2)
 				radius = 2.0

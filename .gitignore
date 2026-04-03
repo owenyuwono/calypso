@@ -5,3 +5,4 @@ content/
 features/
 inference/
 .claude/worktrees/
+.env

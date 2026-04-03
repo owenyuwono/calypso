@@ -16,7 +16,11 @@ from pathlib import Path
 from PIL import Image
 from io import BytesIO
 
-API_KEY = "AIzaSyBb2bI4mVlr1N9WHTqXTR7gwr1gm8OMfOM"
+import os
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
+API_KEY = os.environ["GEMINI_API_KEY"]
 MODEL = "gemini-3.1-flash-image-preview"
 ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 
