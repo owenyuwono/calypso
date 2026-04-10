@@ -11,6 +11,23 @@ const ITEMS: Dictionary = {
 	"bandage": {"name": "Bandage", "description": "Strips of cloth that staunch bleeding wounds.", "icon": "", "mesh": "", "type": "consumable", "heal": 20, "value": 8},
 	# Ammo
 	"ammo_bullet": {"name": "Bullets", "description": "Standard 9mm rounds.", "icon": "", "mesh": "", "type": "ammo", "ammo_type": "bullet", "count": 12, "value": 3},
+	# Food items
+	"canned_beans": {"name": "Canned Beans", "description": "A tin of baked beans. Filling and shelf-stable.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 30, "value": 5},
+	"canned_soup": {"name": "Canned Soup", "description": "Hearty chicken soup in a can.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 25, "value": 4},
+	"dried_meat": {"name": "Dried Meat", "description": "Jerky strips. High protein, lasts forever.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 40, "value": 8},
+	"tomato": {"name": "Tomato", "description": "A fresh garden tomato.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 15, "value": 2, "spoil_hours": 48},
+	"carrot": {"name": "Carrot", "description": "A crunchy orange carrot.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 12, "value": 2, "spoil_hours": 72},
+	"lettuce": {"name": "Lettuce", "description": "Fresh leafy greens.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 8, "value": 1, "spoil_hours": 24},
+	"herbs": {"name": "Herbs", "description": "Fresh herbs for cooking.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 5, "value": 3, "spoil_hours": 36},
+	"fish": {"name": "Fish", "description": "Fresh fish from aquaponics.", "icon": "", "mesh": "", "type": "consumable", "nutrition": 35, "value": 6, "spoil_hours": 24},
+	# Water items
+	"water_bottle": {"name": "Water Bottle", "description": "A bottle of clean drinking water.", "icon": "", "mesh": "", "type": "consumable", "thirst_restore": 20, "value": 2},
+	# Hygiene items
+	"soap": {"name": "Soap", "description": "A bar of soap for washing.", "icon": "", "mesh": "", "type": "material", "value": 3},
+	"toothpaste": {"name": "Toothpaste", "description": "Minty fresh. One tube lasts a while.", "icon": "", "mesh": "", "type": "material", "value": 4},
+	# Medicine
+	"medicine": {"name": "Medicine", "description": "Basic over-the-counter meds.", "icon": "", "mesh": "", "type": "consumable", "heal": 30, "value": 12},
+	"antibiotics": {"name": "Antibiotics", "description": "Prescription antibiotics. Cures infections.", "icon": "", "mesh": "", "type": "consumable", "heal": 50, "value": 25},
 }
 
 # Armor/phys-type resistance tables — single source of truth for damage pipeline

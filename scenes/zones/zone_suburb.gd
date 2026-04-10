@@ -106,15 +106,14 @@ func _build_suburb_lot() -> void:
 	_ctx.nav_region = _nav_region
 	_ctx.world_root = self
 
-	# House: 12x10m, centered at front of lot
-	BuildingHelper.create_building(
-		_ctx, _nav_region, Vector3(0, 0, 6),
-		Vector3(12, 3.5, 10),
-		Color(0.82, 0.75, 0.65),  # beige walls
-		"peaked",
-		Color(0.45, 0.3, 0.18),  # brown roof
-		1.0, true, true, 0.0, ""
-	)
+	# Utility meters
+	_spawn_meter("electric_meter", Vector3(6.5, 0, 8), Color(0.35, 0.35, 0.38))
+	_spawn_meter("water_meter", Vector3(6.5, 0, 4), Color(0.3, 0.45, 0.5))
+
+	# Starter devices behind the house
+	_spawn_device("water_pump", Vector3(-3, 0, 0), Color(0.3, 0.4, 0.55), Vector3(0.6, 0.8, 0.6))
+	_spawn_device("battery_bank", Vector3(5, 0, 0), Color(0.25, 0.3, 0.25), Vector3(0.8, 0.6, 0.4))
+	_spawn_device("water_tank_small", Vector3(-5, 0, 0), Color(0.25, 0.35, 0.5), Vector3(0.7, 1.0, 0.7))
 
 	# Fence around 20x30m lot perimeter (x: ±10, z: -15 to +15)
 	var fence_h: float = 1.5
@@ -154,6 +153,107 @@ func _build_fence_segment(parent: Node3D, start: Vector3, end: Vector3, height: 
 	body.add_child(col)
 
 	parent.add_child(body)
+
+func _spawn_device(device_type: String, pos: Vector3, color: Color, box_size: Vector3 = Vector3(0.6, 0.8, 0.6)) -> void:
+	var def: Dictionary = preload("res://scripts/data/device_database.gd").get_device(device_type)
+	if def.is_empty():
+		return
+
+	var body := StaticBody3D.new()
+	body.position = Vector3(pos.x, box_size.y * 0.5, pos.z)
+
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = box_size
+	mesh_inst.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mesh_inst.set_surface_override_material(0, mat)
+	body.add_child(mesh_inst)
+
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = box_size
+	col.shape = shape
+	body.add_child(col)
+
+	# Label
+	var label := Label3D.new()
+	label.text = def.get("name", device_type)
+	label.font_size = 28
+	label.pixel_size = 0.005
+	label.position = Vector3(0, box_size.y * 0.5 + 0.2, 0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = Color(0.9, 0.85, 0.7)
+	label.outline_modulate = Color(0, 0, 0)
+	label.outline_size = 6
+	var font: Font = load("res://assets/fonts/Philosopher-Bold.ttf")
+	if font:
+		label.font = font
+	body.add_child(label)
+
+	_nav_region.add_child(body)
+
+	# Register with ResourceManager and WorldState
+	var device_id: String
+	var category: String = def.get("category", "")
+	if category == "storage":
+		device_id = ResourceManager.add_container(device_type, 0.0)
+	else:
+		device_id = ResourceManager.add_device(device_type)
+
+	var entity_id: String = "device_%s" % device_id
+	WorldState.register_entity(entity_id, body, {
+		"type": "device",
+		"name": def.get("name", device_type),
+		"device_id": device_id,
+	})
+
+
+func _spawn_meter(meter_type: String, pos: Vector3, color: Color) -> void:
+	var body := StaticBody3D.new()
+	body.position = Vector3(pos.x, 0.5, pos.z)
+
+	# Box mesh for the meter
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.5, 0.7, 0.3)
+	mesh_inst.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mesh_inst.set_surface_override_material(0, mat)
+	body.add_child(mesh_inst)
+
+	# Collision
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.5, 0.7, 0.3)
+	col.shape = shape
+	body.add_child(col)
+
+	# Small label on the box
+	var label := Label3D.new()
+	label.text = "ELECTRIC" if meter_type == "electric_meter" else "WATER"
+	label.font_size = 32
+	label.pixel_size = 0.005
+	label.position = Vector3(0, 0.1, 0.16)
+	label.modulate = Color(0.9, 0.85, 0.7)
+	label.outline_modulate = Color(0, 0, 0)
+	label.outline_size = 4
+	var font: Font = load("res://assets/fonts/Philosopher-Bold.ttf")
+	if font:
+		label.font = font
+	body.add_child(label)
+
+	_nav_region.add_child(body)
+
+	# Register as interactable entity
+	var entity_id: String = meter_type
+	WorldState.register_entity(entity_id, body, {
+		"type": meter_type,
+		"name": "Electric Meter" if meter_type == "electric_meter" else "Water Meter",
+	})
+
 
 func _add_location_markers() -> void:
 	var markers: Node3D = Node3D.new()

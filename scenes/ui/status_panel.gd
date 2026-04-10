@@ -11,8 +11,8 @@ const _STAT_ICONS: Dictionary = {
 	"HP Regen": "res://assets/textures/ui/stats/stat_hp_regen.png",
 }
 
-const _COLOR_BONUS: Color = Color(0.4, 0.9, 0.4)
-const _COLOR_SECTION: Color = Color(0.8, 0.75, 0.5)
+const _COLOR_BONUS: Color = Color(0.4, 0.8, 0.55)
+const _COLOR_SECTION: Color = Color(0.65, 0.78, 0.95)
 
 var _panel: PanelContainer
 var _is_open: bool = false

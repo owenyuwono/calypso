@@ -60,7 +60,7 @@ func _build_ui() -> void:
 	# Zone name label
 	_zone_name_label = Label.new()
 	_zone_name_label.add_theme_font_size_override("font_size", 32)
-	_zone_name_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_zone_name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.92))
 	_zone_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_zone_name_label.add_theme_constant_override("shadow_offset_x", 2)
 	_zone_name_label.add_theme_constant_override("shadow_offset_y", 2)
@@ -82,14 +82,14 @@ func _build_ui() -> void:
 	_progress_bar.show_percentage = false
 
 	var bg_style: StyleBoxFlat = StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.15, 0.12, 0.1)
+	bg_style.bg_color = Color(0.12, 0.12, 0.14)
 	bg_style.corner_radius_top_left = 4
 	bg_style.corner_radius_top_right = 4
 	bg_style.corner_radius_bottom_left = 4
 	bg_style.corner_radius_bottom_right = 4
 
 	var fill_style: StyleBoxFlat = StyleBoxFlat.new()
-	fill_style.bg_color = Color(0.85, 0.7, 0.2)
+	fill_style.bg_color = Color(0.65, 0.78, 0.95)
 	fill_style.corner_radius_top_left = 4
 	fill_style.corner_radius_top_right = 4
 	fill_style.corner_radius_bottom_left = 4

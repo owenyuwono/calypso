@@ -23,9 +23,9 @@ var _quit_btn: Button
 var _cursor_hand: TextureRect
 var _slider_editing: bool = false
 
-const COLOR_ACTIVE := Color(0.788, 0.659, 0.298)  # #c9a84c
-const COLOR_INACTIVE := Color(0.533, 0.533, 0.533)  # #888888
-const COLOR_HIGHLIGHT_BORDER := Color(0.788, 0.659, 0.298, 0.8)
+const COLOR_ACTIVE := Color(0.65, 0.78, 0.95)
+const COLOR_INACTIVE := Color(0.45, 0.45, 0.48)
+const COLOR_HIGHLIGHT_BORDER := Color(0.65, 0.78, 0.95, 0.5)
 
 
 func _ready() -> void:

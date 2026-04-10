@@ -7,8 +7,8 @@ const MAP_RADIUS := 30.0  # world units visible around player
 const BORDER := 2.0
 const UPDATE_INTERVAL := 0.3
 
-const COLOR_BG := Color(0.1, 0.1, 0.15, 0.85)
-const COLOR_BORDER := Color(0.4, 0.35, 0.2)
+const COLOR_BG := Color(0.08, 0.08, 0.1, 0.88)
+const COLOR_BORDER := Color(0.28, 0.28, 0.32, 0.5)
 
 var _timer: float = 0.0
 var _dots: Array = []  # [{pos: Vector2, color: Color, radius: float, is_player: bool}]

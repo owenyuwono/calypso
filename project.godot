@@ -26,6 +26,7 @@ GameEvents="*res://autoloads/game_events.gd"
 TimeManager="*res://autoloads/time_manager.gd"
 ZoneManager="*res://autoloads/zone_manager.gd"
 AudioManager="*res://autoloads/audio_manager.gd"
+ResourceManager="*res://autoloads/resource_manager.gd"
 
 [display]
 

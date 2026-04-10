@@ -81,10 +81,13 @@ var _auto_attack: Node
 var _perception: Node
 var _stamina: Node
 var _ammo: Node
+var _needs: Node
 
 # Child subsystem nodes
 var _hover: Node
 var _debug_block_ring: MeshInstance3D = null
+var _meter_panel: Node
+var _device_panel: Node
 
 # UI references (set by main scene setup)
 var game_menu: Node
@@ -174,6 +177,11 @@ func _ready() -> void:
 	add_child(ammo_comp)
 	ammo_comp.setup("player", 12, 1.5, 48)
 	_ammo = ammo_comp
+
+	var needs_comp := preload("res://scripts/components/needs_component.gd").new()
+	needs_comp.name = "NeedsComponent"
+	add_child(needs_comp)
+	_needs = needs_comp
 
 	# Hover subsystem
 	_hover = preload("res://scenes/player/player_hover.gd").new()
@@ -778,10 +786,56 @@ func _interact_with_nearest() -> void:
 	var target_node := WorldState.get_entity(target_id)
 	if not target_node or not is_instance_valid(target_node):
 		return
-	# Additional interact types (npc, door, etc.) handled by their own systems
+	match etype:
+		"electric_meter":
+			_open_meter_panel("electricity")
+		"water_meter":
+			_open_meter_panel("water")
+		"device":
+			var device_id: String = data.get("device_id", "")
+			if not device_id.is_empty():
+				_open_device_panel(device_id)
+
+func _open_meter_panel(meter_type: String) -> void:
+	if _meter_panel and is_instance_valid(_meter_panel):
+		_meter_panel.queue_free()
+	var MeterPanel = preload("res://scenes/ui/meter_panel.gd")
+	_meter_panel = Control.new()
+	_meter_panel.set_script(MeterPanel)
+	_meter_panel.name = "MeterPanel"
+	_meter_panel.anchor_right = 1.0
+	_meter_panel.anchor_bottom = 1.0
+	var ui_layer: CanvasLayer = get_tree().root.get_node_or_null("Main/UILayer")
+	if ui_layer:
+		ui_layer.add_child(_meter_panel)
+	else:
+		get_tree().root.add_child(_meter_panel)
+	_meter_panel.setup(meter_type)
+	_meter_panel.open()
+
+func _open_device_panel(device_id: String) -> void:
+	if _device_panel and is_instance_valid(_device_panel):
+		_device_panel.queue_free()
+	var DevicePanel = preload("res://scenes/ui/device_panel.gd")
+	_device_panel = Control.new()
+	_device_panel.set_script(DevicePanel)
+	_device_panel.name = "DevicePanel"
+	_device_panel.anchor_right = 1.0
+	_device_panel.anchor_bottom = 1.0
+	var ui_layer: CanvasLayer = get_tree().root.get_node_or_null("Main/UILayer")
+	if ui_layer:
+		ui_layer.add_child(_device_panel)
+	else:
+		get_tree().root.add_child(_device_panel)
+	_device_panel.setup(device_id)
+	_device_panel.open()
 
 func _is_ui_open() -> bool:
 	if game_menu and game_menu.is_open():
+		return true
+	if _meter_panel and is_instance_valid(_meter_panel) and _meter_panel.is_open():
+		return true
+	if _device_panel and is_instance_valid(_device_panel) and _device_panel.is_open():
 		return true
 	return false
 

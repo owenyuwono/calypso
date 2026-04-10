@@ -2,21 +2,22 @@ extends Control
 ## BotW-style full-screen menu with a horizontal tab bar.
 ## Builds its entire scene tree in code.
 
-enum Tab { STATUS, INVENTORY, SYSTEM }
+enum Tab { STATUS, INVENTORY, BASE, SYSTEM }
 
-const TAB_NAMES: Array = ["Status", "Inventory", "System"]
+const TAB_NAMES: Array = ["Status", "Inventory", "Base", "System"]
 
 # Panel builder scripts — one per Tab enum value
 const StatusPanel = preload("res://scenes/ui/status_panel.gd")
 const InventoryPanel = preload("res://scenes/ui/inventory_panel.gd")
+const BasePanel = preload("res://scenes/ui/base_panel.gd")
 const SettingsPanel = preload("res://scenes/ui/settings_panel.gd")
 
 # Styling constants
-const _COLOR_TAB_BG_INACTIVE := Color(0.12, 0.1, 0.08, 0.9)
-const _COLOR_TAB_BG_ACTIVE := Color(0.25, 0.2, 0.1, 0.95)
-const _COLOR_BORDER_INACTIVE := Color(0.4, 0.35, 0.2)
-const _COLOR_BORDER_ACTIVE := Color(1.0, 0.85, 0.3)
-const _TAB_BUTTON_MIN_SIZE := Vector2(120, 40)
+const _COLOR_TAB_BG_INACTIVE := Color(0.1, 0.1, 0.12, 0.7)
+const _COLOR_TAB_BG_ACTIVE := Color(0.15, 0.15, 0.18, 0.95)
+const _COLOR_BORDER_INACTIVE := Color(0.25, 0.25, 0.3, 0.3)
+const _COLOR_BORDER_ACTIVE := Color(0.65, 0.78, 0.95, 0.8)
+const _TAB_BUTTON_MIN_SIZE := Vector2(110, 36)
 
 var _player: Node
 var _last_active_tab: int = Tab.STATUS
@@ -49,13 +50,13 @@ func _build_tab_styles() -> void:
 	_tab_style_inactive.bg_color = _COLOR_TAB_BG_INACTIVE
 	_tab_style_inactive.border_color = _COLOR_BORDER_INACTIVE
 	UIHelper.set_border_width(_tab_style_inactive, 1)
-	UIHelper.set_corner_radius(_tab_style_inactive, 4)
+	UIHelper.set_corner_radius(_tab_style_inactive, 5)
 
 	_tab_style_active = StyleBoxFlat.new()
 	_tab_style_active.bg_color = _COLOR_TAB_BG_ACTIVE
 	_tab_style_active.border_color = _COLOR_BORDER_ACTIVE
-	UIHelper.set_border_width(_tab_style_active, 2)
-	UIHelper.set_corner_radius(_tab_style_active, 4)
+	UIHelper.set_border_width(_tab_style_active, 1)
+	UIHelper.set_corner_radius(_tab_style_active, 5)
 
 
 func _build_ui() -> void:
@@ -120,7 +121,7 @@ func _build_ui() -> void:
 	# --- Divider between tab bar and content ---
 	var divider: ColorRect = ColorRect.new()
 	divider.name = "TabDivider"
-	divider.color = Color(0.6, 0.5, 0.2, 0.6)
+	divider.color = Color(0.3, 0.3, 0.35, 0.3)
 	divider.custom_minimum_size = Vector2(0, 2)
 	divider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(divider)
@@ -169,8 +170,8 @@ func _create_tab_button(label_text: String, index: int) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.custom_minimum_size = _TAB_BUTTON_MIN_SIZE
-	btn.add_theme_font_override("font", UIHelper.GAME_FONT_DISPLAY)
-	btn.add_theme_font_size_override("font_size", 18)
+	btn.add_theme_font_override("font", UIHelper.GAME_FONT)
+	btn.add_theme_font_size_override("font_size", 15)
 	btn.add_theme_stylebox_override("normal", _tab_style_inactive)
 	btn.add_theme_stylebox_override("hover", _tab_style_inactive)
 	btn.add_theme_stylebox_override("pressed", _tab_style_active)
@@ -188,6 +189,7 @@ func _setup_builders() -> void:
 	var builder_scripts: Array = [
 		StatusPanel,
 		InventoryPanel,
+		BasePanel,
 		SettingsPanel,
 	]
 
@@ -275,10 +277,10 @@ func _apply_tab_styles(active_index: int) -> void:
 		var btn: Button = _tab_buttons[i]
 		if i == active_index:
 			btn.add_theme_stylebox_override("normal", _tab_style_active)
-			btn.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+			btn.add_theme_color_override("font_color", Color(0.9, 0.9, 0.92))
 		else:
 			btn.add_theme_stylebox_override("normal", _tab_style_inactive)
-			btn.add_theme_color_override("font_color", Color(0.75, 0.7, 0.6))
+			btn.add_theme_color_override("font_color", Color(0.5, 0.5, 0.53))
 
 
 func _input(event: InputEvent) -> void:

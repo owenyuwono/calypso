@@ -2,14 +2,20 @@ class_name UIHelper
 extends RefCounted
 ## Shared UI utilities for panel styles and common UI setup patterns.
 
-# Shared color constants
-const COLOR_GOLD := Color(1, 0.85, 0.3)
-const COLOR_HEADER := Color(1, 0.9, 0.6)
-const COLOR_EQUIPMENT := Color(0.7, 0.85, 1.0)
-const COLOR_DISABLED := Color(0.5, 0.5, 0.5)
+# Shared color constants — modern minimal palette
+const COLOR_ACCENT := Color(0.65, 0.78, 0.95)
+const COLOR_HEADER := Color(0.9, 0.9, 0.92)
+const COLOR_EQUIPMENT := Color(0.65, 0.78, 0.95)
+const COLOR_DISABLED := Color(0.4, 0.4, 0.42)
+const COLOR_TEXT := Color(0.82, 0.82, 0.84)
+const COLOR_TEXT_DIM := Color(0.5, 0.5, 0.53)
+const COLOR_BORDER := Color(0.28, 0.28, 0.32, 0.5)
+const COLOR_DIVIDER := Color(0.3, 0.3, 0.35, 0.3)
+const COLOR_BG := Color(0.08, 0.08, 0.1, 0.94)
+# Legacy alias
+const COLOR_GOLD := COLOR_ACCENT
 
 const GAME_FONT: FontFile = preload("res://assets/fonts/Marcellus-Regular.ttf")
-const GAME_FONT_BOLD: FontFile = preload("res://assets/fonts/Marcellus-Regular.ttf")
 const GAME_FONT_DISPLAY: FontFile = preload("res://assets/fonts/Philosopher-Bold.ttf")
 
 static func center_panel(panel: PanelContainer) -> void:
@@ -51,24 +57,16 @@ static func create_titled_panel(title: String, size: Vector2, close_callback: Ca
 
 	return {"panel": panel, "vbox": vbox, "drag_handle": drag_handle}
 
-static var _panel_texture: Texture2D = null
-
-static func create_panel_style(_bg_color: Color = Color.BLACK, _border_color: Color = Color.BLACK) -> StyleBoxTexture:
-	if _panel_texture == null:
-		_panel_texture = load("res://assets/textures/ui/panel/frame.png")
-	var style := StyleBoxTexture.new()
-	style.texture = _panel_texture
-	var margin: float = 6.0
-	style.texture_margin_left = margin
-	style.texture_margin_right = margin
-	style.texture_margin_top = margin
-	style.texture_margin_bottom = margin
-	style.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
-	style.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
-	style.content_margin_left = 20
-	style.content_margin_right = 20
-	style.content_margin_top = 20
-	style.content_margin_bottom = 20
+static func create_panel_style(bg_color: Color = COLOR_BG, border_color: Color = COLOR_BORDER) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_color = border_color
+	set_border_width(style, 1)
+	set_corner_radius(style, 6)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
 	return style
 
 ## Creates a TextureRect icon from a texture path.

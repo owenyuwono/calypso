@@ -23,3 +23,13 @@ signal ammo_changed(entity_id: String, magazine_current: int, magazine_max: int,
 signal reload_started(entity_id: String)
 signal reload_finished(entity_id: String)
 signal combat_mode_changed(entity_id: String, mode: String)
+
+# Resources
+signal resources_updated(snapshot: Dictionary)
+signal resource_depleted(resource_type: String)
+signal device_shutdown(device_id: String, device_type: String)
+signal grid_status_changed(connected: bool)
+
+# Personal needs
+signal needs_changed(needs: Dictionary)
+signal need_critical(need_type: String)

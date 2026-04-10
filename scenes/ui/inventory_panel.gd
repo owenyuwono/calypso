@@ -24,24 +24,24 @@ var _slot_icons: Dictionary = {}  # slot_name -> Texture2D
 
 const TYPE_ORDER := {"weapon": 0, "armor": 1, "consumable": 2, "material": 3}
 const TYPE_COLORS := {
-	"consumable": Color(0.18, 0.4, 0.18),
-	"weapon":     Color(0.35, 0.32, 0.25),
-	"armor":      Color(0.2, 0.25, 0.38),
-	"material":   Color(0.4, 0.32, 0.2),
+	"consumable": Color(0.15, 0.22, 0.18),
+	"weapon":     Color(0.2, 0.18, 0.16),
+	"armor":      Color(0.16, 0.18, 0.24),
+	"material":   Color(0.2, 0.18, 0.14),
 }
 
 const EQUIP_SLOT_COLORS: Dictionary = {
-	"main_hand": Color(0.35, 0.3, 0.2),
-	"off_hand":  Color(0.2, 0.25, 0.35),
+	"main_hand": Color(0.18, 0.16, 0.14),
+	"off_hand":  Color(0.14, 0.16, 0.2),
 }
-const EQUIP_SLOT_COLOR_DEFAULT := Color(0.22, 0.2, 0.28)
+const EQUIP_SLOT_COLOR_DEFAULT := Color(0.14, 0.14, 0.16)
 
 const WEAPON_COLORS: Dictionary = {
-	"sword":  Color(0.9, 0.85, 0.3),
-	"axe":    Color(0.8, 0.4, 0.2),
-	"mace":   Color(0.6, 0.6, 0.7),
-	"dagger": Color(0.4, 0.8, 0.4),
-	"staff":  Color(0.5, 0.4, 0.9),
+	"sword":  Color(0.65, 0.78, 0.95),
+	"axe":    Color(0.9, 0.55, 0.35),
+	"mace":   Color(0.6, 0.6, 0.65),
+	"dagger": Color(0.4, 0.75, 0.55),
+	"staff":  Color(0.6, 0.5, 0.85),
 }
 
 const STAT_ICON_DIR := "res://assets/textures/ui/stats/"
@@ -135,7 +135,7 @@ func _build_ui() -> void:
 
 	# --- Item detail section below grid ---
 	var detail_sep := HSeparator.new()
-	detail_sep.add_theme_color_override("separator", Color(0.4, 0.35, 0.25, 0.5))
+	detail_sep.add_theme_color_override("separator", Color(0.3, 0.3, 0.35, 0.3))
 	items_vbox.add_child(detail_sep)
 
 	_detail_container = VBoxContainer.new()
@@ -293,8 +293,8 @@ func _update_mesh_preview() -> void:
 func _build_context_menu() -> void:
 	_context_menu = PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.06, 0.05, 0.97)
-	style.border_color = Color(0.55, 0.45, 0.25)
+	style.bg_color = Color(0.08, 0.08, 0.1, 0.97)
+	style.border_color = Color(0.35, 0.35, 0.4)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(4)
 	style.content_margin_left = 4
@@ -477,8 +477,8 @@ func _build_equip_cell_empty(slot_name: String, cell_size: int) -> Control:
 	cell.custom_minimum_size = Vector2(cell_size, cell_size)
 	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.09, 0.07)
-	style.border_color = Color(0.25, 0.22, 0.18)
+	style.bg_color = Color(0.1, 0.1, 0.12)
+	style.border_color = Color(0.22, 0.22, 0.25)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(5)
 	cell.add_theme_stylebox_override("panel", style)
@@ -509,7 +509,7 @@ func _build_equip_cell_filled(slot_name: String, item_id: String, cell_size: int
 	var slot_color: Color = EQUIP_SLOT_COLORS.get(slot_name, EQUIP_SLOT_COLOR_DEFAULT)
 	var style := StyleBoxFlat.new()
 	style.bg_color = slot_color
-	style.border_color = Color(0.6, 0.5, 0.3)
+	style.border_color = Color(0.4, 0.45, 0.55)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(5)
 	cell.add_theme_stylebox_override("panel", style)
@@ -560,7 +560,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = type_color
-	style.border_color = Color(0.4, 0.35, 0.28)
+	style.border_color = Color(0.28, 0.28, 0.32)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(5)
 	cell.add_theme_stylebox_override("panel", style)
@@ -620,7 +620,7 @@ func _build_cell(item_id: String, count: int) -> Control:
 		var count_label := Label.new()
 		count_label.text = "x%d" % count
 		count_label.add_theme_font_size_override("font_size", 15)
-		count_label.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+		count_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.92))
 		badge.add_child(count_label)
 		cell.add_child(badge)
 
@@ -633,7 +633,7 @@ func _build_empty_cell() -> Control:
 	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
 	cell.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.09, 0.07)
+	style.bg_color = Color(0.1, 0.1, 0.12)
 	style.border_color = Color(0.22, 0.2, 0.16)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(5)
@@ -697,7 +697,7 @@ func _update_detail(item_id: String) -> void:
 		var desc_label := Label.new()
 		desc_label.text = desc_text
 		desc_label.add_theme_font_size_override("font_size", 17)
-		desc_label.add_theme_color_override("font_color", Color(0.65, 0.6, 0.5))
+		desc_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.53))
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_detail_container.add_child(desc_label)
 
@@ -707,17 +707,17 @@ func _update_detail(item_id: String) -> void:
 	_detail_container.add_child(stats_row)
 
 	if item.has("atk_bonus"):
-		_add_detail_stat(stats_row, "ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
+		_add_detail_stat(stats_row, "ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.35))
 	if item.has("def_bonus"):
-		_add_detail_stat(stats_row, "DEF", "+%d" % item["def_bonus"], Color(0.3, 0.6, 0.9))
+		_add_detail_stat(stats_row, "DEF", "+%d" % item["def_bonus"], Color(0.45, 0.65, 0.9))
 	if item.has("heal"):
-		_add_detail_stat(stats_row, "Heal", "%d HP" % item["heal"], Color(0.3, 0.8, 0.3))
+		_add_detail_stat(stats_row, "Heal", "%d HP" % item["heal"], Color(0.4, 0.75, 0.55))
 	if item.has("weapon_type"):
 		_add_detail_stat(stats_row, "Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
 	if item.has("attack_speed"):
-		_add_detail_stat(stats_row, "Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
+		_add_detail_stat(stats_row, "Speed", "%.1f" % item["attack_speed"], Color(0.5, 0.75, 0.6))
 	if item.has("value"):
-		_add_detail_stat(stats_row, "Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
+		_add_detail_stat(stats_row, "Value", "%dg" % item["value"], Color(0.65, 0.78, 0.95))
 
 func _add_detail_stat(parent: HBoxContainer, label_text: String, value_text: String, color: Color) -> void:
 	var pair := HBoxContainer.new()
