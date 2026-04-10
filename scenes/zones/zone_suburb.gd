@@ -99,7 +99,7 @@ func _spawn_zombies() -> void:
 	var spawner: Node = ZombieSpawner.new()
 	add_child(spawner)
 	spawner.add_exclusion_zone(Vector3.ZERO, 18.0)  # keep zombies out of the 20x30 lot
-	spawner.setup(self, Vector3.ZERO, 6, 45.0)
+	spawner.setup(self, Vector3.ZERO, 106, 45.0)
 
 func _build_suburb_lot() -> void:
 	_ctx = WorldBuilderContext.new()

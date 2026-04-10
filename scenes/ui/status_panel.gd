@@ -4,17 +4,11 @@ extends Control
 const _STAT_ICONS: Dictionary = {
 	"HP": "res://assets/textures/ui/stats/stat_hp.png",
 	"ATK": "res://assets/textures/ui/stats/stat_atk.png",
-	"MATK": "res://assets/textures/ui/stats/stat_matk.png",
 	"DEF": "res://assets/textures/ui/stats/stat_def.png",
-	"MDEF": "res://assets/textures/ui/stats/stat_mdef.png",
-	"Crit Rate": "res://assets/textures/ui/stats/stat_crit_rate.png",
-	"Crit Dmg": "res://assets/textures/ui/stats/stat_crit_dmg.png",
 	"Atk Speed": "res://assets/textures/ui/stats/stat_atk_speed.png",
 	"Move Spd": "res://assets/textures/ui/stats/stat_move_spd.png",
-	"Cast Spd": "res://assets/textures/ui/stats/stat_cast_spd.png",
 	"Stamina": "res://assets/textures/ui/stats/stat_stamina.png",
 	"HP Regen": "res://assets/textures/ui/stats/stat_hp_regen.png",
-	"CDR": "res://assets/textures/ui/stats/stat_cdr.png",
 }
 
 const _COLOR_BONUS: Color = Color(0.4, 0.9, 0.4)
@@ -31,27 +25,19 @@ var _level_label: Label
 # Offensive stats
 var _atk_value: Label
 var _atk_bonus: Label
-var _matk_value: Label
-var _matk_bonus: Label
-var _crit_rate_value: Label
-var _crit_dmg_value: Label
 
 # Defensive stats
 var _hp_value: Label
 var _def_value: Label
 var _def_bonus: Label
-var _mdef_value: Label
-var _mdef_bonus: Label
 
 # Speed stats
 var _atk_speed_value: Label
 var _move_speed_value: Label
-var _cast_speed_value: Label
 
 # Resource stats
 var _stamina_value: Label
 var _hp_regen_value: Label
-var _cdr_value: Label
 
 
 func _ready() -> void:
@@ -106,19 +92,6 @@ func _build_ui() -> void:
 	_atk_bonus = atk_row.bonus
 	left_col.add_child(atk_row.container)
 
-	var matk_row := _create_stat_row("MATK", true)
-	_matk_value = matk_row.value
-	_matk_bonus = matk_row.bonus
-	left_col.add_child(matk_row.container)
-
-	var crit_row := _create_stat_row("Crit Rate", false)
-	_crit_rate_value = crit_row.value
-	left_col.add_child(crit_row.container)
-
-	var critdmg_row := _create_stat_row("Crit Dmg", false)
-	_crit_dmg_value = critdmg_row.value
-	left_col.add_child(critdmg_row.container)
-
 	left_col.add_child(HSeparator.new())
 	_add_column_header(left_col, "Defensive")
 
@@ -130,11 +103,6 @@ func _build_ui() -> void:
 	_def_value = def_row.value
 	_def_bonus = def_row.bonus
 	left_col.add_child(def_row.container)
-
-	var mdef_row := _create_stat_row("MDEF", true)
-	_mdef_value = mdef_row.value
-	_mdef_bonus = mdef_row.bonus
-	left_col.add_child(mdef_row.container)
 
 	# Column divider
 	stats_columns.add_child(VSeparator.new())
@@ -155,10 +123,6 @@ func _build_ui() -> void:
 	_move_speed_value = mspd_row.value
 	right_col.add_child(mspd_row.container)
 
-	var cspd_row := _create_stat_row("Cast Spd", false)
-	_cast_speed_value = cspd_row.value
-	right_col.add_child(cspd_row.container)
-
 	right_col.add_child(HSeparator.new())
 	_add_column_header(right_col, "Resource")
 
@@ -169,10 +133,6 @@ func _build_ui() -> void:
 	var hpregen_row := _create_stat_row("HP Regen", false)
 	_hp_regen_value = hpregen_row.value
 	right_col.add_child(hpregen_row.container)
-
-	var cdr_row := _create_stat_row("CDR", false)
-	_cdr_value = cdr_row.value
-	right_col.add_child(cdr_row.container)
 
 
 # Header without a leading separator — used for the first section at the top of a column.
@@ -264,13 +224,6 @@ func refresh() -> void:
 	_atk_value.text = str(stats.atk)
 	_atk_bonus.text = "+%d" % atk_bonus if atk_bonus > 0 else ""
 
-	var matk_bonus: int = equip.get_matk_bonus()
-	_matk_value.text = str(stats.matk)
-	_matk_bonus.text = "+%d" % matk_bonus if matk_bonus > 0 else ""
-
-	_crit_rate_value.text = "%d%%" % stats.crit_rate
-	_crit_dmg_value.text = "%d%%" % stats.crit_damage
-
 	# --- Defensive ---
 	_hp_value.text = "%d / %d" % [stats.hp, stats.max_hp]
 	_hp_value.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if stats.hp < stats.max_hp else Color.WHITE)
@@ -279,14 +232,9 @@ func refresh() -> void:
 	_def_value.text = str(stats.def)
 	_def_bonus.text = "+%d" % def_bonus if def_bonus > 0 else ""
 
-	var mdef_bonus: int = equip.get_mdef_bonus()
-	_mdef_value.text = str(stats.mdef)
-	_mdef_bonus.text = "+%d" % mdef_bonus if mdef_bonus > 0 else ""
-
 	# --- Speed ---
 	_atk_speed_value.text = "%.2f×" % stats.attack_speed_mult
 	_move_speed_value.text = "%.2f×" % stats.move_speed
-	_cast_speed_value.text = "%.2f×" % stats.cast_speed
 
 	# --- Resource ---
 	var stamina_comp: Node = _player.get_node_or_null("StaminaComponent")
@@ -297,9 +245,6 @@ func refresh() -> void:
 
 	var hp_regen: float = stats.hp_regen
 	_hp_regen_value.text = "%.1f/sec" % hp_regen if hp_regen > 0.0 else "0/sec"
-
-	var cdr: float = stats.cooldown_reduction
-	_cdr_value.text = "%d%%" % int(cdr)
 
 
 func is_open() -> bool:

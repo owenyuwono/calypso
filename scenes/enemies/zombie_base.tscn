@@ -3,8 +3,8 @@
 [ext_resource type="Script" path="res://scenes/enemies/zombie_base.gd" id="1_script"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
-radius = 0.4
-height = 1.8
+radius = 0.6
+height = 2.2
 
 [node name="ZombieBase" type="CharacterBody3D"]
 script = ExtResource("1_script")
@@ -16,5 +16,5 @@ target_desired_distance = 1.0
 path_desired_distance = 1.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
 shape = SubResource("CapsuleShape3D_1")

@@ -13,16 +13,10 @@ var level: int = 1
 var attack_speed: float = DEFAULT_ATTACK_SPEED
 var attack_range: float = DEFAULT_ATTACK_RANGE
 
-var matk: int = 0
-var mdef: int = 0
-var crit_rate: int = 5        # percentage
-var crit_damage: int = 150    # percentage (150 = 1.5×)
 var move_speed: float = 1.0   # multiplier
-var cast_speed: float = 1.0   # multiplier
 var max_stamina: float = 100.0
 var stamina_regen: float = 1.0 # multiplier
 var hp_regen: float = 0.0     # per second (out of combat only)
-var cooldown_reduction: float = 0.0  # percentage, capped 30
 var attack_speed_mult: float = 1.0   # multiplier (effective_cd = attack_speed / attack_speed_mult)
 
 func setup(stats: Dictionary) -> void:
@@ -30,21 +24,13 @@ func setup(stats: Dictionary) -> void:
 	max_hp = stats.get("max_hp", 0)
 	atk = stats.get("atk", 0)
 	def = stats.get("def", 0)
-	# level now represents total proficiency level (sum of all skill levels).
-	# Default 19 = 19 proficiency skills each starting at level 1.
-	level = stats.get("level", 19)
+	level = stats.get("level", 1)
 	attack_speed = stats.get("attack_speed", DEFAULT_ATTACK_SPEED)
 	attack_range = stats.get("attack_range", DEFAULT_ATTACK_RANGE)
-	matk = stats.get("matk", 0)
-	mdef = stats.get("mdef", 0)
-	crit_rate = stats.get("crit_rate", 5)
-	crit_damage = stats.get("crit_damage", 150)
 	move_speed = stats.get("move_speed", 1.0)
-	cast_speed = stats.get("cast_speed", 1.0)
 	max_stamina = stats.get("max_stamina", 100.0)
 	stamina_regen = stats.get("stamina_regen", 1.0)
 	hp_regen = stats.get("hp_regen", 0.0)
-	cooldown_reduction = stats.get("cooldown_reduction", 0.0)
 	attack_speed_mult = stats.get("attack_speed_mult", 1.0)
 
 func is_alive() -> bool:
@@ -78,14 +64,8 @@ func _sync() -> void:
 	WorldState.set_entity_data(eid, "level", level)
 	WorldState.set_entity_data(eid, "attack_speed", attack_speed)
 	WorldState.set_entity_data(eid, "attack_range", attack_range)
-	WorldState.set_entity_data(eid, "matk", matk)
-	WorldState.set_entity_data(eid, "mdef", mdef)
-	WorldState.set_entity_data(eid, "crit_rate", crit_rate)
-	WorldState.set_entity_data(eid, "crit_damage", crit_damage)
 	WorldState.set_entity_data(eid, "move_speed", move_speed)
-	WorldState.set_entity_data(eid, "cast_speed", cast_speed)
 	WorldState.set_entity_data(eid, "max_stamina", max_stamina)
 	WorldState.set_entity_data(eid, "stamina_regen", stamina_regen)
 	WorldState.set_entity_data(eid, "hp_regen", hp_regen)
-	WorldState.set_entity_data(eid, "cooldown_reduction", cooldown_reduction)
 	WorldState.set_entity_data(eid, "attack_speed_mult", attack_speed_mult)

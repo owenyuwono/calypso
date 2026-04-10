@@ -11,10 +11,8 @@ const VELOCITY_THRESHOLD: float = 0.5
 
 const FATIGUE_MIN_MULTIPLIERS: Dictionary = {
 	"atk": 0.90,
-	"matk": 0.90,
 	"move_speed": 0.80,
 	"attack_speed": 0.85,
-	"cast_speed": 0.85
 }
 
 var _rest_spots: Array = []

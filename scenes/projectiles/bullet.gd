@@ -66,7 +66,7 @@ func _physics_process(delta: float) -> void:
 	# Raycast from previous position to current position to detect hits
 	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(prev_pos, global_position)
-	query.collision_mask = 1 | (1 << 8)  # physics + perception
+	query.collision_mask = (1 << 8)  # perception layer only (entities) — passes through fences/terrain
 	if shooter_rid.is_valid():
 		query.exclude = [shooter_rid]
 	var result: Dictionary = space_state.intersect_ray(query)
@@ -110,23 +110,11 @@ func _deal_damage(hit_id: String, hit_body: Node, hit_pos: Vector3) -> void:
 
 	var damage: int = maxi(1, int(raw * phys_mod))
 
-	var crit_result: Dictionary = shooter_combat.roll_crit()
-	var is_crit: bool = crit_result["is_crit"]
-	if is_crit and damage > 0:
-		damage = maxi(1, int(damage * crit_result["multiplier"]))
-
-	var hit_type: String = "normal"
-	if phys_mod >= 1.5:
-		hit_type = "weak"
-	elif phys_mod <= 0.5:
-		hit_type = "resist"
-
 	var actual: int = shooter_combat.apply_flat_damage_to(hit_id, damage)
 	if actual > 0:
 		HitVFX.spawn_hit_effect(self, hit_pos, direction)
 		var visuals: Node = shooter_node.get_node_or_null("EntityVisuals")
 		if visuals:
-			visuals.spawn_styled_damage_number(hit_id, actual, hit_type, is_crit, hit_pos)
 			visuals.flash_target(hit_id)
 
 

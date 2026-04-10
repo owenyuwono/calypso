@@ -710,19 +710,12 @@ func _update_detail(item_id: String) -> void:
 		_add_detail_stat(stats_row, "ATK", "+%d" % item["atk_bonus"], Color(0.9, 0.5, 0.3))
 	if item.has("def_bonus"):
 		_add_detail_stat(stats_row, "DEF", "+%d" % item["def_bonus"], Color(0.3, 0.6, 0.9))
-	if item.has("matk_bonus"):
-		_add_detail_stat(stats_row, "MATK", "+%d" % item["matk_bonus"], Color(0.6, 0.4, 0.9))
-	if item.has("mdef_bonus"):
-		_add_detail_stat(stats_row, "MDEF", "+%d" % item["mdef_bonus"], Color(0.4, 0.5, 0.9))
 	if item.has("heal"):
 		_add_detail_stat(stats_row, "Heal", "%d HP" % item["heal"], Color(0.3, 0.8, 0.3))
 	if item.has("weapon_type"):
 		_add_detail_stat(stats_row, "Type", item["weapon_type"].capitalize(), WEAPON_COLORS.get(item["weapon_type"], Color.WHITE))
 	if item.has("attack_speed"):
 		_add_detail_stat(stats_row, "Speed", "%.1f" % item["attack_speed"], Color(0.6, 0.8, 0.6))
-	if item.has("required_skill") and item.has("required_level"):
-		var req_text: String = "%s Lv. %d" % [item["required_skill"].capitalize(), item["required_level"]]
-		_add_detail_stat(stats_row, "Requires", req_text, Color(0.7, 0.6, 0.4))
 	if item.has("value"):
 		_add_detail_stat(stats_row, "Value", "%dg" % item["value"], Color(0.8, 0.7, 0.3))
 

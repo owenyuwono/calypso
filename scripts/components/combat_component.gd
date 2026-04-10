@@ -118,25 +118,8 @@ func get_effective_def() -> int:
 		base += _equipment.get_def_bonus()
 	return base
 
-func get_effective_matk() -> int:
-	var base: int = _stats.matk
-	if _equipment:
-		base += _equipment.get_matk_bonus()
-	return base
-
-func get_effective_mdef() -> int:
-	var base: int = _stats.mdef
-	if _equipment:
-		base += _equipment.get_mdef_bonus()
-	return base
-
 func get_armor_type() -> String:
 	return _equipment.get_armor_type() if _equipment else "light"
-
-func roll_crit() -> Dictionary:
-	var is_crit: bool = randf() < (_stats.crit_rate / 100.0)
-	var multiplier: float = _stats.crit_damage / 100.0
-	return {"is_crit": is_crit, "multiplier": multiplier}
 
 func get_attack_speed_multiplier() -> float:
 	## Returns the speed multiplier for the equipped weapon.
@@ -217,6 +200,9 @@ func _apply_damage_to(target_id: String, damage: int) -> int:
 	if final_damage > 0:
 		target_stats.take_damage(final_damage)
 	GameEvents.entity_damaged.emit(target_id, attacker_id, final_damage, target_stats.hp)
+	# Direct notification to target (avoids broadcast signal filtering issues)
+	if target_entity.has_method("on_hit"):
+		target_entity.on_hit(attacker_id, final_damage)
 	if not target_stats.is_alive():
 		GameEvents.entity_died.emit(target_id, attacker_id)
 	return final_damage

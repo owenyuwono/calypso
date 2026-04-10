@@ -58,7 +58,7 @@ var _combat_mode: String = "melee"  # "melee" or "gun"
 var _gun_cooldown_timer: float = 0.0
 var _player_yaw: float = 0.0  # mouse-controlled facing angle
 const MOUSE_SENSITIVITY: float = 0.003
-var _gun_fire_rate: float = 0.3  # seconds between shots
+var _gun_fire_rate: float = 0.12  # seconds between shots
 var _crosshair: Label = null
 var _mode_label: Label = null
 var _mode_label_timer: float = 0.0
@@ -71,7 +71,7 @@ const COMBO_WINDOW: float = 0.4
 
 # Idle variation
 var _idle_timer: float = 0.0
-var _idle_next_variation: float = 0.0
+var _idle_next_variation: float = 8.0
 const IDLE_ANIMS: PackedStringArray = ["Idle", "Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3"]
 const IDLE_RARE_ANIMS: PackedStringArray = ["Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look"]
 const IDLE_TIRED_ANIMS: PackedStringArray = ["Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck"]
@@ -117,10 +117,10 @@ func _ready() -> void:
 	_audio.setup(self)
 
 	var base_stats: Dictionary = {
-		"hp": 50, "max_hp": 50, "atk": 5, "def": 3, "matk": 5, "mdef": 3,
-		"crit_rate": 5, "crit_damage": 150, "attack_speed": 1.5, "attack_speed_mult": 1.0,
-		"attack_range": 2.5, "move_speed": 1.0, "cast_speed": 1.0,
-		"max_stamina": 100, "stamina_regen": 1.0, "hp_regen": 0.0, "cooldown_reduction": 0,
+		"hp": 50, "max_hp": 50, "atk": 5, "def": 3,
+		"attack_speed": 1.5, "attack_speed_mult": 1.0,
+		"attack_range": 2.5, "move_speed": 1.0,
+		"max_stamina": 100, "stamina_regen": 1.0, "hp_regen": 0.0,
 		"level": 1, "gold": 100,
 	}
 
@@ -282,6 +282,10 @@ func _physics_process(delta: float) -> void:
 	# Face mouse cursor — raycast from camera through mouse position to ground plane (Y=0)
 	_update_facing_to_mouse()
 
+	# Auto-fire gun while holding left mouse button
+	if _combat_mode == "gun" and not _is_ui_open() and not _combat.is_blocking() and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_fire_gun()
+
 	var is_moving := false
 
 	# WASD input (camera-relative direct movement)
@@ -408,7 +412,10 @@ func _physics_process(delta: float) -> void:
 	if not _is_attacking and _attack_target.is_empty():
 		if is_moving:
 			_idle_timer = 0.0
-			_visuals.play_anim("Running")
+			# Check actual AnimationPlayer state to avoid desyncs
+			var ap: AnimationPlayer = _visuals.get_anim_player() if _visuals else null
+			if not ap or ap.current_animation != "Running" or not ap.is_playing():
+				_visuals.play_anim("Running")
 		else:
 			_idle_timer += delta
 			if _idle_timer >= _idle_next_variation:
@@ -442,13 +449,9 @@ func _process_combat(delta: float) -> bool:
 	var result: Dictionary = _auto_attack.process_attack(
 		delta, _attack_target, global_position, effective_move_speed, attack_range, effective_attack_speed
 	)
-	# Keep locked target's HP bar updated
-	if not _attack_target.is_empty():
-		_show_target_hp_bar(_attack_target)
 	return result.get("is_moving", false)
 
 func _cancel_attack() -> void:
-	_hide_target_hp_bar(_attack_target)
 	_attack_target = ""
 	_auto_attack.cancel()
 	_combo_step = 0
@@ -612,20 +615,8 @@ func _resolve_melee_hit() -> void:
 		if target_resistances.has(phys_type):
 			resist_mod = _RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
 
-		# Combine modifiers and determine hit_type label
 		var combined_mod: float = phys_mod * resist_mod
-		var hit_type: String = "normal"
-		if combined_mod >= 1.5:
-			hit_type = "weak"
-		elif combined_mod <= 0.5 and combined_mod > 0.0:
-			hit_type = "resist"
-
 		var damage: int = maxi(1, int(raw_damage * combined_mod)) if combined_mod > 0.0 else 0
-
-		# Crit check (skip on 0 damage)
-		var crit_result: Dictionary = _combat.roll_crit()
-		if crit_result["is_crit"] and damage > 0:
-			damage = maxi(1, int(damage * crit_result["multiplier"]))
 
 		# Apply damage — use actual damage dealt (respects block/parry)
 		var actual_damage: int = 0
@@ -635,11 +626,10 @@ func _resolve_melee_hit() -> void:
 				_hitstop_timer = 0.1
 				hit_landed = true
 
-		# VFX, damage numbers and flash
+		# VFX and flash
 		if actual_damage > 0:
 			var hit_vfx_pos: Vector3 = target_node.global_position + Vector3(0, 1.0, 0)
 			HitVFX.spawn_hit_effect(self, hit_vfx_pos, facing)
-			_visuals.spawn_styled_damage_number(eid, actual_damage, hit_type, crit_result["is_crit"] and actual_damage > 0, target_pos)
 			_visuals.flash_target(eid)
 
 		# SFX
@@ -706,25 +696,6 @@ func _show_mode_label() -> void:
 	_mode_label_timer = 1.5
 
 
-func _show_target_hp_bar(target_id: String) -> void:
-	var target: Node3D = WorldState.get_entity(target_id)
-	if target:
-		var visuals: Node = target.get_node_or_null("EntityVisuals")
-		if visuals:
-			var stats: Node = target.get_node_or_null("StatsComponent")
-			if stats:
-				visuals.set_hp_bar_visible(true)
-				visuals.update_hp_bar_combat(stats.hp, stats.max_hp, true)
-
-func _hide_target_hp_bar(target_id: String) -> void:
-	if target_id.is_empty():
-		return
-	var target: Node3D = WorldState.get_entity(target_id)
-	if target:
-		var visuals: Node = target.get_node_or_null("EntityVisuals")
-		if visuals:
-			visuals.set_hp_bar_visible(false)
-
 func _get_approach_pos(target_pos: Vector3, standoff: float) -> Vector3:
 	var offset: Vector3 = global_position - target_pos
 	offset.y = 0.0
@@ -764,6 +735,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			if _combat_mode == "gun":
 				_fire_gun()
+				# Longer initial cooldown so a single click doesn't double-fire
+				# (click duration ~0.15s > normal fire_rate 0.12s)
+				_gun_cooldown_timer = maxf(_gun_cooldown_timer, 0.25)
 				get_viewport().set_input_as_handled()
 				return
 			if _is_attacking:
@@ -878,18 +852,15 @@ func _on_damage_defended(target_id: String, _attacker_id: String, _amount_negate
 		_visuals.set_state_tint(Color(0.0, 1.0, 1.0, 0.7))
 		var tween := create_tween()
 		tween.tween_callback(_restore_block_tint).set_delay(0.3)
-		_spawn_defense_text("PARRY", Color(0.0, 1.0, 1.0))
 		if _audio:
 			_audio.play_oneshot("combat_parry")
 	elif defense_type == "blocked":
-		_spawn_defense_text("BLOCK", Color(0.7, 0.8, 1.0))
 		if _audio:
 			_audio.play_oneshot("combat_block")
 	elif defense_type == "guard_break":
 		_visuals.set_state_tint(Color(1.0, 0.2, 0.1, 0.5))
 		var tween := create_tween()
 		tween.tween_callback(_visuals.clear_overlay).set_delay(0.5)
-		_spawn_defense_text("GUARD BREAK", Color(1.0, 0.3, 0.1))
 		if _audio:
 			_audio.play_oneshot("combat_guard_break")
 
@@ -922,13 +893,6 @@ func _restore_block_tint() -> void:
 			_visuals.set_state_tint(Color(0.3, 0.5, 1.0, 0.4))
 	else:
 		_visuals.clear_overlay()
-
-func _spawn_defense_text(text: String, color: Color) -> void:
-	var dmg_scene: PackedScene = preload("res://scenes/ui/damage_number.tscn")
-	var dmg: Node3D = dmg_scene.instantiate()
-	get_tree().current_scene.add_child(dmg)
-	dmg.global_position = global_position + Vector3(0, 2.2, 0)
-	dmg.setup_text(text, color)
 
 func _pick_idle_anim() -> String:
 	# If stamina is low, use tired idles

@@ -9,7 +9,6 @@ var _mesh_instances: Array[MeshInstance3D] = []
 var _overlay_material: StandardMaterial3D
 var _anim_player: AnimationPlayer
 var _current_anim: String = ""
-var _hp_bar: Node3D
 var _mesh_path: String = ""
 var _anim_paths: Dictionary = {}
 var _weapon_attachment: BoneAttachment3D
@@ -196,45 +195,6 @@ func _show_weapon() -> void:
 func _hide_weapon() -> void:
 	if _weapon_mesh and is_instance_valid(_weapon_mesh):
 		_weapon_mesh.visible = false
-
-# --- HP Bar ---
-
-func setup_hp_bar(y_offset: float = 1.8, entity_name: String = "") -> void:
-	_hp_bar = ModelHelper.create_hp_bar(get_parent(), y_offset)
-	if _hp_bar and not entity_name.is_empty() and _hp_bar.has_method("set_entity_name"):
-		_hp_bar.set_entity_name(entity_name)
-	if _hp_bar:
-		_hp_bar.visible = false
-
-func update_hp_bar(hp: int, max_hp: int) -> void:
-	ModelHelper.update_entity_hp_bar(_hp_bar, hp, max_hp)
-
-func update_hp_bar_combat(hp: int, max_hp: int, in_combat: bool) -> void:
-	if _hp_bar:
-		if _hp_bar.has_method("update_bar"):
-			_hp_bar.update_bar(hp, max_hp)
-		_hp_bar.visible = in_combat or hp < max_hp
-
-func set_hp_bar_visible(vis: bool) -> void:
-	if _hp_bar:
-		_hp_bar.visible = vis
-
-func hide_hp_bar_keep_name() -> void:
-	if _hp_bar:
-		_hp_bar.visible = true
-		if _hp_bar.has_method("set_bar_visible"):
-			_hp_bar.set_bar_visible(false)
-
-# --- Damage / Combat Visuals ---
-
-func spawn_damage_number(target_id: String, damage: int, color: Color = Color(1, 1, 1), target_pos: Vector3 = Vector3.ZERO) -> void:
-	var parent: Node3D = get_parent()
-	ModelHelper.spawn_damage_number(parent, target_id, damage, color, parent.global_position, target_pos)
-
-func spawn_styled_damage_number(target_id: String, damage: int, hit_type: String, is_crit: bool, target_pos: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
-	var parent: Node3D = get_parent()
-	var attacker_pos: Vector3 = parent.global_position if parent else target_pos
-	ModelHelper.spawn_styled_damage_number(parent, target_id, damage, hit_type, is_crit, attacker_pos, target_pos, color_override)
 
 func flash_target(target_id: String) -> void:
 	var target_node: Node = WorldState.get_entity(target_id)

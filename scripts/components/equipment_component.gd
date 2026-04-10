@@ -82,26 +82,6 @@ func get_def_bonus() -> int:
 		total += item.get("def_bonus", 0)
 	return total
 
-func get_matk_bonus() -> int:
-	var total: int = 0
-	for slot_name in _slots:
-		var item_id: String = _slots[slot_name]
-		if item_id.is_empty():
-			continue
-		var item: Dictionary = ItemDatabase.get_item(item_id)
-		total += item.get("matk_bonus", 0)
-	return total
-
-func get_mdef_bonus() -> int:
-	var total: int = 0
-	for slot_name in _slots:
-		var item_id: String = _slots[slot_name]
-		if item_id.is_empty():
-			continue
-		var item: Dictionary = ItemDatabase.get_item(item_id)
-		total += item.get("mdef_bonus", 0)
-	return total
-
 func get_armor_type() -> String:
 	var torso_id: String = _slots.get("torso", "")
 	if torso_id.is_empty():

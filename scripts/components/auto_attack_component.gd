@@ -8,7 +8,8 @@ signal attack_started(target_id: String)
 signal attack_landed(target_id: String, damage: int, target_pos: Vector3)
 signal target_lost()
 
-const ATTACK_ANIM: String = "1H_Melee_Attack_Chop"
+var attack_anim: String = "Attack"
+var chase_anim: String = "Running"
 
 # Armor/phys-type resistance table (inlined from deleted SkillEffectResolver)
 const _RESISTANCE_MULTIPLIERS: Dictionary = {
@@ -35,6 +36,7 @@ func setup(visuals: Node, combat: Node, nav_agent: Node) -> void:
 	_visuals = visuals
 	_combat = combat
 	_nav_agent = nav_agent
+	_attack_timer = randf()  # stagger so groups don't all attack on the same frame
 
 ## Process one frame of auto-attack logic.
 ## owner_pos: attacker's global_position
@@ -94,7 +96,7 @@ func process_attack(
 	# Resolve pending hit via animation position or fallback countdown
 	var anim_player: AnimationPlayer = _visuals.get_anim_player()
 	if _pending_hit:
-		if anim_player and anim_player.current_animation == ATTACK_ANIM:
+		if anim_player and anim_player.current_animation == attack_anim:
 			if anim_player.current_animation_position >= _hit_time:
 				_pending_hit = false
 				_fire_hit(target_id, target_node)
@@ -110,9 +112,9 @@ func process_attack(
 		_attack_timer += delta
 		if _attack_timer >= attack_speed:
 			_attack_timer = 0.0
-			_visuals.play_anim(ATTACK_ANIM, true)
+			_visuals.play_anim(attack_anim, true)
 			_pending_hit = true
-			_hit_time = _visuals.get_hit_delay(ATTACK_ANIM)
+			_hit_time = _visuals.get_hit_delay(attack_anim)
 			attack_started.emit(target_id)
 
 	return {"is_moving": false, "is_chasing": false}
@@ -149,7 +151,7 @@ func _chase(delta: float, target_node: Node3D, move_speed: float, speed_multipli
 				parent.velocity.x = lerpf(parent.velocity.x, target_vx, delta * 8.0)
 				parent.velocity.z = lerpf(parent.velocity.z, target_vz, delta * 8.0)
 				_visuals.face_direction(dir)
-				_visuals.play_anim("Running_A")
+				_visuals.play_anim(chase_anim)
 
 func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	# Re-validate target hasn't died between animation start and hit point
@@ -181,25 +183,11 @@ func _fire_hit(target_id: String, target_node: Node3D) -> void:
 	if target_resistances.has(phys_type):
 		resist_mod = _RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
 
-	# Combine modifiers and determine hit_type
 	var combined_mod: float = phys_mod * resist_mod
-	var hit_type: String = "normal"
-	if combined_mod >= 1.5:
-		hit_type = "weak"
-	elif combined_mod <= 0.5 and combined_mod > 0.0:
-		hit_type = "resist"
-
 	var damage: int = maxi(1, int(raw_damage * combined_mod)) if combined_mod > 0.0 else 0
-
-	# Crit check (no crit on 0 damage)
-	var crit_result: Dictionary = _combat.roll_crit()
-	if crit_result["is_crit"] and damage > 0:
-		damage = maxi(1, int(damage * crit_result["multiplier"]))
 
 	# Apply and emit — use actual damage dealt (0 if parried, reduced if blocked)
 	var actual_damage: int = 0
 	if damage > 0:
 		actual_damage = _combat.apply_flat_damage_to(target_id, damage)
-	if actual_damage > 0:
-		_visuals.spawn_styled_damage_number(target_id, actual_damage, hit_type, crit_result["is_crit"] and actual_damage > 0, target_pos)
 	attack_landed.emit(target_id, actual_damage, target_pos)

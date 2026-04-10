@@ -21,15 +21,26 @@ const DEFAULT_ANIM_PATHS: Dictionary = {
 	"Idle_Tired_Neck": "res://assets/animation/player/idle_tired_neck_stretch.fbx",
 }
 
+const ZOMBIE_ANIM_PATHS: Dictionary = {
+	"Walk": "res://assets/animation/zombie/walk.fbx",
+	"Attack": "res://assets/animation/zombie/attack_bite.fbx",
+	"Hit": "res://assets/animation/zombie/hit.fbx",
+	"Death": "res://assets/animation/zombie/death.fbx",
+}
+
 const ANIM_WHITELIST: PackedStringArray = [
-	"Idle", "Running", "Attack", "Attack_Slash_02", "Punch_01", "Punch_02", "Hit", "Death_A", "RESET",
+	"Idle", "Running", "Walk", "Attack", "Attack_Slash_02", "Punch_01", "Punch_02", "Hit", "Death", "Death_A", "RESET",
 	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",
 	"Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look",
 	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",
 ]
 
+const STRIP_ROOT_MOTION_ANIMS: PackedStringArray = [
+	"Walk",
+]
+
 const LOOP_ANIMS: PackedStringArray = [
-	"Idle", "Running",
+	"Idle", "Running", "Walk",
 	"Idle_Breathing", "Idle_Breathing_2", "Idle_Breathing_3",
 	"Idle_Rare_Happy", "Idle_Rare_Bored", "Idle_Rare_Looking", "Idle_Rare_Look",
 	"Idle_Tired_Sweat", "Idle_Tired_Shoulder", "Idle_Tired_Neck",
@@ -63,6 +74,13 @@ static func instantiate_model(path: String, scale_val: float) -> Dictionary:
 	instance.scale = Vector3.ONE * scale_val
 	var anim_player := find_animation_player(instance)
 	if anim_player:
+		# Deep-duplicate animation libraries so each instance owns independent copies.
+		# Without this, all instances from the same cached PackedScene share the same
+		# AnimationLibrary resource — modifying one (add/remove/loop_mode) disrupts all.
+		for lib_name in anim_player.get_animation_library_list():
+			var shared_lib: AnimationLibrary = anim_player.get_animation_library(lib_name)
+			anim_player.remove_animation_library(lib_name)
+			anim_player.add_animation_library(lib_name, shared_lib.duplicate(true))
 		# Rescue the first animation as "Idle" before stripping — FBX files
 		# import with internal names (e.g. "mixamo.com") that aren't in the whitelist.
 		_rescue_first_anim_as_idle(anim_player)
@@ -141,12 +159,17 @@ static func instantiate_model_with_anims(mesh_path: String, anim_paths: Dictiona
 		var lib: AnimationLibrary = anim_player.get_animation_library("")
 		lib.add_animation("Idle", idle_anim)
 
-	# Set loop mode on animations that should loop (idle variants, running)
+	# Set loop mode and strip root motion from locomotion animations
 	for lib_name in anim_player.get_animation_library_list():
 		var anim_lib: AnimationLibrary = anim_player.get_animation_library(lib_name)
 		for anim_name in anim_lib.get_animation_list():
-			if String(anim_name) in LOOP_ANIMS:
+			var name_str: String = String(anim_name)
+			if name_str in LOOP_ANIMS:
 				anim_lib.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+			else:
+				anim_lib.get_animation(anim_name).loop_mode = Animation.LOOP_NONE
+			if name_str in STRIP_ROOT_MOTION_ANIMS:
+				_strip_root_motion(anim_lib.get_animation(anim_name))
 
 	return result
 
@@ -163,6 +186,7 @@ static func _rescue_first_anim_as_idle(anim_player: AnimationPlayer) -> void:
 				continue
 			var anim: Animation = anim_lib.get_animation(anim_name)
 			anim_lib.remove_animation(anim_name)
+			anim.loop_mode = Animation.LOOP_LINEAR
 			anim_lib.add_animation("Idle", anim)
 			return
 
@@ -262,6 +286,20 @@ static func _remap_mixamo_animation(animation: Animation, target_model: Node3D) 
 
 		# Set remapped path: target skeleton path + remapped bone name
 		animation.track_set_path(i, NodePath(tgt_skel_path + ":" + bone))
+
+## Zero out XZ root motion on the root bone (Hips) position track, keeping Y for vertical bounce.
+static func _strip_root_motion(animation: Animation) -> void:
+	for i in animation.get_track_count():
+		if animation.track_get_type(i) != Animation.TYPE_POSITION_3D:
+			continue
+		var path: String = String(animation.track_get_path(i).get_concatenated_subnames())
+		if "Hips" not in path:
+			continue
+		# Zero out XZ on each keyframe, keep Y
+		for k in animation.track_get_key_count(i):
+			var pos: Vector3 = animation.track_get_key_value(i, k)
+			animation.track_set_key_value(i, k, Vector3(0.0, pos.y, 0.0))
+		return
 
 static func strip_unused_animations(anim_player: AnimationPlayer, keep_list: PackedStringArray = ANIM_WHITELIST) -> void:
 	for lib_name in anim_player.get_animation_library_list():
@@ -399,63 +437,6 @@ static func apply_toon_to_model(root: Node) -> void:
 
 # --- Consolidated Utility Functions ---
 
-## Spawn a floating damage number above a target entity.
-## caller is needed because static functions can't call get_tree().
-static func spawn_damage_number(caller: Node, target_id: String, damage: int, color: Color = Color(1, 1, 1), attacker_pos: Vector3 = Vector3.ZERO, target_pos: Vector3 = Vector3.ZERO) -> void:
-	# Skip damage numbers for off-screen combat: only spawn if attacker or target is within 30m of player.
-	const CULL_DISTANCE_SQ: float = 900.0  # 30m^2
-	var player_node: Node = WorldState.get_entity("player")
-	if player_node and is_instance_valid(player_node):
-		var player_pos: Vector3 = player_node.global_position
-		var attacker_in_range: bool = attacker_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
-		var target_in_range: bool = target_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
-		if not attacker_in_range and not target_in_range:
-			return
-	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
-	if not dmg_scene:
-		return
-	var dmg := dmg_scene.instantiate()
-	caller.get_tree().current_scene.add_child(dmg)
-	# Compute direction away from attacker on XZ plane
-	var direction := Vector3.ZERO
-	if attacker_pos.length_squared() > 0.01:
-		direction = target_pos - attacker_pos
-		direction.y = 0
-		if direction.length_squared() > 0.01:
-			direction = direction.normalized()
-	# Spawn offset to the side (in the away-from-attacker direction), not on top of target
-	var spawn_offset := direction * 1.0 if direction.length_squared() > 0.01 else Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
-	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
-	dmg.setup(damage, color, direction)
-
-## Spawn a styled floating damage number above a target entity.
-## hit_type: "normal" | "weak" | "resist" | "miss"
-## is_crit: whether the hit was a critical strike (affects style selection)
-static func spawn_styled_damage_number(caller: Node, target_id: String, damage: int, hit_type: String, is_crit: bool, attacker_pos: Vector3, target_pos: Vector3, color_override: Color = Color(-1, -1, -1)) -> void:
-	# Same culling logic as spawn_damage_number (30m from player)
-	const CULL_DISTANCE_SQ: float = 900.0  # 30m^2
-	var player_node: Node = WorldState.get_entity("player")
-	if player_node and is_instance_valid(player_node):
-		var player_pos: Vector3 = player_node.global_position
-		var attacker_in_range: bool = attacker_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
-		var target_in_range: bool = target_pos.distance_squared_to(player_pos) <= CULL_DISTANCE_SQ
-		if not attacker_in_range and not target_in_range:
-			return
-	var dmg_scene := load_model("res://scenes/ui/damage_number.tscn")
-	if not dmg_scene:
-		return
-	var dmg := dmg_scene.instantiate()
-	caller.get_tree().current_scene.add_child(dmg)
-	# Compute direction away from attacker on XZ plane
-	var direction := Vector3.ZERO
-	if attacker_pos.length_squared() > 0.01:
-		direction = target_pos - attacker_pos
-		direction.y = 0
-		if direction.length_squared() > 0.01:
-			direction = direction.normalized()
-	var spawn_offset := direction * 1.0 if direction.length_squared() > 0.01 else Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
-	dmg.global_position = target_pos + Vector3(0, 1.5, 0) + spawn_offset
-	dmg.setup_styled(damage, hit_type, is_crit, direction, color_override)
 
 ## Flash-hit the target entity (calls its flash_hit() method if available).
 static func flash_target(target_node: Node) -> void:
@@ -526,15 +507,6 @@ static func create_procedural_sword() -> Node3D:
 
 	return root
 
-## Create and attach an HP bar above an entity.
-static func create_hp_bar(parent: Node3D, y_offset: float = 1.8) -> Node:
-	var hp_bar_scene := load_model("res://scenes/ui/hp_bar_3d.tscn")
-	if not hp_bar_scene:
-		return null
-	var hp_bar := hp_bar_scene.instantiate()
-	hp_bar.position.y = y_offset
-	parent.add_child(hp_bar)
-	return hp_bar
 
 ## Face a model toward a direction vector.
 static func face_direction(model: Node3D, dir: Vector3) -> void:
@@ -547,11 +519,4 @@ static func get_hit_delay(anim_player: AnimationPlayer, anim_name: String) -> fl
 		return anim_player.get_animation(anim_name).length * 0.5
 	return 0.4
 
-## Update an entity's HP bar with the given hp and max_hp values.
-## Visibility is managed by the entity's combat state via update_hp_bar_combat().
-static func update_entity_hp_bar(hp_bar: Node, hp: int, max_hp: int) -> void:
-	if not hp_bar:
-		return
-	if hp_bar.has_method("update_bar"):
-		hp_bar.update_bar(hp, max_hp)
 
