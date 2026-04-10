@@ -7,6 +7,12 @@ var _player: Node
 var _time_label: Label
 var _stats: Node
 var _stamina_comp: Node
+var _ammo_comp: Node
+var _ammo_panel: PanelContainer
+var _ammo_label: Label
+var _reserve_label: Label
+var _reload_label: Label
+var _ammo_flash_tween: Tween
 
 const UIHelper = preload("res://scripts/utils/ui_helper.gd")
 
@@ -26,6 +32,10 @@ func _ready() -> void:
 	GameEvents.entity_respawned.connect(func(id): _refresh_if_player(id))
 	GameEvents.stamina_changed.connect(_on_stamina_changed)
 	GameEvents.game_hour_changed.connect(_on_game_hour_changed)
+	GameEvents.ammo_changed.connect(_on_ammo_changed)
+	GameEvents.reload_started.connect(_on_reload_started)
+	GameEvents.reload_finished.connect(_on_reload_finished)
+	GameEvents.combat_mode_changed.connect(_on_combat_mode_changed)
 	# Initial refresh
 	_refresh_all()
 
@@ -60,6 +70,9 @@ func _build_ui() -> void:
 	hbox.add_child(_sta_bar)
 
 	add_child(hbox)
+
+	# Ammo counter — bottom-right, visible only in gun mode
+	_build_ammo_panel()
 
 	# Time panel — separate panel to the left of the minimap
 	_build_time_panel()
@@ -98,10 +111,43 @@ func _create_styled_bar(fill_color: Color, bg_color: Color, fill_border: Color, 
 
 	return bar
 
+func _build_ammo_panel() -> void:
+	_ammo_panel = PanelContainer.new()
+	_ammo_panel.add_theme_stylebox_override("panel", UIHelper.create_panel_style())
+	_ammo_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	_ammo_panel.add_child(vbox)
+
+	_ammo_label = UIHelper.create_label("12 / 12", 18, UIHelper.COLOR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	vbox.add_child(_ammo_label)
+
+	_reserve_label = UIHelper.create_label("Reserve: 48", 12, Color(0.7, 0.65, 0.5), HORIZONTAL_ALIGNMENT_CENTER)
+	vbox.add_child(_reserve_label)
+
+	_reload_label = UIHelper.create_label("RELOADING...", 14, Color(1.0, 0.9, 0.4), HORIZONTAL_ALIGNMENT_CENTER)
+	_reload_label.visible = false
+	vbox.add_child(_reload_label)
+
+	# Anchor bottom-right
+	_ammo_panel.anchor_left = 1.0
+	_ammo_panel.anchor_right = 1.0
+	_ammo_panel.anchor_top = 1.0
+	_ammo_panel.anchor_bottom = 1.0
+	_ammo_panel.offset_left = -140.0
+	_ammo_panel.offset_right = -10.0
+	_ammo_panel.offset_top = -100.0
+	_ammo_panel.offset_bottom = -10.0
+
+	_ammo_panel.visible = false
+	add_child(_ammo_panel)
+
 func set_player(p: Node) -> void:
 	_player = p
 	_stats = p.get_node_or_null("StatsComponent")
 	_stamina_comp = p.get_node_or_null("StaminaComponent")
+	_ammo_comp = p.get_node_or_null("AmmoComponent")
 	_refresh_all()
 
 func _refresh_all() -> void:
@@ -141,4 +187,47 @@ func _refresh_stamina() -> void:
 
 func _refresh_time() -> void:
 	_time_label.text = "%s - Day %d (%s)" % [TimeManager.get_time_display(), TimeManager.get_day(), TimeManager.get_phase()]
+
+func _on_ammo_changed(entity_id: String, magazine_current: int, magazine_max: int, reserve: int) -> void:
+	if entity_id != "player":
+		return
+	_ammo_label.text = "%d / %d" % [magazine_current, magazine_max]
+	_reserve_label.text = "Reserve: %d" % reserve
+
+	# Red flash when low ammo
+	if magazine_current <= 3 and magazine_current > 0:
+		_ammo_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+		if _ammo_flash_tween:
+			_ammo_flash_tween.kill()
+		_ammo_flash_tween = create_tween()
+		_ammo_flash_tween.tween_property(_ammo_label, "theme_override_colors/font_color", UIHelper.COLOR_GOLD, 0.3).set_delay(0.2)
+	elif magazine_current == 0:
+		_ammo_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
+	else:
+		_ammo_label.add_theme_color_override("font_color", UIHelper.COLOR_GOLD)
+
+	# Red reserve label when empty
+	if reserve <= 0:
+		_reserve_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	else:
+		_reserve_label.add_theme_color_override("font_color", Color(0.7, 0.65, 0.5))
+
+func _on_reload_started(entity_id: String) -> void:
+	if entity_id != "player":
+		return
+	_reload_label.visible = true
+	_ammo_label.visible = false
+
+func _on_reload_finished(entity_id: String) -> void:
+	if entity_id != "player":
+		return
+	_reload_label.visible = false
+	_ammo_label.visible = true
+
+func _on_combat_mode_changed(entity_id: String, mode: String) -> void:
+	if entity_id != "player":
+		return
+	_ammo_panel.visible = mode == "gun"
+	if mode == "gun" and _ammo_comp:
+		_on_ammo_changed("player", _ammo_comp.get_magazine_current(), _ammo_comp.get_magazine_max(), _ammo_comp.get_reserve())
 

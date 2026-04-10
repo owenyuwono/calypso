@@ -17,3 +17,9 @@ signal game_hour_changed(hour: int)
 
 # Stamina
 signal stamina_changed(entity_id: String, stamina: float, max_stamina: float)
+
+# Ammo
+signal ammo_changed(entity_id: String, magazine_current: int, magazine_max: int, reserve: int)
+signal reload_started(entity_id: String)
+signal reload_finished(entity_id: String)
+signal combat_mode_changed(entity_id: String, mode: String)

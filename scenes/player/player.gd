@@ -19,15 +19,7 @@ const PerceptionComponent = preload("res://scripts/components/perception_compone
 const SfxDatabase = preload("res://scripts/audio/sfx_database.gd")
 const HitVFX = preload("res://scripts/vfx/hit_vfx.gd")
 
-# Armor/phys-type resistance table (inlined from deleted SkillEffectResolver)
-const _RESISTANCE_MULTIPLIERS: Dictionary = {
-	"fatal": 2.0, "weak": 1.5, "neutral": 1.0, "resist": 0.5, "immune": 0.0
-}
-const _ARMOR_PHYS_TYPE_TABLE: Dictionary = {
-	"heavy":  {"slash": "resist", "pierce": "neutral", "blunt": "weak"},
-	"medium": {"slash": "neutral", "pierce": "weak",   "blunt": "neutral"},
-	"light":  {"slash": "weak",   "pierce": "neutral", "blunt": "neutral"},
-}
+const ItemDatabase = preload("res://scripts/data/item_database.gd")
 
 var entity_id: String = "player"
 
@@ -88,6 +80,7 @@ var _combat: Node
 var _auto_attack: Node
 var _perception: Node
 var _stamina: Node
+var _ammo: Node
 
 # Child subsystem nodes
 var _hover: Node
@@ -175,6 +168,12 @@ func _ready() -> void:
 	add_child(perception_comp)
 	perception_comp.setup()
 	_perception = perception_comp
+
+	var ammo_comp := preload("res://scripts/components/ammo_component.gd").new()
+	ammo_comp.name = "AmmoComponent"
+	add_child(ammo_comp)
+	ammo_comp.setup("player", 12, 1.5, 48)
+	_ammo = ammo_comp
 
 	# Hover subsystem
 	_hover = preload("res://scenes/player/player_hover.gd").new()
@@ -605,15 +604,15 @@ func _resolve_melee_hit() -> void:
 		# Physical type modifier (weapon phys_type vs target armor type)
 		var phys_type: String = _combat.get_equipped_phys_type()
 		var armor_type: String = target_combat.get_armor_type() if target_combat else "light"
-		var armor_table: Dictionary = _ARMOR_PHYS_TYPE_TABLE.get(armor_type, {})
+		var armor_table: Dictionary = ItemDatabase.ARMOR_PHYS_TYPE_TABLE.get(armor_type, {})
 		var phys_level: String = armor_table.get(phys_type, "neutral")
-		var phys_mod: float = _RESISTANCE_MULTIPLIERS.get(phys_level, 1.0)
+		var phys_mod: float = ItemDatabase.RESISTANCE_MULTIPLIERS.get(phys_level, 1.0)
 
 		# Element resistance (auto-attacks use target's per-phys_type resistance)
 		var target_resistances: Dictionary = edata.get("resistances", {})
 		var resist_mod: float = 1.0
 		if target_resistances.has(phys_type):
-			resist_mod = _RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
+			resist_mod = ItemDatabase.RESISTANCE_MULTIPLIERS.get(target_resistances[phys_type], 1.0)
 
 		var combined_mod: float = phys_mod * resist_mod
 		var damage: int = maxi(1, int(raw_damage * combined_mod)) if combined_mod > 0.0 else 0
@@ -645,6 +644,10 @@ func _fire_gun() -> void:
 		return
 	if not _stats or not _stats.is_alive():
 		return
+	if not _ammo.try_consume():
+		if not _ammo.is_reloading() and _ammo.get_reserve() > 0:
+			_ammo.start_reload()
+		return
 
 	_gun_cooldown_timer = _gun_fire_rate
 	_visuals.play_anim("Punch_01", true, 3.0)
@@ -667,6 +670,10 @@ func _fire_gun() -> void:
 	bullet.atk = _combat.get_effective_atk()
 	get_tree().current_scene.add_child(bullet)
 	bullet.global_position = muzzle_pos
+
+	# Auto-reload when magazine empties
+	if _ammo.get_magazine_current() <= 0 and _ammo.get_reserve() > 0:
+		_ammo.start_reload()
 
 
 func _spawn_muzzle_flash(pos: Vector3) -> void:
@@ -723,7 +730,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_combat_mode = "melee"
 			_crosshair.visible = false
+			_ammo.cancel_reload()
+		GameEvents.combat_mode_changed.emit("player", _combat_mode)
 		_show_mode_label()
+		get_viewport().set_input_as_handled()
+		return
+
+	if event is InputEventKey and event.pressed and event.keycode == KEY_R and _combat_mode == "gun":
+		_ammo.start_reload()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -784,6 +798,7 @@ func _die() -> void:
 	_is_dead = true
 	_cancel_attack()
 	_stop_navigation()
+	_ammo.cancel_reload()
 	velocity = Vector3.ZERO
 	if _audio:
 		_audio.play_oneshot("combat_death")
